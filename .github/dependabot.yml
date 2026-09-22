@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "deps"
+    ignore:
+      # De AutoCAD.NET-referentie is bewust per AutoCAD-versie vastgezet (25.0 voor 2025,
+      # 25.1 voor 2026, 26.0 voor 2027). Een automatische bump zou de 2025-build op de
+      # 2026-referentie zetten; die update handmatig bij een nieuwe AutoCAD-versie.
+      - dependency-name: "AutoCAD.NET"

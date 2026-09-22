@@ -1,0 +1,38 @@
+name: Bug melden
+description: Meld een probleem met de plugin
+labels: [bug]
+body:
+  - type: textarea
+    id: wat
+    attributes:
+      label: Wat gebeurt er?
+      description: Beschrijf het probleem en wat je verwachtte.
+    validations:
+      required: true
+  - type: textarea
+    id: stappen
+    attributes:
+      label: Stappen om te reproduceren
+      placeholder: |
+        1. Commando ...
+        2. Optie ...
+        3. Resultaat ...
+    validations:
+      required: true
+  - type: input
+    id: versie
+    attributes:
+      label: AutoCAD-/Civil 3D-versie
+      placeholder: "Civil 3D 2027"
+    validations:
+      required: true
+  - type: input
+    id: plugin
+    attributes:
+      label: Versie van de plugin
+      placeholder: "v1.6.0"
+  - type: textarea
+    id: lagen
+    attributes:
+      label: Voorbeeldlaagnamen (optioneel)
+      description: Plak enkele NLCS-laagnamen die met het probleem te maken hebben.

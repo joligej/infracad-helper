@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-core:
+    name: Test kernlogica
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore tests/NlcsLegenda.Core.Tests/NlcsLegenda.Core.Tests.csproj
+      - name: Test
+        run: dotnet test tests/NlcsLegenda.Core.Tests/NlcsLegenda.Core.Tests.csproj -c Release --no-restore --collect:"XPlat Code Coverage" --results-directory coverage
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage/**/coverage.cobertura.xml
+          if-no-files-found: ignore
+
+  build-plugin:
+    name: Bouw plugin (AutoCAD ${{ matrix.acad }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - acad: '2025'
+            tfm: net8.0-windows
+          - acad: '2026'
+            tfm: net8.0-windows
+          - acad: '2027'
+            tfm: net10.0-windows
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Build plugin (NuGet AutoCAD-referenties)
+        run: dotnet build src/NlcsLegenda.Plugin/NlcsLegenda.Plugin.csproj -c Release -p:AcadVersion=${{ matrix.acad }} -p:UseNuGetAcad=true
+      - name: Upload plugin
+        uses: actions/upload-artifact@v7
+        with:
+          name: NlcsLegenda-plugin-${{ matrix.acad }}
+          path: |
+            src/NlcsLegenda.Plugin/bin/Release/${{ matrix.tfm }}/NlcsLegenda.dll
+            src/NlcsLegenda.Plugin/bin/Release/${{ matrix.tfm }}/NlcsLegenda.Core.dll

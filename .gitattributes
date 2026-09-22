@@ -1,0 +1,14 @@
+# Normaliseer regeleindes naar LF in de repository.
+* text=auto eol=lf
+
+# Windows-scripts houden CRLF.
+*.ps1 text eol=crlf
+
+# Binaire bestanden.
+*.dll binary
+*.dwg binary
+*.dwt binary
+*.png binary
+*.jpg binary
+*.pdf binary
+*.zip binary

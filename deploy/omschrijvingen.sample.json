@@ -1,0 +1,256 @@
+{
+  "elementen": {
+    "VH|OPENVERHARDING_BETONSTRAATSTEEN": {
+      "algemeen": "Verharding",
+      "specifiek": "Betonstraatsteen"
+    },
+    "VH|OPENVERHARDING_STRAATBAKSTEEN": {
+      "algemeen": "Verharding",
+      "specifiek": "Straatbaksteen (gebakken)"
+    },
+    "VH|OPENVERHARDING_NATUURSTEEN": {
+      "algemeen": "Verharding",
+      "specifiek": "Natuursteen"
+    },
+    "VH|OPENVERHARDING_TEGEL": {
+      "algemeen": "Verharding",
+      "specifiek": "Betontegel"
+    },
+    "VH|OPENVERHARDING_TEGEL_GRAS": {
+      "algemeen": "Verharding",
+      "specifiek": "Grastegel"
+    },
+    "VH|OPENVERHARDING_SIERBESTRATING": {
+      "algemeen": "Verharding",
+      "specifiek": "Sierbestrating"
+    },
+    "VH|GESLOTENVERHARDING_ASFALT": {
+      "algemeen": "Verharding",
+      "specifiek": "Asfaltverharding"
+    },
+    "VH|GESLOTENVERHARDING_ASFALT_FREESVAK": {
+      "algemeen": "Verharding",
+      "specifiek": "Freesvak asfalt"
+    },
+    "VH|GESLOTENVERHARDING_BETON": {
+      "algemeen": "Verharding",
+      "specifiek": "Betonverharding"
+    },
+    "VH|HALFVERHARDING_GRIND": {
+      "algemeen": "Verharding",
+      "specifiek": "Halfverharding grind"
+    },
+    "VH|HALFVERHARDING_GRAVEL": {
+      "algemeen": "Verharding",
+      "specifiek": "Halfverharding gravel"
+    },
+    "VH|HALFVERHARDING_GRASBETONSTEEN": {
+      "algemeen": "Verharding",
+      "specifiek": "Grasbetonsteen"
+    },
+    "VH|KANTOPSLUITING_TROTTOIRBAND": {
+      "algemeen": "Verharding",
+      "specifiek": "Trottoirband"
+    },
+    "VH|KANTOPSLUITING_OPSLUITBAND": {
+      "algemeen": "Verharding",
+      "specifiek": "Opsluitband"
+    },
+    "VH|KANTOPSLUITING_VOORKANTBAND": {
+      "algemeen": "Verharding",
+      "specifiek": "Voorkantband"
+    },
+    "VH|KANTOPSLUITING_ACHTERKANTBAND": {
+      "algemeen": "Verharding",
+      "specifiek": "Achterkantband"
+    },
+    "VH|KANTOPSLUITING_INRITBAND": {
+      "algemeen": "Verharding",
+      "specifiek": "Inritband"
+    },
+    "VH|KANTOPSLUITING_GELEIDEBAND": {
+      "algemeen": "Verharding",
+      "specifiek": "Geleideband"
+    },
+    "VH|KANTOPSLUITING_BUSHALTEBAND": {
+      "algemeen": "Verharding",
+      "specifiek": "Bushalteband"
+    },
+    "VH|KANTOPSLUITING_SCHEIDINGSBAND": {
+      "algemeen": "Verharding",
+      "specifiek": "Scheidingsband"
+    },
+    "VH|KANTOPSLUITING_ELEMENT_INRITBAND": {
+      "algemeen": "Verharding",
+      "specifiek": "Inritband"
+    },
+    "VH|KANTVERHARDING_STREKLAAG": {
+      "algemeen": "Verharding",
+      "specifiek": "Streklaag"
+    },
+    "VH|DREMPEL_TALUD": {
+      "algemeen": "Verharding",
+      "specifiek": "Verkeersdrempel"
+    },
+    "RI|HWA_RIOOLLEIDING": {
+      "algemeen": "Riolering",
+      "specifiek": "Hemelwaterriool"
+    },
+    "RI|VWA_RIOOLLEIDING": {
+      "algemeen": "Riolering",
+      "specifiek": "Vuilwaterriool"
+    },
+    "RI|GWA_RIOOLLEIDING": {
+      "algemeen": "Riolering",
+      "specifiek": "Gemengd riool"
+    },
+    "RI|HWA_KOLK_STRAATKOLK": {
+      "algemeen": "Riolering",
+      "specifiek": "Straatkolk (HWA)"
+    },
+    "RI|HWA_KOLK_TROTTOIRKOLK": {
+      "algemeen": "Riolering",
+      "specifiek": "Trottoirkolk (HWA)"
+    },
+    "RI|GWA_KOLK_STRAATKOLK": {
+      "algemeen": "Riolering",
+      "specifiek": "Straatkolk"
+    },
+    "RI|GWA_KOLK_TROTTOIRKOLK": {
+      "algemeen": "Riolering",
+      "specifiek": "Trottoirkolk"
+    },
+    "RI|HWA_RIOOLPUT": {
+      "algemeen": "Riolering",
+      "specifiek": "Inspectieput (HWA)"
+    },
+    "RI|HWA_RIOOLPUT_BETON": {
+      "algemeen": "Riolering",
+      "specifiek": "Betonput (HWA)"
+    },
+    "RI|HWA_RIOOLPUT_INSPECTIEPUT": {
+      "algemeen": "Riolering",
+      "specifiek": "Inspectieput (HWA)"
+    },
+    "RI|VWA_RIOOLPUT": {
+      "algemeen": "Riolering",
+      "specifiek": "Inspectieput (VWA)"
+    },
+    "RI|HWA_GOOT_MOLGOOT": {
+      "algemeen": "Riolering",
+      "specifiek": "Molgoot"
+    },
+    "RI|HWA_GOOT_LIJNGOOT": {
+      "algemeen": "Riolering",
+      "specifiek": "Lijngoot"
+    },
+    "GW|GRONDWERKLIJN_KRUIN": {
+      "algemeen": "Grondwerk",
+      "specifiek": "Grondwerklijn kruin"
+    },
+    "GW|GRONDWERKLIJN_TEEN": {
+      "algemeen": "Grondwerk",
+      "specifiek": "Grondwerklijn teen"
+    },
+    "GW|TALUDARCERING_KORT": {
+      "algemeen": "Grondwerk",
+      "specifiek": "Talud (kort)"
+    },
+    "GW|TALUDARCERING_LANG": {
+      "algemeen": "Grondwerk",
+      "specifiek": "Talud (lang)"
+    },
+    "VW|MARKERING_LANGS_STREEP_DOORGETROKKEN": {
+      "algemeen": "Verkeersvoorziening",
+      "specifiek": "Doorgetrokken streep"
+    },
+    "VW|MARKERING_LANGS_STREEP": {
+      "algemeen": "Verkeersvoorziening",
+      "specifiek": "Onderbroken streep"
+    },
+    "VW|MARKERING_DWARS_OVERSTEEK_VOETGANGERS": {
+      "algemeen": "Verkeersvoorziening",
+      "specifiek": "Voetgangersoversteek"
+    },
+    "VW|MARKERING_DWARS_OVERSTEEK_BLOKSTREEP": {
+      "algemeen": "Verkeersvoorziening",
+      "specifiek": "Blokmarkering oversteek"
+    },
+    "VW|MARKERING_DWARS_DRIEHOEK": {
+      "algemeen": "Verkeersvoorziening",
+      "specifiek": "Haaientanden"
+    },
+    "VW|MARKERING_SYMBOOL": {
+      "algemeen": "Verkeersvoorziening",
+      "specifiek": "Wegmarkering symbool"
+    },
+    "IE|MEUBILAIR_WEGMEUBILAIR_LICHTMAST": {
+      "algemeen": "Inrichtingselement",
+      "specifiek": "Lichtmast"
+    },
+    "IE|MEUBILAIR_WEGMEUBILAIR_AFVALBAK": {
+      "algemeen": "Inrichtingselement",
+      "specifiek": "Afvalbak"
+    },
+    "IE|MEUBILAIR_WEGMEUBILAIR_ZITBANK": {
+      "algemeen": "Inrichtingselement",
+      "specifiek": "Zitbank"
+    },
+    "IE|MEUBILAIR_WEGMEUBILAIR_FIETSENREK": {
+      "algemeen": "Inrichtingselement",
+      "specifiek": "Fietsenrek"
+    },
+    "IE|MEUBILAIR_WEGMEUBILAIR_ABRI": {
+      "algemeen": "Inrichtingselement",
+      "specifiek": "Abri"
+    },
+    "IE|MEUBILAIR_WEGMEUBILAIR_HALTEPAAL": {
+      "algemeen": "Inrichtingselement",
+      "specifiek": "Haltepaal"
+    },
+    "IE|MEUBILAIR_WEGMEUBILAIR_PAAL": {
+      "algemeen": "Inrichtingselement",
+      "specifiek": "Paal"
+    },
+    "IE|TERREINAFSCHEIDING_KUNSTMATIG_HEKWERK": {
+      "algemeen": "Inrichtingselement",
+      "specifiek": "Hekwerk"
+    },
+    "IE|TERREINAFSCHEIDING_KUNSTMATIG_MUUR": {
+      "algemeen": "Inrichtingselement",
+      "specifiek": "Muur"
+    },
+    "KG|GRENS_PERCEEL": {
+      "algemeen": "Kadaster",
+      "specifiek": "Perceelsgrens"
+    },
+    "KG|KADASTRAAL_BEBOUWING": {
+      "algemeen": "Kadaster",
+      "specifiek": "Kadastrale bebouwing"
+    },
+    "OG|BEBOUWING_ENTREE": {
+      "algemeen": "Ondergrond",
+      "specifiek": "Entree"
+    },
+    "OG|TERREIN_ERF": {
+      "algemeen": "Ondergrond",
+      "specifiek": "Erf"
+    },
+    "GR|BEPLANTING_CULTUUR_HEESTERS": {
+      "algemeen": "Groen",
+      "specifiek": "Heesters"
+    },
+    "GR|BEPLANTING_CULTUUR_BOSPLANTSOEN": {
+      "algemeen": "Groen",
+      "specifiek": "Bosplantsoen"
+    },
+    "GR|BEPLANTING_CULTUUR_BODEMBEDEKKER": {
+      "algemeen": "Groen",
+      "specifiek": "Bodembedekker"
+    },
+    "GR|BEPLANTING_CULTUUR_VASTE": {
+      "algemeen": "Groen",
+      "specifiek": "Vaste planten"
+    }
+  }
+}

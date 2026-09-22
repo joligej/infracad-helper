@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AcadVersion Condition="'$(AcadVersion)' == ''">2025</AcadVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- AutoCAD 2025 en 2026 draaien op .NET 8, AutoCAD 2027 op .NET 10. -->
+    <TargetFramework Condition="'$(AcadVersion)' == '2027'">net10.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>NlcsLegenda.Plugin</RootNamespace>
+    <AssemblyName>NlcsLegenda</AssemblyName>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <!-- Voor het ribbonpaneel (Autodesk.Windows is WPF-gebaseerd). -->
+    <UseWPF>true</UseWPF>
+    <!-- Voor de instellingen- en omschrijvingen-dialogen (PropertyGrid/DataGridView). -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- AutoCAD/Civil3D-DLL's worden door de host geladen; niet mee kopieren. -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <!-- Bouwen van de Windows-TFM toestaan op niet-Windows build-agents. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <!--
+    Doelversie 2025 (standaard). Overrulebaar met: dotnet build -p:AcadVersion=2027
+    Zonder lokaal geinstalleerde AutoCAD (bijv. op een build-agent) worden de
+    officiele AutoCAD.NET NuGet-referentieassemblies gebruikt.
+  -->
+  <PropertyGroup>
+    <AcadDir Condition="'$(AcadDir)' == ''">C:\Program Files\Autodesk\AutoCAD $(AcadVersion)</AcadDir>
+    <UseNuGetAcad Condition="'$(UseNuGetAcad)' == '' and !Exists('$(AcadDir)\acdbmgd.dll')">true</UseNuGetAcad>
+    <UseNuGetAcad Condition="'$(UseNuGetAcad)' == ''">false</UseNuGetAcad>
+    <AcadNetVersion Condition="'$(AcadNetVersion)' == '' and '$(AcadVersion)' == '2025'">25.0.1</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)' == '' and '$(AcadVersion)' == '2026'">25.1.0</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)' == '' and '$(AcadVersion)' == '2027'">26.0.0</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)' == ''">25.0.1</AcadNetVersion>
+  </PropertyGroup>
+
+  <!-- Optie A: NuGet-referentieassemblies (build-agents, geen AutoCAD nodig). -->
+  <ItemGroup Condition="'$(UseNuGetAcad)' == 'true'">
+    <PackageReference Include="AutoCAD.NET" Version="$(AcadNetVersion)" />
+  </ItemGroup>
+
+  <!-- Optie B: lokaal geinstalleerde AutoCAD-DLL's. -->
+  <ItemGroup Condition="'$(UseNuGetAcad)' != 'true'">
+    <Reference Include="accoremgd">
+      <HintPath>$(AcadDir)\accoremgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="acdbmgd">
+      <HintPath>$(AcadDir)\acdbmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="acmgd">
+      <HintPath>$(AcadDir)\acmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AdWindows">
+      <HintPath>$(AcadDir)\AdWindows.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NlcsLegenda.Core\NlcsLegenda.Core.csproj" />
+  </ItemGroup>
+
+</Project>

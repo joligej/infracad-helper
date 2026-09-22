@@ -1,0 +1,17 @@
+<Project>
+
+  <!--
+    Eén bron van waarheid voor de versie. Zowel NlcsLegenda.Core als NlcsLegenda.Plugin
+    erven dit, zodat de gebouwde DLL's dezelfde versie rapporteren als de release, het
+    bundle-manifest en de CHANGELOG. De release-workflow controleert dat de git-tag
+    hiermee overeenkomt.
+  -->
+  <PropertyGroup>
+    <VersionPrefix>1.13.0</VersionPrefix>
+    <Authors>joligej</Authors>
+    <Company>infracad-helper</Company>
+    <Product>NLCS Legenda</Product>
+    <Copyright>Copyright (c) joligej</Copyright>
+  </PropertyGroup>
+
+</Project>

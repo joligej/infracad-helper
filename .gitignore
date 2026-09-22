@@ -1,0 +1,40 @@
+# ---- Build output ----
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+artifacts/
+
+# ---- Referentiemateriaal en tekeningen (blijven altijd lokaal) ----
+relevante_bronnen/
+# CAD-bestanden nooit committen, waar ze ook staan.
+*.dwg
+*.dwt
+*.dws
+*.dwl
+*.dwl2
+*.dst
+*.sv$
+*.mms
+*.pkt
+*.bak
+
+# ---- Development scratch ----
+_dev_tmp/
+
+# ---- Codesign-materiaal (privésleutels nooit committen) ----
+dev/signing/
+*.pfx
+*.pfx.b64
+*.snk
+
+# ---- OS ----
+Thumbs.db
+Desktop.ini
+
+# Autodesk crash-/telemetrielogs (accoreconsole)
+ErrorReports/
+*.dmp

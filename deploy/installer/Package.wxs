@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Per-user MSI voor de NLCS Legenda-plugin. Installeert de bundle in
+  %APPDATA%\Autodesk\ApplicationPlugins\NlcsLegenda.bundle. Die map wordt op
+  installatiemoment door Windows opgelost (AppDataFolder), dus ook bij een
+  omgeleid of verplaatst gebruikersprofiel komt de bundle op de juiste plek.
+  Er is geen beheerder nodig; de installatie geldt voor de huidige gebruiker.
+
+  Bouwen via dev/scripts/Build-Installer.ps1, dat -d Version en -d BundleStage
+  meegeeft en een gecombineerde bundle klaarzet met per AutoCAD-versie de
+  bijbehorende build (net8 voor 2025 en 2026, net10 voor 2027).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="NLCS Legenda"
+           Manufacturer="joligej"
+           Version="$(var.Version)"
+           UpgradeCode="7B2F4C9A-3E51-4A6D-9C2B-1F0E8D7A6C55"
+           Scope="perUser"
+           Compressed="yes">
+
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="Er is al een nieuwere versie van NLCS Legenda geïnstalleerd." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Property Id="ARPCONTACT" Value="joligej" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/joligej/infracad-helper" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+
+    <StandardDirectory Id="AppDataFolder">
+      <Directory Id="AutodeskDir" Name="Autodesk">
+        <Directory Id="AppPluginsDir" Name="ApplicationPlugins">
+          <Directory Id="INSTALLFOLDER" Name="NlcsLegenda.bundle">
+            <Directory Id="ContentsDir" Name="Contents">
+              <Directory Id="Net82025Dir" Name="net8-2025" />
+              <Directory Id="Net82026Dir" Name="net8-2026" />
+              <Directory Id="Net10Dir" Name="net10" />
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="NLCS Legenda" Level="1">
+      <Component Directory="INSTALLFOLDER" Guid="B5130F2D-1AE6-4424-81D9-540C41AC4771">
+        <RegistryValue Root="HKCU" Key="Software\joligej\NlcsLegenda"
+                       Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        <File Source="$(var.BundleStage)\PackageContents.xml" />
+      </Component>
+
+      <Component Directory="Net82025Dir" Guid="340ACF3F-03CD-414C-9810-DD7F090F2D5A">
+        <RegistryValue Root="HKCU" Key="Software\joligej\NlcsLegenda"
+                       Name="net8-2025" Type="integer" Value="1" KeyPath="yes" />
+        <File Source="$(var.BundleStage)\Contents\net8-2025\NlcsLegenda.dll" />
+        <File Source="$(var.BundleStage)\Contents\net8-2025\NlcsLegenda.Core.dll" />
+      </Component>
+
+      <Component Directory="Net82026Dir" Guid="A5D18F94-3940-492E-A273-57B16CD13490">
+        <RegistryValue Root="HKCU" Key="Software\joligej\NlcsLegenda"
+                       Name="net8-2026" Type="integer" Value="1" KeyPath="yes" />
+        <File Source="$(var.BundleStage)\Contents\net8-2026\NlcsLegenda.dll" />
+        <File Source="$(var.BundleStage)\Contents\net8-2026\NlcsLegenda.Core.dll" />
+      </Component>
+
+      <Component Directory="Net10Dir" Guid="5BDA9D02-7C90-4F50-974D-9D84750908F2">
+        <RegistryValue Root="HKCU" Key="Software\joligej\NlcsLegenda"
+                       Name="net10" Type="integer" Value="1" KeyPath="yes" />
+        <File Source="$(var.BundleStage)\Contents\net10\NlcsLegenda.dll" />
+        <File Source="$(var.BundleStage)\Contents\net10\NlcsLegenda.Core.dll" />
+      </Component>
+    </Feature>
+  </Package>
+</Wix>
