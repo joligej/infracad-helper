@@ -39,8 +39,8 @@ New-Item -ItemType Directory -Force -Path $work | Out-Null
 $dwgCopy = Join-Path $work ([System.IO.Path]::GetFileName($Drawing))
 Copy-Item $Drawing $dwgCopy
 $base = [System.IO.Path]::GetFileNameWithoutExtension($Drawing)
-$csv = Join-Path $work "$($base)_NLCS-legenda.csv"
-$json = Join-Path $work "$($base)_NLCS-legenda.json"
+$csv = Join-Path $work "$($base)_Legenda-Legenda 1.csv"
+$json = Join-Path $work "$($base)_Legenda-Legenda 1.json"
 
 $scr = Join-Path $work "it.scr"
 @"

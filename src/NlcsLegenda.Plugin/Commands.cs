@@ -199,11 +199,36 @@ public partial class Commands
 
         try
         {
-            var settings = LoadSettings(db);
+            var settings = LoadGlobalDefaults();
             IReadOnlyList<LegendEntry> entries;
+            string suffix = "NLCS-legenda";
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                entries = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db)).Entries;
+                var registry = LegendStore.Load(db, tr);
+                var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+                if (registry.Legends.Count > 0)
+                {
+                    // Bij beheerde legenda's exporteert dit de gekozen legenda met exact
+                    // zijn eigen scope en instellingen.
+                    var target = ResolveTargetLegend(ed, db, registry, "exporteren");
+                    if (target is null)
+                    {
+                        ed.WriteMessage("\nGeannuleerd.");
+                        tr.Commit();
+                        return;
+                    }
+                    ObjectId[]? selection = target.Scope == LegendScope.Selection
+                        ? LegendManagement.ResolveHandles(db, target.SourceHandles, out _)
+                            .Where(id => !excluded.Contains(id)).ToArray()
+                        : null;
+                    settings = target.Settings;
+                    entries = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded).Entries;
+                    suffix = "Legenda-" + LegendPresets.SafeFileName(target.Name);
+                }
+                else
+                {
+                    entries = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded).Entries;
+                }
                 tr.Commit();
             }
 
@@ -214,9 +239,9 @@ public partial class Commands
             }
 
             var baseName = string.IsNullOrEmpty(db.Filename)
-                ? Path.Combine(Path.GetTempPath(), "NLCS-legenda")
+                ? Path.Combine(Path.GetTempPath(), suffix)
                 : Path.Combine(Path.GetDirectoryName(db.Filename)!,
-                    Path.GetFileNameWithoutExtension(db.Filename) + "_NLCS-legenda");
+                    Path.GetFileNameWithoutExtension(db.Filename) + "_" + suffix);
 
             var csvPath = baseName + ".csv";
             var jsonPath = baseName + ".json";
@@ -346,16 +371,35 @@ public partial class Commands
                 return;
             }
 
-            var settings = LoadSettings(db);
+            var settings = LoadGlobalDefaults();
 
             Point3d min, max;
             using (var trExt = db.TransactionManager.StartTransaction())
             {
-                bool found = TryGetLegendExtents(db, trExt, out min, out max);
+                var registry = LegendStore.Load(db, trExt);
+                bool found;
+                if (registry.Legends.Count > 0)
+                {
+                    var target = ResolveTargetLegend(ed, db, registry, "de viewport om te maken");
+                    if (target is null)
+                    {
+                        ed.WriteMessage("\nGeannuleerd.");
+                        trExt.Commit();
+                        return;
+                    }
+                    found = LegendManagement.TryGetGroupExtents(db, trExt, target.GroupName, out var ext);
+                    min = found ? ext.MinPoint : Point3d.Origin;
+                    max = found ? ext.MaxPoint : Point3d.Origin;
+                    settings = target.Settings;
+                }
+                else
+                {
+                    found = TryGetLegendExtents(db, trExt, out min, out max);
+                }
                 trExt.Commit();
                 if (!found)
                 {
-                    ed.WriteMessage("\nGeen legenda gevonden in de model space (laag X-XX-AL-LEGENDA*).");
+                    ed.WriteMessage("\nGeen legenda gevonden om een viewport omheen te maken.");
                     return;
                 }
             }
