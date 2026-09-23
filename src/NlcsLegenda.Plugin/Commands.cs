@@ -155,11 +155,31 @@ public partial class Commands
 
         try
         {
-            var settings = LoadSettings(db);
             using var tr = db.TransactionManager.StartTransaction();
-            var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db));
-            var configSource = DrawingStore.HasSettings(db) ? "deze tekening" : "alle tekeningen (globaal)";
-            ed.WriteMessage(BuildInfoReport(analysis, settings, configSource));
+            var registry = LegendStore.Load(db, tr);
+
+            if (registry.Legends.Count > 0)
+            {
+                var sb = new StringBuilder();
+                sb.Append($"\nNLCS Legenda {PluginVersion} — {registry.Legends.Count} legenda('s) in deze tekening:");
+                foreach (var l in registry.Legends)
+                {
+                    var scope = l.Scope == LegendScope.Selection
+                        ? $"selectie ({l.SourceHandles.Count} object(en))"
+                        : "hele tekening";
+                    sb.Append($"\n  - {l.Name} — {scope}");
+                }
+                sb.Append("\nGebruik NLCSLEGENDABEHEER om ze te bekijken en bij te werken.");
+                ed.WriteMessage(sb.ToString());
+                tr.Commit();
+                return;
+            }
+
+            // Nog geen beheerde legenda: toon wat een hele-tekeninglegenda zou bevatten.
+            var settings = LoadGlobalDefaults();
+            var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+            var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded);
+            ed.WriteMessage(BuildInfoReport(analysis, settings, "alle tekeningen (globaal)"));
             tr.Commit();
         }
         catch (Exception ex)
@@ -631,15 +651,10 @@ public partial class Commands
 
     private static ConfigScope PromptScope(Editor ed, ConfigScope preferred)
     {
-        var pko = new PromptKeywordOptions("\nOpslaan voor");
-        pko.Keywords.Add("Alle");
-        pko.Keywords.Add("Tekening");
-        pko.Keywords.Default = preferred == ConfigScope.Drawing ? "Tekening" : "Alle";
-        pko.AllowNone = true;
-        var res = ed.GetKeywords(pko);
-        if (res.Status != PromptStatus.OK)
-            return preferred;
-        return res.StringResult == "Tekening" ? ConfigScope.Drawing : ConfigScope.Global;
+        // Sinds meerdere legenda's is er geen "voor deze tekening"-scope meer voor
+        // instellingen: deze commando's bewerken de globale standaard voor nieuwe legenda's.
+        // Bestaande legenda's pas je aan via NLCSLEGENDABEHEER.
+        return ConfigScope.Global;
     }
 
     [CommandMethod("NLCSLEGENDAUITVINKEN", CommandFlags.Modal)]
@@ -838,8 +853,8 @@ public partial class Commands
         };
     }
 
-    [CommandMethod("NLCSLEGENDABEHEER", CommandFlags.Modal)]
-    public void NlcsLegendaBeheer()
+    [CommandMethod("NLCSLEGENDASAMENSTELLEN", CommandFlags.Modal)]
+    public void NlcsLegendaSamenstellen()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
@@ -849,7 +864,7 @@ public partial class Commands
 
         try
         {
-            var initial = DrawingStore.HasSettings(db) ? ConfigScope.Drawing : ConfigScope.Global;
+            var initial = ConfigScope.Global;
 
             var probe = LoadSettingsForScope(db, initial);
             probe.ExcludedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -890,7 +905,7 @@ public partial class Commands
         }
         catch (Exception ex)
         {
-            ed.WriteMessage($"\nNLCSLEGENDABEHEER fout: {ex.Message}");
+            ed.WriteMessage($"\nNLCSLEGENDASAMENSTELLEN fout: {ex.Message}");
         }
     }
 
@@ -1565,14 +1580,11 @@ public partial class Commands
 
     private static string SaveSettingsToScope(Database db, LegendSettings settings, ConfigScope scope)
     {
-        if (scope == ConfigScope.Drawing)
-        {
-            DrawingStore.WriteSettings(db, settings.ToJson());
-            return "in deze tekening";
-        }
+        // Instellingen worden altijd als globale standaard bewaard (voor nieuwe legenda's);
+        // de oude tekening-scope bestaat niet meer.
         Directory.CreateDirectory(ConfigDir);
         settings.Save(ConfigPath);
-        return "voor alle tekeningen";
+        return "als globale standaard";
     }
 
     private static string SaveCatalogToScope(Database db, DescriptionCatalog catalog, ConfigScope scope)
@@ -1639,6 +1651,7 @@ public partial class Commands
                 LegendStore.Save(db, tr, registry);
                 _pendingPurge.Add(btrId);
                 ed.WriteMessage($"\nNLCSTEST placed rows={rows} at {insert.X:0.0},{insert.Y:0.0} name={def.Name}");
+                tr.Commit();
             }
             PurgePending(db);
         }
