@@ -455,8 +455,9 @@ public partial class Commands
             }
             else
             {
-                vpW = mw * paperPerModel + 2 * marginPaper;
-                vpH = mh * paperPerModel + 2 * marginPaper;
+                var plan = ViewportMath.Compute(mw, mh, settings.Scale, marginPaper);
+                vpW = plan.PaperWidthMm;
+                vpH = plan.PaperHeightMm;
                 viewCenter = new Point2d((min.X + max.X) / 2.0, (min.Y + max.Y) / 2.0);
 
                 var pp = ed.GetPoint("\nMiddelpunt van de viewport op de sheet:");
@@ -629,16 +630,16 @@ public partial class Commands
 
         try
         {
-            var initial = DrawingStore.HasSettings(db) ? ConfigScope.Drawing : ConfigScope.Global;
-            using var dialog = new SettingsDialog(initial, scope => LoadSettingsForScope(db, scope));
+            var settings = LoadGlobalDefaults();
+            using var dialog = new SettingsDialog(settings, "Globale standaard \u2013 geldt voor nieuwe legenda's");
             dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nInstellingen opgeslagen ({SaveSettingsToScope(db, dialog.Settings, dialog.Scope)}).");
+                ed.WriteMessage($"\nInstellingen opgeslagen ({SaveSettingsToScope(db, dialog.Settings, ConfigScope.Global)}).");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            var where = SaveSettingsToScope(db, dialog.Settings, dialog.Scope);
+            var where = SaveSettingsToScope(db, dialog.Settings, ConfigScope.Global);
             ed.WriteMessage($"\nInstellingen opgeslagen ({where}).");
         }
         catch (Exception ex)
@@ -1987,12 +1988,11 @@ public partial class Commands
     {
         try
         {
-            // Pre-plaatsingsinstellingen horen altijd bij deze tekening, nooit globaal.
             var db = AcApp.DocumentManager.MdiActiveDocument?.Database;
             if (db is null)
                 return;
-            DrawingStore.WriteSettings(db, s.ToJson());
-            ed.WriteMessage("\n  \u2192 instellingen opgeslagen in deze tekening.");
+            SaveSettingsToScope(db, s, ConfigScope.Global);
+            ed.WriteMessage("\n  \u2192 opgeslagen als globale standaard voor nieuwe legenda's.");
         }
         catch (Exception ex)
         {
@@ -2004,23 +2004,17 @@ public partial class Commands
     {
         try
         {
-            var db = AcApp.DocumentManager.MdiActiveDocument?.Database;
-            if (db is null)
-                return;
-            using var dialog = new SettingsDialog(ConfigScope.Global, scope =>
-                scope == ConfigScope.Drawing && DrawingStore.ReadSettings(db) is { } j
-                    ? LegendSettings.FromJson(j)
-                    : LegendSettings.FromJson(s.ToJson()));
+            var working = s.Clone();
+            using var dialog = new SettingsDialog(working, "Nieuwe legenda");
             dialog.ApplyRequested += (_, _) =>
             {
                 s.CopyFrom(dialog.Settings);
-                ed.WriteMessage($"\nInstellingen opgeslagen ({SaveSettingsToScope(db, dialog.Settings, dialog.Scope)}).");
+                ed.WriteMessage("\n  \u2192 instellingen bijgewerkt.");
             };
             if (AcWindows.ShowModalDialog(dialog) == WinForms.DialogResult.OK)
             {
                 s.CopyFrom(dialog.Settings);
-                var where = SaveSettingsToScope(db, dialog.Settings, dialog.Scope);
-                ed.WriteMessage($"\nInstellingen opgeslagen ({where}).");
+                ed.WriteMessage("\n  \u2192 instellingen bijgewerkt.");
             }
         }
         catch (Exception ex)

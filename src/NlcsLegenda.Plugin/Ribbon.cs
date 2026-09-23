@@ -64,6 +64,8 @@ internal static class RibbonBuilder
             "Een legenda opnieuw tekenen; bij meerdere kies je welke."));
         beheer.Items.Add(Button("Legenda's", "NLCSLEGENDABEHEER",
             "Legenda's bekijken, bijwerken, hernoemen, zoeken en verwijderen."));
+        beheer.Items.Add(Button("Waarom?", "NLCSLEGENDAWAAROM",
+            "Klik een object aan om te zien of en waarom het in de legenda komt."));
         beheer.Items.Add(Button("Instellingen", "NLCSLEGENDAOPTIES",
             "Standaardinstellingen voor nieuwe legenda's aanpassen."));
         beheer.Items.Add(Button("Samenstellen", "NLCSLEGENDASAMENSTELLEN",

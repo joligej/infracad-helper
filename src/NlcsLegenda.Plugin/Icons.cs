@@ -178,6 +178,12 @@ internal static class RibbonIcons
                     g.DrawPath(pen, path);
                 }
                 break;
+            case "NLCSLEGENDAWAAROM":
+                // Vraagteken: boog, korte staart en een punt.
+                g.DrawArc(pen, 11 * s, 8 * s, 10 * s, 9 * s, 175, 235);
+                g.DrawLine(pen, 16 * s, 15 * s, 16 * s, 18 * s);
+                g.FillEllipse(fill, 16 * s - 1.4f * s, 21.5f * s - 1.4f * s, 2.8f * s, 2.8f * s);
+                break;
         }
     }
 
