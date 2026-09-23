@@ -126,7 +126,7 @@ public partial class Commands
                         Settings = settings.Clone(),
                         CreatedWithVersion = PluginVersion
                     };
-                    var ids = FinalizePlacement(tr, db, br, settings, def.GroupName);
+                    FinalizePlacement(tr, db, br, settings, def.GroupName);
                     registry.Add(def);
                     LegendStore.Save(db, tr, registry);
                     ed.WriteMessage($"\n\"{def.Name}\" geplaatst ({def.Scope.ToDisplay()}).");
@@ -1657,14 +1657,12 @@ public partial class Commands
         {
             var settings = LoadGlobalDefaults();
             int rows = 0;
-            int entryCount = 0;
 
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var registry = LegendStore.Load(db, tr);
                 var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
                 var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded);
-                entryCount = analysis.Entries.Count;
                 ed.WriteMessage(
                     $"\nNLCSTEST entries={analysis.Entries.Count} usedLayers={analysis.UsedNlcsLayerCount} " +
                     $"describedLayers={analysis.DescribedLayerCount} legends={registry.Legends.Count}");

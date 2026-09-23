@@ -45,8 +45,7 @@ public partial class Commands
             return UpdateResult.NoEntries;
 
         // Positie van de bestaande legenda vasthouden.
-        Point3d topLeft = Point3d.Origin;
-        bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out topLeft);
+        bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out var topLeft);
 
         var btrId = LegendBuilder.BuildBlock(db, tr, analysis, def.Settings, out rows);
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
