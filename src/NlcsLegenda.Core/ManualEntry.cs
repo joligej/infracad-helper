@@ -19,6 +19,17 @@ public sealed class ManualEntry
     public bool IsValid =>
         LayerNaming.IsValid(Layer) && !string.IsNullOrWhiteSpace(Description);
 
+    public ManualEntry Clone() => new()
+    {
+        Layer = Layer,
+        Type = Type,
+        Description = Description,
+        Status = Status,
+        Hoofdgroep = Hoofdgroep,
+        SymbolBlock = SymbolBlock,
+        HatchPattern = HatchPattern
+    };
+
     public LegendEntry ToLegendEntry(string? customStatusName = null) => new()
     {
         Status = Status,

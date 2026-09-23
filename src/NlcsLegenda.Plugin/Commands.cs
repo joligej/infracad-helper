@@ -50,6 +50,10 @@ public partial class Commands
         return LegendSettings.Load(ConfigPath);
     }
 
+    // De globale standaardinstellingen: het startpunt voor een NIEUWE legenda. Bestaande
+    // legenda's houden hun eigen snapshot en veranderen niet mee.
+    private static LegendSettings LoadGlobalDefaults() => LegendSettings.Load(ConfigPath);
+
     private static DescriptionCatalog LoadCatalog(Database db)
     {
         var catalog = DescriptionCatalog.Default();
@@ -71,7 +75,8 @@ public partial class Commands
 
         try
         {
-            var settings = LoadSettings(db);
+            // Nieuwe legenda begint bij de globale standaard; wordt daarna een eigen snapshot.
+            var settings = LoadGlobalDefaults();
             if (!PromptOptions(ed, settings, out var selection))
             {
                 ed.WriteMessage("\nGeannuleerd.");
@@ -83,7 +88,9 @@ public partial class Commands
 
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db));
+                var registry = LegendStore.Load(db, tr);
+                var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded);
                 if (analysis.Entries.Count == 0)
                 {
                     ed.WriteMessage("\nGeen NLCS-lagen gevonden om een legenda van te maken.");
@@ -110,13 +117,26 @@ public partial class Commands
                 else
                 {
                     br.Position = jig.Position;
-                    FinalizePlacement(tr, db, br, settings);
+                    var def = new LegendDefinition
+                    {
+                        Name = registry.NextDefaultName(),
+                        Scope = selection is { Length: > 0 } ? LegendScope.Selection : LegendScope.WholeDrawing,
+                        SourceHandles = selection is { Length: > 0 } ? LegendManagement.ToHandles(selection) : new(),
+                        GroupName = LegendRegistry.NewGroupName(),
+                        Settings = settings.Clone(),
+                        CreatedWithVersion = PluginVersion
+                    };
+                    FinalizePlacement(tr, db, br, settings, def.GroupName);
+                    registry.Add(def);
+                    LegendStore.Save(db, tr, registry);
+                    ed.WriteMessage($"\n\"{def.Name}\" geplaatst ({def.Scope.ToDisplay()}).");
                 }
                 tr.Commit();
             }
 
             PurgeTempBlock(db, btrId);
-            ed.WriteMessage(cancelled ? "\nGeannuleerd." : "\nLegenda geplaatst.");
+            if (cancelled)
+                ed.WriteMessage("\nGeannuleerd.");
         }
         catch (Exception ex)
         {
@@ -135,11 +155,31 @@ public partial class Commands
 
         try
         {
-            var settings = LoadSettings(db);
             using var tr = db.TransactionManager.StartTransaction();
-            var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db));
-            var configSource = DrawingStore.HasSettings(db) ? "deze tekening" : "alle tekeningen (globaal)";
-            ed.WriteMessage(BuildInfoReport(analysis, settings, configSource));
+            var registry = LegendStore.Load(db, tr);
+
+            if (registry.Legends.Count > 0)
+            {
+                var sb = new StringBuilder();
+                sb.Append($"\nNLCS Legenda {PluginVersion} — {registry.Legends.Count} legenda('s) in deze tekening:");
+                foreach (var l in registry.Legends)
+                {
+                    var scope = l.Scope == LegendScope.Selection
+                        ? $"selectie ({l.SourceHandles.Count} object(en))"
+                        : "hele tekening";
+                    sb.Append($"\n  - {l.Name} — {scope}");
+                }
+                sb.Append("\nGebruik NLCSLEGENDABEHEER om ze te bekijken en bij te werken.");
+                ed.WriteMessage(sb.ToString());
+                tr.Commit();
+                return;
+            }
+
+            // Nog geen beheerde legenda: toon wat een hele-tekeninglegenda zou bevatten.
+            var settings = LoadGlobalDefaults();
+            var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+            var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded);
+            ed.WriteMessage(BuildInfoReport(analysis, settings, "alle tekeningen (globaal)"));
             tr.Commit();
         }
         catch (Exception ex)
@@ -159,11 +199,36 @@ public partial class Commands
 
         try
         {
-            var settings = LoadSettings(db);
+            var settings = LoadGlobalDefaults();
             IReadOnlyList<LegendEntry> entries;
+            string suffix = "NLCS-legenda";
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                entries = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db)).Entries;
+                var registry = LegendStore.Load(db, tr);
+                var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+                if (registry.Legends.Count > 0)
+                {
+                    // Bij beheerde legenda's exporteert dit de gekozen legenda met exact
+                    // zijn eigen scope en instellingen.
+                    var target = ResolveTargetLegend(ed, db, registry, "exporteren");
+                    if (target is null)
+                    {
+                        ed.WriteMessage("\nGeannuleerd.");
+                        tr.Commit();
+                        return;
+                    }
+                    ObjectId[]? selection = target.Scope == LegendScope.Selection
+                        ? LegendManagement.ResolveHandles(db, target.SourceHandles, out _)
+                            .Where(id => !excluded.Contains(id)).ToArray()
+                        : null;
+                    settings = target.Settings;
+                    entries = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded).Entries;
+                    suffix = "Legenda-" + LegendPresets.SafeFileName(target.Name);
+                }
+                else
+                {
+                    entries = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded).Entries;
+                }
                 tr.Commit();
             }
 
@@ -174,9 +239,9 @@ public partial class Commands
             }
 
             var baseName = string.IsNullOrEmpty(db.Filename)
-                ? Path.Combine(Path.GetTempPath(), "NLCS-legenda")
+                ? Path.Combine(Path.GetTempPath(), suffix)
                 : Path.Combine(Path.GetDirectoryName(db.Filename)!,
-                    Path.GetFileNameWithoutExtension(db.Filename) + "_NLCS-legenda");
+                    Path.GetFileNameWithoutExtension(db.Filename) + "_" + suffix);
 
             var csvPath = baseName + ".csv";
             var jsonPath = baseName + ".json";
@@ -306,16 +371,35 @@ public partial class Commands
                 return;
             }
 
-            var settings = LoadSettings(db);
+            var settings = LoadGlobalDefaults();
 
             Point3d min, max;
             using (var trExt = db.TransactionManager.StartTransaction())
             {
-                bool found = TryGetLegendExtents(db, trExt, out min, out max);
+                var registry = LegendStore.Load(db, trExt);
+                bool found;
+                if (registry.Legends.Count > 0)
+                {
+                    var target = ResolveTargetLegend(ed, db, registry, "de viewport om te maken");
+                    if (target is null)
+                    {
+                        ed.WriteMessage("\nGeannuleerd.");
+                        trExt.Commit();
+                        return;
+                    }
+                    found = LegendManagement.TryGetGroupExtents(db, trExt, target.GroupName, out var ext);
+                    min = found ? ext.MinPoint : Point3d.Origin;
+                    max = found ? ext.MaxPoint : Point3d.Origin;
+                    settings = target.Settings;
+                }
+                else
+                {
+                    found = TryGetLegendExtents(db, trExt, out min, out max);
+                }
                 trExt.Commit();
                 if (!found)
                 {
-                    ed.WriteMessage("\nGeen legenda gevonden in de model space (laag X-XX-AL-LEGENDA*).");
+                    ed.WriteMessage("\nGeen legenda gevonden om een viewport omheen te maken.");
                     return;
                 }
             }
@@ -424,58 +508,58 @@ public partial class Commands
 
         try
         {
-            var settings = LoadSettings(db);
-
-            ObjectId btrId;
-            int rows;
-            bool found;
-            using (var tr = db.TransactionManager.StartTransaction())
+            LegendDefinition? target;
+            using (var tr0 = db.TransactionManager.StartTransaction())
             {
-                // Eén transactie: bij een fout blijft de oude legenda staan.
-                if (!TryEraseLegendGroup(db, tr, out var topLeft))
+                var reg0 = LegendStore.Load(db, tr0);
+                MaybeMigrate(db, tr0, reg0);
+                tr0.Commit();
+            }
+            using (var trPick = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, trPick);
+                trPick.Commit();
+                if (reg.Legends.Count == 0)
                 {
-                    ed.WriteMessage(
-                        "\nGeen bijwerkbare legenda (groep \"NLCS-Legenda\") gevonden. " +
-                        "Plaats eerst een legenda met NLCSLEGENDA.");
-                    tr.Commit();
+                    ed.WriteMessage("\nGeen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.");
                     return;
                 }
-
-                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db));
-                if (analysis.Entries.Count == 0)
-                {
-                    ed.WriteMessage("\nGeen NLCS-lagen meer gevonden; oude legenda is verwijderd.");
-                    tr.Commit();
-                    return;
-                }
-
-                btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out rows);
-                var ms = (BlockTableRecord)tr.GetObject(
-                    SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var br = new BlockReference(topLeft, btrId);
-                ms.AppendEntity(br);
-                tr.AddNewlyCreatedDBObject(br, true);
-
-                // Herplaats op de huidige linksbovenhoek, ook als de nieuwe legenda anders van formaat is.
-                var ext = br.Bounds;
-                if (ext.HasValue)
-                {
-                    var shift = new Vector3d(
-                        topLeft.X - ext.Value.MinPoint.X,
-                        topLeft.Y - ext.Value.MaxPoint.Y, 0);
-                    if (!shift.IsZeroLength())
-                        br.Position += shift;
-                }
-
-                FinalizePlacement(tr, db, br, settings);
-                found = true;
-                tr.Commit();
+                target = ResolveTargetLegend(ed, db, reg, "bijwerken");
+            }
+            if (target is null)
+            {
+                ed.WriteMessage("\nGeannuleerd.");
+                return;
             }
 
-            if (found)
+            UpdateResult result;
+            int rows = 0;
+            string note = string.Empty;
+            using (var tr = db.TransactionManager.StartTransaction())
             {
-                PurgeTempBlock(db, btrId);
-                ed.WriteMessage($"\nLegenda bijgewerkt ({rows} regel(s)) op dezelfde plek.");
+                var registry = LegendStore.Load(db, tr);
+                var def = registry.FindById(target.Id) ?? target;
+                result = BuildManagedLegend(db, tr, registry, def, out rows, out note);
+                if (result == UpdateResult.Updated)
+                    LegendStore.Save(db, tr, registry);
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            switch (result)
+            {
+                case UpdateResult.Updated:
+                    ed.WriteMessage($"\n\"{target.Name}\" bijgewerkt ({rows} regel(s))"
+                        + (note.Length > 0 ? $"; {note}." : "."));
+                    break;
+                case UpdateResult.NoEntries:
+                    ed.WriteMessage($"\n\"{target.Name}\" levert geen legenda-regels op"
+                        + (note.Length > 0 ? $" ({note})" : "")
+                        + "; de bestaande legenda is niet gewijzigd. Verwijder hem eventueel via NLCSLEGENDABEHEER.");
+                    break;
+                default:
+                    ed.WriteMessage($"\n\"{target.Name}\" kon niet worden bijgewerkt; de bestaande legenda staat er nog.");
+                    break;
             }
         }
         catch (Exception ex)
@@ -611,15 +695,10 @@ public partial class Commands
 
     private static ConfigScope PromptScope(Editor ed, ConfigScope preferred)
     {
-        var pko = new PromptKeywordOptions("\nOpslaan voor");
-        pko.Keywords.Add("Alle");
-        pko.Keywords.Add("Tekening");
-        pko.Keywords.Default = preferred == ConfigScope.Drawing ? "Tekening" : "Alle";
-        pko.AllowNone = true;
-        var res = ed.GetKeywords(pko);
-        if (res.Status != PromptStatus.OK)
-            return preferred;
-        return res.StringResult == "Tekening" ? ConfigScope.Drawing : ConfigScope.Global;
+        // Sinds meerdere legenda's is er geen "voor deze tekening"-scope meer voor
+        // instellingen: deze commando's bewerken de globale standaard voor nieuwe legenda's.
+        // Bestaande legenda's pas je aan via NLCSLEGENDABEHEER.
+        return ConfigScope.Global;
     }
 
     [CommandMethod("NLCSLEGENDAUITVINKEN", CommandFlags.Modal)]
@@ -818,8 +897,8 @@ public partial class Commands
         };
     }
 
-    [CommandMethod("NLCSLEGENDABEHEER", CommandFlags.Modal)]
-    public void NlcsLegendaBeheer()
+    [CommandMethod("NLCSLEGENDASAMENSTELLEN", CommandFlags.Modal)]
+    public void NlcsLegendaSamenstellen()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
@@ -829,7 +908,7 @@ public partial class Commands
 
         try
         {
-            var initial = DrawingStore.HasSettings(db) ? ConfigScope.Drawing : ConfigScope.Global;
+            var initial = ConfigScope.Global;
 
             var probe = LoadSettingsForScope(db, initial);
             probe.ExcludedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -870,7 +949,7 @@ public partial class Commands
         }
         catch (Exception ex)
         {
-            ed.WriteMessage($"\nNLCSLEGENDABEHEER fout: {ex.Message}");
+            ed.WriteMessage($"\nNLCSLEGENDASAMENSTELLEN fout: {ex.Message}");
         }
     }
 
@@ -1536,22 +1615,20 @@ public partial class Commands
     private static bool LegendGroupExists(Database db)
     {
         using var tr = db.TransactionManager.StartTransaction();
+        var reg = LegendStore.Load(db, tr);
         var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
-        var exists = gd.Contains(LegendGroupName);
+        var exists = reg.Legends.Count > 0 || gd.Contains(LegendManagement.LegacyGroupName);
         tr.Commit();
         return exists;
     }
 
     private static string SaveSettingsToScope(Database db, LegendSettings settings, ConfigScope scope)
     {
-        if (scope == ConfigScope.Drawing)
-        {
-            DrawingStore.WriteSettings(db, settings.ToJson());
-            return "in deze tekening";
-        }
+        // Instellingen worden altijd als globale standaard bewaard (voor nieuwe legenda's);
+        // de oude tekening-scope bestaat niet meer.
         Directory.CreateDirectory(ConfigDir);
         settings.Save(ConfigPath);
-        return "voor alle tekeningen";
+        return "als globale standaard";
     }
 
     private static string SaveCatalogToScope(Database db, DescriptionCatalog catalog, ConfigScope scope)
@@ -1566,7 +1643,7 @@ public partial class Commands
         return "voor alle tekeningen";
     }
 
-    // Headless smoke-test via AutoCAD Core Console.
+    // Headless smoke-test via AutoCAD Core Console: plaatst een beheerde hele-tekeninglegenda.
     [CommandMethod("NLCSLEGENDATEST", CommandFlags.Modal)]
     public void NlcsLegendaTest()
     {
@@ -1578,39 +1655,47 @@ public partial class Commands
 
         try
         {
-            var settings = LoadSettings(db);
-
-            ObjectId btrId;
-            int rows;
-            Point3d insert;
+            var settings = LoadGlobalDefaults();
+            int rows = 0;
 
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db));
+                var registry = LegendStore.Load(db, tr);
+                var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded);
                 ed.WriteMessage(
                     $"\nNLCSTEST entries={analysis.Entries.Count} usedLayers={analysis.UsedNlcsLayerCount} " +
-                    $"describedLayers={analysis.DescribedLayerCount}");
+                    $"describedLayers={analysis.DescribedLayerCount} legends={registry.Legends.Count}");
                 if (analysis.Entries.Count == 0)
                 {
                     tr.Commit();
                     return;
                 }
 
-                btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out rows);
-
-                insert = ComputeInsertPoint(db, settings);
+                var btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out rows);
+                var insert = ComputeInsertPoint(db, settings);
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
                 var br = new BlockReference(insert, btrId);
                 ms.AppendEntity(br);
                 tr.AddNewlyCreatedDBObject(br, true);
 
-                FinalizePlacement(tr, db, br, settings);
+                var def = new LegendDefinition
+                {
+                    Name = registry.NextDefaultName(),
+                    Scope = LegendScope.WholeDrawing,
+                    GroupName = LegendRegistry.NewGroupName(),
+                    Settings = settings.Clone(),
+                    CreatedWithVersion = PluginVersion
+                };
+                FinalizePlacement(tr, db, br, settings, def.GroupName);
+                registry.Add(def);
+                LegendStore.Save(db, tr, registry);
+                _pendingPurge.Add(btrId);
+                ed.WriteMessage($"\nNLCSTEST placed rows={rows} at {insert.X:0.0},{insert.Y:0.0} name={def.Name}");
                 tr.Commit();
             }
-
-            PurgeTempBlock(db, btrId);
-            ed.WriteMessage($"\nNLCSTEST placed rows={rows} at {insert.X:0.0},{insert.Y:0.0}");
+            PurgePending(db);
         }
         catch (Exception ex)
         {

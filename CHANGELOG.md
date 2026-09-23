@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.14.0 - 2026-09-23
+
+- Meerdere legenda's kunnen naast elkaar in één tekening staan, elk met een eigen bron
+  en eigen instellingen.
+- Een legenda wordt gemaakt van de hele tekening of van een opgeslagen selectie; bij
+  bijwerken houdt hij die bron aan.
+- Bij meerdere legenda's kies je bij het bijwerken welke wordt vernieuwd (of werk alles
+  bij); een legenda die geen regels meer oplevert wordt niet stil verwijderd.
+- `NLCSLEGENDABEHEER` beheert de legenda's: bekijken, bijwerken, hernoemen, opzoeken en
+  verwijderen. De oude samenstel-dialoog heet nu `NLCSLEGENDASAMENSTELLEN`.
+- Globale instellingen zijn het startpunt voor nieuwe legenda's; een bestaande legenda
+  verandert niet mee als de globale standaard later wijzigt.
+- Viewport en export richten zich op de gekozen legenda. Geplaatste legenda's tellen niet
+  meer mee als brondata bij het analyseren, ook niet in de batch-uittrekstaat.
+- Hoeveelheden kloppen nu ook bij een blok dat meerdere keren is ingevoegd en bij
+  geschaalde of geroteerde blokken.
+
 ## 1.13.0 - 2026-09-22
 
 Genereert uit de NLCS-lagen van een Civil 3D- of AutoCAD-tekening automatisch een

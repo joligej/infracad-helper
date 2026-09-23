@@ -8,7 +8,7 @@
   Build-Bundle.ps1 zet de juiste waarde per doelversie.
 -->
 <ApplicationPackage SchemaVersion="1.0"
-                    AppVersion="1.13.0"
+                    AppVersion="1.14.0"
                     ProductCode="{4C4B0F1A-6C1E-4C7E-9E3A-1F2A3B4C5D6E}"
                     Name="NLCS Legenda"
                     Description="Automatische NLCS-legendagenerator"
@@ -35,6 +35,7 @@
         <Command Global="NLCSLEGENDAOMSCHRIJVINGEN" Local="NLCSLEGENDAOMSCHRIJVINGEN" />
         <Command Global="NLCSLEGENDATEKST" Local="NLCSLEGENDATEKST" />
         <Command Global="NLCSLEGENDABEHEER" Local="NLCSLEGENDABEHEER" />
+        <Command Global="NLCSLEGENDASAMENSTELLEN" Local="NLCSLEGENDASAMENSTELLEN" />
         <Command Global="NLCSLEGENDAUITVINKEN" Local="NLCSLEGENDAUITVINKEN" />
         <Command Global="NLCSLEGENDATOEVOEGEN" Local="NLCSLEGENDATOEVOEGEN" />
         <Command Global="NLCSLEGENDASTATUS" Local="NLCSLEGENDASTATUS" />

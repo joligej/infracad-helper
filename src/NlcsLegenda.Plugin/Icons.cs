@@ -111,11 +111,19 @@ internal static class RibbonIcons
                 Knob(g, fill, pen, s, 12f, 20f);
                 break;
 
-            case "NLCSLEGENDABEHEER":
+            case "NLCSLEGENDASAMENSTELLEN":
                 g.DrawLines(pen, new[] { new PointF(8 * s, 11 * s), new PointF(10 * s, 13 * s), new PointF(13 * s, 9 * s) });
                 g.DrawLine(pen, 16 * s, 11 * s, 24 * s, 11 * s);
                 g.DrawLines(pen, new[] { new PointF(8 * s, 19 * s), new PointF(10 * s, 21 * s), new PointF(13 * s, 17 * s) });
                 g.DrawLine(pen, 16 * s, 19 * s, 24 * s, 19 * s);
+                break;
+
+            case "NLCSLEGENDABEHEER":
+                // Lijst van legenda's: kleine kaders met een regel ernaast.
+                g.DrawRectangle(pen, 7 * s, 9 * s, 5 * s, 4 * s);
+                g.DrawLine(pen, 14 * s, 11 * s, 25 * s, 11 * s);
+                g.DrawRectangle(pen, 7 * s, 18 * s, 5 * s, 4 * s);
+                g.DrawLine(pen, 14 * s, 20 * s, 25 * s, 20 * s);
                 break;
 
             case "NLCSLEGENDAOMSCHRIJVINGEN":

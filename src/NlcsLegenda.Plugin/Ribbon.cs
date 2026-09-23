@@ -49,8 +49,6 @@ internal static class RibbonBuilder
         tab.Panels.Add(new RibbonPanel { Source = maken });
         maken.Items.Add(Button("Genereren", "NLCSLEGENDA",
             "Analyseer de tekening en plaats de legenda met de muis."));
-        maken.Items.Add(Button("Bijwerken", "NLCSLEGENDAUPDATE",
-            "Teken de legenda opnieuw op exact dezelfde plek."));
         maken.Items.Add(Button("Overzicht", "NLCSLEGENDAINFO",
             "Toon wat er in de legenda zou komen, zonder te tekenen."));
         maken.Items.Add(Button("Exporteren", "NLCSLEGENDAEXPORT",
@@ -60,11 +58,15 @@ internal static class RibbonBuilder
         maken.Items.Add(Button("Viewport", "NLCSLEGENDAVIEWPORT",
             "Maak in de huidige layout een viewport rond de legenda."));
 
-        var beheer = new RibbonPanelSource { Title = "Instellingen" };
+        var beheer = new RibbonPanelSource { Title = "Beheren" };
         tab.Panels.Add(new RibbonPanel { Source = beheer });
+        beheer.Items.Add(Button("Bijwerken", "NLCSLEGENDAUPDATE",
+            "Een legenda opnieuw tekenen; bij meerdere kies je welke."));
+        beheer.Items.Add(Button("Legenda's", "NLCSLEGENDABEHEER",
+            "Legenda's bekijken, bijwerken, hernoemen, zoeken en verwijderen."));
         beheer.Items.Add(Button("Instellingen", "NLCSLEGENDAOPTIES",
-            "Schaal, teksten en opmaak aanpassen in een venster."));
-        beheer.Items.Add(Button("Samenstellen", "NLCSLEGENDABEHEER",
+            "Standaardinstellingen voor nieuwe legenda's aanpassen."));
+        beheer.Items.Add(Button("Samenstellen", "NLCSLEGENDASAMENSTELLEN",
             "Regels uitvinken en eigen regels toevoegen."));
         beheer.Items.Add(Button("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN",
             "De tekst per element bewerken in een tabel."));

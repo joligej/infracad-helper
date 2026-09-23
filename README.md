@@ -14,20 +14,28 @@ zitten en zet daar de bijbehorende legenda bij, in dezelfde stijl.
 ## Zo werkt het
 
 Start `NLCSLEGENDA`. Je kunt eerst nog de schaal of een paar opties zetten; daarna
-hangt de legenda aan je cursor en zet je hem naast de tekening neer. Alles komt als
-losse objecten in de model space, op de eigen NLCS-lagen, dus kleur en lijntype
-kloppen meteen. Wie liever klikt dan typt vindt in het lint een tab **NLCS Legenda**
-met dezelfde functies.
+hangt de legenda aan je cursor en zet je hem naast de tekening neer. Standaard maakt hij
+een legenda van de hele tekening; kies je in het optiemenu `Selecteren`, dan komt er een
+legenda van alleen die selectie. Alles komt als losse objecten in de model space, op de
+eigen NLCS-lagen, dus kleur en lijntype kloppen meteen. Wie liever klikt dan typt vindt
+in het lint een tab **NLCS Legenda** met dezelfde functies.
 
-Is het ontwerp veranderd, dan tekent `NLCSLEGENDAUPDATE` de legenda opnieuw op
-precies dezelfde plek. `NLCSLEGENDAVIEWPORT` maakt er in de paper space een viewport
-omheen op de ingestelde schaal.
+Je kunt meerdere legenda's naast elkaar in één tekening hebben, bijvoorbeeld één voor de
+hele tekening en aparte legenda's voor deelgebieden. Elke legenda onthoudt zijn eigen
+bron (hele tekening of selectie) en zijn eigen instellingen. `NLCSLEGENDABEHEER` toont de
+legenda's en laat je ze bijwerken, hernoemen, opzoeken (zoomen) en verwijderen.
 
-De teksten en opmaak liggen niet vast. Bijna alles is aan te passen: de titel, de
-statuskoppen, de eenheden, de tekst per element. Instellingen bewerk je met
-`NLCSLEGENDAOPTIES`, de omschrijvingen met `NLCSLEGENDAOMSCHRIJVINGEN`, en
-`NLCSLEGENDATEKST` past de tekst van één aangeklikt element aan. Wat je wijzigt blijft
-bij een volgende update behouden.
+Is het ontwerp veranderd, dan tekent `NLCSLEGENDAUPDATE` de legenda opnieuw op precies
+dezelfde plek. Is er één legenda, dan gaat dat direct; bij meerdere klik je de gewenste
+legenda aan (of kies je uit een lijst). Een selectielegenda wordt daarbij opnieuw van
+diezelfde selectie opgebouwd, niet van de hele tekening. `NLCSLEGENDAVIEWPORT` maakt in
+de paper space een viewport rond de gekozen legenda op de ingestelde schaal.
+
+De globale instellingen zijn het startpunt voor een **nieuwe** legenda. Zet je later de
+globale standaard anders, dan verandert een bestaande legenda niet mee: die houdt de
+instellingen waarmee hij is gemaakt. Instellingen bewerk je met `NLCSLEGENDAOPTIES`, de
+omschrijvingen met `NLCSLEGENDAOMSCHRIJVINGEN`, en `NLCSLEGENDATEKST` past de tekst van
+één aangeklikt element aan.
 
 Onder de legenda komen standaard een meeschalende schaalbalk en een opmerkingenblok.
 Allebei kun je uitzetten of aanpassen.
@@ -66,8 +74,9 @@ importeren, zodat je een opzet met collega's kunt delen.
 
 | Commando | Doet |
 |----------|------|
-| `NLCSLEGENDA` | Legenda genereren en met de muis plaatsen. |
-| `NLCSLEGENDAUPDATE` | De legenda opnieuw tekenen op dezelfde plek. |
+| `NLCSLEGENDA` | Legenda genereren en met de muis plaatsen (hele tekening of selectie). |
+| `NLCSLEGENDAUPDATE` | Een legenda opnieuw tekenen op dezelfde plek; bij meerdere kies je welke. |
+| `NLCSLEGENDABEHEER` | Legenda's bekijken, bijwerken, hernoemen, opzoeken en verwijderen. |
 | `NLCSLEGENDAINFO` | Tonen wat erin zou komen (aantallen, lengtes, oppervlakten, totalen per hoofdgroep) en welke regels nog een eigen omschrijving missen, zonder te tekenen. |
 | `NLCSLEGENDAEXPORT` | De regels wegschrijven als CSV en JSON, met hoeveelheden en de herkomst van elke omschrijving. |
 | `NLCSLEGENDABATCH` | Alle DWG's in een map samen in één uittrekstaat (CSV/JSON) met een kolom Tekening. |
@@ -75,7 +84,7 @@ importeren, zodat je een opzet met collega's kunt delen.
 | `NLCSLEGENDAOPTIES` | Alle instellingen bewerken in een venster (schaal, teksten, opmaak). |
 | `NLCSLEGENDAOMSCHRIJVINGEN` | De omschrijvingen per element bewerken in een tabel. |
 | `NLCSLEGENDATEKST` | Klik een element aan en pas de tekst ervan aan (meerdere regels mogelijk). |
-| `NLCSLEGENDABEHEER` | Regels uitvinken en eigen regels toevoegen in één venster. |
+| `NLCSLEGENDASAMENSTELLEN` | Regels uitvinken en eigen regels toevoegen in één venster. |
 | `NLCSLEGENDAUITVINKEN` | Klik een element aan om die regel uit de legenda te laten. |
 | `NLCSLEGENDATOEVOEGEN` | Een eigen regel toevoegen (type, laag en omschrijving zelf kiezen). |
 | `NLCSLEGENDASTATUS` | Eigen statussen maken en er regels aan toewijzen (naast Nieuw/Bestaand/...). |
