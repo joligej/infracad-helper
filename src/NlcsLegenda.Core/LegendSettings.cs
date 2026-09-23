@@ -410,10 +410,36 @@ public sealed class LegendSettings
 
     public void CopyFrom(LegendSettings other)
     {
+        // Scalars via reflectie; mutable collecties expliciet deep-copyen zodat een
+        // legenda nooit een collectie-instance deelt met de globale defaults of een
+        // andere legenda.
         foreach (var p in typeof(LegendSettings).GetProperties())
-            if (p is { CanRead: true, CanWrite: true })
+            if (p is { CanRead: true, CanWrite: true } && !IsCollectionProperty(p))
                 p.SetValue(this, p.GetValue(other));
+
+        IncludedStatuses = new HashSet<NlcsStatus>(other.IncludedStatuses);
+        IncludedDrawTypes = new HashSet<NlcsDrawType>(other.IncludedDrawTypes);
+        ExcludedDisciplines = new HashSet<string>(other.ExcludedDisciplines, StringComparer.OrdinalIgnoreCase);
+        ExcludedHoofdgroepen = new HashSet<string>(other.ExcludedHoofdgroepen, StringComparer.OrdinalIgnoreCase);
+        ExcludedEntries = new HashSet<string>(other.ExcludedEntries, StringComparer.OrdinalIgnoreCase);
+        TextOverrides = new Dictionary<string, string>(other.TextOverrides, StringComparer.OrdinalIgnoreCase);
+        XrefInclusion = new Dictionary<string, bool>(other.XrefInclusion, StringComparer.OrdinalIgnoreCase);
+        ManualEntries = other.ManualEntries.Select(m => m.Clone()).ToList();
+        CustomStatuses = other.CustomStatuses.Select(cs => cs.Clone()).ToList();
     }
+
+    // Een volledig onafhankelijke kopie: geen enkele collectie-instance wordt gedeeld.
+    public LegendSettings Clone()
+    {
+        var copy = new LegendSettings();
+        copy.CopyFrom(this);
+        return copy;
+    }
+
+    private static bool IsCollectionProperty(System.Reflection.PropertyInfo p) =>
+        p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
+            or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries) or nameof(TextOverrides)
+            or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses);
 
     [JsonIgnore, Browsable(false)]
     public double ModelUnitsPerPaperMm => Scale / 1000.0;
@@ -460,13 +486,42 @@ public sealed class LegendSettings
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
+    // System.Text.Json maakt bij deserialisatie ordinale HashSets/Dictionaries; de
+    // filters horen case-insensitive te blijven. Herstelt ook null-collecties uit
+    // handmatig bewerkte of oude JSON.
+    public LegendSettings Normalize()
+    {
+        IncludedStatuses ??= new HashSet<NlcsStatus>();
+        IncludedDrawTypes ??= new HashSet<NlcsDrawType>();
+        ManualEntries ??= new List<ManualEntry>();
+        CustomStatuses ??= new List<CustomStatus>();
+        ExcludedDisciplines = ToCi(ExcludedDisciplines);
+        ExcludedHoofdgroepen = ToCi(ExcludedHoofdgroepen);
+        ExcludedEntries = ToCi(ExcludedEntries);
+        TextOverrides = ToCi(TextOverrides);
+        XrefInclusion = ToCi(XrefInclusion);
+        return this;
+    }
+
+    private static HashSet<string> ToCi(HashSet<string>? source) =>
+        new(source ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+
+    private static Dictionary<string, T> ToCi<T>(Dictionary<string, T>? source)
+    {
+        var result = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
+        if (source is not null)
+            foreach (var kv in source)
+                result[kv.Key] = kv.Value;
+        return result;
+    }
+
     public static LegendSettings FromJson(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
             return new LegendSettings();
         try
         {
-            return JsonSerializer.Deserialize<LegendSettings>(json, JsonOptions) ?? new LegendSettings();
+            return (JsonSerializer.Deserialize<LegendSettings>(json, JsonOptions) ?? new LegendSettings()).Normalize();
         }
         catch
         {
@@ -484,7 +539,7 @@ public sealed class LegendSettings
             var parsed = JsonSerializer.Deserialize<LegendSettings>(json, JsonOptions);
             if (parsed is null)
                 return false;
-            settings = parsed;
+            settings = parsed.Normalize();
             return true;
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException or ArgumentException)
@@ -498,8 +553,8 @@ public sealed class LegendSettings
         try
         {
             if (File.Exists(path))
-                return JsonSerializer.Deserialize<LegendSettings>(File.ReadAllText(path), JsonOptions)
-                       ?? new LegendSettings();
+                return (JsonSerializer.Deserialize<LegendSettings>(File.ReadAllText(path), JsonOptions)
+                       ?? new LegendSettings()).Normalize();
         }
         catch
         {
