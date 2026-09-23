@@ -23,7 +23,11 @@ in het lint een tab **NLCS Legenda** met dezelfde functies.
 Je kunt meerdere legenda's naast elkaar in één tekening hebben, bijvoorbeeld één voor de
 hele tekening en aparte legenda's voor deelgebieden. Elke legenda onthoudt zijn eigen
 bron (hele tekening of selectie) en zijn eigen instellingen. `NLCSLEGENDABEHEER` toont de
-legenda's en laat je ze bijwerken, hernoemen, opzoeken (zoomen) en verwijderen.
+legenda's en laat je ze bijwerken, hernoemen, opzoeken (zoomen) en verwijderen. In
+hetzelfde venster pas je per gekozen legenda de instellingen aan (de legenda wordt daarna
+in dezelfde bewerking opnieuw opgebouwd), neem je de instellingen over van een andere
+legenda, dupliceer je een legenda, wijzig je de bronselectie of zet je de opmaak van die
+legenda als globale standaard voor nieuwe legenda's.
 
 Is het ontwerp veranderd, dan tekent `NLCSLEGENDAUPDATE` de legenda opnieuw op precies
 dezelfde plek. Is er één legenda, dan gaat dat direct; bij meerdere klik je de gewenste
@@ -33,9 +37,18 @@ de paper space een viewport rond de gekozen legenda op de ingestelde schaal.
 
 De globale instellingen zijn het startpunt voor een **nieuwe** legenda. Zet je later de
 globale standaard anders, dan verandert een bestaande legenda niet mee: die houdt de
-instellingen waarmee hij is gemaakt. Instellingen bewerk je met `NLCSLEGENDAOPTIES`, de
-omschrijvingen met `NLCSLEGENDAOMSCHRIJVINGEN`, en `NLCSLEGENDATEKST` past de tekst van
-één aangeklikt element aan.
+instellingen waarmee hij is gemaakt. De globale standaard bewerk je met `NLCSLEGENDAOPTIES`;
+de instellingen van één bestaande legenda pas je aan via `NLCSLEGENDABEHEER`. De
+omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`, en `NLCSLEGENDATEKST` past de
+tekst van één aangeklikt element aan. Een nieuwe legenda wordt standaard als één blok
+geplaatst; met *Exploderen bij plaatsen* kies je losse entiteiten.
+
+Weet je niet zeker waarom een element niet in de legenda staat? `NLCSLEGENDAWAAROM` laat
+je een object aanwijzen en meldt of en waarom het wel of niet in de gekozen legenda komt
+(status, discipline, hoofdgroep, elementsoort, xref, zichtbaarheid of uitgevinkt).
+
+De teksten volgen de NLCS-template: tekststijl `NLCS-ISO` met vaste hoogtes (2,5 mm voor
+regels, 5 mm voor koppen, 7 mm voor de titel) op de tekstlagen `-T25` en `-T50`.
 
 Onder de legenda komen standaard een meeschalende schaalbalk en een opmerkingenblok.
 Allebei kun je uitzetten of aanpassen.
@@ -76,7 +89,8 @@ importeren, zodat je een opzet met collega's kunt delen.
 |----------|------|
 | `NLCSLEGENDA` | Legenda genereren en met de muis plaatsen (hele tekening of selectie). |
 | `NLCSLEGENDAUPDATE` | Een legenda opnieuw tekenen op dezelfde plek; bij meerdere kies je welke. |
-| `NLCSLEGENDABEHEER` | Legenda's bekijken, bijwerken, hernoemen, opzoeken en verwijderen. |
+| `NLCSLEGENDABEHEER` | Legenda's bekijken, bijwerken, hernoemen, opzoeken, verwijderen, en per legenda instellingen aanpassen, overnemen, dupliceren of de bron wijzigen. |
+| `NLCSLEGENDAWAAROM` | Klik een object aan en zie of en waarom het in de gekozen legenda komt. |
 | `NLCSLEGENDAINFO` | Tonen wat erin zou komen (aantallen, lengtes, oppervlakten, totalen per hoofdgroep) en welke regels nog een eigen omschrijving missen, zonder te tekenen. |
 | `NLCSLEGENDAEXPORT` | De regels wegschrijven als CSV en JSON, met hoeveelheden en de herkomst van elke omschrijving. |
 | `NLCSLEGENDABATCH` | Alle DWG's in een map samen in één uittrekstaat (CSV/JSON) met een kolom Tekening. |
@@ -140,21 +154,21 @@ optie `Algemeen` (of `includeGeneralDescription`) zet je het algemene deel ervoo
 
 ## Configuratie
 
-Je stelt alles in met twee vensters: `NLCSLEGENDAOPTIES` voor de instellingen en
-`NLCSLEGENDAOMSCHRIJVINGEN` voor de teksten per element. Bovenin kies je waar het
-wordt bewaard: voor alle tekeningen, of alleen voor deze tekening.
+`NLCSLEGENDAOPTIES` bewerkt de **globale standaard** die geldt voor nieuwe legenda's.
+De instellingen van een bestaande legenda pas je aan via `NLCSLEGENDABEHEER`; die horen
+bij die ene legenda en worden in de tekening bewaard. De opmaak van een legenda kun je in
+het beheervenster ook als nieuwe globale standaard instellen.
 
-De globale keuze schrijft twee JSON-bestanden in `%APPDATA%\NlcsLegenda\`
-(`settings.json` en `omschrijvingen.json`), los van de plugin zelf: de dll's staan in
-`ApplicationPlugins` (vaak alleen-lezen) en je instellingen bij je profiel.
-`NLCSLEGENDACONFIG` maakt die bestanden aan en toont de paden.
+De globale standaard staat in `%APPDATA%\NlcsLegenda\settings.json`, los van de plugin
+zelf: de dll's staan in `ApplicationPlugins` (vaak alleen-lezen) en je instellingen bij je
+profiel. `NLCSLEGENDACONFIG` maakt dat bestand aan en toont de paden. Een voorbeeld staat
+in [deploy/settings.sample.json](deploy/settings.sample.json); wat je weglaat krijgt de
+standaardwaarde.
 
-Kies je "alleen deze tekening", dan gaat de configuratie de tekening zelf in. Er komen
-dan geen losse bestanden naast je `.dwg` of naast een template, en het werkt ook voor
-een nog niet opgeslagen tekening. Deze keuze gaat vóór de globale. Voorbeelden van de
-globale bestanden staan in [deploy/settings.sample.json](deploy/settings.sample.json)
-en [deploy/omschrijvingen.sample.json](deploy/omschrijvingen.sample.json); wat je
-weglaat krijgt de standaardwaarde.
+De omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`. Die kun je globaal bewaren
+(`%APPDATA%\NlcsLegenda\omschrijvingen.json`) of alleen in de huidige tekening; de keuze
+per tekening gaat vóór de globale. Een voorbeeld staat in
+[deploy/omschrijvingen.sample.json](deploy/omschrijvingen.sample.json).
 
 ## Bouwen en testen
 
