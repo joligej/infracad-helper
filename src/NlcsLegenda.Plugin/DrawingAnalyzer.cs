@@ -1,4 +1,5 @@
 using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.Geometry;
 using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
@@ -28,28 +29,38 @@ public static class DrawingAnalyzer
         public readonly Dictionary<string, string> SymbolBlocks = new(StringComparer.OrdinalIgnoreCase);
         public readonly HashSet<string> ExcludedNlcs = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, bool> Visible = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<ObjectId> Excluded = new();
         public LayerTable? Layers;
     }
+
+    // Veiligheidslimiet tegen ontspoorde recursie; echte cycli worden met een pad-set
+    // afgevangen, dus deze grens hoeft niet laag te zijn.
+    private const int MaxDepth = 16;
 
     public static AnalysisResult Analyze(
         Database db, Transaction tr, LegendSettings settings,
         IReadOnlyCollection<ObjectId>? selection = null,
-        DescriptionCatalog? catalog = null)
+        DescriptionCatalog? catalog = null,
+        IReadOnlyCollection<ObjectId>? excludedIds = null)
     {
         var c = new Collector();
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-        var visited = new HashSet<ObjectId>();
+        if (excludedIds is { Count: > 0 })
+            c.Excluded = new HashSet<ObjectId>(excludedIds);
+        // Pad-set voor cyclusdetectie op blokdefinities: een blok dat meerdere keren is
+        // ingevoegd, wordt per instance geteld, maar een echte cyclus wordt gestopt.
+        var path = new HashSet<ObjectId>();
 
         if (selection is { Count: > 0 })
         {
             foreach (var id in selection)
                 if (tr.GetObject(id, OpenMode.ForRead) is Entity ent)
-                    Process(ent, tr, c, settings, visited, 0, insideIncludedXref: false);
+                    Process(ent, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false);
         }
         else
         {
             var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
-            CollectFromBlock(msId, tr, c, settings, visited, 0, insideIncludedXref: false);
+            CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false);
         }
 
         var descriptions = ReadLayerDescriptions(db, tr, c.Parsed.Values);
@@ -89,44 +100,50 @@ public static class DrawingAnalyzer
 
     private static void CollectFromBlock(
         ObjectId btrId, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> visited, int depth, bool insideIncludedXref)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref)
     {
-        if (depth > 3 || !visited.Add(btrId))
+        if (depth > MaxDepth || !path.Add(btrId))
             return;
 
         var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
         foreach (ObjectId id in btr)
             if (tr.GetObject(id, OpenMode.ForRead) is Entity ent)
-                Process(ent, tr, c, settings, visited, depth, insideIncludedXref);
+                Process(ent, tr, c, settings, path, depth, transform, insideIncludedXref);
+
+        path.Remove(btrId);
     }
 
     private static void Process(
         Entity ent, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> visited, int depth, bool insideIncludedXref)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref)
     {
-        Record(ent, tr, c, settings);
+        // Eigen legenda-geometrie telt nooit als bron.
+        if (c.Excluded.Contains(ent.ObjectId))
+            return;
+
+        Record(ent, tr, c, settings, transform);
 
         if (ent is BlockReference br && !br.BlockTableRecord.IsNull)
         {
             var def = tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) as BlockTableRecord;
             if (def is { IsLayout: false })
             {
+                var nested = br.BlockTransform * transform;
                 if (def.IsFromExternalReference)
                 {
-                    // Een ingeschakelde bovenliggende xref neemt zijn geneste xrefs mee.
                     bool included = insideIncludedXref || settings.IsXrefIncluded(def.Name);
                     if (included)
-                        CollectFromBlock(br.BlockTableRecord, tr, c, settings, visited, depth + 1, insideIncludedXref: true);
+                        CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref: true);
                 }
                 else
                 {
-                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, visited, depth + 1, insideIncludedXref);
+                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref);
                 }
             }
         }
     }
 
-    private static void Record(Entity ent, Transaction tr, Collector c, LegendSettings settings)
+    private static void Record(Entity ent, Transaction tr, Collector c, LegendSettings settings, Matrix3d transform)
     {
         var layerName = ent.Layer;
         if (c.NonNlcs.Contains(layerName))
@@ -162,7 +179,7 @@ public static class DrawingAnalyzer
             }
         }
 
-        AddMetric(ent, nlcs.LocalName, c);
+        AddMetric(ent, nlcs.LocalName, c, transform);
 
         if (ent is Hatch hatch && !c.Hatches.ContainsKey(layerName))
             c.Hatches[layerName] = HatchSample.From(hatch);
@@ -176,25 +193,65 @@ public static class DrawingAnalyzer
         }
     }
 
-    private static void AddMetric(Entity ent, string localLayer, Collector c)
+    private static void AddMetric(Entity ent, string localLayer, Collector c, Matrix3d transform)
     {
         c.Metrics.TryGetValue(localLayer, out var metric);
+        bool identity = transform.IsEqualTo(Matrix3d.Identity);
 
         double length = 0, area = 0;
         switch (ent)
         {
             case Hatch h:
-                area = SafeArea(() => h.Area);
+                // Oppervlak schaalt met de determinant van het lineaire deel van de transform.
+                area = SafeArea(() => h.Area) * AreaScale(transform);
                 break;
             case Curve curve:
-                length = SafeLength(curve);
-                if (curve.Closed)
-                    area = SafeArea(() => curve.Area);
+                if (identity)
+                {
+                    length = SafeLength(curve);
+                    if (curve.Closed) area = SafeArea(() => curve.Area);
+                }
+                else
+                {
+                    // Meet op een getransformeerde kopie, zodat rotatie/schaal uit een
+                    // blok-insertie correct in lengte en oppervlak doorwerken.
+                    (length, area) = MeasureTransformed(curve, transform);
+                }
                 break;
         }
 
         c.Metrics[localLayer] = metric.Add(1, length, area);
     }
+
+    private static (double length, double area) MeasureTransformed(Curve curve, Matrix3d transform)
+    {
+        try
+        {
+            using var copy = (Curve)curve.GetTransformedCopy(transform);
+            double length = SafeLength(copy);
+            double area = copy.Closed ? SafeArea(() => copy.Area) : 0;
+            return (length, area);
+        }
+        catch
+        {
+            // Kan de kopie niet worden gemaakt/gemeten, val terug op de ongetransformeerde
+            // meting met een uniforme schaalbenadering in plaats van een stil fout getal.
+            double s = UniformScale(transform);
+            double length = SafeLength(curve) * s;
+            double area = curve.Closed ? SafeArea(() => curve.Area) * s * s : 0;
+            return (length, area);
+        }
+    }
+
+    // |det| van het 3x3 lineaire deel: de factor waarmee oppervlak schaalt.
+    private static double AreaScale(Matrix3d m)
+    {
+        var cs = m.CoordinateSystem3d;
+        var det = cs.Xaxis.DotProduct(cs.Yaxis.CrossProduct(cs.Zaxis));
+        return Math.Abs(det) < 1e-12 ? 1.0 : Math.Abs(det);
+    }
+
+    private static double UniformScale(Matrix3d m) => Math.Cbrt(AreaScale(m));
 
     private static double SafeLength(Curve curve)
     {
