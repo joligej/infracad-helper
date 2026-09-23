@@ -22,9 +22,12 @@ public sealed class LegendEntry
 
     public Dictionary<NlcsDrawType, string> LayersByType { get; init; } = new();
 
+    // Alleen de echte G/GD/GS-laag. GV valt hier bewust niet onder: een vlak rendert als
+    // rechthoek, een G-lijn altijd als lijn, ook als beide op dezelfde entry zitten.
     public string? GeometryLayer =>
-        LayersByType.TryGetValue(NlcsDrawType.Geometrie, out var g) ? g
-        : LayersByType.TryGetValue(NlcsDrawType.Vlak, out var v) ? v : null;
+        LayersByType.TryGetValue(NlcsDrawType.Geometrie, out var g) ? g : null;
+
+    public string? VlakLayer => LayersByType.TryGetValue(NlcsDrawType.Vlak, out var v) ? v : null;
 
     public string? HatchLayer => LayersByType.TryGetValue(NlcsDrawType.Arcering, out var a) ? a : null;
 
@@ -39,7 +42,7 @@ public sealed class LegendEntry
     public bool IsArea => HasHatch || LayersByType.ContainsKey(NlcsDrawType.Vlak);
 
     public string PrimaryLayer =>
-        GeometryLayer ?? HatchOrFillLayer ?? SymbolLayer
+        GeometryLayer ?? VlakLayer ?? HatchOrFillLayer ?? SymbolLayer
         ?? LayersByType.Values.FirstOrDefault() ?? "0";
 
     public LayerMetric Metric { get; init; } = LayerMetric.Empty;
