@@ -130,7 +130,7 @@ public sealed class LegendSettings
     public LegendSortMode SortMode { get; set; } = LegendSortMode.Status;
 
     [Category("Weergave"), DisplayName("Exploderen bij plaatsen"), Description("Losse entiteiten; anders blijft het één blok.")]
-    public bool ExplodeOnPlace { get; set; } = true;
+    public bool ExplodeOnPlace { get; set; } = false;
 
     [Category("Weergave"), DisplayName("Onzichtbare lagen meenemen")]
     public bool IncludeInvisibleLayers { get; set; } = false;
@@ -198,10 +198,10 @@ public sealed class LegendSettings
     public double TextHeightMm { get; set; } = 2.5;
 
     [Category("Maatvoering (mm)"), DisplayName("Teksthoogte kopregel")]
-    public double HeaderTextHeightMm { get; set; } = 4.0;
+    public double HeaderTextHeightMm { get; set; } = 5.0;
 
     [Category("Maatvoering (mm)"), DisplayName("Teksthoogte titel")]
-    public double TitleTextHeightMm { get; set; } = 6.0;
+    public double TitleTextHeightMm { get; set; } = 7.0;
 
     [Category("Maatvoering (mm)"), DisplayName("Witruimte boven kopregel")]
     public double HeaderSpacingMm { get; set; } = 6.0;
@@ -223,11 +223,11 @@ public sealed class LegendSettings
     [Category("Lagen"), DisplayName("Kaderlaag")]
     public string FrameLayer { get; set; } = "X-XX-AL-LEGENDA_KADER-G";
 
-    [Category("Lagen"), DisplayName("Swatch-vakjeslaag (niet plotten)")]
-    public string SwatchFrameLayer { get; set; } = "X-XX-AL-HULPLIJN-G";
+    [Category("Lagen"), DisplayName("Tekstlaag omschrijvingen")]
+    public string TextLayer { get; set; } = "X-XX-AL-LEGENDA-T25";
 
-    [Category("Lagen"), DisplayName("Tekstlaag")]
-    public string TextLayer { get; set; } = "X-XX-AL-LEGENDA_TEKST-T";
+    [Category("Lagen"), DisplayName("Tekstlaag koppen/titel")]
+    public string HeaderTextLayer { get; set; } = "X-XX-AL-LEGENDA-T50";
 
     // ---- Filters (niet in de GUI-grid; via commando's/JSON) ----
 
@@ -436,6 +436,38 @@ public sealed class LegendSettings
         return copy;
     }
 
+    // Zet alleen opmaak (maatvoering, tekst, lagen, swatch/symbool) terug naar de
+    // templatestandaard. Bron, filters, xrefs, custom statuses, exclusions, handmatige
+    // regels, labels/teksten, schaal en legenda-identiteit blijven ongemoeid.
+    public void ResetFormattingToTemplate()
+    {
+        var d = new LegendSettings();
+        SwatchWidthMm = d.SwatchWidthMm;
+        SwatchHeightMm = d.SwatchHeightMm;
+        RowPitchMm = d.RowPitchMm;
+        LineSpacingFactor = d.LineSpacingFactor;
+        TextHeightMm = d.TextHeightMm;
+        HeaderTextHeightMm = d.HeaderTextHeightMm;
+        TitleTextHeightMm = d.TitleTextHeightMm;
+        HeaderSpacingMm = d.HeaderSpacingMm;
+        TextGapMm = d.TextGapMm;
+        ColumnWidthMm = d.ColumnWidthMm;
+        ColumnGapMm = d.ColumnGapMm;
+        QuantityColumnWidthMm = d.QuantityColumnWidthMm;
+        BorderMarginMm = d.BorderMarginMm;
+        RemarksWidthMm = d.RemarksWidthMm;
+        ScaleBarSegments = d.ScaleBarSegments;
+        ScaleBarSegmentMeters = d.ScaleBarSegmentMeters;
+        ScaleBarHeightMm = d.ScaleBarHeightMm;
+        HatchScaleFactor = d.HatchScaleFactor;
+        DrawSwatchFrame = d.DrawSwatchFrame;
+        ExplodeOnPlace = d.ExplodeOnPlace;
+        TextStyle = d.TextStyle;
+        FrameLayer = d.FrameLayer;
+        TextLayer = d.TextLayer;
+        HeaderTextLayer = d.HeaderTextLayer;
+    }
+
     private static bool IsCollectionProperty(System.Reflection.PropertyInfo p) =>
         p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries) or nameof(TextOverrides)
@@ -444,19 +476,29 @@ public sealed class LegendSettings
     [JsonIgnore, Browsable(false)]
     public double ModelUnitsPerPaperMm => Scale / 1000.0;
 
-    public bool IsIncluded(NlcsLayerName layer)
+    public bool IsIncluded(NlcsLayerName layer) => ExplainExclusion(layer) is null;
+
+    // Geeft de reden waarom een laag buiten de legenda valt, of null als hij meetelt. Zo
+    // gebruiken filter en diagnose ("waarom ontbreekt dit?") exact dezelfde beslissing.
+    // De elementsoort- en zichtbaarheidsfilters zitten hier bewust niet in: die werken op
+    // entiteitsniveau, niet op de laagnaam.
+    public string? ExplainExclusion(NlcsLayerName layer)
     {
         var key = EntryKey(layer);
         // Uitvinken en een uitgeschakelde xref winnen altijd, ook van een eigen status.
-        if (ExcludedEntries.Contains(key)) return false;
-        if (layer.IsXref && !IsXrefIncluded(layer.XrefName)) return false;
+        if (ExcludedEntries.Contains(key)) return "de regel is handmatig uitgevinkt";
+        if (layer.IsXref && !IsXrefIncluded(layer.XrefName))
+            return $"xref '{layer.XrefName}' wordt niet meegenomen";
         // Een handmatige toewijzing aan een eigen status haalt de laag door de
         // status-/discipline-/hoofdgroepfilters heen: de gebruiker koos die regel bewust.
-        if (FindCustomStatus(key) is not null) return true;
-        if (!IncludedStatuses.Contains(layer.Status)) return false;
-        if (ExcludedDisciplines.Contains(layer.Discipline)) return false;
-        if (ExcludedHoofdgroepen.Contains(layer.Hoofdgroep)) return false;
-        return true;
+        if (FindCustomStatus(key) is not null) return null;
+        if (!IncludedStatuses.Contains(layer.Status))
+            return $"status '{layer.Status}' staat uit";
+        if (ExcludedDisciplines.Contains(layer.Discipline))
+            return $"discipline '{layer.Discipline}' is uitgesloten";
+        if (ExcludedHoofdgroepen.Contains(layer.Hoofdgroep))
+            return $"hoofdgroep '{layer.Hoofdgroep}' is uitgesloten";
+        return null;
     }
 
     // Bij geneste xrefs bepaalt de bovenste xref de keuze uit de instellingen.

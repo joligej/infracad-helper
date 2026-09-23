@@ -89,26 +89,37 @@ internal sealed class ButtonBar : FlowLayoutPanel
 internal sealed class SettingsDialog : Form
 {
     private readonly PropertyGrid _grid;
-    private readonly ScopeBar _scopeBar;
-    private readonly Func<ConfigScope, LegendSettings> _loader;
-    private LegendSettings _settings;
+    private readonly LegendSettings _settings;
 
     public event EventHandler? ApplyRequested;
 
-    public SettingsDialog(ConfigScope initialScope, Func<ConfigScope, LegendSettings> loader)
+    // Bewerkt precies één instellingenobject (een werkkopie). De aanroeper bepaalt de scope
+    // (globale standaard of één specifieke legenda) en past het resultaat toe; de dialog
+    // zelf kent geen tekening- of legenda-scope meer.
+    public SettingsDialog(LegendSettings settings, string contextLabel)
     {
-        _loader = loader;
-        _settings = loader(initialScope);
+        _settings = settings;
 
         Text = "NLCS Legenda \u2013 instellingen";
         Font = SystemFonts.MessageBoxFont;
         ClientSize = new Size(520, 640);
-        MinimumSize = new Size(460, 460);
+        MinimumSize = new Size(460, 480);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = false;
         ShowIcon = false;
         MinimizeBox = false;
+
+        var header = new Label
+        {
+            Dock = DockStyle.Top,
+            Text = contextLabel,
+            AutoSize = false,
+            Height = 28,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(10, 0, 0, 0),
+            Font = new Font(SystemFonts.MessageBoxFont!, FontStyle.Bold)
+        };
 
         _grid = new PropertyGrid
         {
@@ -119,22 +130,18 @@ internal sealed class SettingsDialog : Form
             HelpVisible = true
         };
 
-        _scopeBar = new ScopeBar(initialScope);
-        _scopeBar.ScopeChanged += (_, _) =>
-        {
-            _settings = _loader(_scopeBar.Scope);
-            _grid.SelectedObject = _settings;
-            ScrollToTop();
-        };
-
         var buttons = new ButtonBar(withApply: true);
         buttons.Apply!.Click += (_, _) =>
         {
             if (ValidateScale())
                 ApplyRequested?.Invoke(this, EventArgs.Empty);
         };
+        var remarks = buttons.AddExtra("Opmerkingen\u2026");
+        remarks.Click += (_, _) => EditRemarks();
+        var resetFormat = buttons.AddExtra("Opmaak \u2192 template");
+        resetFormat.Click += (_, _) => { _settings.ResetFormattingToTemplate(); _grid.Refresh(); };
         var reset = buttons.AddExtra("Standaardwaarden");
-        reset.Click += (_, _) => { ResetToDefaults(_settings); _grid.Refresh(); ScrollToTop(); };
+        reset.Click += (_, _) => { ResetToDefaults(_settings); _grid.Refresh(); };
         AcceptButton = buttons.Ok;
         CancelButton = buttons.Cancel;
 
@@ -142,24 +149,19 @@ internal sealed class SettingsDialog : Form
 
         Controls.Add(_grid);
         Controls.Add(buttons);
-        Controls.Add(_scopeBar);
+        Controls.Add(header);
     }
 
     public LegendSettings Settings => _settings;
 
-    public ConfigScope Scope => _scopeBar.Scope;
-
-    private void ScrollToTop()
+    private void EditRemarks()
     {
-        var item = _grid.SelectedGridItem;
-        if (item is null)
-            return;
-        while (item.Parent is not null)
-            item = item.Parent;
-        foreach (GridItem child in item.GridItems)
+        using var dlg = new RemarksEditDialog(_settings.RemarksTitle, _settings.RemarksText);
+        if (dlg.ShowDialog(this) == DialogResult.OK)
         {
-            _grid.SelectedGridItem = child;
-            break;
+            _settings.RemarksTitle = dlg.RemarksTitle;
+            _settings.RemarksText = dlg.RemarksText;
+            _grid.Refresh();
         }
     }
 
@@ -188,6 +190,74 @@ internal sealed class SettingsDialog : Form
             property.SetValue(target, property.GetValue(defaults));
         }
     }
+}
+
+// Meerregelige editor voor de opmerkingen: Enter maakt een nieuwe regel, met scrollbar en
+// gewone klembord-ondersteuning. Regeleindes en lege regels blijven exact behouden.
+internal sealed class RemarksEditDialog : Form
+{
+    private readonly TextBox _title;
+    private readonly TextBox _body;
+
+    public RemarksEditDialog(string title, string body)
+    {
+        Text = "NLCS Legenda \u2013 opmerkingen";
+        Font = SystemFonts.MessageBoxFont;
+        ClientSize = new Size(560, 420);
+        MinimumSize = new Size(420, 320);
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        ShowInTaskbar = false;
+        ShowIcon = false;
+        MinimizeBox = false;
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            Padding = new Padding(8, 6, 8, 6)
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        layout.Controls.Add(new Label { Text = "Kop", AutoSize = true, Margin = new Padding(0, 2, 0, 2) }, 0, 0);
+        _title = new TextBox { Dock = DockStyle.Fill, Text = title };
+        layout.Controls.Add(_title, 0, 1);
+        layout.Controls.Add(new Label
+        {
+            Text = "Tekst (Enter = nieuwe regel; gebruik \u2022 voor opsommingen)",
+            AutoSize = true,
+            Margin = new Padding(0, 8, 0, 2)
+        }, 0, 2);
+        _body = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            AcceptsReturn = true,
+            WordWrap = true,
+            ScrollBars = ScrollBars.Vertical,
+            Text = body
+        };
+        layout.Controls.Add(_body, 0, 3);
+
+        var buttons = new ButtonBar(withApply: false);
+        AcceptButton = buttons.Ok;
+        CancelButton = buttons.Cancel;
+        // Enter in het meerregelige veld hoort een regeleinde te maken, niet OK te drukken.
+        buttons.Ok.Click += (_, _) => DialogResult = DialogResult.OK;
+
+        Controls.Add(layout);
+        Controls.Add(buttons);
+    }
+
+    public string RemarksTitle => _title.Text.Trim();
+
+    // Body niet trimmen op regelniveau: bewuste lege regels en inspringing blijven staan.
+    public string RemarksText => _body.Text.Replace("\r\n", "\n").Trim('\n');
 }
 
 public sealed class DescriptionRow

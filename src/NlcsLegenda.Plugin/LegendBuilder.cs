@@ -29,7 +29,7 @@ public static class LegendBuilder
 
         EnsureLayer(tr, db, s.FrameLayer, 7);
         EnsureLayer(tr, db, s.TextLayer, 7);
-        EnsureLayer(tr, db, s.SwatchFrameLayer, 7, plottable: false);
+        EnsureLayer(tr, db, s.HeaderTextLayer, 7);
         var styleId = ResolveTextStyle(tr, db, s.TextStyle);
 
         double swatchW = s.ToModel(s.SwatchWidthMm);
@@ -49,7 +49,7 @@ public static class LegendBuilder
             {
                 case LegendItemKind.Title:
                     AddText(btr, tr, item.Text, new Point3d(item.X, item.YTop - titleH, 0),
-                        titleH, s.TextLayer, styleId);
+                        titleH, s.HeaderTextLayer, styleId);
                     var underline = new Line(
                         new Point3d(layout.MinX, item.YTop - titleH * TitleUnderlineOffset, 0),
                         new Point3d(layout.MaxX, item.YTop - titleH * TitleUnderlineOffset, 0)) { Layer = s.FrameLayer };
@@ -59,7 +59,7 @@ public static class LegendBuilder
 
                 case LegendItemKind.Header:
                     AddText(btr, tr, item.Text, new Point3d(item.X, item.YTop - headerH, 0),
-                        headerH, s.TextLayer, styleId);
+                        headerH, s.HeaderTextLayer, styleId);
                     break;
 
                 case LegendItemKind.SubHeader:
@@ -275,49 +275,73 @@ public static class LegendBuilder
         foreach (var lyr in entry.LayersByType.Values)
             EnsureLayer(tr, db, lyr, 7);
 
-        // Swatch-kaders staan op een niet-plotbare hulplijnlaag.
-        var rect = MakeRectangle(x, bottom, swatchW, swatchH, s.SwatchFrameLayer);
-        btr.AppendEntity(rect);
-        tr.AddNewlyCreatedDBObject(rect, true);
+        // Elke elementsoort rendert volgens zijn eigen semantiek en wordt van achter naar
+        // voren gestapeld: eerst vlak/vulling/arcering als achtergrond, dan de G-lijn als
+        // lijnsample, dan het symbool. Zo blijft een G altijd een lijn, ook als dezelfde
+        // entry daarnaast een arcering of vulling heeft.
 
-        if (entry.HasHatch)
+        // Vlak (GV): begrensd oppervlak, weergegeven als rechthoek op de bronlaag.
+        if (entry.VlakLayer is { } vlakLayer)
         {
-            var hatchLayer = entry.HatchOrFillLayer!;
+            var area = MakeRectangle(x, bottom, swatchW, swatchH, vlakLayer);
+            btr.AppendEntity(area);
+            tr.AddNewlyCreatedDBObject(area, true);
+        }
+
+        // Vlakvulling (V): egale (SOLID) vulling van het vakje.
+        if (entry.FillLayer is { } fillLayer)
+        {
+            var fillBoundary = MakeRectangle(x, bottom, swatchW, swatchH, fillLayer);
+            var fillId = btr.AppendEntity(fillBoundary);
+            tr.AddNewlyCreatedDBObject(fillBoundary, true);
+            AddSolidFill(btr, tr, fillId, fillLayer);
+        }
+
+        // Arcering (A): het patroon uit de brontekening.
+        if (entry.HatchLayer is { } hatchLayer)
+        {
             analysis.HatchSamples.TryGetValue(hatchLayer, out var sample);
             AddHatch(btr, tr, x, bottom, swatchW, swatchH, hatchLayer, sample, s.HatchScaleFactor);
         }
 
-        bool symbolDrawn = false;
-        if (entry.SymbolLayer is { } symLayer && s.InsertSymbolBlocks && entry.SymbolBlockName is { } blk)
-        {
-            symbolDrawn = TryInsertSymbol(btr, tr, db, blk, symLayer,
-                x + swatchW / 2, midY, swatchW, swatchH);
-        }
-
+        // Geometrie (G/GD/GS): altijd een horizontale lijn; linetype en kleur volgen ByLayer.
         if (entry.GeometryLayer is { } geoLayer)
         {
-            if (entry.IsArea)
+            var line = new Polyline();
+            line.AddVertexAt(0, new Point2d(x, midY), 0, 0, 0);
+            line.AddVertexAt(1, new Point2d(x + swatchW, midY), 0, 0, 0);
+            line.Layer = geoLayer;
+            btr.AppendEntity(line);
+            tr.AddNewlyCreatedDBObject(line, true);
+        }
+
+        // Symbool (S): echt blok passend in het vakje. Staat de optie uit, dan tekenen we
+        // niets (geen nep-cirkel). Alleen als het vakje verder leeg is en een aanwezig blok
+        // niet geplaatst kan worden, valt het terug op een neutrale markering.
+        if (entry.SymbolLayer is { } symLayer)
+        {
+            bool symbolDrawn = false;
+            if (s.InsertSymbolBlocks && entry.SymbolBlockName is { } blk)
+                symbolDrawn = TryInsertSymbol(btr, tr, db, blk, symLayer,
+                    x + swatchW / 2, midY, swatchW, swatchH);
+
+            bool swatchOtherwiseEmpty = entry.GeometryLayer is null && entry.VlakLayer is null
+                && entry.FillLayer is null && entry.HatchLayer is null;
+            if (!symbolDrawn && s.InsertSymbolBlocks && swatchOtherwiseEmpty)
             {
-                var inner = MakeRectangle(x, bottom, swatchW, swatchH, geoLayer);
-                btr.AppendEntity(inner);
-                tr.AddNewlyCreatedDBObject(inner, true);
-            }
-            else
-            {
-                var line = new Polyline();
-                line.AddVertexAt(0, new Point2d(x, midY), 0, 0, 0);
-                line.AddVertexAt(1, new Point2d(x + swatchW, midY), 0, 0, 0);
-                line.Layer = geoLayer;
-                btr.AppendEntity(line);
-                tr.AddNewlyCreatedDBObject(line, true);
+                var marker = new Circle(new Point3d(x + swatchW / 2, midY, 0), Vector3d.ZAxis,
+                    Math.Min(swatchW, swatchH) * MarkerRadiusRatio) { Layer = symLayer };
+                btr.AppendEntity(marker);
+                tr.AddNewlyCreatedDBObject(marker, true);
             }
         }
-        else if (!symbolDrawn && entry.SymbolLayer is { } symLayer2)
+
+        // Kader per swatch: alleen een zichtbaar vakje op de kaderlaag als de gebruiker dat wil.
+        if (s.DrawSwatchFrame)
         {
-            var marker = new Circle(new Point3d(x + swatchW / 2, midY, 0), Vector3d.ZAxis,
-                Math.Min(swatchW, swatchH) * MarkerRadiusRatio) { Layer = symLayer2 };
-            btr.AppendEntity(marker);
-            tr.AddNewlyCreatedDBObject(marker, true);
+            var frame = MakeRectangle(x, bottom, swatchW, swatchH, s.FrameLayer);
+            btr.AppendEntity(frame);
+            tr.AddNewlyCreatedDBObject(frame, true);
         }
 
         // Omschrijving als MText met vaste breedte: AutoCAD breekt exact op de kolombreedte
@@ -666,17 +690,32 @@ public static class LegendBuilder
         tr.AddNewlyCreatedDBObject(ltr, true);
     }
 
-    // InfraCAD-tekeningen hebben vaak een tekststijl met NLCS in de naam.
+    // De NLCS-template schrijft tekststijl "NLCS-ISO" voor (font NLCS-ISO.ttf). Die krijgt
+    // voorrang boven een losse "bevat NLCS"-match; hoogtes zetten we zelf per tekst.
     private static ObjectId ResolveTextStyle(Transaction tr, Database db, string name)
     {
         var tst = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForRead);
         if (!string.IsNullOrWhiteSpace(name) && tst.Has(name))
             return tst[name];
 
+        if (tst.Has("NLCS-ISO"))
+            return tst["NLCS-ISO"];
+
+        // Een variabele-hoogte NLCS-ISO-stijl (height 0) is bruikbaar; vaste-hoogte varianten
+        // (NLCS-ISO-M500-T25 e.d.) negeren onze eigen teksthoogte en slaan we over.
         foreach (ObjectId id in tst)
         {
             if (tr.GetObject(id, OpenMode.ForRead) is TextStyleTableRecord ts &&
-                ts.Name.Contains("NLCS", StringComparison.OrdinalIgnoreCase))
+                ts.Name.StartsWith("NLCS-ISO", StringComparison.OrdinalIgnoreCase) &&
+                ts.TextSize == 0.0)
+                return id;
+        }
+
+        foreach (ObjectId id in tst)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is TextStyleTableRecord ts &&
+                ts.Name.Contains("NLCS", StringComparison.OrdinalIgnoreCase) &&
+                ts.TextSize == 0.0)
                 return id;
         }
         return db.Textstyle;

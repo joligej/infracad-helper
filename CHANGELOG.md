@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.15.0 - 2026-09-23
+
+- Legenda-opmaak volgt de NLCS-template: tekststijl `NLCS-ISO`, standaard teksthoogtes
+  (2,5 mm regels, 5 mm koppen, 7 mm titel) en de tekstlagen `-T25`/`-T50`.
+- Een geometrieregel (G) blijft altijd een lijn, ook als hetzelfde element een arcering of
+  vulling heeft. Vlakken, vlakvullingen, arceringen en symbolen renderen elk apart.
+- `Kader per swatch` en `Symboolblokken invoegen` werken nu zoals verwacht: staat een optie
+  uit, dan wordt het vakje niet omkaderd respectievelijk geen symbool of vervangende cirkel
+  getekend.
+- Nieuwe legenda's worden standaard als één blok geplaatst (niet meer geëxplodeerd).
+- Instellingen per legenda: in `NLCSLEGENDABEHEER` pas je de opmaak van één gekozen legenda
+  aan; de legenda wordt daarna in dezelfde bewerking opnieuw opgebouwd.
+- Instellingen overnemen van een andere legenda, een legenda dupliceren, de bronselectie
+  aanpassen (vervangen/toevoegen/verwijderen) en de opmaak van een legenda als globale
+  standaard instellen.
+- `NLCSLEGENDAWAAROM`: klik een object aan en zie of en waarom het wel of niet in een
+  gekozen legenda komt.
+- Meerregelige opmerkingen met een echte editor; regeleindes en opsommingen blijven behouden.
+- `Opmaak → template` zet alleen de opmaak terug, niet de bron, filters of eigen regels.
+
 ## 1.14.0 - 2026-09-23
 
 - Meerdere legenda's kunnen naast elkaar in één tekening staan, elk met een eigen bron
