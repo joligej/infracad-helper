@@ -7,6 +7,15 @@ public enum LegendScope
     Selection
 }
 
+public static class LegendScopeExtensions
+{
+    public static string ToDisplay(this LegendScope scope) => scope switch
+    {
+        LegendScope.Selection => "selectie",
+        _ => "hele tekening"
+    };
+}
+
 // Eén beheerde legenda in een tekening: stabiele identiteit, bron-scope en een eigen
 // instellingen-snapshot. De geometrie hoort bij de AutoCAD-group met naam GroupName.
 public sealed class LegendDefinition

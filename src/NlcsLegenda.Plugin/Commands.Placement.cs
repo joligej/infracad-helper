@@ -25,7 +25,7 @@ public partial class Commands
     }
 
     private static List<ObjectId> FinalizePlacement(
-        Transaction tr, Database db, BlockReference br, LegendSettings s)
+        Transaction tr, Database db, BlockReference br, LegendSettings s, string groupName)
     {
         List<ObjectId> ids;
         if (s.ExplodeOnPlace)
@@ -40,73 +40,8 @@ public partial class Commands
             ids = new List<ObjectId> { br.ObjectId };
         }
 
-        AddToLegendGroup(tr, db, ids);
+        LegendManagement.AddToGroup(db, tr, groupName, ids);
         return ids;
-    }
-
-    private const string LegendGroupName = "NLCS-Legenda";
-
-    private static void AddToLegendGroup(
-        Transaction tr, Database db, IEnumerable<ObjectId> ids)
-    {
-        var idc = new ObjectIdCollection();
-        foreach (var id in ids)
-            idc.Add(id);
-        if (idc.Count == 0)
-            return;
-
-        var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForWrite);
-        Group group;
-        if (gd.Contains(LegendGroupName))
-        {
-            group = (Group)tr.GetObject(gd.GetAt(LegendGroupName), OpenMode.ForWrite);
-        }
-        else
-        {
-            group = new Group("NLCS-legenda (automatisch)", true);
-            gd.SetAt(LegendGroupName, group);
-            tr.AddNewlyCreatedDBObject(group, true);
-        }
-        group.Append(idc);
-    }
-
-    private static bool TryEraseLegendGroup(Database db, Transaction tr, out Point3d topLeft)
-    {
-        topLeft = Point3d.Origin;
-        var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
-        if (!gd.Contains(LegendGroupName))
-            return false;
-
-        var group = (Group)tr.GetObject(gd.GetAt(LegendGroupName), OpenMode.ForWrite);
-        var ids = group.GetAllEntityIds();
-        if (ids.Length == 0)
-        {
-            group.Erase();
-            return false;
-        }
-
-        // Bijwerken gebruikt de huidige linksbovenhoek, niet het oorspronkelijke plaatsingspunt.
-        double minX = double.MaxValue, maxY = double.MinValue;
-        bool any = false;
-        foreach (var id in ids)
-        {
-            if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent || ent.IsErased)
-                continue;
-            var ext = ent.Bounds;
-            if (ext.HasValue)
-            {
-                minX = Math.Min(minX, ext.Value.MinPoint.X);
-                maxY = Math.Max(maxY, ext.Value.MaxPoint.Y);
-                any = true;
-            }
-            ent.Erase();
-        }
-
-        group.Erase();
-        topLeft = new Point3d(
-            any && minX < double.MaxValue ? minX : 0,
-            any && maxY > double.MinValue ? maxY : 0, 0);
-        return true;
     }
 
     private static Point3d ComputeInsertPoint(Database db, LegendSettings s)
