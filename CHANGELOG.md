@@ -11,6 +11,9 @@
   die keuze weigeren ze veilig zonder iets te wijzigen.
 - Het controlecommando heet nu `NLCSLEGENDAELEMENT` (ribbon: "Element controleren") met
   compacte uitvoer; `NLCSLEGENDAWAAROM` blijft als alias werken.
+- Een regel die niet volledig getekend kan worden wordt nu gemeld in plaats van stil
+  overgeslagen; een bijgewerkte legenda met zulke regels geldt niet meer als volledig
+  geslaagd.
 
 ## 1.15.0 - 2026-09-23
 
