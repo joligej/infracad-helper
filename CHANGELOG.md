@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.17.0 - 2026-10-01
+
+- KLIC-groepering: voeg kabels/leidingen in de legenda samen op soort, spanning/druk,
+  uitvoering (mantelbuis/hulpstuk) of volgnummer. Zo worden bijvoorbeeld DATA, DATA2 en
+  DATA3 één regel. Hoeveelheden tellen op en het is omkeerbaar. In te stellen onder
+  *Groepering*, globaal of per legenda.
+- Generieke placeholdertekst uit KLIC-symbolen (zoals "TYPE \ LABEL \ OMSCHRIJVING") wordt
+  standaard weggelaten; echte omschrijvingen blijven staan.
+
 ## 1.16.0 - 2026-10-01
 
 - Commando's die een venster nodig hebben (klikken, dialogen) weigeren nu netjes in de
