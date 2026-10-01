@@ -43,7 +43,7 @@ omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`, en `NLCSLEGENDATEKST` 
 tekst van één aangeklikt element aan. Een nieuwe legenda wordt standaard als één blok
 geplaatst; met *Exploderen bij plaatsen* kies je losse entiteiten.
 
-Weet je niet zeker waarom een element niet in de legenda staat? `NLCSLEGENDAWAAROM` laat
+Weet je niet zeker waarom een element niet in de legenda staat? `NLCSLEGENDAELEMENT` laat
 je een object aanwijzen en meldt of en waarom het wel of niet in de gekozen legenda komt
 (status, discipline, hoofdgroep, elementsoort, xref, zichtbaarheid of uitgevinkt).
 
@@ -90,7 +90,7 @@ importeren, zodat je een opzet met collega's kunt delen.
 | `NLCSLEGENDA` | Legenda genereren en met de muis plaatsen (hele tekening of selectie). |
 | `NLCSLEGENDAUPDATE` | Een legenda opnieuw tekenen op dezelfde plek; bij meerdere kies je welke. |
 | `NLCSLEGENDABEHEER` | Legenda's bekijken, bijwerken, hernoemen, opzoeken, verwijderen, en per legenda instellingen aanpassen, overnemen, dupliceren of de bron wijzigen. |
-| `NLCSLEGENDAWAAROM` | Klik een object aan en zie of en waarom het in de gekozen legenda komt. |
+| `NLCSLEGENDAELEMENT` | Klik een object aan en zie of en waarom het in de gekozen legenda komt. |
 | `NLCSLEGENDAINFO` | Tonen wat erin zou komen (aantallen, lengtes, oppervlakten, totalen per hoofdgroep) en welke regels nog een eigen omschrijving missen, zonder te tekenen. |
 | `NLCSLEGENDAEXPORT` | De regels wegschrijven als CSV en JSON, met hoeveelheden en de herkomst van elke omschrijving. |
 | `NLCSLEGENDABATCH` | Alle DWG's in een map samen in één uittrekstaat (CSV/JSON) met een kolom Tekening. |
