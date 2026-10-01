@@ -9,6 +9,8 @@
 - Bij meerdere legenda's kiezen `NLCSLEGENDAUPDATE`/`NLCSLEGENDAEXPORT` headless de doel-
   legenda via de omgevingsvariabele `NLCSLEGENDA_TARGET` (legenda-id of unieke naam); zonder
   die keuze weigeren ze veilig zonder iets te wijzigen.
+- Het controlecommando heet nu `NLCSLEGENDAELEMENT` (ribbon: "Element controleren") met
+  compacte uitvoer; `NLCSLEGENDAWAAROM` blijft als alias werken.
 
 ## 1.15.0 - 2026-09-23
 

@@ -469,15 +469,17 @@ public partial class Commands
     // "Waarom ontbreekt dit?" (U5): diagnosticeert voor een gekozen legenda waarom een
     // aangeklikt object wel of niet wordt opgenomen. Gebruikt exact dezelfde filterlogica
     // als de analyse (ExplainExclusion + elementsoort- en zichtbaarheidsfilter).
+    // NLCSLEGENDAWAAROM blijft als alias bestaan voor wie het oude commando gewend is.
+    [CommandMethod("NLCSLEGENDAELEMENT", CommandFlags.Modal)]
     [CommandMethod("NLCSLEGENDAWAAROM", CommandFlags.Modal)]
-    public void NlcsLegendaWaarom()
+    public void NlcsLegendaElement()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        if (!RequireInteractive(ed, "NLCSLEGENDAWAAROM")) return;
+        if (!RequireInteractive(ed, "NLCSLEGENDAELEMENT")) return;
 
         try
         {
@@ -509,34 +511,30 @@ public partial class Commands
                 return;
             }
             var settings = target?.Settings ?? LoadGlobalDefaults();
-            var name = target?.Name ?? "de globale standaard";
+            var name = target?.Name ?? "globale standaard";
 
             using var tr = db.TransactionManager.StartTransaction();
-            if (LegendManagement.CollectManagedIds(db, tr, registry).Contains(per.ObjectId))
-            {
-                ed.WriteMessage("\nDit object hoort bij een beheerde legenda en telt nooit mee als bron.");
-                tr.Commit();
-                return;
-            }
-
-            if (tr.GetObject(per.ObjectId, OpenMode.ForRead) is not Entity ent)
-            {
-                tr.Commit();
-                return;
-            }
-            var reason = DiagnoseObject(db, tr, ent.Layer, settings, target, per.ObjectId, out var localName);
+            bool managed = LegendManagement.CollectManagedIds(db, tr, registry).Contains(per.ObjectId);
+            string layer = tr.GetObject(per.ObjectId, OpenMode.ForRead) is Entity ent ? ent.Layer : "?";
+            string? reason;
+            string localName = string.Empty;
+            if (managed)
+                reason = "hoort bij een beheerde legenda; telt niet mee als bron";
+            else
+                reason = DiagnoseObject(db, tr, layer, settings, target, per.ObjectId, out localName);
             tr.Commit();
 
-            var head = $"\nObject op laag '{ent.Layer}'"
-                + (string.IsNullOrEmpty(localName) ? "" : $" ({localName})") + $" — legenda {name}:";
-            ed.WriteMessage(head);
-            ed.WriteMessage(reason is null
-                ? "\n  \u2192 wordt opgenomen."
-                : $"\n  \u2192 niet opgenomen: {reason}.");
+            // Compacte, technische weergave.
+            ed.WriteMessage($"\nElement: {layer}"
+                + (string.IsNullOrEmpty(localName) ? "" : $" ({localName})"));
+            ed.WriteMessage($"\nLegenda: {name}");
+            ed.WriteMessage($"\nResultaat: {(reason is null ? "opgenomen" : "niet opgenomen")}");
+            if (reason is not null)
+                ed.WriteMessage($"\nReden: {reason}");
         }
         catch (Exception ex)
         {
-            ed.WriteMessage($"\nNLCSLEGENDAWAAROM fout: {ex.Message}");
+            ed.WriteMessage($"\nNLCSLEGENDAELEMENT fout: {ex.Message}");
         }
     }
 
