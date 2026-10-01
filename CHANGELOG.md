@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.0 - 2026-10-01
+
+- Gelijke statussen samenvoegen: voegt dezelfde regel uit verschillende statussen samen,
+  maar alleen als lijn, vlak, arcering en symbool er precies hetzelfde uitzien. In te stellen
+  onder *Groepering*.
+
 ## 1.17.0 - 2026-10-01
 
 - KLIC-groepering: voeg kabels/leidingen in de legenda samen op soort, spanning/druk,

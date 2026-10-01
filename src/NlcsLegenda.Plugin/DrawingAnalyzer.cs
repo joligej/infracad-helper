@@ -81,12 +81,17 @@ public static class DrawingAnalyzer
             };
         }
 
+        var renderIds = settings.MergeIdenticalStatuses
+            ? ReadRenderIds(db, tr, c.Parsed.Values)
+            : null;
+
         var entries = LegendGrouping.Build(
             c.Parsed.Values, settings,
             name => descriptions.TryGetValue(name, out var d) ? d : null,
             c.Metrics,
             name => c.SymbolBlocks.TryGetValue(name, out var b) ? b : null,
-            catalog);
+            catalog,
+            renderIds is null ? null : name => renderIds.TryGetValue(name, out var r) ? r : null);
 
         return new AnalysisResult
         {
@@ -298,6 +303,29 @@ public static class DrawingAnalyzer
         }
         c.Visible[layerName] = visible;
         return visible;
+    }
+
+    private static Dictionary<string, string> ReadRenderIds(
+        Database db, Transaction tr, IEnumerable<NlcsLayerName> layers)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        foreach (var layer in layers)
+        {
+            if (result.ContainsKey(layer.LocalName) || !lt.Has(layer.Raw))
+                continue;
+            if (tr.GetObject(lt[layer.Raw], OpenMode.ForRead) is not LayerTableRecord ltr)
+                continue;
+            string lt4 = "Continuous";
+            try
+            {
+                if (tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord ltype)
+                    lt4 = ltype.Name;
+            }
+            catch { /* standaard */ }
+            result[layer.LocalName] = $"{ltr.Color}|{lt4}|{ltr.LineWeight}";
+        }
+        return result;
     }
 
     private static Dictionary<string, string> ReadLayerDescriptions(
