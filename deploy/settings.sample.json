@@ -36,6 +36,8 @@
   "explodeOnPlace": false,
   "includeInvisibleLayers": false,
   "includeXrefLayers": false,
+  "mergedDimensions": [],
+  "suppressKlicPlaceholders": true,
   "includeScaleBar": true,
   "scaleBarSegments": 4,
   "scaleBarSegmentMeters": 0,

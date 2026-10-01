@@ -49,6 +49,11 @@ public sealed class LegendEntry
 
     public string? SymbolBlockName { get; init; }
 
+    // Bij samenvoegen (KLIC-groepering): de oorspronkelijke elementnamen die in deze regel
+    // zijn samengenomen. Leeg als er niets is samengevoegd. Puur informatief/traceerbaar;
+    // de groepering zelf is een afgeleide weergave en volledig omkeerbaar.
+    public IReadOnlyList<string> MergedMembers { get; init; } = System.Array.Empty<string>();
+
     public QuantityKind QuantityType
     {
         get

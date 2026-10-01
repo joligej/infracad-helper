@@ -63,12 +63,20 @@ element aan om die regel weg te laten (of weer terug te zetten). Heb je een eige
 die er juist wél bij hoort, dan maak je met `NLCSLEGENDATOEVOEGEN` een regel aan: je
 kiest het type (lijn, vlak, arcering, vlakvulling of symbool), de laag en de
 omschrijving. In `NLCSLEGENDABEHEER` staat dit bij elkaar in één venster. Het uitvinken
-en de eigen regels bewaar je globaal of per tekening.
+en de eigen regels horen bij de globale standaard of bij één legenda.
 
 Je kunt ook per elementsoort kiezen wat in de legenda komt: geometrie/lijnen, vlakken,
 arceringen, vlakvullingen en symbolen zijn afzonderlijk aan of uit te zetten. Standaard
 staat alles aan. Je vindt dit in `NLCSLEGENDAOPTIES` onder *Elementsoorten* en in het
 keuzemenu vóór het plaatsen. `NLCSLEGENDAINFO` meldt welke soorten uitstaan.
+
+Voor KLIC-tekeningen (kabels en leidingen) kun je regels samenvoegen op een eigenschap.
+Onder *Groepering* in de instellingen zet je los aan of je samenvoegt op soort, spanning/druk,
+uitvoering (mantelbuis/hulpstuk) of volgnummer. Zo worden bijvoorbeeld DATA, DATA2 en DATA3
+één regel, of hoog- en laagspanning samen. De hoeveelheden tellen op en het is omkeerbaar:
+zet je de groepering uit, dan staat elke laag weer apart. Generieke placeholdertekst uit
+KLIC-symbolen (zoals "TYPE \ LABEL \ OMSCHRIJVING") wordt standaard weggelaten; echte tekst
+blijft staan.
 
 Naast de vaste statussen (Nieuw, Bestaand, Vervallen, Tijdelijk, Revisie) maak je met
 `NLCSLEGENDASTATUS` eigen statussen aan. Daar wijs je regels aan toe: automatische
@@ -76,14 +84,14 @@ NLCS-lagen door ze in de tekening aan te wijzen, handmatige regels via een lijst
 regel verschijnt dan onder de eigen kopregel, ook als de gewone status ervan uitstaat.
 
 Werk je met externe referenties, dan bepaalt `NLCSLEGENDAXREFS` per gekoppelde xref of
-die meetelt. Globaal geldt één aan/uit-schakelaar; de keuze per xref leg je per tekening
-vast en gaat daar vóór.
+die meetelt. Dit geldt als globale standaard; per legenda pas je het aan via
+`NLCSLEGENDABEHEER`.
 
 Heb je een legenda-opzet die je vaker gebruikt, dan bewaar je die met `NLCSLEGENDAPRESET`
-als profiel. In een volgende tekening laad je het profiel weer, globaal of alleen voor die
-tekening. Zo hoef je schaal, teksten en opmaak niet telkens opnieuw in te stellen. Een
-profiel kun je ook exporteren naar een `.json`-bestand en op een andere computer weer
-importeren, zodat je een opzet met collega's kunt delen.
+als profiel. In een volgende tekening laad je het profiel weer als globale standaard. Zo
+hoef je schaal, teksten en opmaak niet telkens opnieuw in te stellen. Een profiel kun je
+ook exporteren naar een `.json`-bestand en op een andere computer weer importeren, zodat je
+een opzet met collega's kunt delen.
 
 | Commando | Doet |
 |----------|------|
