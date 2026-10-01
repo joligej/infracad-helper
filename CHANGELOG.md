@@ -1,6 +1,6 @@
 # Changelog
 
-## Niet uitgebracht
+## 1.16.0 - 2026-10-01
 
 - Commando's die een venster nodig hebben (klikken, dialogen) weigeren nu netjes in de
   AutoCAD Core Console in plaats van te kunnen crashen. Headless blijven `NLCSLEGENDAINFO`,
