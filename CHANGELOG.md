@@ -18,6 +18,8 @@
   globale standaard (voor nieuwe legenda's) of de eigen instellingen van één bestaande
   legenda (via `NLCSLEGENDABEHEER`). Oude tekeningspecifieke configuratie wordt nog gelezen
   en kan met `NLCSLEGENDACONFIG` worden gewist.
+- Knoppen in de instellingenvensters groeien mee met hun tekst, zodat langere labels niet
+  meer worden afgekapt.
 
 ## 1.15.0 - 2026-09-23
 

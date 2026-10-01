@@ -15,7 +15,7 @@ internal sealed class ButtonBar : FlowLayoutPanel
     {
         Dock = DockStyle.Bottom;
         FlowDirection = FlowDirection.RightToLeft;
-        WrapContents = false;
+        WrapContents = true;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Padding = new Padding(8, 6, 8, 8);
@@ -38,12 +38,17 @@ internal sealed class ButtonBar : FlowLayoutPanel
         return button;
     }
 
+    // Knoppen groeien mee met hun tekst (DPI-/taal-onafhankelijk) met een nette ondergrens,
+    // zodat langere labels als "Opmaak → template" niet worden afgekapt.
     private static Button MakeButton(string text, DialogResult result) => new()
     {
         Text = text,
         DialogResult = result,
-        Size = new Size(92, 26),
-        Margin = new Padding(6, 0, 0, 0),
+        AutoSize = true,
+        AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        MinimumSize = new Size(92, 28),
+        Padding = new Padding(10, 2, 10, 2),
+        Margin = new Padding(6, 3, 0, 0),
         UseVisualStyleBackColor = true
     };
 }
@@ -64,8 +69,8 @@ internal sealed class SettingsDialog : Form
 
         Text = "NLCS Legenda \u2013 instellingen";
         Font = SystemFonts.MessageBoxFont;
-        ClientSize = new Size(520, 640);
-        MinimumSize = new Size(460, 480);
+        ClientSize = new Size(560, 640);
+        MinimumSize = new Size(600, 500);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = false;
