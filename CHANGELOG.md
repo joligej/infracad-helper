@@ -1,5 +1,15 @@
 # Changelog
 
+## Niet uitgebracht
+
+- Commando's die een venster nodig hebben (klikken, dialogen) weigeren nu netjes in de
+  AutoCAD Core Console in plaats van te kunnen crashen. Headless blijven `NLCSLEGENDAINFO`,
+  `NLCSLEGENDATEST`, `NLCSLEGENDAEXPORT`, `NLCSLEGENDAUPDATE` en `NLCSLEGENDABATCHTEST`
+  werken.
+- Bij meerdere legenda's kiezen `NLCSLEGENDAUPDATE`/`NLCSLEGENDAEXPORT` headless de doel-
+  legenda via de omgevingsvariabele `NLCSLEGENDA_TARGET` (legenda-id of unieke naam); zonder
+  die keuze weigeren ze veilig zonder iets te wijzigen.
+
 ## 1.15.0 - 2026-09-23
 
 - Legenda-opmaak volgt de NLCS-template: tekststijl `NLCS-ISO`, standaard teksthoogtes

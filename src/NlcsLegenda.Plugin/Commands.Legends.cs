@@ -101,6 +101,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDABEHEER")) return;
 
         try
         {
@@ -476,6 +477,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDAWAAROM")) return;
 
         try
         {
@@ -566,15 +568,41 @@ public partial class Commands
         return settings.ExplainExclusion(parsed);
     }
 
-    // Kiest de doel-legenda voor update/viewport/export: 0 = null, 1 = die ene, >1 = de
-    // gebruiker klikt een legenda-object aan (of kiest uit een lijst als klikken faalt).
+    // Naam van de omgevingsvariabele waarmee automatisering (per proces) een doel-legenda
+    // kiest zonder interactie: een legenda-id of een unieke naam.
+    internal const string TargetEnvVar = "NLCSLEGENDA_TARGET";
+
+    // Kiest de doel-legenda voor update/viewport/export. Volgorde: expliciete env-var (headless
+    // automatisering) -> 0/1 legenda eenduidig -> meerdere: in de GUI klikken/lijst, in de Core
+    // Console veilig weigeren. In de Core Console wordt nooit GetEntity/een lijstprompt bereikt.
     private static LegendDefinition? ResolveTargetLegend(
         Editor ed, Database db, LegendRegistry registry, string actie)
     {
-        if (registry.Legends.Count == 0)
+        var token = Environment.GetEnvironmentVariable(TargetEnvVar);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            if (LegendTargeting.TryResolveByToken(registry, token, out var byToken, out var err))
+                return byToken;
+            ed.WriteMessage($"\n{TargetEnvVar}=\"{token}\": {err}. Geen wijziging doorgevoerd.");
             return null;
-        if (registry.Legends.Count == 1)
-            return registry.Legends[0];
+        }
+
+        switch (LegendTargeting.ResolveAuto(registry, out var target))
+        {
+            case TargetResolution.None:
+                return null;
+            case TargetResolution.Single:
+                return target;
+        }
+
+        // Meerdere legenda's: headless nooit interactief kiezen (native crash in accoreconsole).
+        if (HostEnvironment.IsCoreConsole)
+        {
+            ed.WriteMessage(
+                $"\nMeerdere legenda's gevonden. Kies er headless één via de omgevingsvariabele " +
+                $"{TargetEnvVar} (legenda-id of unieke naam). Geen wijziging doorgevoerd.");
+            return null;
+        }
 
         var peo = new PromptEntityOptions($"\nKlik een onderdeel van de legenda om te {actie} (of Enter voor een lijst)")
         {

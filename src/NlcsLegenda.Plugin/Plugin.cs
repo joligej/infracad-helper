@@ -1,4 +1,5 @@
 using Autodesk.AutoCAD.Runtime;
+using NlcsLegenda.Core;
 using AcApp = Autodesk.AutoCAD.ApplicationServices.Core.Application;
 
 [assembly: ExtensionApplication(typeof(NlcsLegenda.Plugin.Plugin))]
@@ -13,17 +14,23 @@ public sealed class Plugin : IExtensionApplication
         doc?.Editor.WriteMessage(
             "\nNLCS Legenda geladen. Gebruik het commando NLCSLEGENDA.\n");
 
+        // Headless (accoreconsole) is er geen ribbon; de Idle-route en ribbon-API's zijn dan
+        // onnodig en vergroten alleen het risico.
+        if (HostEnvironment.IsCoreConsole)
+            return;
+
         try
         {
             RibbonBuilder.Initialize();
         }
         catch
         {
-            // Zonder ribbon (bijv. headless) werkt de plugin gewoon via de commando's.
+            // Zonder ribbon werkt de plugin gewoon via de commando's.
         }
     }
 
     public void Terminate()
     {
+        RibbonBuilder.Shutdown();
     }
 }

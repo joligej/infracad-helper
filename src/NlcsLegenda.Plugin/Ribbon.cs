@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using Autodesk.Windows;
+using NlcsLegenda.Core;
 using AcWindows = Autodesk.AutoCAD.ApplicationServices.Application;
 
 namespace NlcsLegenda.Plugin;
@@ -8,12 +9,25 @@ namespace NlcsLegenda.Plugin;
 internal static class RibbonBuilder
 {
     private const string TabId = "NLCSLEGENDA_TAB";
+    private static bool _idleHooked;
 
     public static void Initialize()
     {
+        if (HostEnvironment.IsCoreConsole)
+            return;
         if (TryBuild())
             return;
         AcWindows.Idle += OnIdle;
+        _idleHooked = true;
+    }
+
+    // Afmelden bij terminate zodat er geen Idle-handler blijft hangen.
+    public static void Shutdown()
+    {
+        if (!_idleHooked)
+            return;
+        AcWindows.Idle -= OnIdle;
+        _idleHooked = false;
     }
 
     private static void OnIdle(object? sender, EventArgs e)
@@ -21,12 +35,16 @@ internal static class RibbonBuilder
         try
         {
             if (TryBuild())
+            {
                 AcWindows.Idle -= OnIdle;
+                _idleHooked = false;
+            }
         }
         catch
         {
             // Nooit de Idle-lus laten crashen; zonder ribbon werkt de plugin via commando's.
             AcWindows.Idle -= OnIdle;
+            _idleHooked = false;
         }
     }
 

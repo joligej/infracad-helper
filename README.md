@@ -107,6 +107,20 @@ importeren, zodat je een opzet met collega's kunt delen.
 | `NLCSLEGENDACONFIG` | De globale configuratiebestanden aanmaken en de paden tonen. |
 | `NLCSLEGENDATEST` | Plaatsen zonder vragen; bedoeld voor scripts en tests. |
 
+## Headless gebruik (Core Console)
+
+De meeste commando's zijn bedoeld voor AutoCAD/Civil 3D met venster. In de AutoCAD Core
+Console (`accoreconsole.exe`, zonder venster) werken alleen de commando's die geen muis of
+dialoog nodig hebben: `NLCSLEGENDAINFO`, `NLCSLEGENDATEST`, `NLCSLEGENDAEXPORT`,
+`NLCSLEGENDAUPDATE` en `NLCSLEGENDABATCHTEST`. Een venster-commando (zoals `NLCSLEGENDA`,
+`NLCSLEGENDABEHEER` of `NLCSLEGENDAVIEWPORT`) weigert in de Core Console netjes en wijzigt
+niets.
+
+`NLCSLEGENDAUPDATE` en `NLCSLEGENDAEXPORT` kiezen headless automatisch de legenda als er maar
+één is. Zijn er meerdere, kies er dan één via de omgevingsvariabele `NLCSLEGENDA_TARGET`
+(een legenda-id of een unieke naam) vóór het starten van de Core Console; zonder die keuze
+weigeren ze veilig in plaats van een object te vragen.
+
 ## Installatie
 
 Er zijn twee manieren, allebei bij de [releases](https://github.com/joligej/infracad-helper/releases).

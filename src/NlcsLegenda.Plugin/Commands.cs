@@ -54,6 +54,19 @@ public partial class Commands
     // legenda's houden hun eigen snapshot en veranderen niet mee.
     private static LegendSettings LoadGlobalDefaults() => LegendSettings.Load(ConfigPath);
 
+    // GUI-only commands roepen dit aan vóór de eerste interactieve/native prompt. In de Core
+    // Console (headless) is er geen venster en crashen GetEntity/GetPoint/dialogen; dan weigeren
+    // we veilig zonder iets te muteren.
+    private static bool RequireInteractive(Editor ed, string command)
+    {
+        if (!HostEnvironment.IsCoreConsole)
+            return true;
+        ed.WriteMessage(
+            $"\n{command} werkt alleen in AutoCAD met venster, niet in de Core Console (headless). " +
+            "Geen wijziging doorgevoerd.");
+        return false;
+    }
+
     private static DescriptionCatalog LoadCatalog(Database db)
     {
         var catalog = DescriptionCatalog.Default();
@@ -72,6 +85,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDA")) return;
 
         try
         {
@@ -200,28 +214,40 @@ public partial class Commands
         try
         {
             var settings = LoadGlobalDefaults();
+
+            // Doel kiezen vóór de transactie; export mag geen transactie openhouden tijdens
+            // een eventuele keuze. Headless met meerdere legenda's weigert de resolver veilig.
+            LegendRegistry registry;
+            using (var trReg = db.TransactionManager.StartTransaction())
+            {
+                registry = LegendStore.Load(db, trReg);
+                trReg.Commit();
+            }
+
+            LegendDefinition? target = null;
+            if (registry.Legends.Count > 0)
+            {
+                target = ResolveTargetLegend(ed, db, registry, "exporteren");
+                if (target is null)
+                {
+                    ed.WriteMessage("\nGeannuleerd.");
+                    return;
+                }
+                settings = target.Settings;
+            }
+
             IReadOnlyList<LegendEntry> entries;
             string suffix = "NLCS-legenda";
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                var registry = LegendStore.Load(db, tr);
                 var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
-                if (registry.Legends.Count > 0)
+                if (target is not null)
                 {
-                    // Bij beheerde legenda's exporteert dit de gekozen legenda met exact
-                    // zijn eigen scope en instellingen.
-                    var target = ResolveTargetLegend(ed, db, registry, "exporteren");
-                    if (target is null)
-                    {
-                        ed.WriteMessage("\nGeannuleerd.");
-                        tr.Commit();
-                        return;
-                    }
+                    // Exporteert de gekozen legenda met exact zijn eigen scope en instellingen.
                     ObjectId[]? selection = target.Scope == LegendScope.Selection
                         ? LegendManagement.ResolveHandles(db, target.SourceHandles, out _)
                             .Where(id => !excluded.Contains(id)).ToArray()
                         : null;
-                    settings = target.Settings;
                     entries = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded).Entries;
                     suffix = "Legenda-" + LegendPresets.SafeFileName(target.Name);
                 }
@@ -266,6 +292,7 @@ public partial class Commands
         if (doc is null)
             return;
         var ed = doc.Editor;
+        if (!RequireInteractive(ed, "NLCSLEGENDABATCH")) return;
 
         try
         {
@@ -362,6 +389,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDAVIEWPORT")) return;
 
         try
         {
@@ -373,24 +401,36 @@ public partial class Commands
 
             var settings = LoadGlobalDefaults();
 
+            // Registry buiten een transactie laden en het doel kiezen vóór de transactie, zodat
+            // er nooit een transactie openstaat tijdens gebruikersinvoer.
+            LegendRegistry registry;
+            using (var trReg = db.TransactionManager.StartTransaction())
+            {
+                registry = LegendStore.Load(db, trReg);
+                trReg.Commit();
+            }
+
+            LegendDefinition? target = null;
+            if (registry.Legends.Count > 0)
+            {
+                target = ResolveTargetLegend(ed, db, registry, "de viewport om te maken");
+                if (target is null)
+                {
+                    ed.WriteMessage("\nGeannuleerd.");
+                    return;
+                }
+                settings = target.Settings;
+            }
+
             Point3d min, max;
             using (var trExt = db.TransactionManager.StartTransaction())
             {
-                var registry = LegendStore.Load(db, trExt);
                 bool found;
-                if (registry.Legends.Count > 0)
+                if (target is not null)
                 {
-                    var target = ResolveTargetLegend(ed, db, registry, "de viewport om te maken");
-                    if (target is null)
-                    {
-                        ed.WriteMessage("\nGeannuleerd.");
-                        trExt.Commit();
-                        return;
-                    }
                     found = LegendManagement.TryGetGroupExtents(db, trExt, target.GroupName, out var ext);
                     min = found ? ext.MinPoint : Point3d.Origin;
                     max = found ? ext.MaxPoint : Point3d.Origin;
-                    settings = target.Settings;
                 }
                 else
                 {
@@ -516,17 +556,19 @@ public partial class Commands
                 MaybeMigrate(db, tr0, reg0);
                 tr0.Commit();
             }
+
+            LegendRegistry reg;
             using (var trPick = db.TransactionManager.StartTransaction())
             {
-                var reg = LegendStore.Load(db, trPick);
+                reg = LegendStore.Load(db, trPick);
                 trPick.Commit();
-                if (reg.Legends.Count == 0)
-                {
-                    ed.WriteMessage("\nGeen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.");
-                    return;
-                }
-                target = ResolveTargetLegend(ed, db, reg, "bijwerken");
             }
+            if (reg.Legends.Count == 0)
+            {
+                ed.WriteMessage("\nGeen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.");
+                return;
+            }
+            target = ResolveTargetLegend(ed, db, reg, "bijwerken");
             if (target is null)
             {
                 ed.WriteMessage("\nGeannuleerd.");
@@ -627,6 +669,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDAOPTIES")) return;
 
         try
         {
@@ -656,6 +699,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDAOMSCHRIJVINGEN")) return;
 
         try
         {
@@ -710,6 +754,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDAUITVINKEN")) return;
 
         try
         {
@@ -770,6 +815,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDATOEVOEGEN")) return;
 
         try
         {
@@ -906,6 +952,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDASAMENSTELLEN")) return;
 
         try
         {
@@ -971,6 +1018,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDAXREFS")) return;
 
         try
         {
@@ -1047,6 +1095,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDASTATUS")) return;
 
         try
         {
@@ -1128,6 +1177,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDAPRESET")) return;
 
         try
         {
@@ -1504,6 +1554,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDATEKST")) return;
 
         try
         {
@@ -1602,6 +1653,9 @@ public partial class Commands
 
     private static bool AskYesNo(Editor ed, string question, bool defaultYes)
     {
+        // Headless geen native keyword-prompt; neem de standaardkeuze.
+        if (HostEnvironment.IsCoreConsole)
+            return defaultYes;
         var pko = new PromptKeywordOptions($"\n{question}");
         pko.Keywords.Add("Ja");
         pko.Keywords.Add("Nee");
