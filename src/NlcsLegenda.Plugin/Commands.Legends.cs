@@ -49,7 +49,9 @@ public partial class Commands
         // Positie van de bestaande legenda vasthouden.
         bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out var topLeft);
 
-        var btrId = LegendBuilder.BuildBlock(db, tr, analysis, def.Settings, out rows);
+        var btrId = LegendBuilder.BuildBlock(db, tr, analysis, def.Settings, out rows, out var issues);
+        if (issues.Count > 0)
+            note = AppendNote(note, $"{issues.Count} regel(s) met tekenfouten ({issues[0].SourceLayer}: {issues[0].Reason})");
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
         var br = new BlockReference(hadGeometry ? topLeft : ComputeInsertPoint(db, def.Settings), btrId);
         ms.AppendEntity(br);
@@ -72,6 +74,10 @@ public partial class Commands
     }
 
     private static readonly List<ObjectId> _pendingPurge = new();
+
+    // Voegt een melding toe aan een bestaande note (puntkomma-gescheiden), leeg blijft leeg.
+    private static string AppendNote(string note, string extra) =>
+        string.IsNullOrEmpty(note) ? extra : $"{note}; {extra}";
 
     private static void PurgePending(Database db)
     {

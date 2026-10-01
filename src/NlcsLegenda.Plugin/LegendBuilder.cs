@@ -17,9 +17,12 @@ public static class LegendBuilder
     private const double RemarksTitleRatio = 1.15;       // kop opmerkingen t.o.v. teksthoogte
 
     public static ObjectId BuildBlock(
-        Database db, Transaction tr, AnalysisResult analysis, LegendSettings s, out int rowCount)
+        Database db, Transaction tr, AnalysisResult analysis, LegendSettings s,
+        out int rowCount, out IReadOnlyList<RenderIssue> issues)
     {
         rowCount = 0;
+        var issueList = new List<RenderIssue>();
+        issues = issueList;
 
         var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
         var btrName = "NLCS_LEGENDA_" + Guid.NewGuid().ToString("N");
@@ -72,12 +75,19 @@ public static class LegendBuilder
                     {
                         DrawEntry(btr, tr, db, item, analysis, s,
                             swatchW, swatchH, textGap, textH, colWidth, styleId);
+                        rowCount++;
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Eén regel die niet te tekenen is mag de rest niet blokkeren.
+                        // Regel die niet te tekenen is: de rest gaat door, maar we melden het
+                        // zodat de update niet ten onrechte als volledig geslaagd geldt.
+                        var entry = item.Entry!;
+                        issueList.Add(new RenderIssue(
+                            entry.Description,
+                            entry.PrimaryLayer,
+                            string.Join("+", entry.LayersByType.Keys),
+                            ex.Message));
                     }
-                    rowCount++;
                     break;
             }
         }

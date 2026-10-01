@@ -113,7 +113,8 @@ public partial class Commands
                 }
                 ReportAnalysis(ed, analysis);
 
-                btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _);
+                btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _, out var issues);
+                ReportRenderIssues(ed, issues);
 
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
@@ -1727,7 +1728,9 @@ public partial class Commands
                     return;
                 }
 
-                var btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out rows);
+                var btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out rows, out var issues);
+                if (issues.Count > 0)
+                    ed.WriteMessage($"\nNLCSTEST renderissues={issues.Count} first={issues[0].SourceLayer}:{issues[0].Reason}");
                 var insert = ComputeInsertPoint(db, settings);
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
@@ -1756,6 +1759,17 @@ public partial class Commands
         {
             ed.WriteMessage($"\nNLCSTEST error: {ex.Message}");
         }
+    }
+
+    private static void ReportRenderIssues(Editor ed, IReadOnlyList<RenderIssue> issues)
+    {
+        if (issues.Count == 0)
+            return;
+        ed.WriteMessage($"\nLet op: {issues.Count} regel(s) konden niet volledig worden getekend:");
+        foreach (var i in issues.Take(5))
+            ed.WriteMessage($"\n  - {i.Entry} ({i.SourceLayer}): {i.Reason}");
+        if (issues.Count > 5)
+            ed.WriteMessage($"\n  ... en nog {issues.Count - 5}.");
     }
 
     private static void ReportAnalysis(Editor ed, AnalysisResult analysis)
