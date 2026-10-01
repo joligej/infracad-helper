@@ -49,6 +49,10 @@ public sealed class LegendEntry
 
     public string? SymbolBlockName { get; init; }
 
+    // Visuele identiteit (kleur/linetype/lineweight/arcering/symbool) van de representatieve
+    // laag. Gebruikt om statussen alleen samen te voegen als ze er echt hetzelfde uitzien.
+    public string RenderIdentity { get; init; } = string.Empty;
+
     // Bij samenvoegen (KLIC-groepering): de oorspronkelijke elementnamen die in deze regel
     // zijn samengenomen. Leeg als er niets is samengevoegd. Puur informatief/traceerbaar;
     // de groepering zelf is een afgeleide weergave en volledig omkeerbaar.

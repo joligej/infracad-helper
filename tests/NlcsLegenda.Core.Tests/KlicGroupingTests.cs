@@ -122,4 +122,41 @@ public class KlicGroupingTests
         Assert.True(LegendSettings.TryParse(s.ToJson(), out var back));
         Assert.True(back!.SamenvoegenNummer);
     }
+
+    // Statussamenvoeging: alleen bij identieke render-identiteit.
+    [Fact]
+    public void MergeStatuses_CombinesOnlyWhenRenderIdentical()
+    {
+        var layers = Parse("N-WE-KL-DATA-G", "B-WE-KL-DATA-G");
+        var s = KlicSettings();
+        s.MergeIdenticalStatuses = true;
+
+        // Zelfde render -> samen tot één regel.
+        var same = LegendGrouping.Build(layers, s, renderIdentity: _ => "kleur3");
+        Assert.Single(same);
+
+        // Verschillende render per status -> apart.
+        var diff = LegendGrouping.Build(layers, s,
+            renderIdentity: l => l.StartsWith("N-") ? "groen" : "grijs");
+        Assert.Equal(2, diff.Count);
+    }
+
+    [Fact]
+    public void MergeStatuses_Off_KeepsStatusesSeparate()
+    {
+        var layers = Parse("N-WE-KL-DATA-G", "B-WE-KL-DATA-G");
+        var s = KlicSettings();
+        s.MergeIdenticalStatuses = false;
+        Assert.Equal(2, LegendGrouping.Build(layers, s, renderIdentity: _ => "kleur3").Count);
+    }
+
+    [Fact]
+    public void MergeStatuses_NoRenderInfo_NeverMerges()
+    {
+        var layers = Parse("N-WE-KL-DATA-G", "B-WE-KL-DATA-G");
+        var s = KlicSettings();
+        s.MergeIdenticalStatuses = true;
+        // Geen render-identiteit beschikbaar -> veilig niet samenvoegen.
+        Assert.Equal(2, LegendGrouping.Build(layers, s).Count);
+    }
 }

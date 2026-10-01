@@ -181,6 +181,10 @@ public sealed class LegendSettings
         else MergedDimensions.Remove(dim);
     }
 
+    [Category("Groepering"), DisplayName("Gelijke statussen samenvoegen"),
+     Description("Voegt dezelfde regel uit verschillende statussen samen, maar alleen als lijn, vlak, arcering en symbool er precies hetzelfde uitzien.")]
+    public bool MergeIdenticalStatuses { get; set; } = false;
+
     [Category("Groepering"), DisplayName("KLIC-placeholdertekst weglaten"),
      Description("Laat generieke 'TYPE \\ LABEL \\ OMSCHRIJVING'-placeholders uit KLIC-symbolen weg.")]
     public bool SuppressKlicPlaceholders { get; set; } = true;

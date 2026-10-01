@@ -78,6 +78,11 @@ zet je de groepering uit, dan staat elke laag weer apart. Generieke placeholdert
 KLIC-symbolen (zoals "TYPE \ LABEL \ OMSCHRIJVING") wordt standaard weggelaten; echte tekst
 blijft staan.
 
+Onder *Groepering* staat ook *Gelijke statussen samenvoegen*. Die voegt dezelfde regel uit
+verschillende statussen samen, maar alleen als lijn, vlak, arcering en symbool er precies
+hetzelfde uitzien. Standaard staat dit uit, omdat de status in NLCS meestal juist de kleur
+bepaalt.
+
 Naast de vaste statussen (Nieuw, Bestaand, Vervallen, Tijdelijk, Revisie) maak je met
 `NLCSLEGENDASTATUS` eigen statussen aan. Daar wijs je regels aan toe: automatische
 NLCS-lagen door ze in de tekening aan te wijzen, handmatige regels via een lijstje. Zo'n

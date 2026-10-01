@@ -13,7 +13,8 @@ public static class LegendGrouping
         Func<string, string?>? layerDescription = null,
         IReadOnlyDictionary<string, LayerMetric>? metrics = null,
         Func<string, string?>? symbolBlock = null,
-        DescriptionCatalog? catalog = null)
+        DescriptionCatalog? catalog = null,
+        Func<string, string?>? renderIdentity = null)
     {
         var descriptions = catalog ?? DescriptionCatalog.Default();
         var groups = new Dictionary<string, List<NlcsLayerName>>();
@@ -70,7 +71,8 @@ public static class LegendGrouping
                 DescriptionSource = descSource,
                 LayersByType = byType,
                 Metric = metric,
-                SymbolBlockName = blockName
+                SymbolBlockName = blockName,
+                RenderIdentity = RenderId(byType, renderIdentity, blockName)
             });
         }
 
@@ -86,35 +88,59 @@ public static class LegendGrouping
         return Sort(Merge(entries, settings), settings);
     }
 
+    // Visuele identiteit: per elementsoort de bronlaag-look (kleur/linetype/lineweight) plus
+    // symbool. Lege identiteit als er geen laag-info beschikbaar is (dan nooit samenvoegen).
+    private static string RenderId(
+        Dictionary<NlcsDrawType, string> byType, Func<string, string?>? renderIdentity, string? block)
+    {
+        if (renderIdentity is null)
+            return string.Empty;
+        var parts = new List<string>();
+        foreach (var kv in byType.OrderBy(k => k.Key))
+            parts.Add($"{kv.Key}={renderIdentity(kv.Value) ?? "?"}");
+        if (!string.IsNullOrEmpty(block))
+            parts.Add("S=" + block);
+        return string.Join(";", parts);
+    }
+
     // KLIC-groepering: voegt regels samen die alleen verschillen in een eigenschap die op
-    // "samenvoegen" staat. Hoeveelheden tellen op, de eerste regel levert de weergave, en de
-    // samengevoegde elementnamen blijven als leden bewaard. Omkeerbaar: zonder gekozen
-    // dimensies gebeurt er niets.
+    // "samenvoegen" staat. Met "gelijke statussen samenvoegen" vallen ook verschillende
+    // statussen samen, maar alleen bij identieke render-identiteit. Hoeveelheden tellen op,
+    // de eerste regel levert de weergave, bronleden blijven bewaard. Omkeerbaar.
     private static List<LegendEntry> Merge(List<LegendEntry> entries, LegendSettings settings)
     {
-        if (settings.MergedDimensions.Count == 0)
+        bool mergeStatus = settings.MergeIdenticalStatuses;
+        if (settings.MergedDimensions.Count == 0 && !mergeStatus)
             return entries;
+
+        string KeyOf(LegendEntry e)
+        {
+            var props = ElementProperties.From(e.Element);
+            // Bij statussamenvoeging vervangt de render-identiteit de status in de sleutel,
+            // zodat alleen visueel identieke regels over statussen heen samenvallen.
+            var statusPart = mergeStatus && e.RenderIdentity.Length > 0
+                ? "R:" + e.RenderIdentity
+                : e.StatusGroupId;
+            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{props.MergeKey(settings.MergedDimensions)}";
+        }
 
         var merged = new List<LegendEntry>();
         var byKey = new Dictionary<string, List<LegendEntry>>();
         foreach (var e in entries)
         {
-            var props = ElementProperties.From(e.Element);
-            var key = $"{e.StatusGroupId}|{e.Discipline}|{e.Hoofdgroep}|{props.MergeKey(settings.MergedDimensions)}";
+            var key = KeyOf(e);
             if (!byKey.TryGetValue(key, out var list))
             {
                 list = new List<LegendEntry>();
                 byKey[key] = list;
-                merged.Add(e); // plaatshouder; vervangen we straks door de samengevoegde regel
+                merged.Add(e);
             }
             list.Add(e);
         }
 
         for (int i = 0; i < merged.Count; i++)
         {
-            var props = ElementProperties.From(merged[i].Element);
-            var key = $"{merged[i].StatusGroupId}|{merged[i].Discipline}|{merged[i].Hoofdgroep}|{props.MergeKey(settings.MergedDimensions)}";
-            var group = byKey[key];
+            var group = byKey[KeyOf(merged[i])];
             if (group.Count > 1)
                 merged[i] = Combine(group);
         }
@@ -139,6 +165,7 @@ public static class LegendGrouping
             LayersByType = rep.LayersByType,
             Metric = metric,
             SymbolBlockName = rep.SymbolBlockName,
+            RenderIdentity = rep.RenderIdentity,
             MergedMembers = group.Select(e => e.Element).ToList()
         };
     }
