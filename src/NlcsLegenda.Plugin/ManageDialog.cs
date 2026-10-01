@@ -41,18 +41,13 @@ internal sealed class LegendManageDialog : Form
     private readonly CheckedListBox _entries;
     private readonly DataGridView _grid;
     private BindingList<ManualRow> _rows = new();
-    private readonly ScopeBar _scopeBar;
     private readonly IReadOnlyList<EntryCheckItem> _allEntries;
-    private readonly Func<ConfigScope, LegendSettings> _loader;
 
     public event EventHandler? ApplyRequested;
 
-    public LegendManageDialog(
-        IReadOnlyList<EntryCheckItem> allEntries, ConfigScope initialScope,
-        Func<ConfigScope, LegendSettings> loader)
+    public LegendManageDialog(IReadOnlyList<EntryCheckItem> allEntries, LegendSettings initial)
     {
         _allEntries = allEntries;
-        _loader = loader;
 
         Text = "NLCS Legenda \u2013 samenstellen";
         Font = SystemFonts.MessageBoxFont;
@@ -102,9 +97,6 @@ internal sealed class LegendManageDialog : Form
         bottomGroup.Controls.Add(removeBar);
         split.Panel2.Controls.Add(bottomGroup);
 
-        _scopeBar = new ScopeBar(initialScope);
-        _scopeBar.ScopeChanged += (_, _) => LoadFromScope(_scopeBar.Scope);
-
         var buttons = new ButtonBar(withApply: true);
         buttons.Apply!.Click += (_, _) =>
         {
@@ -131,9 +123,8 @@ internal sealed class LegendManageDialog : Form
 
         Controls.Add(split);
         Controls.Add(buttons);
-        Controls.Add(_scopeBar);
 
-        LoadFromScope(initialScope);
+        LoadFrom(initial);
     }
 
     private void Warn(string message) =>
@@ -155,8 +146,6 @@ internal sealed class LegendManageDialog : Form
         }
         return null;
     }
-
-    public ConfigScope Scope => _scopeBar.Scope;
 
     public HashSet<string> ExcludedKeys
     {
@@ -221,10 +210,8 @@ internal sealed class LegendManageDialog : Form
         return grid;
     }
 
-    private void LoadFromScope(ConfigScope scope)
+    private void LoadFrom(LegendSettings settings)
     {
-        var settings = _loader(scope);
-
         for (int i = 0; i < _entries.Items.Count; i++)
             if (_entries.Items[i] is EntryCheckItem item)
                 _entries.SetItemChecked(i, !settings.ExcludedEntries.Contains(item.Key));

@@ -43,16 +43,16 @@ public partial class Commands
         }
     }
 
-    private static LegendSettings LoadSettings(Database db)
-    {
-        if (DrawingStore.ReadSettings(db) is { } json)
-            return LegendSettings.FromJson(json);
-        return LegendSettings.Load(ConfigPath);
-    }
-
     // De globale standaardinstellingen: het startpunt voor een NIEUWE legenda. Bestaande
     // legenda's houden hun eigen snapshot en veranderen niet mee.
     private static LegendSettings LoadGlobalDefaults() => LegendSettings.Load(ConfigPath);
+
+    private static string SaveGlobalDefaults(LegendSettings settings)
+    {
+        Directory.CreateDirectory(ConfigDir);
+        settings.Save(ConfigPath);
+        return "als globale standaard";
+    }
 
     // GUI-only commands roepen dit aan vóór de eerste interactieve/native prompt. In de Core
     // Console (headless) is er geen venster en crashen GetEntity/GetPoint/dialogen; dan weigeren
@@ -67,6 +67,9 @@ public partial class Commands
         return false;
     }
 
+    // De globale omschrijvingen (ingebouwde catalogus + globale gebruikersoverrides). Oude
+    // tekeningspecifieke omschrijvingen worden nog ingelezen zodat bestaande tekeningen hun
+    // teksten behouden, maar er wordt niets nieuws meer tekeningspecifiek weggeschreven.
     private static DescriptionCatalog LoadCatalog(Database db)
     {
         var catalog = DescriptionCatalog.Default();
@@ -75,6 +78,21 @@ public partial class Commands
         if (DrawingStore.ReadDescriptions(db) is { } json)
             catalog.MergeFrom(DescriptionCatalog.FromJson(json));
         return catalog;
+    }
+
+    private static DescriptionCatalog LoadGlobalCatalog()
+    {
+        var catalog = DescriptionCatalog.Default();
+        if (File.Exists(DescriptionsPath))
+            catalog.MergeFrom(DescriptionCatalog.Load(DescriptionsPath));
+        return catalog;
+    }
+
+    private static string SaveGlobalCatalog(DescriptionCatalog catalog)
+    {
+        Directory.CreateDirectory(ConfigDir);
+        catalog.Save(DescriptionsPath);
+        return "voor alle tekeningen";
     }
 
     [CommandMethod("NLCSLEGENDA", CommandFlags.Modal)]
@@ -348,7 +366,7 @@ public partial class Commands
             return;
         }
 
-        var settings = LoadSettings(db);
+        var settings = LoadGlobalDefaults();
         var catalog = LoadCatalog(db);
         var results = BatchExport.AnalyzeFolder(folder, settings, catalog);
         if (results.Count == 0)
@@ -643,14 +661,20 @@ public partial class Commands
             ed.WriteMessage(
                 $"\nGlobale bestanden{maakStatus} (voor alle tekeningen):" +
                 $"\n  {ConfigPath}" +
-                $"\n  {DescriptionsPath}" +
-                "\nTekeningspecifieke instellingen bewaren we in de tekening zelf; er komen dus" +
-                " geen losse bestanden naast je .dwg te staan." +
-                $"\n  Instellingen in deze tekening: {(drawingSettings ? "ja" : "nee")}" +
-                $"\n  Omschrijvingen in deze tekening: {(drawingDesc ? "ja" : "nee")}");
+                $"\n  {DescriptionsPath}");
+
+            // Oude tekeningspecifieke configuratie uit v1.13-v1.15 kan nog in de tekening
+            // staan; die wordt alleen nog gelezen voor migratie en kan hier worden gewist.
+            if (drawingSettings || drawingDesc)
+            {
+                ed.WriteMessage(
+                    "\nOude tekeningspecifieke configuratie gevonden (uit een vorige versie):" +
+                    $"\n  Instellingen: {(drawingSettings ? "ja" : "nee")}" +
+                    $"\n  Omschrijvingen: {(drawingDesc ? "ja" : "nee")}");
+            }
 
             if ((drawingSettings || drawingDesc) &&
-                AskYesNo(ed, "Tekeningspecifieke NLCS-configuratie uit deze tekening wissen?", false))
+                AskYesNo(ed, "Oude tekeningspecifieke NLCS-configuratie uit deze tekening wissen?", false))
             {
                 DrawingStore.Clear(db);
                 ed.WriteMessage("\nTekeningspecifieke configuratie gewist; voortaan gelden de globale instellingen.");
@@ -677,13 +701,13 @@ public partial class Commands
             var settings = LoadGlobalDefaults();
             using var dialog = new SettingsDialog(settings, "Globale standaard \u2013 geldt voor nieuwe legenda's");
             dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nInstellingen opgeslagen ({SaveSettingsToScope(db, dialog.Settings, ConfigScope.Global)}).");
+                ed.WriteMessage($"\nInstellingen opgeslagen ({SaveGlobalDefaults(dialog.Settings)}).");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            var where = SaveSettingsToScope(db, dialog.Settings, ConfigScope.Global);
+            var where = SaveGlobalDefaults(dialog.Settings);
             ed.WriteMessage($"\nInstellingen opgeslagen ({where}).");
         }
         catch (Exception ex)
@@ -704,47 +728,21 @@ public partial class Commands
 
         try
         {
-            var initial = DrawingStore.HasDescriptions(db) ? ConfigScope.Drawing : ConfigScope.Global;
-            using var dialog = new DescriptionsDialog(initial, scope => LoadCatalogForScope(db, scope));
+            using var dialog = new DescriptionsDialog(LoadGlobalCatalog());
             dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nOmschrijvingen opgeslagen ({SaveCatalogToScope(db, dialog.ToCatalog().Diff(DescriptionCatalog.Default()), dialog.Scope)}).");
+                ed.WriteMessage($"\nOmschrijvingen opgeslagen ({SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()))}).");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            var where = SaveCatalogToScope(db, dialog.ToCatalog().Diff(DescriptionCatalog.Default()), dialog.Scope);
+            var where = SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()));
             ed.WriteMessage($"\nOmschrijvingen opgeslagen ({where}).");
         }
         catch (Exception ex)
         {
             ed.WriteMessage($"\nNLCSLEGENDAOMSCHRIJVINGEN fout: {ex.Message}");
         }
-    }
-
-    private static LegendSettings LoadSettingsForScope(Database db, ConfigScope scope)
-    {
-        if (scope == ConfigScope.Drawing && DrawingStore.ReadSettings(db) is { } json)
-            return LegendSettings.FromJson(json);
-        return LegendSettings.Load(ConfigPath);
-    }
-
-    private static DescriptionCatalog LoadCatalogForScope(Database db, ConfigScope scope)
-    {
-        var catalog = DescriptionCatalog.Default();
-        if (File.Exists(DescriptionsPath))
-            catalog.MergeFrom(DescriptionCatalog.Load(DescriptionsPath));
-        if (scope == ConfigScope.Drawing && DrawingStore.ReadDescriptions(db) is { } json)
-            catalog.MergeFrom(DescriptionCatalog.FromJson(json));
-        return catalog;
-    }
-
-    private static ConfigScope PromptScope(Editor ed, ConfigScope preferred)
-    {
-        // Sinds meerdere legenda's is er geen "voor deze tekening"-scope meer voor
-        // instellingen: deze commando's bewerken de globale standaard voor nieuwe legenda's.
-        // Bestaande legenda's pas je aan via NLCSLEGENDABEHEER.
-        return ConfigScope.Global;
     }
 
     [CommandMethod("NLCSLEGENDAUITVINKEN", CommandFlags.Modal)]
@@ -782,8 +780,7 @@ public partial class Commands
             }
 
             var key = LegendSettings.EntryKey(layer!);
-            var scope = PromptScope(ed, DrawingStore.HasSettings(db) ? ConfigScope.Drawing : ConfigScope.Global);
-            var settings = LoadSettingsForScope(db, scope);
+            var settings = LoadGlobalDefaults();
 
             bool nowExcluded;
             if (settings.ExcludedEntries.Contains(key))
@@ -796,7 +793,7 @@ public partial class Commands
                 settings.ExcludedEntries.Add(key);
                 nowExcluded = true;
             }
-            var where = SaveSettingsToScope(db, settings, scope);
+            var where = SaveGlobalDefaults(settings);
             ed.WriteMessage($"\n{key} {(nowExcluded ? "uitgevinkt" : "weer opgenomen")} ({where}).");
 
             if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
@@ -884,10 +881,9 @@ public partial class Commands
                     manual.HatchPattern = pr.StringResult.Trim();
             }
 
-            var scope = PromptScope(ed, DrawingStore.HasSettings(db) ? ConfigScope.Drawing : ConfigScope.Global);
-            var settings = LoadSettingsForScope(db, scope);
+            var settings = LoadGlobalDefaults();
             settings.ManualEntries.Add(manual);
-            var where = SaveSettingsToScope(db, settings, scope);
+            var where = SaveGlobalDefaults(settings);
             ed.WriteMessage($"\nRegel \"{manual.Description}\" toegevoegd ({where}).");
 
             if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
@@ -957,9 +953,7 @@ public partial class Commands
 
         try
         {
-            var initial = ConfigScope.Global;
-
-            var probe = LoadSettingsForScope(db, initial);
+            var probe = LoadGlobalDefaults();
             probe.ExcludedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             probe.ManualEntries = new List<ManualEntry>();
             probe.IncludedStatuses = new HashSet<NlcsStatus>
@@ -982,15 +976,15 @@ public partial class Commands
                 tr.Commit();
             }
 
-            using var dialog = new LegendManageDialog(items, initial, scope => LoadSettingsForScope(db, scope));
+            using var dialog = new LegendManageDialog(items, LoadGlobalDefaults());
             dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nSamenstelling opgeslagen ({SaveComposition(db, dialog.Scope, dialog.ExcludedKeys, dialog.ManualEntries)}).");
+                ed.WriteMessage($"\nSamenstelling opgeslagen ({SaveComposition(dialog.ExcludedKeys, dialog.ManualEntries)}).");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            var where = SaveComposition(db, dialog.Scope, dialog.ExcludedKeys, dialog.ManualEntries);
+            var where = SaveComposition(dialog.ExcludedKeys, dialog.ManualEntries);
             ed.WriteMessage($"\nSamenstelling opgeslagen ({where}).");
 
             if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
@@ -1002,13 +996,12 @@ public partial class Commands
         }
     }
 
-    private static string SaveComposition(
-        Database db, ConfigScope scope, HashSet<string> excluded, List<ManualEntry> manual)
+    private static string SaveComposition(HashSet<string> excluded, List<ManualEntry> manual)
     {
-        var settings = LoadSettingsForScope(db, scope);
+        var settings = LoadGlobalDefaults();
         settings.ExcludedEntries = excluded;
         settings.ManualEntries = manual;
-        return SaveSettingsToScope(db, settings, scope);
+        return SaveGlobalDefaults(settings);
     }
 
     [CommandMethod("NLCSLEGENDAXREFS", CommandFlags.Modal)]
@@ -1043,12 +1036,11 @@ public partial class Commands
                 return;
             }
 
-            // De keuze staat altijd in de tekening zelf.
-            var settings = LoadSettingsForScope(db, ConfigScope.Drawing);
+            var settings = LoadGlobalDefaults();
 
             while (true)
             {
-                ed.WriteMessage("\nXrefs meenemen (tekeningspecifiek):");
+                ed.WriteMessage("\nXrefs meenemen (globale standaard voor nieuwe legenda's):");
                 for (int i = 0; i < xrefs.Count; i++)
                     ed.WriteMessage($"\n  {i + 1}. {xrefs[i]}: {(settings.IsXrefIncluded(xrefs[i]) ? "aan" : "uit")}");
 
@@ -1076,8 +1068,8 @@ public partial class Commands
                 }
             }
 
-            SaveSettingsToScope(db, settings, ConfigScope.Drawing);
-            ed.WriteMessage("\n  \u2192 xref-keuze opgeslagen in deze tekening.");
+            SaveGlobalDefaults(settings);
+            ed.WriteMessage("\n  \u2192 xref-keuze opgeslagen als globale standaard.");
 
             if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
                 NlcsLegendaUpdate();
@@ -1100,8 +1092,7 @@ public partial class Commands
 
         try
         {
-            var scope = PromptScope(ed, DrawingStore.HasSettings(db) ? ConfigScope.Drawing : ConfigScope.Global);
-            var settings = LoadSettingsForScope(db, scope);
+            var settings = LoadGlobalDefaults();
             bool changed = false;
 
             while (true)
@@ -1158,7 +1149,7 @@ public partial class Commands
                 return;
             }
 
-            var where = SaveSettingsToScope(db, settings, scope);
+            var where = SaveGlobalDefaults(settings);
             ed.WriteMessage($"\n  \u2192 eigen statussen opgeslagen ({where}).");
 
             if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
@@ -1226,7 +1217,7 @@ public partial class Commands
             ed.WriteMessage("\nGeannuleerd.");
             return;
         }
-        LegendPresets.Save(PresetsDir, name, LoadSettings(db));
+        LegendPresets.Save(PresetsDir, name, LoadGlobalDefaults());
         ed.WriteMessage($"\nProfiel \"{name}\" opgeslagen.");
     }
 
@@ -1247,8 +1238,7 @@ public partial class Commands
             ed.WriteMessage("\nProfiel niet gevonden.");
             return;
         }
-        var scope = PromptScope(ed, ConfigScope.Drawing);
-        var where = SaveSettingsToScope(db, settings, scope);
+        var where = SaveGlobalDefaults(settings);
         ed.WriteMessage($"\nProfiel \"{names[idx]}\" geladen ({where}).");
 
         if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
@@ -1592,16 +1582,11 @@ public partial class Commands
                 Specifiek = defaultEntry?.Specifiek ?? StandardTexts.Humanize(layer.Element)
             };
 
-            DescriptionEntry LoadEntry(ConfigScope scope)
-            {
-                var catalog = LoadCatalogForScope(db, scope);
-                if (catalog.Elementen.TryGetValue(key, out var e))
-                    return new DescriptionEntry { Algemeen = e.Algemeen, Specifiek = e.Specifiek };
-                return new DescriptionEntry { Algemeen = fallback.Algemeen, Specifiek = fallback.Specifiek };
-            }
+            var current = LoadGlobalCatalog().Elementen.TryGetValue(key, out var existing)
+                ? new DescriptionEntry { Algemeen = existing.Algemeen, Specifiek = existing.Specifiek }
+                : new DescriptionEntry { Algemeen = fallback.Algemeen, Specifiek = fallback.Specifiek };
 
-            var initial = DrawingStore.HasDescriptions(db) ? ConfigScope.Drawing : ConfigScope.Global;
-            using var dialog = new TextEditDialog(key, initial, LoadEntry, fallback);
+            using var dialog = new TextEditDialog(key, current, fallback);
             dialog.ApplyRequested += (_, _) =>
             {
                 var applied = new DescriptionEntry
@@ -1609,7 +1594,7 @@ public partial class Commands
                     Algemeen = string.IsNullOrWhiteSpace(dialog.Algemeen) ? null : dialog.Algemeen,
                     Specifiek = dialog.Specifiek
                 };
-                ed.WriteMessage($"\nTekst voor {key} opgeslagen ({SaveSingleDescription(db, key, applied, dialog.Scope)}).");
+                ed.WriteMessage($"\nTekst voor {key} opgeslagen ({SaveSingleDescription(key, applied)}).");
             };
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
@@ -1622,7 +1607,7 @@ public partial class Commands
                 Algemeen = string.IsNullOrWhiteSpace(dialog.Algemeen) ? null : dialog.Algemeen,
                 Specifiek = dialog.Specifiek
             };
-            var where = SaveSingleDescription(db, key, entry, dialog.Scope);
+            var where = SaveSingleDescription(key, entry);
             ed.WriteMessage($"\nTekst voor {key} opgeslagen ({where}).");
 
             if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
@@ -1634,17 +1619,8 @@ public partial class Commands
         }
     }
 
-    private static string SaveSingleDescription(Database db, string key, DescriptionEntry entry, ConfigScope scope)
+    private static string SaveSingleDescription(string key, DescriptionEntry entry)
     {
-        if (scope == ConfigScope.Drawing)
-        {
-            var catalog = DrawingStore.ReadDescriptions(db) is { } j
-                ? DescriptionCatalog.FromJson(j) : new DescriptionCatalog();
-            catalog.Elementen[key] = entry;
-            DrawingStore.WriteDescriptions(db, catalog.Diff(DescriptionCatalog.Default()).ToJson());
-            return "in deze tekening";
-        }
-
         var global = File.Exists(DescriptionsPath) ? DescriptionCatalog.Load(DescriptionsPath) : new DescriptionCatalog();
         global.Elementen[key] = entry;
         Directory.CreateDirectory(ConfigDir);
@@ -1676,27 +1652,6 @@ public partial class Commands
         var exists = reg.Legends.Count > 0 || gd.Contains(LegendManagement.LegacyGroupName);
         tr.Commit();
         return exists;
-    }
-
-    private static string SaveSettingsToScope(Database db, LegendSettings settings, ConfigScope scope)
-    {
-        // Instellingen worden altijd als globale standaard bewaard (voor nieuwe legenda's);
-        // de oude tekening-scope bestaat niet meer.
-        Directory.CreateDirectory(ConfigDir);
-        settings.Save(ConfigPath);
-        return "als globale standaard";
-    }
-
-    private static string SaveCatalogToScope(Database db, DescriptionCatalog catalog, ConfigScope scope)
-    {
-        if (scope == ConfigScope.Drawing)
-        {
-            DrawingStore.WriteDescriptions(db, catalog.ToJson());
-            return "in deze tekening";
-        }
-        Directory.CreateDirectory(ConfigDir);
-        catalog.Save(DescriptionsPath);
-        return "voor alle tekeningen";
     }
 
     // Headless smoke-test via AutoCAD Core Console: plaatst een beheerde hele-tekeninglegenda.
@@ -2056,10 +2011,7 @@ public partial class Commands
     {
         try
         {
-            var db = AcApp.DocumentManager.MdiActiveDocument?.Database;
-            if (db is null)
-                return;
-            SaveSettingsToScope(db, s, ConfigScope.Global);
+            SaveGlobalDefaults(s);
             ed.WriteMessage("\n  \u2192 opgeslagen als globale standaard voor nieuwe legenda's.");
         }
         catch (Exception ex)
@@ -2095,16 +2047,12 @@ public partial class Commands
     {
         try
         {
-            var db = AcApp.DocumentManager.MdiActiveDocument?.Database;
-            if (db is null)
-                return;
-            var initial = DrawingStore.HasDescriptions(db) ? ConfigScope.Drawing : ConfigScope.Global;
-            using var dialog = new DescriptionsDialog(initial, scope => LoadCatalogForScope(db, scope));
+            using var dialog = new DescriptionsDialog(LoadGlobalCatalog());
             dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nOmschrijvingen opgeslagen ({SaveCatalogToScope(db, dialog.ToCatalog().Diff(DescriptionCatalog.Default()), dialog.Scope)}).");
+                ed.WriteMessage($"\nOmschrijvingen opgeslagen ({SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()))}).");
             if (AcWindows.ShowModalDialog(dialog) == WinForms.DialogResult.OK)
             {
-                var where = SaveCatalogToScope(db, dialog.ToCatalog().Diff(DescriptionCatalog.Default()), dialog.Scope);
+                var where = SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()));
                 ed.WriteMessage($"\nOmschrijvingen opgeslagen ({where}).");
             }
         }
