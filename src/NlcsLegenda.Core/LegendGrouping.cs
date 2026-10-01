@@ -83,7 +83,64 @@ public static class LegendGrouping
             entries.Add(custom is null ? basic : manual.ToLegendEntry(custom));
         }
 
-        return Sort(entries, settings);
+        return Sort(Merge(entries, settings), settings);
+    }
+
+    // KLIC-groepering: voegt regels samen die alleen verschillen in een eigenschap die op
+    // "samenvoegen" staat. Hoeveelheden tellen op, de eerste regel levert de weergave, en de
+    // samengevoegde elementnamen blijven als leden bewaard. Omkeerbaar: zonder gekozen
+    // dimensies gebeurt er niets.
+    private static List<LegendEntry> Merge(List<LegendEntry> entries, LegendSettings settings)
+    {
+        if (settings.MergedDimensions.Count == 0)
+            return entries;
+
+        var merged = new List<LegendEntry>();
+        var byKey = new Dictionary<string, List<LegendEntry>>();
+        foreach (var e in entries)
+        {
+            var props = ElementProperties.From(e.Element);
+            var key = $"{e.StatusGroupId}|{e.Discipline}|{e.Hoofdgroep}|{props.MergeKey(settings.MergedDimensions)}";
+            if (!byKey.TryGetValue(key, out var list))
+            {
+                list = new List<LegendEntry>();
+                byKey[key] = list;
+                merged.Add(e); // plaatshouder; vervangen we straks door de samengevoegde regel
+            }
+            list.Add(e);
+        }
+
+        for (int i = 0; i < merged.Count; i++)
+        {
+            var props = ElementProperties.From(merged[i].Element);
+            var key = $"{merged[i].StatusGroupId}|{merged[i].Discipline}|{merged[i].Hoofdgroep}|{props.MergeKey(settings.MergedDimensions)}";
+            var group = byKey[key];
+            if (group.Count > 1)
+                merged[i] = Combine(group);
+        }
+        return merged;
+    }
+
+    private static LegendEntry Combine(List<LegendEntry> group)
+    {
+        var rep = group.OrderBy(e => ElementProperties.From(e.Element).Nummer.Length == 0 ? 0 : 1)
+                       .ThenBy(e => e.Element, StringComparer.OrdinalIgnoreCase).First();
+        var metric = LayerMetric.Empty;
+        foreach (var e in group) metric += e.Metric;
+        return new LegendEntry
+        {
+            Status = rep.Status,
+            CustomStatusName = rep.CustomStatusName,
+            Discipline = rep.Discipline,
+            Hoofdgroep = rep.Hoofdgroep,
+            Element = rep.Element,
+            Description = rep.Description,
+            DescriptionSource = rep.DescriptionSource,
+            LayersByType = rep.LayersByType,
+            Metric = metric,
+            SymbolBlockName = rep.SymbolBlockName,
+            MergedMembers = group.Select(e => e.Element).ToList()
+        };
     }
 
     private static List<LegendEntry> Sort(List<LegendEntry> entries, LegendSettings settings)
@@ -136,11 +193,14 @@ public static class LegendGrouping
             foreach (var layer in group.OrderBy(l => TypePriority(l.DrawType)))
             {
                 var desc = layerDescription(layer.LocalName);
-                if (!string.IsNullOrWhiteSpace(desc))
-                {
-                    source = DescriptionSource.Laagbeschrijving;
-                    return desc.Trim();
-                }
+                if (string.IsNullOrWhiteSpace(desc))
+                    continue;
+                // KLIC-symbolen dragen soms lege attribuut-tags als omschrijving mee; die
+                // slaan we over en vallen terug op de catalogus/laagnaam.
+                if (settings.SuppressKlicPlaceholders && PlaceholderText.IsGeneric(desc))
+                    continue;
+                source = DescriptionSource.Laagbeschrijving;
+                return desc.Trim();
             }
         }
 

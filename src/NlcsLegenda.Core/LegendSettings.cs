@@ -138,6 +138,53 @@ public sealed class LegendSettings
     [Category("Weergave"), DisplayName("Xref-lagen meenemen")]
     public bool IncludeXrefLayers { get; set; } = false;
 
+    // ---- Groepering (KLIC) ----
+
+    [Browsable(false)]
+    public HashSet<GroupDimension> MergedDimensions { get; set; } = new();
+
+    [Category("Groepering"), DisplayName("Soort samenvoegen"), JsonIgnore,
+     Description("Voegt kabels/leidingen samen ongeacht de soort (bijv. alle KL in één regel).")]
+    public bool SamenvoegenSoort
+    {
+        get => MergedDimensions.Contains(GroupDimension.Soort);
+        set => SetDimension(GroupDimension.Soort, value);
+    }
+
+    [Category("Groepering"), DisplayName("Spanning/druk samenvoegen"), JsonIgnore,
+     Description("Voegt bijv. hoog-/midden-/laagspanning of hoge/lage druk samen.")]
+    public bool SamenvoegenSpecificatie
+    {
+        get => MergedDimensions.Contains(GroupDimension.Specificatie);
+        set => SetDimension(GroupDimension.Specificatie, value);
+    }
+
+    [Category("Groepering"), DisplayName("Uitvoering samenvoegen"), JsonIgnore,
+     Description("Voegt mantelbuis en hulpstuk samen met de hoofdregel.")]
+    public bool SamenvoegenUitvoering
+    {
+        get => MergedDimensions.Contains(GroupDimension.Uitvoering);
+        set => SetDimension(GroupDimension.Uitvoering, value);
+    }
+
+    [Category("Groepering"), DisplayName("Volgnummer samenvoegen"), JsonIgnore,
+     Description("Voegt bijv. DATA, DATA2 en DATA3 samen tot één regel.")]
+    public bool SamenvoegenNummer
+    {
+        get => MergedDimensions.Contains(GroupDimension.Nummer);
+        set => SetDimension(GroupDimension.Nummer, value);
+    }
+
+    private void SetDimension(GroupDimension dim, bool merge)
+    {
+        if (merge) MergedDimensions.Add(dim);
+        else MergedDimensions.Remove(dim);
+    }
+
+    [Category("Groepering"), DisplayName("KLIC-placeholdertekst weglaten"),
+     Description("Laat generieke 'TYPE \\ LABEL \\ OMSCHRIJVING'-placeholders uit KLIC-symbolen weg.")]
+    public bool SuppressKlicPlaceholders { get; set; } = true;
+
     // ---- Schaalbalk ----
 
     [Category("Schaalbalk"), DisplayName("Schaalbalk tonen")]
@@ -426,6 +473,7 @@ public sealed class LegendSettings
         XrefInclusion = new Dictionary<string, bool>(other.XrefInclusion, StringComparer.OrdinalIgnoreCase);
         ManualEntries = other.ManualEntries.Select(m => m.Clone()).ToList();
         CustomStatuses = other.CustomStatuses.Select(cs => cs.Clone()).ToList();
+        MergedDimensions = new HashSet<GroupDimension>(other.MergedDimensions);
     }
 
     // Een volledig onafhankelijke kopie: geen enkele collectie-instance wordt gedeeld.
@@ -471,7 +519,8 @@ public sealed class LegendSettings
     private static bool IsCollectionProperty(System.Reflection.PropertyInfo p) =>
         p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries) or nameof(TextOverrides)
-            or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses);
+            or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
+            or nameof(MergedDimensions);
 
     [JsonIgnore, Browsable(false)]
     public double ModelUnitsPerPaperMm => Scale / 1000.0;
@@ -537,6 +586,7 @@ public sealed class LegendSettings
         IncludedDrawTypes ??= new HashSet<NlcsDrawType>();
         ManualEntries ??= new List<ManualEntry>();
         CustomStatuses ??= new List<CustomStatus>();
+        MergedDimensions ??= new HashSet<GroupDimension>();
         ExcludedDisciplines = ToCi(ExcludedDisciplines);
         ExcludedHoofdgroepen = ToCi(ExcludedHoofdgroepen);
         ExcludedEntries = ToCi(ExcludedEntries);
