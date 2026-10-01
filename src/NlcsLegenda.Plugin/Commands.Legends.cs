@@ -312,7 +312,7 @@ public partial class Commands
         if (def is null) return;
         if (!AskYesNo(ed, $"Instellingen van \"{def.Name}\" als globale standaard voor nieuwe legenda's gebruiken?", true))
             return;
-        var where = SaveSettingsToScope(db, def.Settings, ConfigScope.Global);
+        var where = SaveGlobalDefaults(def.Settings);
         ed.WriteMessage($"\nGlobale standaard bijgewerkt op basis van \"{def.Name}\" ({where}). Bestaande legenda's blijven ongewijzigd.");
     }
 

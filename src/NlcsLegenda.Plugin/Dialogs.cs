@@ -5,44 +5,6 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-internal enum ConfigScope
-{
-    Global,
-
-    Drawing
-}
-
-internal sealed class ScopeBar : FlowLayoutPanel
-{
-    private readonly ComboBox _scope;
-
-    public event EventHandler? ScopeChanged;
-
-    public ScopeBar(ConfigScope initial)
-    {
-        Dock = DockStyle.Top;
-        FlowDirection = FlowDirection.LeftToRight;
-        WrapContents = false;
-        AutoSize = true;
-        Padding = new Padding(8, 6, 8, 6);
-
-        Controls.Add(new Label { Text = "Bewaren in:", AutoSize = true, Margin = new Padding(0, 5, 6, 0) });
-        _scope = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 180,
-            Margin = new Padding(0, 2, 0, 2)
-        };
-        _scope.Items.Add("Alle tekeningen");
-        _scope.Items.Add("Alleen deze tekening");
-        _scope.SelectedIndex = initial == ConfigScope.Drawing ? 1 : 0;
-        _scope.SelectedIndexChanged += (_, _) => ScopeChanged?.Invoke(this, EventArgs.Empty);
-        Controls.Add(_scope);
-    }
-
-    public ConfigScope Scope => _scope.SelectedIndex == 1 ? ConfigScope.Drawing : ConfigScope.Global;
-}
-
 internal sealed class ButtonBar : FlowLayoutPanel
 {
     public Button Ok { get; }
@@ -272,16 +234,12 @@ public sealed class DescriptionRow
 internal sealed class DescriptionsDialog : Form
 {
     private readonly DataGridView _grid;
-    private readonly ScopeBar _scopeBar;
-    private readonly Func<ConfigScope, DescriptionCatalog> _loader;
     private BindingList<DescriptionRow> _rows = new();
 
     public event EventHandler? ApplyRequested;
 
-    public DescriptionsDialog(ConfigScope initialScope, Func<ConfigScope, DescriptionCatalog> loader)
+    public DescriptionsDialog(DescriptionCatalog initial)
     {
-        _loader = loader;
-
         Text = "NLCS Legenda \u2013 omschrijvingen";
         Font = SystemFonts.MessageBoxFont;
         ClientSize = new Size(760, 620);
@@ -327,9 +285,6 @@ internal sealed class DescriptionsDialog : Form
         });
         _grid.EditingControlShowing += OnEditingControlShowing;
 
-        _scopeBar = new ScopeBar(initialScope);
-        _scopeBar.ScopeChanged += (_, _) => LoadRows(_scopeBar.Scope);
-
         var buttons = new ButtonBar(withApply: true);
         buttons.Apply!.Click += (_, _) => ApplyRequested?.Invoke(this, EventArgs.Empty);
         var reset = buttons.AddExtra("Standaardwaarden");
@@ -344,14 +299,9 @@ internal sealed class DescriptionsDialog : Form
 
         Controls.Add(_grid);
         Controls.Add(buttons);
-        Controls.Add(_scopeBar);
 
-        LoadRows(initialScope);
+        SetRows(initial);
     }
-
-    public ConfigScope Scope => _scopeBar.Scope;
-
-    private void LoadRows(ConfigScope scope) => SetRows(_loader(scope));
 
     private void SetRows(DescriptionCatalog catalog)
     {
@@ -415,17 +365,12 @@ internal sealed class TextEditDialog : Form
 {
     private readonly TextBox _algemeen;
     private readonly TextBox _specifiek;
-    private readonly ScopeBar _scopeBar;
-    private readonly Func<ConfigScope, DescriptionEntry> _loader;
     private readonly DescriptionEntry _default;
 
     public event EventHandler? ApplyRequested;
 
-    public TextEditDialog(
-        string elementKey, ConfigScope initialScope,
-        Func<ConfigScope, DescriptionEntry> loader, DescriptionEntry defaults)
+    public TextEditDialog(string elementKey, DescriptionEntry current, DescriptionEntry defaults)
     {
-        _loader = loader;
         _default = defaults;
 
         Text = "NLCS Legenda \u2013 elementtekst";
@@ -437,9 +382,6 @@ internal sealed class TextEditDialog : Form
         ShowInTaskbar = false;
         ShowIcon = false;
         MinimizeBox = false;
-
-        _scopeBar = new ScopeBar(initialScope);
-        _scopeBar.ScopeChanged += (_, _) => LoadFromScope(_scopeBar.Scope);
 
         var layout = new TableLayoutPanel
         {
@@ -481,23 +423,14 @@ internal sealed class TextEditDialog : Form
 
         Controls.Add(layout);
         Controls.Add(buttons);
-        Controls.Add(_scopeBar);
 
-        LoadFromScope(initialScope);
+        _algemeen.Text = current.Algemeen ?? string.Empty;
+        _specifiek.Text = current.Specifiek;
     }
 
     public string Algemeen => _algemeen.Text.Trim();
 
     public string Specifiek => _specifiek.Text.Trim();
-
-    public ConfigScope Scope => _scopeBar.Scope;
-
-    private void LoadFromScope(ConfigScope scope)
-    {
-        var entry = _loader(scope);
-        _algemeen.Text = entry.Algemeen ?? string.Empty;
-        _specifiek.Text = entry.Specifiek;
-    }
 
     private static TextBox MakeTextBox() => new()
     {

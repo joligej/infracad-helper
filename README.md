@@ -179,10 +179,10 @@ profiel. `NLCSLEGENDACONFIG` maakt dat bestand aan en toont de paden. Een voorbe
 in [deploy/settings.sample.json](deploy/settings.sample.json); wat je weglaat krijgt de
 standaardwaarde.
 
-De omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`. Die kun je globaal bewaren
-(`%APPDATA%\NlcsLegenda\omschrijvingen.json`) of alleen in de huidige tekening; de keuze
-per tekening gaat vóór de globale. Een voorbeeld staat in
-[deploy/omschrijvingen.sample.json](deploy/omschrijvingen.sample.json).
+De omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`; die worden globaal bewaard in
+`%APPDATA%\NlcsLegenda\omschrijvingen.json`. Een voorbeeld staat in
+[deploy/omschrijvingen.sample.json](deploy/omschrijvingen.sample.json). Omschrijvingen die
+je voor één legenda wilt afwijken, stel je per legenda in via `NLCSLEGENDABEHEER`.
 
 ## Bouwen en testen
 

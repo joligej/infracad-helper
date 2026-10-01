@@ -14,6 +14,10 @@
 - Een regel die niet volledig getekend kan worden wordt nu gemeld in plaats van stil
   overgeslagen; een bijgewerkte legenda met zulke regels geldt niet meer als volledig
   geslaagd.
+- De oude "Alleen deze tekening"-instellingenscope is vervallen. Instellingen zijn nu de
+  globale standaard (voor nieuwe legenda's) of de eigen instellingen van één bestaande
+  legenda (via `NLCSLEGENDABEHEER`). Oude tekeningspecifieke configuratie wordt nog gelezen
+  en kan met `NLCSLEGENDACONFIG` worden gewist.
 
 ## 1.15.0 - 2026-09-23
 
