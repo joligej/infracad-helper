@@ -201,6 +201,15 @@ een echte tekening draaien, dan doet `dev/scripts/Run-HeadlessLegendTest.ps1` da
 headless via de AutoCAD Core Console. `dev/scripts/Run-IntegrationTests.ps1` draait
 plaatsen, overzicht, export en bijwerken achter elkaar en controleert de resultaten.
 
+## Ondersteunde versies
+
+AutoCAD/Civil 3D 2025, 2026 en 2027 (64-bit). De plugin bouwt op .NET 8 voor 2025/2026 en
+op .NET 10 voor 2027. De .NET 8-build laadt zowel op de oudere .NET 8-hosts (2025 t/m
+Update 1.3, 2026 t/m Update 1.1) als op de nieuwere .NET 10-hosts (2025.1.4+, 2026.1.2+),
+zodat één installatie alle updates dekt. Getest op AutoCAD 2025 (Update 1.4, .NET 10) en
+2027.1 (.NET 10). Werk Autodesk-producten en object enablers op dezelfde machine samen bij
+naar hun .NET 10-versie; dat is Autodesk-advies, los van deze plugin.
+
 ## Beperkingen
 
 De ingebouwde teksten dekken de gangbare elementen. Voor de rest valt de plugin
