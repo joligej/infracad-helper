@@ -2042,9 +2042,10 @@ public partial class Commands
 
             foreach (var scale in new[] { 100.0, 200.0, 500.0, 1000.0 })
             {
-                var plan = ViewportMath.Compute(mw, mh, scale, 5.0);
+                const double margin = 5.0;
+                var plan = ViewportMath.Compute(mw, mh, scale, margin);
                 double paperPerModel = 1000.0 / scale;
-                double w, h, vh;
+                double w, h, vh, vw;
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
                     var lm = LayoutManager.Current;
@@ -2061,12 +2062,20 @@ public partial class Commands
                     w = vp.Width;
                     h = vp.Height;
                     vh = vp.ViewHeight;
+                    vw = vp.ViewHeight * (vp.Width / vp.Height); // zichtbare modelbreedte
                     tr.Commit();
                 }
-                double implied = h / vh;              // papier-mm per modeleenheid
+                double implied = h / vh;
                 bool exact = Math.Abs(implied - paperPerModel) < 1e-6;
+                // Marges: papiermaat moet legenda + 2x marge zijn (geen clipping, geen overmaat).
+                double expW = mw * paperPerModel + 2 * margin;
+                double expH = mh * paperPerModel + 2 * margin;
+                bool marginsOk = Math.Abs(w - expW) < 1e-3 && Math.Abs(h - expH) < 1e-3;
+                // Clipping: zichtbaar model moet de legenda volledig omvatten.
+                bool noClip = vw + 1e-6 >= mw && vh + 1e-6 >= mh;
                 ed.WriteMessage(
-                    $"\nVPTEST: 1:{scale:0} vp {w:0.0}x{h:0.0}mm viewH={vh:0.000} schaal 1:{1000.0 / implied:0} {(exact ? "OK" : "FAIL")}");
+                    $"\nVPTEST: 1:{scale:0} vp {w:0.0}x{h:0.0}mm schaal {(exact ? "OK" : "FAIL")} " +
+                    $"marges {(marginsOk ? "OK" : "FAIL")} clipping {(noClip ? "geen" : "FAIL")}");
             }
         }
         catch (Exception ex)

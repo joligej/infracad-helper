@@ -80,4 +80,47 @@ public class CompositionTreeTests
             new[] { ("K", "L", "") }, new HashSet<string>());
         Assert.Equal("Overig", tree.Groups[0].Label);
     }
+
+    [Fact]
+    public void Filter_DoesNotChangeIncludeState()
+    {
+        var tree = Sample();
+        tree.Groups[0].Leaves[1].Included = false;
+        _ = tree.Filter("Data").ToList();      // filteren mag selectie niet wissen
+        _ = tree.Filter("Put").ToList();
+        _ = tree.Filter(null).ToList();
+        Assert.False(tree.Groups[0].Leaves[1].Included);
+        Assert.Single(tree.ExcludedKeys());
+    }
+
+    [Fact]
+    public void ExclusionRoundTrip_RebuildsSameState()
+    {
+        var tree = Sample();
+        tree.SetGroup(tree.Groups[0], false);          // Data-groep uit
+        var excluded = tree.ExcludedKeys();
+        Assert.Equal(3, excluded.Count);
+
+        var rebuilt = Sample(excluded.ToArray());
+        Assert.Equal(TriState.Off, rebuilt.Groups[0].State);
+        Assert.Equal(TriState.On, rebuilt.Groups[1].State);
+        Assert.Equal(excluded, rebuilt.ExcludedKeys());
+    }
+
+    [Fact]
+    public void RealKlicStructure_GroupsBySoort()
+    {
+        var items = new[]
+        {
+            ("N-WE-KL-DATA-G", "Data", "DATA"),
+            ("N-WE-KL-DATA2-G", "Data 2", "DATA"),
+            ("N-WE-KL-DATA3-G", "Data 3", "DATA"),
+            ("N-WE-KL-GAS-G", "Gas", "GAS"),
+        };
+        var tree = CompositionTree.Build(items, new HashSet<string>());
+        Assert.Equal(2, tree.Groups.Count);
+        Assert.Equal(3, tree.Groups.Single(g => g.Label == "DATA").Leaves.Count);
+        tree.SetGroup(tree.Groups[0], false);
+        Assert.Equal(3, tree.ExcludedKeys().Count);
+    }
 }
