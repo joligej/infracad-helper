@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.22.0 - 2026-10-03
+
+- Samenstellen (uitsluitingen en eigen regels) is nu ook bereikbaar vanuit het
+  instellingenvenster, naast het losse commando.
+- Omschrijvingen gebruiken intern één model; de tekeningopslag volgt één actueel schema.
+
 ## 1.21.1 - 2026-10-02
 
 - Symbolen in de legenda worden nu op de NLCS-bronschaal (schaal/1000) getekend in plaats van
