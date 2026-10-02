@@ -1755,7 +1755,7 @@ public partial class Commands
                 {
                     count = LayerRename.CountOnLayer(db, tr, name);
                     if (tr.GetObject(lt[name], OpenMode.ForRead) is LayerTableRecord ltr)
-                        info = $"kleur {ltr.Color}";
+                        info = DescribeLayer(tr, ltr);
                 }
                 tr.Commit();
                 return (exists, count, info);
@@ -1793,6 +1793,25 @@ public partial class Commands
         {
             ed.WriteMessage($"\nNLCSLEGENDALAAGNAAM fout: {ex.Message}");
         }
+    }
+
+    // Korte beschrijving van de zichtbare laageigenschappen voor het conflictbeeld.
+    private static string DescribeLayer(Transaction tr, LayerTableRecord ltr)
+    {
+        string lt = "Continuous";
+        try
+        {
+            if (tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord l)
+                lt = l.Name;
+        }
+        catch { /* standaard */ }
+        var flags = new List<string>();
+        if (!ltr.IsPlottable) flags.Add("niet-plotbaar");
+        if (ltr.IsFrozen) flags.Add("bevroren");
+        if (ltr.IsOff) flags.Add("uit");
+        if (ltr.IsLocked) flags.Add("vergrendeld");
+        var extra = flags.Count > 0 ? ", " + string.Join("/", flags) : string.Empty;
+        return $"kleur {ltr.Color}, {lt}, dikte {ltr.LineWeight}{extra}";
     }
 
     // Laagnaam kiezen: een object aanwijzen (dan geldt zijn laag) of de naam typen.
