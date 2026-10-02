@@ -109,8 +109,6 @@ public enum QuantityKind
 
 public enum DescriptionSource
 {
-    EigenTekst,
-
     Laagbeschrijving,
 
     Catalogus,

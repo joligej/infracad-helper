@@ -100,20 +100,14 @@ public static class DrawingAnalyzer
             return (baseId ?? string.Empty) + hatch;
         }
 
-        // Per-legenda omschrijvingen liggen bovenop de globale catalogus; leeg = volg globaal.
-        var effectiveCatalog = catalog;
-        if (settings.DescriptionOverrides.Elementen.Count > 0)
-        {
-            effectiveCatalog = (catalog ?? DescriptionCatalog.Default()).Clone();
-            effectiveCatalog.MergeFrom(settings.DescriptionOverrides);
-        }
-
+        // DescriptionOverrides worden in LegendGrouping.Build toegepast (één plek), dus hier
+        // alleen de basiscatalogus doorgeven.
         var entries = LegendGrouping.Build(
             c.Parsed.Values, settings,
             name => descriptions.TryGetValue(name, out var d) ? d : null,
             c.Metrics,
             name => c.SymbolBlocks.TryGetValue(name, out var b) ? b : null,
-            effectiveCatalog,
+            catalog,
             renderIds is null ? null : RenderId);
 
         return new AnalysisResult

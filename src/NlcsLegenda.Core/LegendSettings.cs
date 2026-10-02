@@ -385,10 +385,6 @@ public sealed class LegendSettings
     [Browsable(false)]
     public HashSet<string> ExcludedHoofdgroepen { get; set; } = new(StringComparer.OrdinalIgnoreCase) { "AL" };
 
-    [Browsable(false)]
-    public Dictionary<string, string> TextOverrides { get; set; } =
-        new(StringComparer.OrdinalIgnoreCase);
-
     // Per-legenda omschrijvingen: overschrijven de globale catalogus/standaard alleen voor
     // deze legenda. Zo kunnen A en B in dezelfde tekening eigen teksten hebben. Leeg = volg
     // de globale omschrijvingen.
@@ -479,7 +475,6 @@ public sealed class LegendSettings
         ExcludedDisciplines = new HashSet<string>(other.ExcludedDisciplines, StringComparer.OrdinalIgnoreCase);
         ExcludedHoofdgroepen = new HashSet<string>(other.ExcludedHoofdgroepen, StringComparer.OrdinalIgnoreCase);
         ExcludedEntries = new HashSet<string>(other.ExcludedEntries, StringComparer.OrdinalIgnoreCase);
-        TextOverrides = new Dictionary<string, string>(other.TextOverrides, StringComparer.OrdinalIgnoreCase);
         DescriptionOverrides = other.DescriptionOverrides.Clone();
         XrefInclusion = new Dictionary<string, bool>(other.XrefInclusion, StringComparer.OrdinalIgnoreCase);
         ManualEntries = other.ManualEntries.Select(m => m.Clone()).ToList();
@@ -529,7 +524,7 @@ public sealed class LegendSettings
 
     private static bool IsCollectionProperty(System.Reflection.PropertyInfo p) =>
         p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
-            or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries) or nameof(TextOverrides)
+            or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
             or nameof(MergedDimensions) or nameof(DescriptionOverrides);
 
@@ -601,7 +596,6 @@ public sealed class LegendSettings
         ExcludedDisciplines = ToCi(ExcludedDisciplines);
         ExcludedHoofdgroepen = ToCi(ExcludedHoofdgroepen);
         ExcludedEntries = ToCi(ExcludedEntries);
-        TextOverrides = ToCi(TextOverrides);
         XrefInclusion = ToCi(XrefInclusion);
         DescriptionOverrides ??= new DescriptionCatalog();
         DescriptionOverrides.Elementen = ToCi(DescriptionOverrides.Elementen);

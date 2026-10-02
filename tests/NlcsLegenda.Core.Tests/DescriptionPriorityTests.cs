@@ -15,14 +15,15 @@ public class DescriptionPriorityTests
     }
 
     [Fact]
-    public void TextOverride_WinsOverEverything()
+    public void Override_BeatsBuiltInCatalog()
     {
         var settings = new LegendSettings();
-        settings.TextOverrides["OPENVERHARDING_BETONSTRAATSTEEN"] = "Mijn klinkers";
+        settings.DescriptionOverrides.Elementen["VH|OPENVERHARDING_BETONSTRAATSTEEN"] =
+            new DescriptionEntry { Specifiek = "Mijn klinkers" };
 
         var entries = LegendGrouping.Build(
             Parse("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A"), settings,
-            _ => "Beschrijving uit laag");
+            _ => null);
 
         Assert.Equal("Mijn klinkers", entries[0].Description);
     }

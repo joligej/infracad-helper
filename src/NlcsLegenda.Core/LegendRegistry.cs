@@ -3,8 +3,8 @@ using System.Text.Json.Serialization;
 
 namespace NlcsLegenda.Core;
 
-// De beheerde legenda's van één tekening. Wordt als JSON in de DWG bewaard onder een
-// eigen NOD-root, los van de oude v1.13 SETTINGS-scope.
+// De registry van beheerde legenda's van één tekening. Wordt als JSON in de DWG bewaard
+// onder een eigen NOD-root.
 public sealed class LegendRegistry
 {
     // Verhoog bij een niet-terugwaarts-leesbare wijziging. Een hogere versie dan deze
