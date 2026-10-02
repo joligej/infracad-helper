@@ -57,6 +57,7 @@ internal sealed class SettingsDialog : Form
 {
     private readonly List<PropertyGrid> _grids = new();
     private readonly LegendSettings _settings;
+    private readonly IReadOnlyList<EntryCheckItem>? _composition;
 
     public event EventHandler? ApplyRequested;
 
@@ -68,10 +69,13 @@ internal sealed class SettingsDialog : Form
     };
 
     // Bewerkt precies één instellingenobject (een werkkopie). De aanroeper bepaalt de scope
-    // (globale standaard of één specifieke legenda) en past het resultaat toe; de dialog zelf
-    // kent geen tekening- of legenda-scope. De instellingen staan verdeeld over tabbladen.
-    public SettingsDialog(LegendSettings settings, string contextLabel)
+    // (globale standaard of één specifieke legenda) en past het resultaat toe. Geef je de
+    // geanalyseerde entries mee, dan kan de gebruiker vanuit dit venster ook samenstellen
+    // (uitsluitingen + eigen regels) via dezelfde boom-editor als het losse commando.
+    public SettingsDialog(LegendSettings settings, string contextLabel,
+        IReadOnlyList<EntryCheckItem>? composition = null)
     {
+        _composition = composition;
         _settings = settings;
 
         Text = "NLCS Legenda \u2013 instellingen";
@@ -111,6 +115,11 @@ internal sealed class SettingsDialog : Form
         };
         var remarks = buttons.AddExtra("Opmerkingen\u2026");
         remarks.Click += (_, _) => EditRemarks();
+        if (_composition is not null)
+        {
+            var samenstellen = buttons.AddExtra("Samenstellen\u2026");
+            samenstellen.Click += (_, _) => EditComposition();
+        }
         var resetFormat = buttons.AddExtra("Opmaak \u2192 template");
         resetFormat.Click += (_, _) => { _settings.ResetFormattingToTemplate(); RefreshGrids(); };
         var reset = buttons.AddExtra("Standaardwaarden");
@@ -159,6 +168,21 @@ internal sealed class SettingsDialog : Form
         {
             _settings.RemarksTitle = dlg.RemarksTitle;
             _settings.RemarksText = dlg.RemarksText;
+            RefreshGrids();
+        }
+    }
+
+    // Samenstellen vanuit het instellingenvenster: dezelfde boom-editor als het losse commando,
+    // maar op dezelfde werkkopie. Annuleren laat de werkkopie ongemoeid (Cancel = geen mutatie).
+    private void EditComposition()
+    {
+        if (_composition is null)
+            return;
+        using var dlg = new LegendManageDialog(_composition, _settings);
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _settings.ExcludedEntries = dlg.ExcludedKeys;
+            _settings.ManualEntries = dlg.ManualEntries;
             RefreshGrids();
         }
     }

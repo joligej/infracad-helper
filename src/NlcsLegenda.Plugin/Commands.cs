@@ -680,7 +680,7 @@ public partial class Commands
         {
             if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
             var settings = GetTargetSettings(db, target);
-            using var dialog = new SettingsDialog(settings, target.ContextLabel);
+            using var dialog = new SettingsDialog(settings, target.ContextLabel, BuildCompositionItems(db, settings));
             dialog.ApplyRequested += (_, _) => ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
@@ -1013,6 +1013,40 @@ public partial class Commands
                 return soort;
         }
         return StandardTexts.HoofdgroepName(e.Hoofdgroep);
+    }
+
+    // Bouwt de lijst van tekening-entries voor de samenstellen-boom (alle statussen, zonder
+    // uitsluitingen/eigen regels). Geeft null terug als er niets te analyseren is, zodat het
+    // instellingenvenster de samenstellen-knop dan niet toont.
+    private List<EntryCheckItem>? BuildCompositionItems(Database db, LegendSettings settings)
+    {
+        try
+        {
+            var probe = settings.Clone();
+            probe.ExcludedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            probe.ManualEntries = new List<ManualEntry>();
+            probe.IncludedStatuses = new HashSet<NlcsStatus>
+            {
+                NlcsStatus.Nieuw, NlcsStatus.Bestaand, NlcsStatus.Vervallen,
+                NlcsStatus.Tijdelijk, NlcsStatus.Revisie, NlcsStatus.Overig
+            };
+            using var tr = db.TransactionManager.StartTransaction();
+            var analysis = DrawingAnalyzer.Analyze(db, tr, probe, catalog: LoadCatalog(db));
+            var items = analysis.Entries
+                .Select(e => new EntryCheckItem(LegendSettings.EntryKey(e),
+                    $"[{e.Status.DisplayName()}] {e.Description}", EntryGroupLabel(e)))
+                .GroupBy(x => x.Key)
+                .Select(g => g.First())
+                .OrderBy(x => x.Group, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            tr.Commit();
+            return items.Count > 0 ? items : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     [CommandMethod("NLCSLEGENDAXREFS", CommandFlags.Modal)]
