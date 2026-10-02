@@ -2190,6 +2190,113 @@ public partial class Commands
         }
     }
 
+    // Meet de maatvoering van een bestaande referentielegenda (swatch, rijafstand, teksthoogtes) en
+    // schrijft een machineleesbaar contract. Model is in meters (INSUNITS=6); op schaal 1:S is
+    // 1 modelmeter = 1000/S mm papier. De schaal komt uit NLCS_MEET_SCALE (default 200), het
+    // doelbestand uit NLCS_CONTRACT_OUT. VLA/ActiveX werkt niet in accoreconsole, daarom .NET-API.
+    [CommandMethod("NLCSLEGENDATEMPLATEMETEN", CommandFlags.Modal)]
+    public void NlcsLegendaTemplateMeten()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            double scale = 200.0;
+            if (double.TryParse(Environment.GetEnvironmentVariable("NLCS_MEET_SCALE"), out var s) && s > 0)
+                scale = s;
+            int insunits = db.Insunits == UnitsValue.Meters ? 6 : (int)db.Insunits;
+            double mmPerModel = (db.Insunits == UnitsValue.Millimeters ? 1.0 : 1000.0) / scale;
+
+            var samples = new List<(double w, double h, double cx, double cy)>();
+            var texts = new List<(double height, double x, double y)>();
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+                var ms = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+                foreach (ObjectId id in ms)
+                {
+                    var ent = tr.GetObject(id, OpenMode.ForRead);
+                    if (ent is Curve crv and (Polyline or Line))
+                    {
+                        var ext = crv.GeometricExtents;
+                        double w = ext.MaxPoint.X - ext.MinPoint.X;
+                        double h = ext.MaxPoint.Y - ext.MinPoint.Y;
+                        // Liggende swatch-sample: brede, lage horizontale lijn/polyline.
+                        if (w > 2 && w < 8 && h < 1.5)
+                            samples.Add((w, h, (ext.MinPoint.X + ext.MaxPoint.X) / 2.0, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2.0));
+                    }
+                    else if (ent is DBText t && t.Height > 0)
+                        texts.Add((t.Height, t.Position.X, t.Position.Y));
+                    else if (ent is MText m && m.TextHeight > 0)
+                        texts.Add((m.TextHeight, m.Location.X, m.Location.Y));
+                }
+                tr.Commit();
+            }
+
+            if (samples.Count == 0 || texts.Count == 0)
+            {
+                ed.WriteMessage("\nMETEN: te weinig meetbare geometrie (samples/teksten).");
+                return;
+            }
+
+            static double Mode(IEnumerable<double> values, double bucket)
+            {
+                return values.GroupBy(v => Math.Round(v / bucket) * bucket)
+                    .OrderByDescending(g => g.Count()).ThenBy(g => g.Key)
+                    .Select(g => g.Average()).First();
+            }
+
+            // Swatchbreedte = dominante breedte van de horizontale samples.
+            double swW = Mode(samples.Select(x => x.w), 0.2);
+
+            // Rijafstand uit de omschrijvingsteksten (kleinste teksthoogte = T25): per kolom (X)
+            // de dichtstbevolkte nemen en de mediaan van opeenvolgende verticale sprongen.
+            double descH = Mode(texts.Select(t => t.height), 0.05);
+            var desc = texts.Where(t => Math.Abs(t.height - descH) <= descH * 0.1).ToList();
+            double colX = Mode(desc.Select(t => t.x), 1.0);
+            var column = desc.Where(t => Math.Abs(t.x - colX) <= 2.0).OrderByDescending(t => t.y).ToList();
+            var gaps = new List<double>();
+            for (int i = 1; i < column.Count; i++)
+            {
+                double g = column[i - 1].y - column[i].y;
+                if (g > descH * 0.5 && g < descH * 6) gaps.Add(g);
+            }
+            gaps.Sort();
+            double pitch = gaps.Count > 0 ? gaps[gaps.Count / 2] : 0;
+
+            var txtModes = texts.Select(t => t.height).GroupBy(v => Math.Round(v / 0.05) * 0.05)
+                .OrderByDescending(g => g.Count()).Take(3)
+                .Select(g => g.Average() * mmPerModel).OrderBy(v => v).ToList();
+
+            double swWmm = swW * mmPerModel, pitchMm = pitch * mmPerModel;
+            ed.WriteMessage($"\nMETEN: INSUNITS={insunits} schaal 1:{scale:0} mm/model={mmPerModel:0.###}");
+            ed.WriteMessage($"\nMETEN: swatchbreedte {swWmm:0.0} mm (n={samples.Count})");
+            ed.WriteMessage($"\nMETEN: rijafstand {pitchMm:0.0} mm (n={gaps.Count}, kolom {column.Count})");
+            ed.WriteMessage($"\nMETEN: teksthoogtes mm = {string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}");
+
+            var json = new StringBuilder();
+            json.Append("{\n");
+            json.Append($"  \"bron\": \"{Path.GetFileName(db.Filename)}\",\n");
+            json.Append($"  \"schaal\": {scale:0},\n");
+            json.Append($"  \"insunits\": {insunits},\n");
+            json.Append($"  \"swatchBreedteMm\": {swWmm:0.0},\n");
+            json.Append($"  \"rijafstandMm\": {pitchMm:0.0},\n");
+            json.Append($"  \"teksthoogtesMm\": [{string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}]\n");
+            json.Append("}\n");
+            string outPath = Environment.GetEnvironmentVariable("NLCS_CONTRACT_OUT")
+                ?? Path.Combine(Path.GetTempPath(), "nlcs-template-contract.json");
+            File.WriteAllText(outPath, json.ToString());
+            ed.WriteMessage($"\nMETEN: contract geschreven naar {outPath}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nMETEN error: {ex.Message}");
+        }
+    }
+
     // Headless bewijs van de laagnaam-rename: maakt testlagen met entiteiten, hernoemt (dry-run
     // + apply in één transactie), test een botsing met samenvoegen en een vergrendelde bronlaag.
     [CommandMethod("NLCSLEGENDALAAGNAAMTEST", CommandFlags.Modal)]
