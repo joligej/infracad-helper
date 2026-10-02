@@ -2227,6 +2227,28 @@ public partial class Commands
                 ed.WriteMessage($"\nVPTEST: kaal {mw2:0.0} x {mh2:0.0} modeleenheden");
                 CheckAt("kaal", mw2, mh2, c2, 200.0);
             }
+
+            // Variant 4: drie kolommen (breder profiel).
+            var threeCol = LoadGlobalDefaults();
+            threeCol.Columns = 3;
+            if (Measure(threeCol, out var mw3, out var mh3, out var c3))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: 3-koloms {mw3:0.0} x {mh3:0.0} modeleenheden");
+                CheckAt("3-koloms", mw3, mh3, c3, 200.0);
+            }
+
+            // Variant 5: hoeveelheden + opmerkingen + schaalbalk (volledige breedte) op 1:500.
+            var full = LoadGlobalDefaults();
+            full.IncludeQuantities = true;
+            full.IncludeRemarks = true;
+            full.IncludeScaleBar = true;
+            if (Measure(full, out var mw4, out var mh4, out var c4))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: volledig {mw4:0.0} x {mh4:0.0} modeleenheden");
+                CheckAt("volledig", mw4, mh4, c4, 500.0);
+            }
         }
         catch (Exception ex)
         {
