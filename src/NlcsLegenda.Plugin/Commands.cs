@@ -1959,6 +1959,9 @@ public partial class Commands
                     sB.ExcludedEntries.Add(firstKey);
                 if (descKey.Length > 0)
                     sB.DescriptionOverrides.Elementen[descKey] = new DescriptionEntry { Specifiek = "EIGEN-B-TEKST" };
+                // A krijgt een eigen handmatige regel en een eigen status; B/C niet.
+                sA.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VV-ISO-G", Type = NlcsDrawType.Geometrie, Description = "ISO-handregel A" });
+                sA.CustomStatuses.Add(new CustomStatus { Name = "ISO-STATUS-A" });
 
                 var defA = IsoDef(reg, sA);
                 var defB = IsoDef(reg, sB);
@@ -1991,6 +1994,12 @@ public partial class Commands
                 bool cOk = cDef.Settings.Scale == gd.Scale && cDef.Settings.ExcludedEntries.Count == 0
                     && cDef.Settings.DescriptionOverrides.Elementen.Count == 0;
                 ed.WriteMessage($"\nISO: C.scale={cDef.Settings.Scale:0} (globaal {gd.Scale:0}) C.excl={cDef.Settings.ExcludedEntries.Count} -> {(cOk ? "OK" : "FAIL")}");
+                // Handregel + status: alleen A, niet B/C.
+                bool dimOk = a.Settings.ManualEntries.Count == 1 && a.Settings.CustomStatuses.Count == 1
+                    && b.Settings.ManualEntries.Count == 0 && b.Settings.CustomStatuses.Count == 0
+                    && cDef.Settings.ManualEntries.Count == 0 && cDef.Settings.CustomStatuses.Count == 0;
+                ed.WriteMessage($"\nISO: A.manual={a.Settings.ManualEntries.Count}/status={a.Settings.CustomStatuses.Count} " +
+                    $"B.manual={b.Settings.ManualEntries.Count} C.manual={cDef.Settings.ManualEntries.Count} -> {(dimOk ? "OK" : "FAIL")}");
                 tr.Commit();
             }
 
