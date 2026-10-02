@@ -2072,32 +2072,6 @@ public partial class Commands
 
         try
         {
-            string groupName;
-            Point3d min, max;
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var reg = LegendStore.Load(db, tr);
-                var def = IsoDef(reg, LoadGlobalDefaults());
-                reg.Add(def);
-                if (BuildManagedLegend(db, tr, reg, def, out _, out _) != UpdateResult.Updated)
-                {
-                    tr.Commit();
-                    ed.WriteMessage("\nVPTEST: geen legenda om omheen te meten.");
-                    return;
-                }
-                LegendStore.Save(db, tr, reg);
-                groupName = def.GroupName;
-                LegendManagement.TryGetGroupExtents(db, tr, groupName, out var ext);
-                min = ext.MinPoint;
-                max = ext.MaxPoint;
-                tr.Commit();
-            }
-            PurgePending(db);
-
-            double mw = max.X - min.X, mh = max.Y - min.Y;
-            var center = new Point2d((min.X + max.X) / 2.0, (min.Y + max.Y) / 2.0);
-            ed.WriteMessage($"\nVPTEST: legenda {mw:0.0} x {mh:0.0} modeleenheden");
-
             string layoutName = "Model";
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -2119,7 +2093,29 @@ public partial class Commands
             }
             LayoutManager.Current.CurrentLayout = layoutName;
 
-            foreach (var scale in new[] { 100.0, 200.0, 500.0, 1000.0 })
+            // Bouwt een legenda met de gegeven instellingen en geeft de werkelijke extents terug.
+            bool Measure(LegendSettings s, out double mw, out double mh, out Point2d center)
+            {
+                mw = mh = 0; center = default;
+                using var tr = db.TransactionManager.StartTransaction();
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, s);
+                reg.Add(def);
+                if (BuildManagedLegend(db, tr, reg, def, out _, out _) != UpdateResult.Updated)
+                {
+                    tr.Commit();
+                    return false;
+                }
+                LegendStore.Save(db, tr, reg);
+                LegendManagement.TryGetGroupExtents(db, tr, def.GroupName, out var ext);
+                mw = ext.MaxPoint.X - ext.MinPoint.X;
+                mh = ext.MaxPoint.Y - ext.MinPoint.Y;
+                center = new Point2d((ext.MinPoint.X + ext.MaxPoint.X) / 2.0, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2.0);
+                tr.Commit();
+                return true;
+            }
+
+            void CheckAt(string label, double mw, double mh, Point2d center, double scale)
             {
                 const double margin = 5.0;
                 var plan = ViewportMath.Compute(mw, mh, scale, margin);
@@ -2138,9 +2134,7 @@ public partial class Commands
                     vp.Height = plan.PaperHeightMm;
                     vp.ViewCenter = center;
                     vp.ViewHeight = plan.PaperHeightMm / paperPerModel;
-                    w = vp.Width;
-                    h = vp.Height;
-                    vh = vp.ViewHeight;
+                    w = vp.Width; h = vp.Height; vh = vp.ViewHeight;
                     vw = vp.ViewHeight * (vp.Width / vp.Height); // zichtbare modelbreedte
                     tr.Commit();
                 }
@@ -2153,8 +2147,41 @@ public partial class Commands
                 // Clipping: zichtbaar model moet de legenda volledig omvatten.
                 bool noClip = vw + 1e-6 >= mw && vh + 1e-6 >= mh;
                 ed.WriteMessage(
-                    $"\nVPTEST: 1:{scale:0} vp {w:0.0}x{h:0.0}mm schaal {(exact ? "OK" : "FAIL")} " +
+                    $"\nVPTEST: {label} 1:{scale:0} vp {w:0.0}x{h:0.0}mm schaal {(exact ? "OK" : "FAIL")} " +
                     $"marges {(marginsOk ? "OK" : "FAIL")} clipping {(noClip ? "geen" : "FAIL")}");
+            }
+
+            // Variant 1: standaard legenda op vier schalen.
+            if (!Measure(LoadGlobalDefaults(), out var mw0, out var mh0, out var c0))
+            {
+                ed.WriteMessage("\nVPTEST: geen legenda om omheen te meten.");
+                return;
+            }
+            PurgePending(db);
+            ed.WriteMessage($"\nVPTEST: standaard {mw0:0.0} x {mh0:0.0} modeleenheden");
+            foreach (var scale in new[] { 100.0, 200.0, 500.0, 1000.0 })
+                CheckAt("standaard", mw0, mh0, c0, scale);
+
+            // Variant 2: twee kolommen geeft een smaller/hoger profiel, zelfde viewport-contract.
+            var twoCol = LoadGlobalDefaults();
+            twoCol.Columns = 2;
+            if (Measure(twoCol, out var mw1, out var mh1, out var c1))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: 2-koloms {mw1:0.0} x {mh1:0.0} modeleenheden");
+                CheckAt("2-koloms", mw1, mh1, c1, 200.0);
+            }
+
+            // Variant 3: zonder kader, opmerkingen en schaalbalk (minimale omvang).
+            var bare = LoadGlobalDefaults();
+            bare.DrawBorder = false;
+            bare.IncludeRemarks = false;
+            bare.IncludeScaleBar = false;
+            if (Measure(bare, out var mw2, out var mh2, out var c2))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: kaal {mw2:0.0} x {mh2:0.0} modeleenheden");
+                CheckAt("kaal", mw2, mh2, c2, 200.0);
             }
         }
         catch (Exception ex)
