@@ -1826,6 +1826,96 @@ public partial class Commands
         }
     }
 
+    // Headless bewijs van per-legenda-isolatie: maakt twee hele-tekeninglegenda's met eigen
+    // instellingen, bouwt ze, bewerkt daarna alleen A en toont dat B ongemoeid blijft; alles
+    // via de echte registry-persistentie en rebuild.
+    [CommandMethod("NLCSLEGENDAISOLATIETEST", CommandFlags.Modal)]
+    public void NlcsLegendaIsolatieTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+
+        try
+        {
+            string idA, idB, firstKey = string.Empty;
+            int aRows, bRows;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
+                var probe = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db), excludedIds: excluded);
+                if (probe.Entries.Count > 0)
+                    firstKey = LegendSettings.EntryKey(probe.Entries[0]);
+
+                var sA = LoadGlobalDefaults();
+                var sB = LoadGlobalDefaults();
+                sB.Scale = 500;
+                if (firstKey.Length > 0)
+                    sB.ExcludedEntries.Add(firstKey);
+
+                var defA = IsoDef(reg, sA);
+                var defB = IsoDef(reg, sB);
+                reg.Add(defA);
+                reg.Add(defB);
+                idA = defA.Id;
+                idB = defB.Id;
+                BuildManagedLegend(db, tr, reg, defA, out aRows, out _);
+                BuildManagedLegend(db, tr, reg, defB, out bRows, out _);
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+            }
+            PurgePending(db);
+            ed.WriteMessage($"\nISO: A rows={aRows} B rows={bRows} (B schaal 500, 1 uitgevinkt)");
+
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var a = reg.FindById(idA)!;
+                var b = reg.FindById(idB)!;
+                ed.WriteMessage(
+                    $"\nISO: persisted A.scale={a.Settings.Scale:0} A.excl={a.Settings.ExcludedEntries.Count} " +
+                    $"B.scale={b.Settings.Scale:0} B.excl={b.Settings.ExcludedEntries.Count}");
+                tr.Commit();
+            }
+
+            int aRows2, bAfter;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var a = reg.FindById(idA)!;
+                if (firstKey.Length > 0)
+                    a.Settings.ExcludedEntries.Add(firstKey);
+                BuildManagedLegend(db, tr, reg, a, out aRows2, out _);
+                BuildManagedLegend(db, tr, reg, reg.FindById(idB)!, out bAfter, out _);
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            bool ok = (firstKey.Length == 0 || aRows2 == aRows - 1) && bAfter == bRows;
+            ed.WriteMessage(
+                $"\nISO: na A bewerken A rows={aRows2} (verwacht {(firstKey.Length > 0 ? aRows - 1 : aRows)}) " +
+                $"B rows={bAfter} (verwacht {bRows})");
+            ed.WriteMessage($"\nISO: isolatie {(ok ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nISO error: {ex.Message}");
+        }
+    }
+
+    private static LegendDefinition IsoDef(LegendRegistry reg, LegendSettings settings) => new()
+    {
+        Name = reg.NextDefaultName(),
+        Scope = LegendScope.WholeDrawing,
+        GroupName = LegendRegistry.NewGroupName(),
+        Settings = settings.Clone(),
+        CreatedWithVersion = PluginVersion
+    };
+
     private static void ReportRenderIssues(Editor ed, IReadOnlyList<RenderIssue> issues)
     {
         if (issues.Count == 0)
