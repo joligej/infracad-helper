@@ -133,7 +133,6 @@ public static class LegendExport
 
     private static string SourceLabel(DescriptionSource source) => source switch
     {
-        DescriptionSource.EigenTekst => "eigen tekst",
         DescriptionSource.Laagbeschrijving => "laagbeschrijving",
         DescriptionSource.Catalogus => "catalogus",
         DescriptionSource.Handmatig => "handmatig",

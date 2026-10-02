@@ -3,9 +3,8 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// De legacy-migratie draait alleen als er nog geen beheerde legenda's zijn (idempotent) en
-// leest oude instellingen via FromJson, dat nooit mag crashen op kapotte of gedeeltelijke
-// data. Deze tests dekken die data-laag; de AutoCAD-grouprename zit in LegendManagement.
+// Robuustheid van de config-datalaag: FromJson mag nooit crashen op kapotte of gedeeltelijke
+// data, en de registry roundtript stabiel en onafhankelijk per legenda.
 public class MigrationDataTests
 {
     [Fact]

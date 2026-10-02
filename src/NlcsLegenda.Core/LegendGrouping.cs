@@ -16,7 +16,14 @@ public static class LegendGrouping
         DescriptionCatalog? catalog = null,
         Func<string, string?>? renderIdentity = null)
     {
+        // Per-legenda omschrijvingen liggen bovenop de (globale) catalogus. Dit is de enige plek
+        // waar ze worden toegepast, zodat elke aanroeper dezelfde effectieve teksten krijgt.
         var descriptions = catalog ?? DescriptionCatalog.Default();
+        if (settings.DescriptionOverrides.Elementen.Count > 0)
+        {
+            descriptions = descriptions.Clone();
+            descriptions.MergeFrom(settings.DescriptionOverrides);
+        }
         var groups = new Dictionary<string, List<NlcsLayerName>>();
 
         foreach (var layer in usedLayers)
@@ -200,28 +207,14 @@ public static class LegendGrouping
     }
 
     // Volgorde van omschrijvingsbronnen (één plek bepaalt de precedence):
-    //   1. legacy TextOverrides (oude per-element/laag-tekst; blijft leesbaar voor oude data);
-    //   2. laagbeschrijving uit de tekening;
-    //   3. effectieve catalogus = ingebouwde referentie + per-legenda DescriptionOverrides;
-    //   4. nette laagnaam.
-    // Het canonieke per-legenda model is DescriptionOverrides (zit in de catalogus verwerkt);
-    // nieuwe teksten gaan daarheen, TextOverrides wordt niet meer geschreven.
+    //   1. laagbeschrijving uit de tekening;
+    //   2. effectieve catalogus = ingebouwde referentie + per-legenda DescriptionOverrides;
+    //   3. nette laagnaam.
+    // Het canonieke per-legenda model is DescriptionOverrides (zit in de catalogus verwerkt).
     private static string ResolveDescription(
         List<NlcsLayerName> group, NlcsLayerName representative, LegendSettings settings,
         Func<string, string?>? layerDescription, DescriptionCatalog catalog, out DescriptionSource source)
     {
-        if (settings.TextOverrides.TryGetValue(representative.Element, out var byElement))
-        {
-            source = DescriptionSource.EigenTekst;
-            return byElement;
-        }
-        foreach (var layer in group)
-            if (settings.TextOverrides.TryGetValue(layer.LocalName, out var byLayer))
-            {
-                source = DescriptionSource.EigenTekst;
-                return byLayer;
-            }
-
         if (layerDescription is not null)
         {
             foreach (var layer in group.OrderBy(l => TypePriority(l.DrawType)))

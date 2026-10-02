@@ -10,7 +10,7 @@ public class LegendSettingsCloneTests
     {
         var a = new LegendSettings();
         a.ExcludedEntries.Add("N|WE|VH|X");
-        a.TextOverrides["EL"] = "Tekst";
+        a.DescriptionOverrides.Elementen["VH|EL"] = new DescriptionEntry { Specifiek = "Tekst" };
         a.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-EIGEN-G", Description = "Eigen" });
         a.CustomStatuses.Add(new CustomStatus { Name = "Onder voorbehoud", Members = { "N|WE|RI|R" } });
 
@@ -19,7 +19,7 @@ public class LegendSettingsCloneTests
         Assert.NotSame(a.ExcludedEntries, b.ExcludedEntries);
         Assert.NotSame(a.IncludedStatuses, b.IncludedStatuses);
         Assert.NotSame(a.IncludedDrawTypes, b.IncludedDrawTypes);
-        Assert.NotSame(a.TextOverrides, b.TextOverrides);
+        Assert.NotSame(a.DescriptionOverrides, b.DescriptionOverrides);
         Assert.NotSame(a.XrefInclusion, b.XrefInclusion);
         Assert.NotSame(a.ManualEntries, b.ManualEntries);
         Assert.NotSame(a.CustomStatuses, b.CustomStatuses);
@@ -82,13 +82,13 @@ public class LegendSettingsCloneTests
         var a = new LegendSettings();
         a.XrefInclusion["Xref-B"] = true;
         a.ExcludedEntries.Add("N|WE|RI|Riool");
-        a.TextOverrides["Element"] = "Waarde";
+        a.DescriptionOverrides.Elementen["VH|ELEMENT"] = new DescriptionEntry { Specifiek = "Waarde" };
 
         var restored = LegendSettings.FromJson(a.ToJson());
 
         Assert.True(restored.IsXrefIncluded("xref-b"));
         Assert.Contains("n|we|ri|riool", restored.ExcludedEntries);
-        Assert.True(restored.TextOverrides.ContainsKey("ELEMENT"));
+        Assert.True(restored.DescriptionOverrides.Elementen.ContainsKey("vh|element"));
     }
 
     // De instellingen-dialog bewerkt een werkkopie en past die bij Opslaan/Toepassen toe via

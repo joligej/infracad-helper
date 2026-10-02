@@ -89,36 +89,6 @@ public partial class Commands
         _pendingPurge.Clear();
     }
 
-    // Voert de eenmalige legacy- en omschrijving-snapshotmigratie uit binnen een bestaande
-    // transactie.
-    private static void MaybeMigrate(Database db, Transaction tr, LegendRegistry registry)
-    {
-        try
-        {
-            LegendManagement.MigrateLegacyIfNeeded(db, tr, registry, LoadGlobalDefaults(), PluginVersion, out _);
-
-            // Oude legenda's (schema < 2) toonden de live globale omschrijvingen. Leg die nu
-            // vast onder hun eigen overrides, zodat latere globale wijzigingen ze niet meer
-            // veranderen; daarna is elke legenda onafhankelijk.
-            if (registry.SchemaVersion < 2 && registry.Legends.Count > 0)
-            {
-                var globalUser = LoadGlobalDescriptionDefaults();
-                foreach (var l in registry.Legends)
-                {
-                    var snap = globalUser.Clone();
-                    snap.MergeFrom(l.Settings.DescriptionOverrides);
-                    l.Settings.DescriptionOverrides = snap;
-                }
-                registry.SchemaVersion = 2;
-                LegendStore.Save(db, tr, registry);
-            }
-        }
-        catch
-        {
-            // Migratie faalt zacht; de tekening blijft bruikbaar.
-        }
-    }
-
     [CommandMethod("NLCSLEGENDABEHEER", CommandFlags.Modal)]
     public void NlcsLegendaBeheer()
     {
@@ -131,13 +101,6 @@ public partial class Commands
 
         try
         {
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var reg = LegendStore.Load(db, tr);
-                MaybeMigrate(db, tr, reg);
-                tr.Commit();
-            }
-
             while (true)
             {
                 LegendRegistry registry;

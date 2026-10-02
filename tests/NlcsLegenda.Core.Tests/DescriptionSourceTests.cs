@@ -32,16 +32,17 @@ public class DescriptionSourceTests
     }
 
     [Fact]
-    public void TextOverride_TakesPrecedence()
+    public void Override_UsesCatalogSource()
     {
         var layer = Parse("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A");
         var settings = new LegendSettings();
-        settings.TextOverrides[layer.Element] = "Mijn eigen tekst";
+        settings.DescriptionOverrides.Elementen["VH|OPENVERHARDING_BETONSTRAATSTEEN"] =
+            new DescriptionEntry { Specifiek = "Mijn eigen tekst" };
 
         var entries = LegendGrouping.Build(new[] { layer }, settings, _ => null);
 
         var entry = Assert.Single(entries);
-        Assert.Equal(DescriptionSource.EigenTekst, entry.DescriptionSource);
+        Assert.Equal(DescriptionSource.Catalogus, entry.DescriptionSource);
         Assert.Equal("Mijn eigen tekst", entry.Description);
     }
 

@@ -109,9 +109,6 @@ public class ElementTypeFilterTests
     {
         var s = new LegendSettings();
         s.ToonGeometrie = false;
-        var settingsWith = new LegendSettings();
-        settingsWith.TextOverrides["OPENVERHARDING_BETONSTRAATSTEEN"] = "Steen";
-        s.TextOverrides["OPENVERHARDING_BETONSTRAATSTEEN"] = "Steen";
 
         var entries = LegendGrouping.Build(
             Parse("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-G", "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-S"), s);

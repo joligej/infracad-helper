@@ -138,7 +138,8 @@ public class QuantityAndExportTests
     public void Csv_QuotesFieldsWithSeparator()
     {
         var settings = new LegendSettings();
-        settings.TextOverrides["OPENVERHARDING_TEGEL"] = "Tegel; grijs";
+        settings.DescriptionOverrides.Elementen["VH|OPENVERHARDING_TEGEL"] =
+            new DescriptionEntry { Specifiek = "Tegel; grijs" };
 
         var entries = LegendGrouping.Build(Parse("N-WE-VH-OPENVERHARDING_TEGEL-G"), settings);
         var csv = LegendExport.ToCsv(entries);
@@ -156,7 +157,8 @@ public class QuantityAndExportTests
     public void Csv_NeutralizesFormulaInjection(string dangerous)
     {
         var settings = new LegendSettings();
-        settings.TextOverrides["OPENVERHARDING_TEGEL"] = dangerous;
+        settings.DescriptionOverrides.Elementen["VH|OPENVERHARDING_TEGEL"] =
+            new DescriptionEntry { Specifiek = dangerous };
 
         var entries = LegendGrouping.Build(Parse("N-WE-VH-OPENVERHARDING_TEGEL-G"), settings);
         var csv = LegendExport.ToCsv(entries);

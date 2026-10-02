@@ -3,10 +3,8 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-// De registry van beheerde legenda's staat onder een EIGEN NOD-root, los van de oude
-// v1.13-root "NLCSLEGENDA". Zo kan een oude "tekeningconfig wissen"-actie (die de
-// NLCSLEGENDA-root verwijdert) de legenda-registry nooit vernietigen. Alle lees/schrijf
-// gaat via een bestaande transactie, zodat metadata en geometrie samen committen.
+// De registry van beheerde legenda's staat onder een eigen NOD-root. Alle lees/schrijf gaat
+// via een bestaande transactie, zodat metadata en geometrie samen committen.
 internal static class LegendStore
 {
     private const string RegistryRoot = "NLCSLEGENDA_REGISTRY";
@@ -43,6 +41,15 @@ internal static class LegendStore
 
     public static void Save(Database db, Transaction tr, LegendRegistry registry)
     {
+        // Nooit onleesbare of nieuwere (niet-ondersteunde) legenda-gegevens overschrijven.
+        // De eerste opslag (nog geen root) en een normale mutatie (bestaande geldige registry)
+        // gaan door; alleen corrupt/future wordt geweigerd zodat er niets verloren gaat.
+        var existing = ReadRaw(db, tr);
+        if (existing is not null && !LegendRegistry.TryParse(existing, out _, out var err))
+            throw new NotSupportedException(
+                "Bestaande legenda-gegevens zijn onleesbaar of nieuwer dan deze plugin; er wordt niets " +
+                $"overschreven. {err}");
+
         var nod = (DBDictionary)tr.GetObject(db.NamedObjectsDictionaryId, OpenMode.ForWrite);
         DBDictionary root;
         if (nod.Contains(RegistryRoot))

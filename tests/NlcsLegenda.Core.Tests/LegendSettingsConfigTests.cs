@@ -19,7 +19,8 @@ public class LegendSettingsConfigTests
                 ColumnWidthMm = 90,
                 Title = "MIJN LEGENDA"
             };
-            original.TextOverrides["OPENVERHARDING_BETONSTRAATSTEEN"] = "Klinkers";
+            original.DescriptionOverrides.Elementen["VH|OPENVERHARDING_BETONSTRAATSTEEN"] =
+                new DescriptionEntry { Specifiek = "Klinkers" };
             original.IncludedStatuses = new HashSet<NlcsStatus> { NlcsStatus.Nieuw, NlcsStatus.Bestaand };
 
             original.Save(path);
@@ -30,7 +31,7 @@ public class LegendSettingsConfigTests
             Assert.Equal(12, loaded.MaxRowsPerColumn);
             Assert.Equal(90, loaded.ColumnWidthMm);
             Assert.Equal("MIJN LEGENDA", loaded.Title);
-            Assert.Equal("Klinkers", loaded.TextOverrides["OPENVERHARDING_BETONSTRAATSTEEN"]);
+            Assert.Equal("Klinkers", loaded.DescriptionOverrides.Elementen["VH|OPENVERHARDING_BETONSTRAATSTEEN"].Specifiek);
             Assert.Equal(2, loaded.IncludedStatuses.Count);
             Assert.Contains(NlcsStatus.Nieuw, loaded.IncludedStatuses);
         }
