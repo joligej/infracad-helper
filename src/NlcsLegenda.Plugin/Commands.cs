@@ -966,10 +966,11 @@ public partial class Commands
                 var analysis = DrawingAnalyzer.Analyze(db, tr, probe, catalog: LoadCatalog(db));
                 items = analysis.Entries
                     .Select(e => new EntryCheckItem(LegendSettings.EntryKey(e),
-                        $"[{e.Status.DisplayName()}] {e.Description}"))
+                        $"[{e.Status.DisplayName()}] {e.Description}", EntryGroupLabel(e)))
                     .GroupBy(x => x.Key)
                     .Select(g => g.First())
-                    .OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
+                    .OrderBy(x => x.Group, StringComparer.CurrentCultureIgnoreCase)
+                    .ThenBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
                     .ToList();
                 tr.Commit();
             }
@@ -993,6 +994,17 @@ public partial class Commands
         {
             ed.WriteMessage($"\nNLCSLEGENDASAMENSTELLEN fout: {ex.Message}");
         }
+    }
+
+    private static string EntryGroupLabel(LegendEntry e)
+    {
+        if (string.Equals(e.Discipline, "KL", StringComparison.OrdinalIgnoreCase))
+        {
+            var soort = ElementProperties.From(e.Element).Soort;
+            if (!string.IsNullOrWhiteSpace(soort))
+                return soort;
+        }
+        return StandardTexts.HoofdgroepName(e.Hoofdgroep);
     }
 
     [CommandMethod("NLCSLEGENDAXREFS", CommandFlags.Modal)]
