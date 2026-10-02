@@ -2401,6 +2401,39 @@ public partial class Commands
         }
     }
 
+    // Twee aparte commando's (dus twee undo-stappen) om Undo van een rename real-host te testen:
+    // SETUP maakt de testlaag, RENAME hernoemt die. Een _U na RENAME moet de rename terugdraaien.
+    [CommandMethod("NLCSLEGENDAUNDOSETUP", CommandFlags.Modal)]
+    public void NlcsLegendaUndoSetup()
+    {
+        var db = AcApp.DocumentManager.MdiActiveDocument?.Database;
+        if (db is null) return;
+        using var tr = db.TransactionManager.StartTransaction();
+        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+        if (!lt.Has("N-WE-KL-UNDOSRC-G"))
+        {
+            var ltr = new LayerTableRecord { Name = "N-WE-KL-UNDOSRC-G" };
+            lt.Add(ltr);
+            tr.AddNewlyCreatedDBObject(ltr, true);
+        }
+        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+        var line = new Autodesk.AutoCAD.DatabaseServices.Line(Point3d.Origin, new Point3d(1, 1, 0)) { Layer = "N-WE-KL-UNDOSRC-G" };
+        ms.AppendEntity(line);
+        tr.AddNewlyCreatedDBObject(line, true);
+        tr.Commit();
+    }
+
+    [CommandMethod("NLCSLEGENDAUNDORENAME", CommandFlags.Modal)]
+    public void NlcsLegendaUndoRename()
+    {
+        var db = AcApp.DocumentManager.MdiActiveDocument?.Database;
+        if (db is null) return;
+        using var tr = db.TransactionManager.StartTransaction();
+        var p = LayerRename.Analyze(db, tr, "N-WE-KL-UNDOSRC-G", "N-WE-KL-UNDODST-G");
+        LayerRename.Apply(db, tr, p, false, out _);
+        tr.Commit();
+    }
+
     private static void ReportRenderIssues(Editor ed, IReadOnlyList<RenderIssue> issues)
     {
         if (issues.Count == 0)
