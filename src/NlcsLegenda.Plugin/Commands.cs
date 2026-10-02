@@ -1916,6 +1916,102 @@ public partial class Commands
         CreatedWithVersion = PluginVersion
     };
 
+    // Headless bewijs van de echte viewport-flow: plaatst een legenda, maakt in een layout een
+    // viewport om de werkelijke legenda-extents op meerdere schalen en controleert dat de
+    // viewport exact op schaal staat (papier-mm / modeleenheid = 1000 / schaal).
+    [CommandMethod("NLCSLEGENDAVIEWPORTTEST", CommandFlags.Modal)]
+    public void NlcsLegendaViewportTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+
+        try
+        {
+            string groupName;
+            Point3d min, max;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, LoadGlobalDefaults());
+                reg.Add(def);
+                if (BuildManagedLegend(db, tr, reg, def, out _, out _) != UpdateResult.Updated)
+                {
+                    tr.Commit();
+                    ed.WriteMessage("\nVPTEST: geen legenda om omheen te meten.");
+                    return;
+                }
+                LegendStore.Save(db, tr, reg);
+                groupName = def.GroupName;
+                LegendManagement.TryGetGroupExtents(db, tr, groupName, out var ext);
+                min = ext.MinPoint;
+                max = ext.MaxPoint;
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            double mw = max.X - min.X, mh = max.Y - min.Y;
+            var center = new Point2d((min.X + max.X) / 2.0, (min.Y + max.Y) / 2.0);
+            ed.WriteMessage($"\nVPTEST: legenda {mw:0.0} x {mh:0.0} modeleenheden");
+
+            string layoutName = "Model";
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var layouts = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
+                foreach (DBDictionaryEntry entry in layouts)
+                {
+                    if (!string.Equals(entry.Key, "Model", StringComparison.OrdinalIgnoreCase))
+                    {
+                        layoutName = entry.Key;
+                        break;
+                    }
+                }
+                tr.Commit();
+            }
+            if (string.Equals(layoutName, "Model", StringComparison.OrdinalIgnoreCase))
+            {
+                ed.WriteMessage("\nVPTEST: geen papier-layout aanwezig.");
+                return;
+            }
+            LayoutManager.Current.CurrentLayout = layoutName;
+
+            foreach (var scale in new[] { 100.0, 200.0, 500.0, 1000.0 })
+            {
+                var plan = ViewportMath.Compute(mw, mh, scale, 5.0);
+                double paperPerModel = 1000.0 / scale;
+                double w, h, vh;
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    var lm = LayoutManager.Current;
+                    var layout = (Layout)tr.GetObject(lm.GetLayoutId(lm.CurrentLayout), OpenMode.ForRead);
+                    var ps = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite);
+                    var vp = new Viewport();
+                    ps.AppendEntity(vp);
+                    tr.AddNewlyCreatedDBObject(vp, true);
+                    vp.CenterPoint = new Point3d(200, 150, 0);
+                    vp.Width = plan.PaperWidthMm;
+                    vp.Height = plan.PaperHeightMm;
+                    vp.ViewCenter = center;
+                    vp.ViewHeight = plan.PaperHeightMm / paperPerModel;
+                    w = vp.Width;
+                    h = vp.Height;
+                    vh = vp.ViewHeight;
+                    tr.Commit();
+                }
+                double implied = h / vh;              // papier-mm per modeleenheid
+                bool exact = Math.Abs(implied - paperPerModel) < 1e-6;
+                ed.WriteMessage(
+                    $"\nVPTEST: 1:{scale:0} vp {w:0.0}x{h:0.0}mm viewH={vh:0.000} schaal 1:{1000.0 / implied:0} {(exact ? "OK" : "FAIL")}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nVPTEST error: {ex.Message}");
+        }
+    }
+
     private static void ReportRenderIssues(Editor ed, IReadOnlyList<RenderIssue> issues)
     {
         if (issues.Count == 0)
