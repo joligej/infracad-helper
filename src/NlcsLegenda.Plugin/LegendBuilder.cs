@@ -12,7 +12,6 @@ public static class LegendBuilder
     private const double SubHeaderHeightRatio = 0.85;   // subkop t.o.v. kophoogte
     private const double TitleUnderlineOffset = 1.35;    // onderstreping onder de titel
     private const double SubHeaderIndentRatio = 0.15;    // inspringing subkop in de swatch
-    private const double SymbolFitRatio = 0.75;          // max. vulgraad in het vakje voor te grote symbolen
     private const double RemarksTitleRatio = 1.15;       // kop opmerkingen t.o.v. teksthoogte
 
     public static ObjectId BuildBlock(
@@ -330,7 +329,7 @@ public static class LegendBuilder
         {
             if (s.InsertSymbolBlocks && entry.SymbolBlockName is { } blk)
                 TryInsertSymbol(btr, tr, db, blk, symLayer,
-                    x + swatchW / 2, midY, swatchW, swatchH);
+                    x + swatchW / 2, midY, swatchW, swatchH, s.ModelUnitsPerPaperMm);
         }
 
         // Kader per swatch: alleen een zichtbaar vakje op de kaderlaag als de gebruiker dat wil.
@@ -377,7 +376,7 @@ public static class LegendBuilder
 
     private static bool TryInsertSymbol(
         BlockTableRecord btr, Transaction tr, Database db, string blockName, string layer,
-        double centerX, double centerY, double swatchW, double swatchH)
+        double centerX, double centerY, double swatchW, double swatchH, double modelPerPaperMm)
     {
         try
         {
@@ -416,10 +415,15 @@ public static class LegendBuilder
                 return false;
             }
 
-            double capW = swatchW * SymbolFitRatio;
-            double capH = swatchH * SymbolFitRatio;
-            // Symbolen worden niet vergroot; alleen te grote symbolen worden passend geschaald.
-            double fit = Math.Min(1.0, Math.Min(capW / extW, capH / extH));
+            // NLCS-schaalafhankelijke symbolen staan op bronschaal: de blokdefinitie is in
+            // papier-mm en wordt met modeleenheden-per-papier-mm (Scale/1000) geplaatst. Gemeten
+            // op SIT-NW-LEGENDA.dwg: symbolen staan op insertschaal 0,2 bij 1:200. Zo verschijnt
+            // het symbool op zijn eigen papierformaat; alleen als het groter is dan het vakje
+            // schalen we het passend terug (geen vaste vulgraad).
+            double fit = modelPerPaperMm;
+            double maxFit = Math.Min(swatchW / extW, swatchH / extH);
+            if (fit > maxFit)
+                fit = maxFit;
 
             var center = new Point3d((minX + maxX) / 2.0, (minY + maxY) / 2.0, 0);
             var m = Matrix3d.Displacement(new Vector3d(centerX - center.X, centerY - center.Y, 0))

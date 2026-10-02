@@ -1959,6 +1959,9 @@ public partial class Commands
                     sB.ExcludedEntries.Add(firstKey);
                 if (descKey.Length > 0)
                     sB.DescriptionOverrides.Elementen[descKey] = new DescriptionEntry { Specifiek = "EIGEN-B-TEKST" };
+                // A krijgt een eigen handmatige regel en een eigen status; B/C niet.
+                sA.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VV-ISO-G", Type = NlcsDrawType.Geometrie, Description = "ISO-handregel A" });
+                sA.CustomStatuses.Add(new CustomStatus { Name = "ISO-STATUS-A" });
 
                 var defA = IsoDef(reg, sA);
                 var defB = IsoDef(reg, sB);
@@ -1991,6 +1994,12 @@ public partial class Commands
                 bool cOk = cDef.Settings.Scale == gd.Scale && cDef.Settings.ExcludedEntries.Count == 0
                     && cDef.Settings.DescriptionOverrides.Elementen.Count == 0;
                 ed.WriteMessage($"\nISO: C.scale={cDef.Settings.Scale:0} (globaal {gd.Scale:0}) C.excl={cDef.Settings.ExcludedEntries.Count} -> {(cOk ? "OK" : "FAIL")}");
+                // Handregel + status: alleen A, niet B/C.
+                bool dimOk = a.Settings.ManualEntries.Count == 1 && a.Settings.CustomStatuses.Count == 1
+                    && b.Settings.ManualEntries.Count == 0 && b.Settings.CustomStatuses.Count == 0
+                    && cDef.Settings.ManualEntries.Count == 0 && cDef.Settings.CustomStatuses.Count == 0;
+                ed.WriteMessage($"\nISO: A.manual={a.Settings.ManualEntries.Count}/status={a.Settings.CustomStatuses.Count} " +
+                    $"B.manual={b.Settings.ManualEntries.Count} C.manual={cDef.Settings.ManualEntries.Count} -> {(dimOk ? "OK" : "FAIL")}");
                 tr.Commit();
             }
 
@@ -2049,6 +2058,104 @@ public partial class Commands
         CreatedWithVersion = PluginVersion
     };
 
+    // Xref-isolatie over opslaan/heropenen. SETUP maakt drie legenda's met eigen xref-keuzes en
+    // bewaart ze in de tekening; na QSAVE + heropenen controleert VERIFY dat elke legenda zijn
+    // eigen xref-inclusie houdt en dat een andere legenda of de globale default A/B niet raakt.
+    [CommandMethod("NLCSLEGENDAXREFSETUP", CommandFlags.Modal)]
+    public void NlcsLegendaXrefSetup()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var reg = LegendStore.Load(db, tr);
+
+            var sA = LoadGlobalDefaults();
+            sA.IncludeXrefLayers = false;
+            sA.XrefInclusion["xref1"] = true;
+            sA.XrefInclusion["xref2"] = false;
+            sA.Title = "XREF-A";
+
+            var sB = LoadGlobalDefaults();
+            sB.IncludeXrefLayers = false;
+            sB.XrefInclusion["xref1"] = false;
+            sB.XrefInclusion["xref2"] = true;
+            sB.Title = "XREF-B";
+
+            // C simuleert een legenda die is aangemaakt toen de globale default aan stond.
+            var sC = LoadGlobalDefaults();
+            sC.IncludeXrefLayers = true;
+            sC.Title = "XREF-C";
+
+            foreach (var s in new[] { sA, sB, sC })
+                reg.Add(IsoDef(reg, s));
+            LegendStore.Save(db, tr, reg);
+            tr.Commit();
+            ed.WriteMessage("\nXREF: setup klaar. QSAVE, heropenen, dan NLCSLEGENDAXREFVERIFY.");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nXREF setup error: {ex.Message}");
+        }
+    }
+
+    [CommandMethod("NLCSLEGENDAXREFVERIFY", CommandFlags.Modal)]
+    public void NlcsLegendaXrefVerify()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var reg = LegendStore.Load(db, tr);
+            LegendDefinition? Find(string title) =>
+                reg.Legends.FirstOrDefault(l => string.Equals(l.Settings.Title, title, StringComparison.Ordinal));
+            var a = Find("XREF-A");
+            var b = Find("XREF-B");
+            var c = Find("XREF-C");
+            if (a is null || b is null || c is null)
+            {
+                ed.WriteMessage("\nXREF: legenda's niet gevonden na heropenen -> FAIL");
+                tr.Commit();
+                return;
+            }
+
+            bool persisted =
+                a.Settings.IsXrefIncluded("xref1") && !a.Settings.IsXrefIncluded("xref2") &&
+                !b.Settings.IsXrefIncluded("xref1") && b.Settings.IsXrefIncluded("xref2");
+            ed.WriteMessage($"\nXREF: persisted A(1={a.Settings.IsXrefIncluded("xref1")},2={a.Settings.IsXrefIncluded("xref2")}) " +
+                $"B(1={b.Settings.IsXrefIncluded("xref1")},2={b.Settings.IsXrefIncluded("xref2")}) -> {(persisted ? "OK" : "FAIL")}");
+
+            // Geneste xref: het topniveau bepaalt de keuze (xref2|nested volgt xref2).
+            bool nested = !a.Settings.IsXrefIncluded("xref2|nested") && b.Settings.IsXrefIncluded("xref2|nested");
+            ed.WriteMessage($"\nXREF: genest A={a.Settings.IsXrefIncluded("xref2|nested")} B={b.Settings.IsXrefIncluded("xref2|nested")} -> {(nested ? "OK" : "FAIL")}");
+
+            // C kreeg de globale default (aan); A/B hebben een eigen uitgeschakelde default.
+            bool cDefault = c.Settings.IncludeXrefLayers && c.Settings.XrefInclusion.Count == 0
+                && !a.Settings.IncludeXrefLayers && !b.Settings.IncludeXrefLayers;
+            ed.WriteMessage($"\nXREF: C.default={c.Settings.IncludeXrefLayers} C.expliciet={c.Settings.XrefInclusion.Count} -> {(cDefault ? "OK" : "FAIL")}");
+
+            // Onbekende xref valt terug op de eigen default van de legenda, niet op een andere
+            // legenda: A/B zeggen nee (eigen default uit), C ja.
+            bool fallback = !a.Settings.IsXrefIncluded("xref9") && !b.Settings.IsXrefIncluded("xref9")
+                && c.Settings.IsXrefIncluded("xref9");
+            ed.WriteMessage($"\nXREF: onbekend A={a.Settings.IsXrefIncluded("xref9")} B={b.Settings.IsXrefIncluded("xref9")} C={c.Settings.IsXrefIncluded("xref9")} -> {(fallback ? "OK" : "FAIL")}");
+
+            tr.Commit();
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nXREF verify error: {ex.Message}");
+        }
+    }
+
     // Headless bewijs van de echte viewport-flow: plaatst een legenda, maakt in een layout een
     // viewport om de werkelijke legenda-extents op meerdere schalen en controleert dat de
     // viewport exact op schaal staat (papier-mm / modeleenheid = 1000 / schaal).
@@ -2063,32 +2170,6 @@ public partial class Commands
 
         try
         {
-            string groupName;
-            Point3d min, max;
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var reg = LegendStore.Load(db, tr);
-                var def = IsoDef(reg, LoadGlobalDefaults());
-                reg.Add(def);
-                if (BuildManagedLegend(db, tr, reg, def, out _, out _) != UpdateResult.Updated)
-                {
-                    tr.Commit();
-                    ed.WriteMessage("\nVPTEST: geen legenda om omheen te meten.");
-                    return;
-                }
-                LegendStore.Save(db, tr, reg);
-                groupName = def.GroupName;
-                LegendManagement.TryGetGroupExtents(db, tr, groupName, out var ext);
-                min = ext.MinPoint;
-                max = ext.MaxPoint;
-                tr.Commit();
-            }
-            PurgePending(db);
-
-            double mw = max.X - min.X, mh = max.Y - min.Y;
-            var center = new Point2d((min.X + max.X) / 2.0, (min.Y + max.Y) / 2.0);
-            ed.WriteMessage($"\nVPTEST: legenda {mw:0.0} x {mh:0.0} modeleenheden");
-
             string layoutName = "Model";
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -2110,7 +2191,29 @@ public partial class Commands
             }
             LayoutManager.Current.CurrentLayout = layoutName;
 
-            foreach (var scale in new[] { 100.0, 200.0, 500.0, 1000.0 })
+            // Bouwt een legenda met de gegeven instellingen en geeft de werkelijke extents terug.
+            bool Measure(LegendSettings s, out double mw, out double mh, out Point2d center)
+            {
+                mw = mh = 0; center = default;
+                using var tr = db.TransactionManager.StartTransaction();
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, s);
+                reg.Add(def);
+                if (BuildManagedLegend(db, tr, reg, def, out _, out _) != UpdateResult.Updated)
+                {
+                    tr.Commit();
+                    return false;
+                }
+                LegendStore.Save(db, tr, reg);
+                LegendManagement.TryGetGroupExtents(db, tr, def.GroupName, out var ext);
+                mw = ext.MaxPoint.X - ext.MinPoint.X;
+                mh = ext.MaxPoint.Y - ext.MinPoint.Y;
+                center = new Point2d((ext.MinPoint.X + ext.MaxPoint.X) / 2.0, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2.0);
+                tr.Commit();
+                return true;
+            }
+
+            void CheckAt(string label, double mw, double mh, Point2d center, double scale)
             {
                 const double margin = 5.0;
                 var plan = ViewportMath.Compute(mw, mh, scale, margin);
@@ -2129,9 +2232,7 @@ public partial class Commands
                     vp.Height = plan.PaperHeightMm;
                     vp.ViewCenter = center;
                     vp.ViewHeight = plan.PaperHeightMm / paperPerModel;
-                    w = vp.Width;
-                    h = vp.Height;
-                    vh = vp.ViewHeight;
+                    w = vp.Width; h = vp.Height; vh = vp.ViewHeight;
                     vw = vp.ViewHeight * (vp.Width / vp.Height); // zichtbare modelbreedte
                     tr.Commit();
                 }
@@ -2144,13 +2245,153 @@ public partial class Commands
                 // Clipping: zichtbaar model moet de legenda volledig omvatten.
                 bool noClip = vw + 1e-6 >= mw && vh + 1e-6 >= mh;
                 ed.WriteMessage(
-                    $"\nVPTEST: 1:{scale:0} vp {w:0.0}x{h:0.0}mm schaal {(exact ? "OK" : "FAIL")} " +
+                    $"\nVPTEST: {label} 1:{scale:0} vp {w:0.0}x{h:0.0}mm schaal {(exact ? "OK" : "FAIL")} " +
                     $"marges {(marginsOk ? "OK" : "FAIL")} clipping {(noClip ? "geen" : "FAIL")}");
+            }
+
+            // Variant 1: standaard legenda op vier schalen.
+            if (!Measure(LoadGlobalDefaults(), out var mw0, out var mh0, out var c0))
+            {
+                ed.WriteMessage("\nVPTEST: geen legenda om omheen te meten.");
+                return;
+            }
+            PurgePending(db);
+            ed.WriteMessage($"\nVPTEST: standaard {mw0:0.0} x {mh0:0.0} modeleenheden");
+            foreach (var scale in new[] { 100.0, 200.0, 500.0, 1000.0 })
+                CheckAt("standaard", mw0, mh0, c0, scale);
+
+            // Variant 2: twee kolommen geeft een smaller/hoger profiel, zelfde viewport-contract.
+            var twoCol = LoadGlobalDefaults();
+            twoCol.Columns = 2;
+            if (Measure(twoCol, out var mw1, out var mh1, out var c1))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: 2-koloms {mw1:0.0} x {mh1:0.0} modeleenheden");
+                CheckAt("2-koloms", mw1, mh1, c1, 200.0);
+            }
+
+            // Variant 3: zonder kader, opmerkingen en schaalbalk (minimale omvang).
+            var bare = LoadGlobalDefaults();
+            bare.DrawBorder = false;
+            bare.IncludeRemarks = false;
+            bare.IncludeScaleBar = false;
+            if (Measure(bare, out var mw2, out var mh2, out var c2))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: kaal {mw2:0.0} x {mh2:0.0} modeleenheden");
+                CheckAt("kaal", mw2, mh2, c2, 200.0);
             }
         }
         catch (Exception ex)
         {
             ed.WriteMessage($"\nVPTEST error: {ex.Message}");
+        }
+    }
+
+    // Meet de maatvoering van een bestaande referentielegenda (swatch, rijafstand, teksthoogtes) en
+    // schrijft een machineleesbaar contract. Model is in meters (INSUNITS=6); op schaal 1:S is
+    // 1 modelmeter = 1000/S mm papier. De schaal komt uit NLCS_MEET_SCALE (default 200), het
+    // doelbestand uit NLCS_CONTRACT_OUT. VLA/ActiveX werkt niet in accoreconsole, daarom .NET-API.
+    [CommandMethod("NLCSLEGENDATEMPLATEMETEN", CommandFlags.Modal)]
+    public void NlcsLegendaTemplateMeten()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            double scale = 200.0;
+            if (double.TryParse(Environment.GetEnvironmentVariable("NLCS_MEET_SCALE"), out var s) && s > 0)
+                scale = s;
+            int insunits = db.Insunits == UnitsValue.Meters ? 6 : (int)db.Insunits;
+            double mmPerModel = (db.Insunits == UnitsValue.Millimeters ? 1.0 : 1000.0) / scale;
+
+            var samples = new List<(double w, double h, double cx, double cy)>();
+            var texts = new List<(double height, double x, double y)>();
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+                var ms = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+                foreach (ObjectId id in ms)
+                {
+                    var ent = tr.GetObject(id, OpenMode.ForRead);
+                    if (ent is Curve crv and (Polyline or Line))
+                    {
+                        var ext = crv.GeometricExtents;
+                        double w = ext.MaxPoint.X - ext.MinPoint.X;
+                        double h = ext.MaxPoint.Y - ext.MinPoint.Y;
+                        // Liggende swatch-sample: brede, lage horizontale lijn/polyline.
+                        if (w > 2 && w < 8 && h < 1.5)
+                            samples.Add((w, h, (ext.MinPoint.X + ext.MaxPoint.X) / 2.0, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2.0));
+                    }
+                    else if (ent is DBText t && t.Height > 0)
+                        texts.Add((t.Height, t.Position.X, t.Position.Y));
+                    else if (ent is MText m && m.TextHeight > 0)
+                        texts.Add((m.TextHeight, m.Location.X, m.Location.Y));
+                }
+                tr.Commit();
+            }
+
+            if (samples.Count == 0 || texts.Count == 0)
+            {
+                ed.WriteMessage("\nMETEN: te weinig meetbare geometrie (samples/teksten).");
+                return;
+            }
+
+            static double Mode(IEnumerable<double> values, double bucket)
+            {
+                return values.GroupBy(v => Math.Round(v / bucket) * bucket)
+                    .OrderByDescending(g => g.Count()).ThenBy(g => g.Key)
+                    .Select(g => g.Average()).First();
+            }
+
+            // Swatchbreedte = dominante breedte van de horizontale samples.
+            double swW = Mode(samples.Select(x => x.w), 0.2);
+
+            // Rijafstand uit de omschrijvingsteksten (kleinste teksthoogte = T25): per kolom (X)
+            // de dichtstbevolkte nemen en de mediaan van opeenvolgende verticale sprongen.
+            double descH = Mode(texts.Select(t => t.height), 0.05);
+            var desc = texts.Where(t => Math.Abs(t.height - descH) <= descH * 0.1).ToList();
+            double colX = Mode(desc.Select(t => t.x), 1.0);
+            var column = desc.Where(t => Math.Abs(t.x - colX) <= 2.0).OrderByDescending(t => t.y).ToList();
+            var gaps = new List<double>();
+            for (int i = 1; i < column.Count; i++)
+            {
+                double g = column[i - 1].y - column[i].y;
+                if (g > descH * 0.5 && g < descH * 6) gaps.Add(g);
+            }
+            gaps.Sort();
+            double pitch = gaps.Count > 0 ? gaps[gaps.Count / 2] : 0;
+
+            var txtModes = texts.Select(t => t.height).GroupBy(v => Math.Round(v / 0.05) * 0.05)
+                .OrderByDescending(g => g.Count()).Take(3)
+                .Select(g => g.Average() * mmPerModel).OrderBy(v => v).ToList();
+
+            double swWmm = swW * mmPerModel, pitchMm = pitch * mmPerModel;
+            ed.WriteMessage($"\nMETEN: INSUNITS={insunits} schaal 1:{scale:0} mm/model={mmPerModel:0.###}");
+            ed.WriteMessage($"\nMETEN: swatchbreedte {swWmm:0.0} mm (n={samples.Count})");
+            ed.WriteMessage($"\nMETEN: rijafstand {pitchMm:0.0} mm (n={gaps.Count}, kolom {column.Count})");
+            ed.WriteMessage($"\nMETEN: teksthoogtes mm = {string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}");
+
+            var json = new StringBuilder();
+            json.Append("{\n");
+            json.Append($"  \"bron\": \"{Path.GetFileName(db.Filename)}\",\n");
+            json.Append($"  \"schaal\": {scale:0},\n");
+            json.Append($"  \"insunits\": {insunits},\n");
+            json.Append($"  \"swatchBreedteMm\": {swWmm:0.0},\n");
+            json.Append($"  \"rijafstandMm\": {pitchMm:0.0},\n");
+            json.Append($"  \"teksthoogtesMm\": [{string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}]\n");
+            json.Append("}\n");
+            string outPath = Environment.GetEnvironmentVariable("NLCS_CONTRACT_OUT")
+                ?? Path.Combine(Path.GetTempPath(), "nlcs-template-contract.json");
+            File.WriteAllText(outPath, json.ToString());
+            ed.WriteMessage($"\nMETEN: contract geschreven naar {outPath}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nMETEN error: {ex.Message}");
         }
     }
 
@@ -2399,6 +2640,39 @@ public partial class Commands
             if (backup is not null) File.WriteAllBytes(DescriptionsPath, backup);
             else if (File.Exists(DescriptionsPath)) File.Delete(DescriptionsPath);
         }
+    }
+
+    // Twee aparte commando's (dus twee undo-stappen) om Undo van een rename real-host te testen:
+    // SETUP maakt de testlaag, RENAME hernoemt die. Een _U na RENAME moet de rename terugdraaien.
+    [CommandMethod("NLCSLEGENDAUNDOSETUP", CommandFlags.Modal)]
+    public void NlcsLegendaUndoSetup()
+    {
+        var db = AcApp.DocumentManager.MdiActiveDocument?.Database;
+        if (db is null) return;
+        using var tr = db.TransactionManager.StartTransaction();
+        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+        if (!lt.Has("N-WE-KL-UNDOSRC-G"))
+        {
+            var ltr = new LayerTableRecord { Name = "N-WE-KL-UNDOSRC-G" };
+            lt.Add(ltr);
+            tr.AddNewlyCreatedDBObject(ltr, true);
+        }
+        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+        var line = new Autodesk.AutoCAD.DatabaseServices.Line(Point3d.Origin, new Point3d(1, 1, 0)) { Layer = "N-WE-KL-UNDOSRC-G" };
+        ms.AppendEntity(line);
+        tr.AddNewlyCreatedDBObject(line, true);
+        tr.Commit();
+    }
+
+    [CommandMethod("NLCSLEGENDAUNDORENAME", CommandFlags.Modal)]
+    public void NlcsLegendaUndoRename()
+    {
+        var db = AcApp.DocumentManager.MdiActiveDocument?.Database;
+        if (db is null) return;
+        using var tr = db.TransactionManager.StartTransaction();
+        var p = LayerRename.Analyze(db, tr, "N-WE-KL-UNDOSRC-G", "N-WE-KL-UNDODST-G");
+        LayerRename.Apply(db, tr, p, false, out _);
+        tr.Commit();
     }
 
     private static void ReportRenderIssues(Editor ed, IReadOnlyList<RenderIssue> issues)

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.21.1 - 2026-10-02
+
+- Symbolen in de legenda worden nu op de NLCS-bronschaal (schaal/1000) getekend in plaats van
+  een vaste vulgraad van het swatchvak; bij overloop wordt nog steeds naar het vak teruggeschaald.
+
 ## 1.21.0 - 2026-10-02
 
 - Veiliger overnemen van oude tekeningconfiguratie: oude instellingen en omschrijvingen worden
