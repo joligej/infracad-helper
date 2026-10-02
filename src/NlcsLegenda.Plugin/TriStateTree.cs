@@ -44,7 +44,7 @@ internal sealed class TriStateTree : TreeView
     {
         base.OnNodeMouseClick(e);
         var hit = HitTest(e.Location);
-        if (hit.Location == TreeViewHitTestLocations.StateImage)
+        if (e.Node is not null && hit.Location == TreeViewHitTestLocations.StateImage)
             Toggle(e.Node);
     }
 
