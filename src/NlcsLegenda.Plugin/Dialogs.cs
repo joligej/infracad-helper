@@ -55,22 +55,29 @@ internal sealed class ButtonBar : FlowLayoutPanel
 
 internal sealed class SettingsDialog : Form
 {
-    private readonly PropertyGrid _grid;
+    private readonly List<PropertyGrid> _grids = new();
     private readonly LegendSettings _settings;
 
     public event EventHandler? ApplyRequested;
 
+    // Quantity-properties krijgen een eigen tabblad; ze zitten qua categorie verspreid.
+    private static readonly HashSet<string> QuantityProps = new(StringComparer.Ordinal)
+    {
+        "IncludeQuantities", "UnitCount", "UnitLength", "UnitArea", "QuantityDecimals",
+        "IncludeTotalsRow", "TotalsPrefix", "QuantityColumnWidthMm"
+    };
+
     // Bewerkt precies één instellingenobject (een werkkopie). De aanroeper bepaalt de scope
-    // (globale standaard of één specifieke legenda) en past het resultaat toe; de dialog
-    // zelf kent geen tekening- of legenda-scope meer.
+    // (globale standaard of één specifieke legenda) en past het resultaat toe; de dialog zelf
+    // kent geen tekening- of legenda-scope. De instellingen staan verdeeld over tabbladen.
     public SettingsDialog(LegendSettings settings, string contextLabel)
     {
         _settings = settings;
 
         Text = "NLCS Legenda \u2013 instellingen";
         Font = SystemFonts.MessageBoxFont;
-        ClientSize = new Size(560, 640);
-        MinimumSize = new Size(600, 500);
+        ClientSize = new Size(600, 640);
+        MinimumSize = new Size(560, 500);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = false;
@@ -88,14 +95,13 @@ internal sealed class SettingsDialog : Form
             Font = new Font(SystemFonts.MessageBoxFont!, FontStyle.Bold)
         };
 
-        _grid = new PropertyGrid
-        {
-            Dock = DockStyle.Fill,
-            SelectedObject = _settings,
-            PropertySort = PropertySort.Categorized,
-            ToolbarVisible = false,
-            HelpVisible = true
-        };
+        var tabs = new TabControl { Dock = DockStyle.Fill };
+        tabs.TabPages.Add(Tab("Algemeen", p => InCategory(p, "Algemeen", "Viewport")));
+        tabs.TabPages.Add(Tab("Inhoud", p => InCategory(p, "Elementsoorten", "Statussen", "Groepering", "Lagen")));
+        tabs.TabPages.Add(Tab("Opmaak", p => InCategory(p, "Weergave", "Kolommen", "Koppen")));
+        tabs.TabPages.Add(Tab("Teksten", p => InCategory(p, "Teksten", "Opmerkingen") && !QuantityProps.Contains(p.Name)));
+        tabs.TabPages.Add(Tab("Hoeveelheden", p => QuantityProps.Contains(p.Name)));
+        tabs.TabPages.Add(Tab("Schaalbalk / Extra", p => InCategory(p, "Schaalbalk", "Maatvoering (mm)")));
 
         var buttons = new ButtonBar(withApply: true);
         buttons.Apply!.Click += (_, _) =>
@@ -106,20 +112,45 @@ internal sealed class SettingsDialog : Form
         var remarks = buttons.AddExtra("Opmerkingen\u2026");
         remarks.Click += (_, _) => EditRemarks();
         var resetFormat = buttons.AddExtra("Opmaak \u2192 template");
-        resetFormat.Click += (_, _) => { _settings.ResetFormattingToTemplate(); _grid.Refresh(); };
+        resetFormat.Click += (_, _) => { _settings.ResetFormattingToTemplate(); RefreshGrids(); };
         var reset = buttons.AddExtra("Standaardwaarden");
-        reset.Click += (_, _) => { ResetToDefaults(_settings); _grid.Refresh(); };
+        reset.Click += (_, _) => { ResetToDefaults(_settings); RefreshGrids(); };
         AcceptButton = buttons.Ok;
         CancelButton = buttons.Cancel;
 
         FormClosing += OnFormClosing;
 
-        Controls.Add(_grid);
+        Controls.Add(tabs);
         Controls.Add(buttons);
         Controls.Add(header);
     }
 
     public LegendSettings Settings => _settings;
+
+    private TabPage Tab(string title, Func<PropertyDescriptor, bool> include)
+    {
+        var grid = new PropertyGrid
+        {
+            Dock = DockStyle.Fill,
+            SelectedObject = new FilteredSettings(_settings, include),
+            PropertySort = PropertySort.Categorized,
+            ToolbarVisible = false,
+            HelpVisible = true
+        };
+        _grids.Add(grid);
+        var page = new TabPage(title) { Padding = new Padding(4) };
+        page.Controls.Add(grid);
+        return page;
+    }
+
+    private static bool InCategory(PropertyDescriptor p, params string[] categories)
+        => categories.Contains(p.Category, StringComparer.Ordinal);
+
+    private void RefreshGrids()
+    {
+        foreach (var grid in _grids)
+            grid.Refresh();
+    }
 
     private void EditRemarks()
     {
@@ -128,7 +159,7 @@ internal sealed class SettingsDialog : Form
         {
             _settings.RemarksTitle = dlg.RemarksTitle;
             _settings.RemarksText = dlg.RemarksText;
-            _grid.Refresh();
+            RefreshGrids();
         }
     }
 

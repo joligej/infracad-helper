@@ -7,15 +7,18 @@ namespace NlcsLegenda.Plugin;
 
 internal sealed class EntryCheckItem
 {
-    public EntryCheckItem(string key, string label)
+    public EntryCheckItem(string key, string label, string group = "")
     {
         Key = key;
         Label = label;
+        Group = group;
     }
 
     public string Key { get; }
 
     public string Label { get; }
+
+    public string Group { get; }
 
     public override string ToString() => Label;
 }
@@ -38,7 +41,8 @@ internal sealed class LegendManageDialog : Form
     private static readonly string[] TypeNames = { "Lijn", "Vlak", "Arcering", "Vulling", "Symbool" };
     private static readonly string[] StatusNames = { "Nieuw", "Bestaand", "Vervallen", "Tijdelijk", "Revisie" };
 
-    private readonly CheckedListBox _entries;
+    private readonly TriStateTree _tree;
+    private readonly TextBox _filter;
     private readonly DataGridView _grid;
     private BindingList<ManualRow> _rows = new();
     private readonly IReadOnlyList<EntryCheckItem> _allEntries;
@@ -80,11 +84,12 @@ internal sealed class LegendManageDialog : Form
             catch { /* bij een extreem klein venster de standaardverdeling houden */ }
         };
 
-        var topGroup = new GroupBox { Text = "NLCS-regels (vink uit wat je niet in de legenda wilt)", Dock = DockStyle.Fill, Padding = new Padding(8) };
-        _entries = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false };
-        foreach (var item in _allEntries)
-            _entries.Items.Add(item, true);
-        topGroup.Controls.Add(_entries);
+        var topGroup = new GroupBox { Text = "NLCS-regels (vink uit wat je niet in de legenda wilt; groep in één klik)", Dock = DockStyle.Fill, Padding = new Padding(8) };
+        _tree = new TriStateTree { Dock = DockStyle.Fill };
+        _filter = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Filter\u2026" };
+        _filter.TextChanged += (_, _) => _tree.SetModel(_tree.Model, _filter.Text);
+        topGroup.Controls.Add(_tree);
+        topGroup.Controls.Add(_filter);
         split.Panel1.Controls.Add(topGroup);
 
         var bottomGroup = new GroupBox { Text = "Eigen regels", Dock = DockStyle.Fill, Padding = new Padding(8) };
@@ -147,17 +152,7 @@ internal sealed class LegendManageDialog : Form
         return null;
     }
 
-    public HashSet<string> ExcludedKeys
-    {
-        get
-        {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < _entries.Items.Count; i++)
-                if (!_entries.GetItemChecked(i) && _entries.Items[i] is EntryCheckItem item)
-                    set.Add(item.Key);
-            return set;
-        }
-    }
+    public HashSet<string> ExcludedKeys => _tree.Model.ExcludedKeys();
 
     public List<ManualEntry> ManualEntries
     {
@@ -212,9 +207,9 @@ internal sealed class LegendManageDialog : Form
 
     private void LoadFrom(LegendSettings settings)
     {
-        for (int i = 0; i < _entries.Items.Count; i++)
-            if (_entries.Items[i] is EntryCheckItem item)
-                _entries.SetItemChecked(i, !settings.ExcludedEntries.Contains(item.Key));
+        var model = CompositionTree.Build(
+            _allEntries.Select(i => (i.Key, i.Label, i.Group)), settings.ExcludedEntries);
+        _tree.SetModel(model, _filter.Text);
 
         _rows = new BindingList<ManualRow>(settings.ManualEntries.Select(m => new ManualRow
         {

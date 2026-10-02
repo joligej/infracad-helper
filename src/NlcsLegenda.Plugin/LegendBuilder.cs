@@ -12,7 +12,6 @@ public static class LegendBuilder
     private const double SubHeaderHeightRatio = 0.85;   // subkop t.o.v. kophoogte
     private const double TitleUnderlineOffset = 1.35;    // onderstreping onder de titel
     private const double SubHeaderIndentRatio = 0.15;    // inspringing subkop in de swatch
-    private const double MarkerRadiusRatio = 0.28;       // straal symboolmarkering
     private const double SymbolFitRatio = 0.75;          // max. vulgraad in het vakje voor te grote symbolen
     private const double RemarksTitleRatio = 1.15;       // kop opmerkingen t.o.v. teksthoogte
 
@@ -325,25 +324,13 @@ public static class LegendBuilder
             tr.AddNewlyCreatedDBObject(line, true);
         }
 
-        // Symbool (S): echt blok passend in het vakje. Staat de optie uit, dan tekenen we
-        // niets (geen nep-cirkel). Alleen als het vakje verder leeg is en een aanwezig blok
-        // niet geplaatst kan worden, valt het terug op een neutrale markering.
+        // Symbool (S): echt blok passend in het vakje. Staat de optie uit of kan een blok niet
+        // worden geplaatst, dan tekenen we niets; geen generieke nep-markering.
         if (entry.SymbolLayer is { } symLayer)
         {
-            bool symbolDrawn = false;
             if (s.InsertSymbolBlocks && entry.SymbolBlockName is { } blk)
-                symbolDrawn = TryInsertSymbol(btr, tr, db, blk, symLayer,
+                TryInsertSymbol(btr, tr, db, blk, symLayer,
                     x + swatchW / 2, midY, swatchW, swatchH);
-
-            bool swatchOtherwiseEmpty = entry.GeometryLayer is null && entry.VlakLayer is null
-                && entry.FillLayer is null && entry.HatchLayer is null;
-            if (!symbolDrawn && s.InsertSymbolBlocks && swatchOtherwiseEmpty)
-            {
-                var marker = new Circle(new Point3d(x + swatchW / 2, midY, 0), Vector3d.ZAxis,
-                    Math.Min(swatchW, swatchH) * MarkerRadiusRatio) { Layer = symLayer };
-                btr.AppendEntity(marker);
-                tr.AddNewlyCreatedDBObject(marker, true);
-            }
         }
 
         // Kader per swatch: alleen een zichtbaar vakje op de kaderlaag als de gebruiker dat wil.

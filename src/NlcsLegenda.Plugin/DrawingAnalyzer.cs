@@ -85,13 +85,26 @@ public static class DrawingAnalyzer
             ? ReadRenderIds(db, tr, c.Parsed.Values)
             : null;
 
+        // Render-identiteit per laag = laag-look plus de gesamplede arcering (patroon/schaal/
+        // hoek). Zo vallen statussen alleen samen als ook de arcering identiek is.
+        string? RenderId(string name)
+        {
+            if (renderIds is null)
+                return null;
+            renderIds.TryGetValue(name, out var baseId);
+            var hatch = c.Hatches.TryGetValue(name, out var h)
+                ? $"|H:{h.PatternName}:{h.PatternScale:0.###}:{h.PatternAngle:0.###}:{h.IsSolid}"
+                : string.Empty;
+            return (baseId ?? string.Empty) + hatch;
+        }
+
         var entries = LegendGrouping.Build(
             c.Parsed.Values, settings,
             name => descriptions.TryGetValue(name, out var d) ? d : null,
             c.Metrics,
             name => c.SymbolBlocks.TryGetValue(name, out var b) ? b : null,
             catalog,
-            renderIds is null ? null : name => renderIds.TryGetValue(name, out var r) ? r : null);
+            renderIds is null ? null : RenderId);
 
         return new AnalysisResult
         {
@@ -323,7 +336,8 @@ public static class DrawingAnalyzer
                     lt4 = ltype.Name;
             }
             catch { /* standaard */ }
-            result[layer.LocalName] = $"{ltr.Color}|{lt4}|{ltr.LineWeight}";
+            var transp = ltr.Transparency.IsByAlpha ? ltr.Transparency.Alpha.ToString() : "L";
+            result[layer.LocalName] = $"{ltr.Color}|{lt4}|{ltr.LineWeight}|{transp}";
         }
         return result;
     }

@@ -698,17 +698,16 @@ public partial class Commands
 
         try
         {
-            var settings = LoadGlobalDefaults();
-            using var dialog = new SettingsDialog(settings, "Globale standaard \u2013 geldt voor nieuwe legenda's");
-            dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nInstellingen opgeslagen ({SaveGlobalDefaults(dialog.Settings)}).");
+            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+            var settings = GetTargetSettings(db, target);
+            using var dialog = new SettingsDialog(settings, target.ContextLabel);
+            dialog.ApplyRequested += (_, _) => ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            var where = SaveGlobalDefaults(dialog.Settings);
-            ed.WriteMessage($"\nInstellingen opgeslagen ({where}).");
+            ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
         }
         catch (Exception ex)
         {
@@ -780,7 +779,8 @@ public partial class Commands
             }
 
             var key = LegendSettings.EntryKey(layer!);
-            var settings = LoadGlobalDefaults();
+            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+            var settings = GetTargetSettings(db, target);
 
             bool nowExcluded;
             if (settings.ExcludedEntries.Contains(key))
@@ -793,11 +793,8 @@ public partial class Commands
                 settings.ExcludedEntries.Add(key);
                 nowExcluded = true;
             }
-            var where = SaveGlobalDefaults(settings);
-            ed.WriteMessage($"\n{key} {(nowExcluded ? "uitgevinkt" : "weer opgenomen")} ({where}).");
-
-            if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
-                NlcsLegendaUpdate();
+            ed.WriteMessage($"\n{key} {(nowExcluded ? "uitgevinkt" : "weer opgenomen")}.");
+            ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
         }
         catch (Exception ex)
         {
@@ -881,13 +878,11 @@ public partial class Commands
                     manual.HatchPattern = pr.StringResult.Trim();
             }
 
-            var settings = LoadGlobalDefaults();
+            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+            var settings = GetTargetSettings(db, target);
             settings.ManualEntries.Add(manual);
-            var where = SaveGlobalDefaults(settings);
-            ed.WriteMessage($"\nRegel \"{manual.Description}\" toegevoegd ({where}).");
-
-            if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
-                NlcsLegendaUpdate();
+            ed.WriteMessage($"\nRegel \"{manual.Description}\" toegevoegd.");
+            ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
         }
         catch (Exception ex)
         {
@@ -953,7 +948,10 @@ public partial class Commands
 
         try
         {
-            var probe = LoadGlobalDefaults();
+            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+            var settings = GetTargetSettings(db, target);
+
+            var probe = settings.Clone();
             probe.ExcludedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             probe.ManualEntries = new List<ManualEntry>();
             probe.IncludedStatuses = new HashSet<NlcsStatus>
@@ -968,27 +966,29 @@ public partial class Commands
                 var analysis = DrawingAnalyzer.Analyze(db, tr, probe, catalog: LoadCatalog(db));
                 items = analysis.Entries
                     .Select(e => new EntryCheckItem(LegendSettings.EntryKey(e),
-                        $"[{e.Status.DisplayName()}] {e.Description}"))
+                        $"[{e.Status.DisplayName()}] {e.Description}", EntryGroupLabel(e)))
                     .GroupBy(x => x.Key)
                     .Select(g => g.First())
-                    .OrderBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
+                    .OrderBy(x => x.Group, StringComparer.CurrentCultureIgnoreCase)
+                    .ThenBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
                     .ToList();
                 tr.Commit();
             }
 
-            using var dialog = new LegendManageDialog(items, LoadGlobalDefaults());
-            dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nSamenstelling opgeslagen ({SaveComposition(dialog.ExcludedKeys, dialog.ManualEntries)}).");
+            using var dialog = new LegendManageDialog(items, settings);
+            void Apply()
+            {
+                settings.ExcludedEntries = dialog.ExcludedKeys;
+                settings.ManualEntries = dialog.ManualEntries;
+                ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
+            }
+            dialog.ApplyRequested += (_, _) => Apply();
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            var where = SaveComposition(dialog.ExcludedKeys, dialog.ManualEntries);
-            ed.WriteMessage($"\nSamenstelling opgeslagen ({where}).");
-
-            if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
-                NlcsLegendaUpdate();
+            Apply();
         }
         catch (Exception ex)
         {
@@ -996,12 +996,15 @@ public partial class Commands
         }
     }
 
-    private static string SaveComposition(HashSet<string> excluded, List<ManualEntry> manual)
+    private static string EntryGroupLabel(LegendEntry e)
     {
-        var settings = LoadGlobalDefaults();
-        settings.ExcludedEntries = excluded;
-        settings.ManualEntries = manual;
-        return SaveGlobalDefaults(settings);
+        if (string.Equals(e.Discipline, "KL", StringComparison.OrdinalIgnoreCase))
+        {
+            var soort = ElementProperties.From(e.Element).Soort;
+            if (!string.IsNullOrWhiteSpace(soort))
+                return soort;
+        }
+        return StandardTexts.HoofdgroepName(e.Hoofdgroep);
     }
 
     [CommandMethod("NLCSLEGENDAXREFS", CommandFlags.Modal)]
@@ -1036,11 +1039,12 @@ public partial class Commands
                 return;
             }
 
-            var settings = LoadGlobalDefaults();
+            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+            var settings = GetTargetSettings(db, target);
 
             while (true)
             {
-                ed.WriteMessage("\nXrefs meenemen (globale standaard voor nieuwe legenda's):");
+                ed.WriteMessage("\nXrefs meenemen:");
                 for (int i = 0; i < xrefs.Count; i++)
                     ed.WriteMessage($"\n  {i + 1}. {xrefs[i]}: {(settings.IsXrefIncluded(xrefs[i]) ? "aan" : "uit")}");
 
@@ -1068,11 +1072,7 @@ public partial class Commands
                 }
             }
 
-            SaveGlobalDefaults(settings);
-            ed.WriteMessage("\n  \u2192 xref-keuze opgeslagen als globale standaard.");
-
-            if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
-                NlcsLegendaUpdate();
+            ApplyTargetSettings(ed, db, target, settings, "Xref-keuze");
         }
         catch (Exception ex)
         {
@@ -1092,7 +1092,8 @@ public partial class Commands
 
         try
         {
-            var settings = LoadGlobalDefaults();
+            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+            var settings = GetTargetSettings(db, target);
             bool changed = false;
 
             while (true)
@@ -1148,12 +1149,7 @@ public partial class Commands
                 ed.WriteMessage("\nNiets gewijzigd.");
                 return;
             }
-
-            var where = SaveGlobalDefaults(settings);
-            ed.WriteMessage($"\n  \u2192 eigen statussen opgeslagen ({where}).");
-
-            if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
-                NlcsLegendaUpdate();
+            ApplyTargetSettings(ed, db, target, settings, "Eigen statussen");
         }
         catch (Exception ex)
         {
@@ -1238,11 +1234,9 @@ public partial class Commands
             ed.WriteMessage("\nProfiel niet gevonden.");
             return;
         }
-        var where = SaveGlobalDefaults(settings);
-        ed.WriteMessage($"\nProfiel \"{names[idx]}\" geladen ({where}).");
-
-        if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
-            NlcsLegendaUpdate();
+        if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+        ed.WriteMessage($"\nProfiel \"{names[idx]}\" geladen.");
+        ApplyTargetSettings(ed, db, target, settings, "Profiel");
     }
 
     private static void PresetList(Editor ed)
@@ -1573,6 +1567,9 @@ public partial class Commands
             }
 
             var key = $"{layer.Hoofdgroep}|{layer.Element.ToUpperInvariant()}";
+            string element = layer.Element;
+
+            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
 
             var def = DescriptionCatalog.Default();
             def.Elementen.TryGetValue(key, out var defaultEntry);
@@ -1582,36 +1579,48 @@ public partial class Commands
                 Specifiek = defaultEntry?.Specifiek ?? StandardTexts.Humanize(layer.Element)
             };
 
-            var current = LoadGlobalCatalog().Elementen.TryGetValue(key, out var existing)
-                ? new DescriptionEntry { Algemeen = existing.Algemeen, Specifiek = existing.Specifiek }
-                : new DescriptionEntry { Algemeen = fallback.Algemeen, Specifiek = fallback.Specifiek };
+            // Globaal bewerkt de gedeelde catalogus; een legenda krijgt een eigen tekst-override
+            // (één losse regel), zodat dezelfde entry per legenda kan verschillen.
+            DescriptionEntry current;
+            if (target.IsGlobal)
+                current = LoadGlobalCatalog().Elementen.TryGetValue(key, out var existing)
+                    ? new DescriptionEntry { Algemeen = existing.Algemeen, Specifiek = existing.Specifiek }
+                    : new DescriptionEntry { Algemeen = fallback.Algemeen, Specifiek = fallback.Specifiek };
+            else
+                current = GetTargetSettings(db, target).TextOverrides.TryGetValue(element, out var ov)
+                    ? new DescriptionEntry { Algemeen = null, Specifiek = ov }
+                    : new DescriptionEntry { Algemeen = null, Specifiek = fallback.Specifiek };
 
             using var dialog = new TextEditDialog(key, current, fallback);
-            dialog.ApplyRequested += (_, _) =>
+            void Apply()
             {
-                var applied = new DescriptionEntry
+                if (target.IsGlobal)
                 {
-                    Algemeen = string.IsNullOrWhiteSpace(dialog.Algemeen) ? null : dialog.Algemeen,
-                    Specifiek = dialog.Specifiek
-                };
-                ed.WriteMessage($"\nTekst voor {key} opgeslagen ({SaveSingleDescription(key, applied)}).");
-            };
+                    var applied = new DescriptionEntry
+                    {
+                        Algemeen = string.IsNullOrWhiteSpace(dialog.Algemeen) ? null : dialog.Algemeen,
+                        Specifiek = dialog.Specifiek
+                    };
+                    ed.WriteMessage(
+                        $"\nTekst voor {key} opgeslagen ({SaveSingleDescription(key, applied)}); bestaande legenda's blijven ongewijzigd.");
+                }
+                else
+                {
+                    var s = GetTargetSettings(db, target);
+                    if (string.IsNullOrWhiteSpace(dialog.Specifiek))
+                        s.TextOverrides.Remove(element);
+                    else
+                        s.TextOverrides[element] = dialog.Specifiek;
+                    ApplyTargetSettings(ed, db, target, s, $"Tekst voor {key}");
+                }
+            }
+            dialog.ApplyRequested += (_, _) => Apply();
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-
-            var entry = new DescriptionEntry
-            {
-                Algemeen = string.IsNullOrWhiteSpace(dialog.Algemeen) ? null : dialog.Algemeen,
-                Specifiek = dialog.Specifiek
-            };
-            var where = SaveSingleDescription(key, entry);
-            ed.WriteMessage($"\nTekst voor {key} opgeslagen ({where}).");
-
-            if (LegendGroupExists(db) && AskYesNo(ed, "Legenda nu bijwerken?", true))
-                NlcsLegendaUpdate();
+            Apply();
         }
         catch (Exception ex)
         {
@@ -1626,6 +1635,107 @@ public partial class Commands
         Directory.CreateDirectory(ConfigDir);
         global.Save(DescriptionsPath);
         return "voor alle tekeningen";
+    }
+
+    // Bewerkt een NLCS-laagnaam component voor component en hernoemt de laag in één
+    // transactie (één Undo). Dry-run via de live preview/validatie; botsing met een bestaande
+    // laag voegt samen; xref-afhankelijke lagen worden geweigerd.
+    [CommandMethod("NLCSLEGENDALAAGNAAM", CommandFlags.Modal)]
+    public void NlcsLegendaLaagnaam()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDALAAGNAAM")) return;
+
+        try
+        {
+            var source = PromptLayerName(ed, db);
+            if (source is null)
+            {
+                ed.WriteMessage("\nGeannuleerd.");
+                return;
+            }
+
+            if (!NlcsLayerComponents.TryParse(source, out var comp, out var perr))
+            {
+                ed.WriteMessage($"\n\"{source}\" is geen NLCS-laagnaam ({perr}).");
+                return;
+            }
+
+            LayerRename.Plan probe0;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                probe0 = LayerRename.Analyze(db, tr, source, source);
+                tr.Commit();
+            }
+            if (probe0.Blocked)
+            {
+                ed.WriteMessage($"\nKan niet: {probe0.Reason}.");
+                return;
+            }
+
+            (bool exists, int count) Probe(string name)
+            {
+                if (string.Equals(name, source, StringComparison.Ordinal))
+                    return (false, 0);
+                using var tr = db.TransactionManager.StartTransaction();
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+                bool exists = lt.Has(name);
+                int count = exists ? LayerRename.CountOnLayer(db, tr, name) : 0;
+                tr.Commit();
+                return (exists, count);
+            }
+
+            using var dialog = new LayerEditDialog(comp, source, probe0.AffectedEntities, Probe);
+            if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
+            {
+                ed.WriteMessage("\nGesloten.");
+                return;
+            }
+
+            var target = dialog.Result.Compose();
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var plan = LayerRename.Analyze(db, tr, source, target);
+                if (!LayerRename.Apply(db, tr, plan, dialog.MergeIntoExisting, out var err))
+                {
+                    tr.Abort();
+                    ed.WriteMessage($"\nHernoemen mislukt: {err}.");
+                    return;
+                }
+                tr.Commit();
+            }
+            ed.WriteMessage($"\nLaag hernoemd naar \"{target}\". Gebruik U om terug te draaien.");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nNLCSLEGENDALAAGNAAM fout: {ex.Message}");
+        }
+    }
+
+    // Laagnaam kiezen: een object aanwijzen (dan geldt zijn laag) of de naam typen.
+    private static string? PromptLayerName(Editor ed, Database db)
+    {
+        var peo = new PromptEntityOptions("\nSelecteer een object van de laag [Typen]", "Typen");
+        peo.AllowNone = false;
+        var per = ed.GetEntity(peo);
+        if (per.Status == PromptStatus.Keyword && per.StringResult == "Typen")
+        {
+            var pso = new PromptStringOptions("\nLaagnaam:") { AllowSpaces = true };
+            var sr = ed.GetString(pso);
+            return sr.Status == PromptStatus.OK && !string.IsNullOrWhiteSpace(sr.StringResult)
+                ? sr.StringResult.Trim()
+                : null;
+        }
+        if (per.Status != PromptStatus.OK)
+            return null;
+        using var tr = db.TransactionManager.StartTransaction();
+        var layer = ((Entity)tr.GetObject(per.ObjectId, OpenMode.ForRead)).Layer;
+        tr.Commit();
+        return layer;
     }
 
     private static bool AskYesNo(Editor ed, string question, bool defaultYes)
@@ -1713,6 +1823,192 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nNLCSTEST error: {ex.Message}");
+        }
+    }
+
+    // Headless bewijs van per-legenda-isolatie: maakt twee hele-tekeninglegenda's met eigen
+    // instellingen, bouwt ze, bewerkt daarna alleen A en toont dat B ongemoeid blijft; alles
+    // via de echte registry-persistentie en rebuild.
+    [CommandMethod("NLCSLEGENDAISOLATIETEST", CommandFlags.Modal)]
+    public void NlcsLegendaIsolatieTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+
+        try
+        {
+            string idA, idB, firstKey = string.Empty;
+            int aRows, bRows;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
+                var probe = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db), excludedIds: excluded);
+                if (probe.Entries.Count > 0)
+                    firstKey = LegendSettings.EntryKey(probe.Entries[0]);
+
+                var sA = LoadGlobalDefaults();
+                var sB = LoadGlobalDefaults();
+                sB.Scale = 500;
+                if (firstKey.Length > 0)
+                    sB.ExcludedEntries.Add(firstKey);
+
+                var defA = IsoDef(reg, sA);
+                var defB = IsoDef(reg, sB);
+                reg.Add(defA);
+                reg.Add(defB);
+                idA = defA.Id;
+                idB = defB.Id;
+                BuildManagedLegend(db, tr, reg, defA, out aRows, out _);
+                BuildManagedLegend(db, tr, reg, defB, out bRows, out _);
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+            }
+            PurgePending(db);
+            ed.WriteMessage($"\nISO: A rows={aRows} B rows={bRows} (B schaal 500, 1 uitgevinkt)");
+
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var a = reg.FindById(idA)!;
+                var b = reg.FindById(idB)!;
+                ed.WriteMessage(
+                    $"\nISO: persisted A.scale={a.Settings.Scale:0} A.excl={a.Settings.ExcludedEntries.Count} " +
+                    $"B.scale={b.Settings.Scale:0} B.excl={b.Settings.ExcludedEntries.Count}");
+                tr.Commit();
+            }
+
+            int aRows2, bAfter;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var a = reg.FindById(idA)!;
+                if (firstKey.Length > 0)
+                    a.Settings.ExcludedEntries.Add(firstKey);
+                BuildManagedLegend(db, tr, reg, a, out aRows2, out _);
+                BuildManagedLegend(db, tr, reg, reg.FindById(idB)!, out bAfter, out _);
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            bool ok = (firstKey.Length == 0 || aRows2 == aRows - 1) && bAfter == bRows;
+            ed.WriteMessage(
+                $"\nISO: na A bewerken A rows={aRows2} (verwacht {(firstKey.Length > 0 ? aRows - 1 : aRows)}) " +
+                $"B rows={bAfter} (verwacht {bRows})");
+            ed.WriteMessage($"\nISO: isolatie {(ok ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nISO error: {ex.Message}");
+        }
+    }
+
+    private static LegendDefinition IsoDef(LegendRegistry reg, LegendSettings settings) => new()
+    {
+        Name = reg.NextDefaultName(),
+        Scope = LegendScope.WholeDrawing,
+        GroupName = LegendRegistry.NewGroupName(),
+        Settings = settings.Clone(),
+        CreatedWithVersion = PluginVersion
+    };
+
+    // Headless bewijs van de echte viewport-flow: plaatst een legenda, maakt in een layout een
+    // viewport om de werkelijke legenda-extents op meerdere schalen en controleert dat de
+    // viewport exact op schaal staat (papier-mm / modeleenheid = 1000 / schaal).
+    [CommandMethod("NLCSLEGENDAVIEWPORTTEST", CommandFlags.Modal)]
+    public void NlcsLegendaViewportTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+
+        try
+        {
+            string groupName;
+            Point3d min, max;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, LoadGlobalDefaults());
+                reg.Add(def);
+                if (BuildManagedLegend(db, tr, reg, def, out _, out _) != UpdateResult.Updated)
+                {
+                    tr.Commit();
+                    ed.WriteMessage("\nVPTEST: geen legenda om omheen te meten.");
+                    return;
+                }
+                LegendStore.Save(db, tr, reg);
+                groupName = def.GroupName;
+                LegendManagement.TryGetGroupExtents(db, tr, groupName, out var ext);
+                min = ext.MinPoint;
+                max = ext.MaxPoint;
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            double mw = max.X - min.X, mh = max.Y - min.Y;
+            var center = new Point2d((min.X + max.X) / 2.0, (min.Y + max.Y) / 2.0);
+            ed.WriteMessage($"\nVPTEST: legenda {mw:0.0} x {mh:0.0} modeleenheden");
+
+            string layoutName = "Model";
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var layouts = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
+                foreach (DBDictionaryEntry entry in layouts)
+                {
+                    if (!string.Equals(entry.Key, "Model", StringComparison.OrdinalIgnoreCase))
+                    {
+                        layoutName = entry.Key;
+                        break;
+                    }
+                }
+                tr.Commit();
+            }
+            if (string.Equals(layoutName, "Model", StringComparison.OrdinalIgnoreCase))
+            {
+                ed.WriteMessage("\nVPTEST: geen papier-layout aanwezig.");
+                return;
+            }
+            LayoutManager.Current.CurrentLayout = layoutName;
+
+            foreach (var scale in new[] { 100.0, 200.0, 500.0, 1000.0 })
+            {
+                var plan = ViewportMath.Compute(mw, mh, scale, 5.0);
+                double paperPerModel = 1000.0 / scale;
+                double w, h, vh;
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    var lm = LayoutManager.Current;
+                    var layout = (Layout)tr.GetObject(lm.GetLayoutId(lm.CurrentLayout), OpenMode.ForRead);
+                    var ps = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite);
+                    var vp = new Viewport();
+                    ps.AppendEntity(vp);
+                    tr.AddNewlyCreatedDBObject(vp, true);
+                    vp.CenterPoint = new Point3d(200, 150, 0);
+                    vp.Width = plan.PaperWidthMm;
+                    vp.Height = plan.PaperHeightMm;
+                    vp.ViewCenter = center;
+                    vp.ViewHeight = plan.PaperHeightMm / paperPerModel;
+                    w = vp.Width;
+                    h = vp.Height;
+                    vh = vp.ViewHeight;
+                    tr.Commit();
+                }
+                double implied = h / vh;              // papier-mm per modeleenheid
+                bool exact = Math.Abs(implied - paperPerModel) < 1e-6;
+                ed.WriteMessage(
+                    $"\nVPTEST: 1:{scale:0} vp {w:0.0}x{h:0.0}mm viewH={vh:0.000} schaal 1:{1000.0 / implied:0} {(exact ? "OK" : "FAIL")}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nVPTEST error: {ex.Message}");
         }
     }
 

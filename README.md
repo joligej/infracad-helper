@@ -37,9 +37,13 @@ de paper space een viewport rond de gekozen legenda op de ingestelde schaal.
 
 De globale instellingen zijn het startpunt voor een **nieuwe** legenda. Zet je later de
 globale standaard anders, dan verandert een bestaande legenda niet mee: die houdt de
-instellingen waarmee hij is gemaakt. De globale standaard bewerk je met `NLCSLEGENDAOPTIES`;
-de instellingen van één bestaande legenda pas je aan via `NLCSLEGENDABEHEER`. De
-omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`, en `NLCSLEGENDATEKST` past de
+instellingen waarmee hij is gemaakt. De instelcommando's (`NLCSLEGENDAOPTIES`,
+`NLCSLEGENDASAMENSTELLEN`, `NLCSLEGENDATEKST`, `NLCSLEGENDASTATUS`, `NLCSLEGENDAXREFS`,
+`NLCSLEGENDAUITVINKEN`, `NLCSLEGENDATOEVOEGEN`, `NLCSLEGENDAPRESET`) vragen eerst waarop je
+het toepast: op een bestaande legenda (die wordt dan meteen bijgewerkt) of op de globale
+standaard voor nieuwe legenda's. Bestaat er nog geen legenda, dan geldt vanzelf de globale
+standaard. De instellingen van één bestaande legenda bewerk je ook via `NLCSLEGENDABEHEER`.
+De omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`, en `NLCSLEGENDATEKST` past de
 tekst van één aangeklikt element aan. Een nieuwe legenda wordt standaard als één blok
 geplaatst; met *Exploderen bij plaatsen* kies je losse entiteiten.
 
@@ -115,6 +119,7 @@ een opzet met collega's kunt delen.
 | `NLCSLEGENDAUITVINKEN` | Klik een element aan om die regel uit de legenda te laten. |
 | `NLCSLEGENDATOEVOEGEN` | Een eigen regel toevoegen (type, laag en omschrijving zelf kiezen). |
 | `NLCSLEGENDASTATUS` | Eigen statussen maken en er regels aan toewijzen (naast Nieuw/Bestaand/...). |
+| `NLCSLEGENDALAAGNAAM` | Een NLCS-laagnaam component voor component bewerken en de laag hernoemen. |
 | `NLCSLEGENDAXREFS` | Per gekoppelde xref kiezen of die in de legenda wordt meegenomen. |
 | `NLCSLEGENDAPRESET` | Legenda-instellingen als profiel opslaan, laden, en im-/exporteren als bestand. |
 | `NLCSLEGENDACONFIG` | De globale configuratiebestanden aanmaken en de paden tonen. |
