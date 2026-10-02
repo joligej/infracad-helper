@@ -27,7 +27,6 @@ public static class DrawingAnalyzer
         public readonly Dictionary<string, HatchSample> Hatches = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, LayerMetric> Metrics = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, string> SymbolBlocks = new(StringComparer.OrdinalIgnoreCase);
-        public readonly Dictionary<string, string> SymbolTransforms = new(StringComparer.OrdinalIgnoreCase);
         public readonly HashSet<string> ExcludedNlcs = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, bool> Visible = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<ObjectId> Excluded = new();
@@ -86,8 +85,10 @@ public static class DrawingAnalyzer
             ? ReadRenderIds(db, tr, c.Parsed.Values)
             : null;
 
-        // Render-identiteit per laag = laag-look plus de gesamplede arcering (patroon/schaal/
-        // hoek). Zo vallen statussen alleen samen als ook de arcering identiek is.
+        // Render-identiteit per laag = de effectieve legendaweergave: laag-look (kleur/linetype/
+        // lineweight/transparantie) plus de gesamplede arcering. De symboolidentiteit is de
+        // bloknaam (toegevoegd in LegendGrouping): de renderer tekent elk symboolblok op
+        // legendaschaal, onafhankelijk van de bron-transform, dus die hoort hier niet bij.
         string? RenderId(string name)
         {
             if (renderIds is null)
@@ -96,8 +97,7 @@ public static class DrawingAnalyzer
             var hatch = c.Hatches.TryGetValue(name, out var h)
                 ? $"|H:{h.PatternName}:{h.PatternScale:0.###}:{h.PatternAngle:0.###}:{h.IsSolid}"
                 : string.Empty;
-            var sym = c.SymbolTransforms.TryGetValue(name, out var st) ? "|X:" + st : string.Empty;
-            return (baseId ?? string.Empty) + hatch + sym;
+            return (baseId ?? string.Empty) + hatch;
         }
 
         // Per-legenda omschrijvingen liggen bovenop de globale catalogus; leeg = volg globaal.
@@ -217,14 +217,7 @@ public static class DrawingAnalyzer
         {
             var name = BlockName(symbolRef, tr);
             if (!string.IsNullOrEmpty(name) && !name.StartsWith('*'))
-            {
                 c.SymbolBlocks[nlcs.LocalName] = name;
-                // Effectieve bron-transform; alleen voor statusmerge (niet voor weergave, die
-                // normaliseert). Negatieve schaal = spiegeling.
-                var sf = symbolRef.ScaleFactors;
-                c.SymbolTransforms[nlcs.LocalName] =
-                    $"{sf.X:0.###}:{sf.Y:0.###}:{sf.Z:0.###}:{symbolRef.Rotation:0.###}";
-            }
         }
     }
 
