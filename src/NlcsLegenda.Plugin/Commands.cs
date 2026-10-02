@@ -1885,6 +1885,7 @@ public partial class Commands
         try
         {
             string idA, idB, idC = string.Empty, firstKey = string.Empty, descKey = string.Empty;
+            string bGeomBefore = string.Empty;
             int aRows, bRows;
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -1921,6 +1922,7 @@ public partial class Commands
                 BuildManagedLegend(db, tr, reg, defA, out aRows, out _);
                 BuildManagedLegend(db, tr, reg, defB, out bRows, out _);
                 BuildManagedLegend(db, tr, reg, defC, out _, out _);
+                bGeomBefore = GeomHash(db, tr, defB.GroupName);
                 LegendStore.Save(db, tr, reg);
                 tr.Commit();
             }
@@ -1949,21 +1951,29 @@ public partial class Commands
                 tr.Commit();
             }
 
+            // Geometrie-hash van B vóór het bewerken van A is in het bouwblok gemeten (bGeomBefore).
             int aRows2, bAfter;
+            string bGeomAfter = string.Empty;
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var reg = LegendStore.Load(db, tr);
                 var a = reg.FindById(idA)!;
+                var bDef = reg.FindById(idB)!;
                 if (firstKey.Length > 0)
                     a.Settings.ExcludedEntries.Add(firstKey);
                 BuildManagedLegend(db, tr, reg, a, out aRows2, out _);
-                BuildManagedLegend(db, tr, reg, reg.FindById(idB)!, out bAfter, out _);
+                BuildManagedLegend(db, tr, reg, bDef, out bAfter, out _);
+                bGeomAfter = GeomHash(db, tr, bDef.GroupName);
                 LegendStore.Save(db, tr, reg);
                 tr.Commit();
             }
             PurgePending(db);
 
-            bool ok = (firstKey.Length == 0 || aRows2 == aRows - 1) && bAfter == bRows;
+            // B's geometrie mag niet veranderen doordat A is bewerkt (geometrie-isolatie).
+            bool geomOk = bGeomBefore.Length > 0 && bGeomBefore == bGeomAfter;
+            ed.WriteMessage($"\nISO: B-geometrie {(geomOk ? "ongewijzigd" : "GEWIJZIGD")} ({bGeomAfter})");
+
+            bool ok = (firstKey.Length == 0 || aRows2 == aRows - 1) && bAfter == bRows && geomOk;
             ed.WriteMessage(
                 $"\nISO: na A bewerken A rows={aRows2} (verwacht {(firstKey.Length > 0 ? aRows - 1 : aRows)}) " +
                 $"B rows={bAfter} (verwacht {bRows})");
@@ -2003,6 +2013,13 @@ public partial class Commands
         Settings = settings.Clone(),
         CreatedWithVersion = PluginVersion
     };
+
+    // Compacte geometrie-vingerafdruk van een legenda-groep: afgeronde extents, in dezelfde
+    // transactie gemeten (losse read-transacties geven in de Core Console geen bounds terug).
+    private static string GeomHash(Database db, Transaction tr, string groupName) =>
+        LegendManagement.TryGetGroupExtents(db, tr, groupName, out var e)
+            ? $"{e.MinPoint.X:0.0},{e.MinPoint.Y:0.0},{e.MaxPoint.X:0.0},{e.MaxPoint.Y:0.0}"
+            : string.Empty;
 
     // Xref-isolatie over opslaan/heropenen. SETUP maakt drie legenda's met eigen xref-keuzes en
     // bewaart ze in de tekening; na QSAVE + heropenen controleert VERIFY dat elke legenda zijn
