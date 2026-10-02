@@ -9,7 +9,8 @@ public sealed class LegendRegistry
 {
     // Verhoog bij een niet-terugwaarts-leesbare wijziging. Een hogere versie dan deze
     // plugin kent, wordt niet overschreven maar als "niet ondersteund" gemeld.
-    public const int CurrentSchemaVersion = 1;
+    // v2: omschrijvingen staan als onafhankelijke snapshot per legenda.
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 

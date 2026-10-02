@@ -83,6 +83,12 @@ public partial class Commands
         return catalog;
     }
 
+    // Alleen de globale gebruikersomschrijvingen (het verschil t.o.v. de ingebouwde catalogus).
+    // Wordt bij het maken van een legenda als onafhankelijke snapshot in de legenda gezet, zodat
+    // latere wijzigingen aan de globale standaard bestaande legenda's niet meer veranderen.
+    private static DescriptionCatalog LoadGlobalDescriptionDefaults()
+        => File.Exists(DescriptionsPath) ? DescriptionCatalog.Load(DescriptionsPath) : new DescriptionCatalog();
+
     private static string SaveGlobalCatalog(DescriptionCatalog catalog)
     {
         Directory.CreateDirectory(ConfigDir);
@@ -127,6 +133,11 @@ public partial class Commands
                 }
                 tr.Commit();
             }
+
+            // Onafhankelijke omschrijving-snapshot: leg de huidige globale gebruikersomschrijvingen
+            // vast in de legenda, tenzij er al (legacy) overrides zijn overgenomen.
+            if (settings.DescriptionOverrides.Elementen.Count == 0)
+                settings.DescriptionOverrides = LoadGlobalDescriptionDefaults();
 
             if (!PromptOptions(ed, settings, out var selection))
             {
@@ -751,15 +762,17 @@ public partial class Commands
         {
             if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
 
-            var global = LoadGlobalCatalog();
+            // Globaal werkt op de globale gebruikersomschrijvingen (voor nieuwe legenda's). Een
+            // legenda toont de ingebouwde catalogus plus zijn eigen snapshot en slaat die als
+            // zelfstandige override (t.o.v. de ingebouwde catalogus) op.
             DescriptionCatalog initial;
             if (target.IsGlobal)
             {
-                initial = global;
+                initial = LoadGlobalCatalog();
             }
             else
             {
-                initial = global.Clone();
+                initial = DescriptionCatalog.Default();
                 initial.MergeFrom(GetTargetSettings(db, target).DescriptionOverrides);
             }
 
@@ -774,7 +787,7 @@ public partial class Commands
                 else
                 {
                     var s = GetTargetSettings(db, target);
-                    s.DescriptionOverrides = dialog.ToCatalog().Diff(global);
+                    s.DescriptionOverrides = dialog.ToCatalog().Diff(DescriptionCatalog.Default());
                     ApplyTargetSettings(ed, db, target, s, "Omschrijvingen");
                 }
             }
@@ -2267,6 +2280,101 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nMIG error: {ex.Message}");
+        }
+    }
+
+    // Headless bewijs dat globale omschrijvingwijzigingen bestaande legenda's niet veranderen
+    // (snapshot bij creatie) maar een nieuwe legenda wél de nieuwe globale tekst krijgt.
+    // Werkt met backup/restore op het echte globale omschrijvingenbestand.
+    [CommandMethod("NLCSLEGENDADESCTEST", CommandFlags.Modal)]
+    public void NlcsLegendaDescTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+
+        byte[]? backup = File.Exists(DescriptionsPath) ? File.ReadAllBytes(DescriptionsPath) : null;
+        try
+        {
+            string descKey = string.Empty;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var excluded = LegendManagement.CollectManagedIds(db, tr, LegendStore.Load(db, tr));
+                var probe = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: DescriptionCatalog.Default(), excludedIds: excluded);
+                if (probe.Entries.Count > 0)
+                    descKey = $"{probe.Entries[^1].Hoofdgroep}|{probe.Entries[^1].Element.ToUpperInvariant()}";
+                tr.Commit();
+            }
+            if (descKey.Length == 0) { ed.WriteMessage("\nDESC: geen entries."); return; }
+
+            void SetGlobal(string text)
+            {
+                var cat = new DescriptionCatalog();
+                cat.Elementen[descKey] = new DescriptionEntry { Specifiek = text };
+                SaveGlobalCatalog(cat);
+            }
+
+            string TextOf(string id)
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var reg = LegendStore.Load(db, tr);
+                var def = reg.FindById(id)!;
+                var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
+                var an = DrawingAnalyzer.Analyze(db, tr, def.Settings, catalog: DescriptionCatalog.Default(), excludedIds: excluded);
+                var e = an.Entries.FirstOrDefault(x => $"{x.Hoofdgroep}|{x.Element.ToUpperInvariant()}" == descKey);
+                tr.Commit();
+                return e?.Description ?? "(geen)";
+            }
+
+            // Globaal V1 -> maak G1 (snapshot).
+            SetGlobal("GLOBAL-V1");
+            string idG1;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var s = LoadGlobalDefaults();
+                s.DescriptionOverrides = LoadGlobalDescriptionDefaults();   // snapshot zoals bij plaatsing
+                var def = IsoDef(reg, s);
+                reg.Add(def);
+                idG1 = def.Id;
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+            }
+            PurgePending(db);
+            ed.WriteMessage($"\nDESC: G1 na creatie = \"{TextOf(idG1)}\" (verwacht GLOBAL-V1)");
+
+            // Globaal V2 -> G1 ongewijzigd, nieuwe G2 krijgt V2.
+            SetGlobal("GLOBAL-V2");
+            string g1after = TextOf(idG1);
+            string idG2;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var s = LoadGlobalDefaults();
+                s.DescriptionOverrides = LoadGlobalDescriptionDefaults();
+                var def = IsoDef(reg, s);
+                reg.Add(def);
+                idG2 = def.Id;
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+            }
+            PurgePending(db);
+            string g2 = TextOf(idG2);
+            bool ok = g1after == "GLOBAL-V1" && g2 == "GLOBAL-V2";
+            ed.WriteMessage($"\nDESC: na globaal V2 -> G1=\"{g1after}\" (verwacht GLOBAL-V1) G2=\"{g2}\" (verwacht GLOBAL-V2) -> {(ok ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nDESC error: {ex.Message}");
+        }
+        finally
+        {
+            if (backup is not null) File.WriteAllBytes(DescriptionsPath, backup);
+            else if (File.Exists(DescriptionsPath)) File.Delete(DescriptionsPath);
         }
     }
 
