@@ -1628,7 +1628,6 @@ public partial class Commands
             }
 
             var key = $"{layer.Hoofdgroep}|{layer.Element.ToUpperInvariant()}";
-            string element = layer.Element;
 
             if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
 
@@ -1640,17 +1639,18 @@ public partial class Commands
                 Specifiek = defaultEntry?.Specifiek ?? StandardTexts.Humanize(layer.Element)
             };
 
-            // Globaal bewerkt de gedeelde catalogus; een legenda krijgt een eigen tekst-override
-            // (één losse regel), zodat dezelfde entry per legenda kan verschillen.
+            // Globaal bewerkt de gedeelde catalogus; een legenda krijgt een eigen omschrijving
+            // in zijn snapshot (DescriptionOverrides), hetzelfde canonieke model als
+            // NLCSLEGENDAOMSCHRIJVINGEN.
             DescriptionEntry current;
             if (target.IsGlobal)
                 current = LoadGlobalCatalog().Elementen.TryGetValue(key, out var existing)
                     ? new DescriptionEntry { Algemeen = existing.Algemeen, Specifiek = existing.Specifiek }
                     : new DescriptionEntry { Algemeen = fallback.Algemeen, Specifiek = fallback.Specifiek };
             else
-                current = GetTargetSettings(db, target).TextOverrides.TryGetValue(element, out var ov)
-                    ? new DescriptionEntry { Algemeen = null, Specifiek = ov }
-                    : new DescriptionEntry { Algemeen = null, Specifiek = fallback.Specifiek };
+                current = GetTargetSettings(db, target).DescriptionOverrides.Elementen.TryGetValue(key, out var ov)
+                    ? new DescriptionEntry { Algemeen = ov.Algemeen, Specifiek = ov.Specifiek }
+                    : new DescriptionEntry { Algemeen = fallback.Algemeen, Specifiek = fallback.Specifiek };
 
             using var dialog = new TextEditDialog(key, current, fallback);
             void Apply()
@@ -1669,9 +1669,13 @@ public partial class Commands
                 {
                     var s = GetTargetSettings(db, target);
                     if (string.IsNullOrWhiteSpace(dialog.Specifiek))
-                        s.TextOverrides.Remove(element);
+                        s.DescriptionOverrides.Elementen.Remove(key);
                     else
-                        s.TextOverrides[element] = dialog.Specifiek;
+                        s.DescriptionOverrides.Elementen[key] = new DescriptionEntry
+                        {
+                            Algemeen = string.IsNullOrWhiteSpace(dialog.Algemeen) ? null : dialog.Algemeen,
+                            Specifiek = dialog.Specifiek
+                        };
                     ApplyTargetSettings(ed, db, target, s, $"Tekst voor {key}");
                 }
             }
