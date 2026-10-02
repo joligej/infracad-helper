@@ -20,14 +20,18 @@ NLCSLEGENDATEMPLATEMETEN
 
 `NLCSLEGENDATEMPLATEMETEN` meet in de model space:
 
-- swatchbreedte uit de horizontale sample-lijnen (dominante breedte);
+- lijnsample-breedte uit de horizontale sample-lijnen (dominante breedte);
+- swatchkader-breedte apart uit gesloten rechthoeken (sample en kader zijn niet hetzelfde);
 - rijafstand uit de verticale afstand tussen de omschrijvingsteksten (T25);
-- teksthoogtes uit alle tekst in de tekening.
+- teksthoogtes uit alle tekst in de tekening;
+- symbool-insertschaal + resulterende papiermaat uit de symboolblokken.
 
 Model is in meters (INSUNITS=6); op 1:200 is 1 modelmeter 5 mm papier.
 
 ## Toleranties
 
 - Rijafstand en teksthoogtes komen exact overeen met `TemplateDefaults`.
-- De gemeten swatchbreedte (22,4 mm) is de sample-lijn; het swatchkader (`SwatchWidthMm` = 24 mm)
-  is iets breder dan de lijn erin. De test staat daarom een kleine marge toe.
+- De gemeten lijnsample (22,4 mm) zit binnen het swatchvak; `SwatchWidthMm` (24 mm) mag iets breder
+  zijn. Het swatchkader (gesloten rechthoek) komt in deze referentie weinig voor (de legenda
+  gebruikt vooral sample-lijnen).
+- De symbool-insertschaal is schaal/1000 (0,2 bij 1:200); dit is de basis die de renderer gebruikt.

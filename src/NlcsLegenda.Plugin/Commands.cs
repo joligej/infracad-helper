@@ -2255,6 +2255,8 @@ public partial class Commands
             double mmPerModel = (db.Insunits == UnitsValue.Millimeters ? 1.0 : 1000.0) / scale;
 
             var samples = new List<(double w, double h, double cx, double cy)>();
+            var frames = new List<double>();
+            var symbols = new List<(string block, double sx, double sy, double rot, double w, double h)>();
             var texts = new List<(double height, double x, double y)>();
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -2263,7 +2265,15 @@ public partial class Commands
                 foreach (ObjectId id in ms)
                 {
                     var ent = tr.GetObject(id, OpenMode.ForRead);
-                    if (ent is Curve crv and (Polyline or Line))
+                    if (ent is Polyline pl && pl.Closed && pl.NumberOfVertices is 4 or 5)
+                    {
+                        // Swatchkader: gesloten rechthoek, breder dan hoog, in swatch-bereik.
+                        var ext = pl.GeometricExtents;
+                        double fw = ext.MaxPoint.X - ext.MinPoint.X, fh = ext.MaxPoint.Y - ext.MinPoint.Y;
+                        if (fw > 2 && fw < 8 && fh > 0.3 && fh < 3 && fw > fh)
+                            frames.Add(fw);
+                    }
+                    else if (ent is Curve crv and (Polyline or Line))
                     {
                         var ext = crv.GeometricExtents;
                         double w = ext.MaxPoint.X - ext.MinPoint.X;
@@ -2271,6 +2281,15 @@ public partial class Commands
                         // Liggende swatch-sample: brede, lage horizontale lijn/polyline.
                         if (w > 2 && w < 8 && h < 1.5)
                             samples.Add((w, h, (ext.MinPoint.X + ext.MaxPoint.X) / 2.0, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2.0));
+                    }
+                    else if (ent is BlockReference br)
+                    {
+                        // Symbool: insertschaal/rotatie + werkelijke bounds (voor paper-mm).
+                        double w = 0, h = 0;
+                        try { var ext = br.GeometricExtents; w = ext.MaxPoint.X - ext.MinPoint.X; h = ext.MaxPoint.Y - ext.MinPoint.Y; }
+                        catch { /* lege/ongeldige block-extents overslaan */ }
+                        if (br.ScaleFactors.X > 0 && w > 0 && w < 12 && h < 12)
+                            symbols.Add((br.Name, br.ScaleFactors.X, br.ScaleFactors.Y, br.Rotation, w, h));
                     }
                     else if (ent is DBText t && t.Height > 0)
                         texts.Add((t.Height, t.Position.X, t.Position.Y));
@@ -2295,6 +2314,21 @@ public partial class Commands
 
             // Swatchbreedte = dominante breedte van de horizontale samples.
             double swW = Mode(samples.Select(x => x.w), 0.2);
+            // Swatchkader apart: de gesloten rechthoek is doorgaans iets breder dan de sample-lijn.
+            double frameW = frames.Count > 0 ? Mode(frames, 0.2) : 0;
+
+            // Dominant symbool: meest voorkomende insertschaal + resulterende papiermaat.
+            double symScale = 0, symPaperW = 0, symPaperH = 0;
+            int symCount = symbols.Count;
+            string symBlock = "";
+            if (symbols.Count > 0)
+            {
+                symScale = Mode(symbols.Select(s => s.sx), 0.05);
+                var dom = symbols.Where(s => Math.Abs(s.sx - symScale) <= 0.05).ToList();
+                symBlock = dom.GroupBy(s => s.block).OrderByDescending(g => g.Count()).First().Key;
+                symPaperW = Mode(dom.Select(s => s.w), 0.2) * mmPerModel;
+                symPaperH = Mode(dom.Select(s => s.h), 0.2) * mmPerModel;
+            }
 
             // Rijafstand uit de omschrijvingsteksten (kleinste teksthoogte = T25): per kolom (X)
             // de dichtstbevolkte nemen en de mediaan van opeenvolgende verticale sprongen.
@@ -2315,20 +2349,23 @@ public partial class Commands
                 .OrderByDescending(g => g.Count()).Take(3)
                 .Select(g => g.Average() * mmPerModel).OrderBy(v => v).ToList();
 
-            double swWmm = swW * mmPerModel, pitchMm = pitch * mmPerModel;
+            double swWmm = swW * mmPerModel, pitchMm = pitch * mmPerModel, frameWmm = frameW * mmPerModel;
             ed.WriteMessage($"\nMETEN: INSUNITS={insunits} schaal 1:{scale:0} mm/model={mmPerModel:0.###}");
-            ed.WriteMessage($"\nMETEN: swatchbreedte {swWmm:0.0} mm (n={samples.Count})");
+            ed.WriteMessage($"\nMETEN: lijnsample {swWmm:0.0} mm (n={samples.Count}); swatchkader {frameWmm:0.0} mm (n={frames.Count})");
             ed.WriteMessage($"\nMETEN: rijafstand {pitchMm:0.0} mm (n={gaps.Count}, kolom {column.Count})");
             ed.WriteMessage($"\nMETEN: teksthoogtes mm = {string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}");
+            ed.WriteMessage($"\nMETEN: symbool insertschaal {symScale:0.###} ({symBlock}) -> {symPaperW:0.0}x{symPaperH:0.0} mm (n={symCount})");
 
             var json = new StringBuilder();
             json.Append("{\n");
             json.Append($"  \"bron\": \"{Path.GetFileName(db.Filename)}\",\n");
             json.Append($"  \"schaal\": {scale:0},\n");
             json.Append($"  \"insunits\": {insunits},\n");
-            json.Append($"  \"swatchBreedteMm\": {swWmm:0.0},\n");
+            json.Append($"  \"lijnSampleBreedteMm\": {swWmm:0.0},\n");
+            json.Append($"  \"swatchKaderBreedteMm\": {frameWmm:0.0},\n");
             json.Append($"  \"rijafstandMm\": {pitchMm:0.0},\n");
-            json.Append($"  \"teksthoogtesMm\": [{string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}]\n");
+            json.Append($"  \"teksthoogtesMm\": [{string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}],\n");
+            json.Append($"  \"symbool\": {{ \"insertSchaal\": {symScale:0.###}, \"paperBreedteMm\": {symPaperW:0.0}, \"paperHoogteMm\": {symPaperH:0.0}, \"aantal\": {symCount} }}\n");
             json.Append("}\n");
             string outPath = Environment.GetEnvironmentVariable("NLCS_CONTRACT_OUT")
                 ?? Path.Combine(Path.GetTempPath(), "nlcs-template-contract.json");

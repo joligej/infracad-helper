@@ -10,7 +10,8 @@ namespace NlcsLegenda.Core.Tests;
 public class TemplateContractTests
 {
     private sealed record Contract(
-        double SwatchBreedteMm, double RijafstandMm, double[] TeksthoogtesMm);
+        double LijnSampleMm, double SwatchKaderMm, double RijafstandMm, double[] TeksthoogtesMm,
+        double Schaal, double SymboolInsertSchaal);
 
     private static Contract Load()
     {
@@ -18,9 +19,12 @@ public class TemplateContractTests
         using var doc = JsonDocument.Parse(File.ReadAllText(path));
         var root = doc.RootElement;
         return new Contract(
-            root.GetProperty("swatchBreedteMm").GetDouble(),
+            root.GetProperty("lijnSampleBreedteMm").GetDouble(),
+            root.GetProperty("swatchKaderBreedteMm").GetDouble(),
             root.GetProperty("rijafstandMm").GetDouble(),
-            root.GetProperty("teksthoogtesMm").EnumerateArray().Select(e => e.GetDouble()).ToArray());
+            root.GetProperty("teksthoogtesMm").EnumerateArray().Select(e => e.GetDouble()).ToArray(),
+            root.GetProperty("schaal").GetDouble(),
+            root.GetProperty("symbool").GetProperty("insertSchaal").GetDouble());
     }
 
     [Fact]
@@ -39,13 +43,22 @@ public class TemplateContractTests
     }
 
     [Fact]
-    public void Swatchkader_is_niet_smaller_dan_de_gemeten_sample_en_blijft_dichtbij()
+    public void Swatchkader_is_niet_smaller_dan_de_gemeten_lijnsample_en_blijft_dichtbij()
     {
-        // De gemeten waarde is de sample-lijn binnen het kader; het kader mag iets breder zijn.
-        double sample = Load().SwatchBreedteMm;
+        // De gemeten lijnsample zit binnen het swatchvak; het kader (SwatchWidthMm) mag iets breder.
+        double sample = Load().LijnSampleMm;
         Assert.True(TemplateDefaults.SwatchWidthMm >= sample - 0.1,
             $"kader {TemplateDefaults.SwatchWidthMm} < sample {sample}");
         Assert.True(TemplateDefaults.SwatchWidthMm <= sample + 3.0,
             $"kader {TemplateDefaults.SwatchWidthMm} te breed t.o.v. sample {sample}");
+    }
+
+    [Fact]
+    public void Symbool_insertschaal_is_schaal_gedeeld_door_1000()
+    {
+        // Symbolen staan in de referentie op insertschaal = schaal/1000 (0,2 bij 1:200); dit is
+        // de basis die LegendBuilder.TryInsertSymbol gebruikt (ModelUnitsPerPaperMm).
+        var c = Load();
+        Assert.Equal(c.Schaal / 1000.0, c.SymboolInsertSchaal, 3);
     }
 }
