@@ -2058,6 +2058,104 @@ public partial class Commands
         CreatedWithVersion = PluginVersion
     };
 
+    // Xref-isolatie over opslaan/heropenen. SETUP maakt drie legenda's met eigen xref-keuzes en
+    // bewaart ze in de tekening; na QSAVE + heropenen controleert VERIFY dat elke legenda zijn
+    // eigen xref-inclusie houdt en dat een andere legenda of de globale default A/B niet raakt.
+    [CommandMethod("NLCSLEGENDAXREFSETUP", CommandFlags.Modal)]
+    public void NlcsLegendaXrefSetup()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var reg = LegendStore.Load(db, tr);
+
+            var sA = LoadGlobalDefaults();
+            sA.IncludeXrefLayers = false;
+            sA.XrefInclusion["xref1"] = true;
+            sA.XrefInclusion["xref2"] = false;
+            sA.Title = "XREF-A";
+
+            var sB = LoadGlobalDefaults();
+            sB.IncludeXrefLayers = false;
+            sB.XrefInclusion["xref1"] = false;
+            sB.XrefInclusion["xref2"] = true;
+            sB.Title = "XREF-B";
+
+            // C simuleert een legenda die is aangemaakt toen de globale default aan stond.
+            var sC = LoadGlobalDefaults();
+            sC.IncludeXrefLayers = true;
+            sC.Title = "XREF-C";
+
+            foreach (var s in new[] { sA, sB, sC })
+                reg.Add(IsoDef(reg, s));
+            LegendStore.Save(db, tr, reg);
+            tr.Commit();
+            ed.WriteMessage("\nXREF: setup klaar. QSAVE, heropenen, dan NLCSLEGENDAXREFVERIFY.");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nXREF setup error: {ex.Message}");
+        }
+    }
+
+    [CommandMethod("NLCSLEGENDAXREFVERIFY", CommandFlags.Modal)]
+    public void NlcsLegendaXrefVerify()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var reg = LegendStore.Load(db, tr);
+            LegendDefinition? Find(string title) =>
+                reg.Legends.FirstOrDefault(l => string.Equals(l.Settings.Title, title, StringComparison.Ordinal));
+            var a = Find("XREF-A");
+            var b = Find("XREF-B");
+            var c = Find("XREF-C");
+            if (a is null || b is null || c is null)
+            {
+                ed.WriteMessage("\nXREF: legenda's niet gevonden na heropenen -> FAIL");
+                tr.Commit();
+                return;
+            }
+
+            bool persisted =
+                a.Settings.IsXrefIncluded("xref1") && !a.Settings.IsXrefIncluded("xref2") &&
+                !b.Settings.IsXrefIncluded("xref1") && b.Settings.IsXrefIncluded("xref2");
+            ed.WriteMessage($"\nXREF: persisted A(1={a.Settings.IsXrefIncluded("xref1")},2={a.Settings.IsXrefIncluded("xref2")}) " +
+                $"B(1={b.Settings.IsXrefIncluded("xref1")},2={b.Settings.IsXrefIncluded("xref2")}) -> {(persisted ? "OK" : "FAIL")}");
+
+            // Geneste xref: het topniveau bepaalt de keuze (xref2|nested volgt xref2).
+            bool nested = !a.Settings.IsXrefIncluded("xref2|nested") && b.Settings.IsXrefIncluded("xref2|nested");
+            ed.WriteMessage($"\nXREF: genest A={a.Settings.IsXrefIncluded("xref2|nested")} B={b.Settings.IsXrefIncluded("xref2|nested")} -> {(nested ? "OK" : "FAIL")}");
+
+            // C kreeg de globale default (aan); A/B hebben een eigen uitgeschakelde default.
+            bool cDefault = c.Settings.IncludeXrefLayers && c.Settings.XrefInclusion.Count == 0
+                && !a.Settings.IncludeXrefLayers && !b.Settings.IncludeXrefLayers;
+            ed.WriteMessage($"\nXREF: C.default={c.Settings.IncludeXrefLayers} C.expliciet={c.Settings.XrefInclusion.Count} -> {(cDefault ? "OK" : "FAIL")}");
+
+            // Onbekende xref valt terug op de eigen default van de legenda, niet op een andere
+            // legenda: A/B zeggen nee (eigen default uit), C ja.
+            bool fallback = !a.Settings.IsXrefIncluded("xref9") && !b.Settings.IsXrefIncluded("xref9")
+                && c.Settings.IsXrefIncluded("xref9");
+            ed.WriteMessage($"\nXREF: onbekend A={a.Settings.IsXrefIncluded("xref9")} B={b.Settings.IsXrefIncluded("xref9")} C={c.Settings.IsXrefIncluded("xref9")} -> {(fallback ? "OK" : "FAIL")}");
+
+            tr.Commit();
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nXREF verify error: {ex.Message}");
+        }
+    }
+
     // Headless bewijs van de echte viewport-flow: plaatst een legenda, maakt in een layout een
     // viewport om de werkelijke legenda-extents op meerdere schalen en controleert dat de
     // viewport exact op schaal staat (papier-mm / modeleenheid = 1000 / schaal).
