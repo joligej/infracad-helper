@@ -1700,19 +1700,26 @@ public partial class Commands
                 return;
             }
 
-            (bool exists, int count) Probe(string name)
+            (bool exists, int count, string info) Probe(string name)
             {
                 if (string.Equals(name, source, StringComparison.Ordinal))
-                    return (false, 0);
+                    return (false, 0, string.Empty);
                 using var tr = db.TransactionManager.StartTransaction();
                 var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
                 bool exists = lt.Has(name);
-                int count = exists ? LayerRename.CountOnLayer(db, tr, name) : 0;
+                int count = 0;
+                string info = string.Empty;
+                if (exists)
+                {
+                    count = LayerRename.CountOnLayer(db, tr, name);
+                    if (tr.GetObject(lt[name], OpenMode.ForRead) is LayerTableRecord ltr)
+                        info = $"kleur {ltr.Color}";
+                }
                 tr.Commit();
-                return (exists, count);
+                return (exists, count, info);
             }
 
-            using var dialog = new LayerEditDialog(comp, source, probe0.AffectedEntities, Probe);
+            using var dialog = new LayerEditDialog(comp, source, probe0.AffectedEntities, probe0.SourceLocked, Probe);
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
@@ -1720,6 +1727,13 @@ public partial class Commands
             }
 
             var target = dialog.Result.Compose();
+            // Samenvoegen is onomkeerbaar binnen de laag: expliciet laten bevestigen.
+            if (dialog.MergeIntoExisting
+                && !AskYesNo(ed, $"Laag \"{target}\" bestaat al. Entiteiten samenvoegen en bronlaag verwijderen?", false))
+            {
+                ed.WriteMessage("\nGeannuleerd.");
+                return;
+            }
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var plan = LayerRename.Analyze(db, tr, source, target);
@@ -2058,6 +2072,89 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nVPTEST error: {ex.Message}");
+        }
+    }
+
+    // Headless bewijs van de laagnaam-rename: maakt testlagen met entiteiten, hernoemt (dry-run
+    // + apply in één transactie), test een botsing met samenvoegen en een vergrendelde bronlaag.
+    [CommandMethod("NLCSLEGENDALAAGNAAMTEST", CommandFlags.Modal)]
+    public void NlcsLegendaLaagnaamTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+
+        try
+        {
+            const string src = "N-WE-KL-RENTEST-G";
+            const string dst = "N-WE-KL-RENDONE-G";
+            const string merge = "N-WE-KL-MERGED-G";
+
+            void MakeLayerLine(string layer, bool locked)
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                if (!lt.Has(layer))
+                {
+                    var ltr = new LayerTableRecord { Name = layer, IsLocked = locked };
+                    lt.Add(ltr);
+                    tr.AddNewlyCreatedDBObject(ltr, true);
+                }
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                var line = new Autodesk.AutoCAD.DatabaseServices.Line(Point3d.Origin, new Point3d(1, 1, 0)) { Layer = layer };
+                ms.AppendEntity(line);
+                tr.AddNewlyCreatedDBObject(line, true);
+                tr.Commit();
+            }
+
+            MakeLayerLine(src, locked: true);
+
+            LayerRename.Plan plan;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                plan = LayerRename.Analyze(db, tr, src, dst);
+                tr.Commit();
+            }
+            ed.WriteMessage($"\nRENTEST: dry-run {src}->{dst} affected={plan.AffectedEntities} locked={plan.SourceLocked} targetExists={plan.TargetExists}");
+
+            bool renamed;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var p = LayerRename.Analyze(db, tr, src, dst);
+                renamed = LayerRename.Apply(db, tr, p, false, out var err);
+                if (!renamed) ed.WriteMessage($"\nRENTEST: rename fout {err}");
+                tr.Commit();
+            }
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+                ed.WriteMessage($"\nRENTEST: na rename src bestaat={lt.Has(src)} dst bestaat={lt.Has(dst)} dstCount={LayerRename.CountOnLayer(db, tr, dst)}");
+                tr.Commit();
+            }
+
+            // Botsing + samenvoegen.
+            MakeLayerLine(merge, locked: false);
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var p = LayerRename.Analyze(db, tr, dst, merge);
+                var ok = LayerRename.Apply(db, tr, p, true, out var err);
+                if (!ok) ed.WriteMessage($"\nRENTEST: merge fout {err}");
+                tr.Commit();
+            }
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+                int c = LayerRename.CountOnLayer(db, tr, merge);
+                bool ok = !lt.Has(dst) && lt.Has(merge) && c == 2;
+                ed.WriteMessage($"\nRENTEST: na merge dst weg={!lt.Has(dst)} mergeCount={c} -> {(ok ? "OK" : "FAIL")}");
+                tr.Commit();
+            }
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nRENTEST error: {ex.Message}");
         }
     }
 

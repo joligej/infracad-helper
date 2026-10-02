@@ -10,9 +10,10 @@ namespace NlcsLegenda.Plugin;
 internal sealed class LayerEditDialog : Form
 {
     private readonly NlcsLayerComponents _comp;
-    private readonly Func<string, (bool exists, int count)>? _probe;
+    private readonly Func<string, (bool exists, int count, string info)>? _probe;
     private readonly int _affected;
     private readonly string _sourceName;
+    private readonly bool _sourceLocked;
 
     private readonly ComboBox _status = new() { DropDownStyle = ComboBoxStyle.DropDown, Width = 70 };
     private readonly TextBox _sub = new() { Width = 50 };
@@ -31,13 +32,14 @@ internal sealed class LayerEditDialog : Form
     public bool MergeIntoExisting { get; private set; }
 
     public LayerEditDialog(
-        NlcsLayerComponents initial, string sourceName, int affected,
-        Func<string, (bool exists, int count)>? targetProbe)
+        NlcsLayerComponents initial, string sourceName, int affected, bool sourceLocked,
+        Func<string, (bool exists, int count, string info)>? targetProbe)
     {
         _comp = initial;
         _affected = affected;
         _probe = targetProbe;
         _sourceName = sourceName;
+        _sourceLocked = sourceLocked;
 
         Text = "NLCS Legenda \u2013 laagnaam bewerken";
         Font = SystemFonts.MessageBoxFont;
@@ -120,13 +122,16 @@ internal sealed class LayerEditDialog : Form
         MergeIntoExisting = false;
         if (errors.Count == 0 && _probe is not null)
         {
-            var (exists, count) = _probe(name);
+            var (exists, count, info) = _probe(name);
             if (exists)
             {
                 MergeIntoExisting = true;
-                lines.Add($"Let op: laag \"{name}\" bestaat al ({count} entiteit(en)). Hernoemen voegt samen.");
+                lines.Add($"Let op: laag \"{name}\" bestaat al ({count} entiteit(en){(string.IsNullOrEmpty(info) ? "" : ", " + info)}).");
+                lines.Add("Hernoemen voegt samen: entiteiten gaan naar die laag en de bronlaag wordt verwijderd.");
             }
         }
+        if (_sourceLocked)
+            lines.Add("Let op: de huidige laag is vergrendeld; hernoemen kan wel.");
         lines.Add($"Raakt {_affected} entiteit(en) op de huidige laag.");
 
         _status2.ForeColor = errors.Count > 0 ? Color.Firebrick : Color.DimGray;
