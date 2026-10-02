@@ -199,6 +199,13 @@ public static class LegendGrouping
         return 100 + (idx < 0 ? int.MaxValue - 100 : idx);
     }
 
+    // Volgorde van omschrijvingsbronnen (één plek bepaalt de precedence):
+    //   1. legacy TextOverrides (oude per-element/laag-tekst; blijft leesbaar voor oude data);
+    //   2. laagbeschrijving uit de tekening;
+    //   3. effectieve catalogus = ingebouwde referentie + per-legenda DescriptionOverrides;
+    //   4. nette laagnaam.
+    // Het canonieke per-legenda model is DescriptionOverrides (zit in de catalogus verwerkt);
+    // nieuwe teksten gaan daarheen, TextOverrides wordt niet meer geschreven.
     private static string ResolveDescription(
         List<NlcsLayerName> group, NlcsLayerName representative, LegendSettings settings,
         Func<string, string?>? layerDescription, DescriptionCatalog catalog, out DescriptionSource source)

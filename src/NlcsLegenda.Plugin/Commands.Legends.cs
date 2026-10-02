@@ -42,7 +42,10 @@ public partial class Commands
                 note = $"{missing} bronobject(en) ontbreken";
         }
 
-        var analysis = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, LoadCatalog(db), excluded);
+        // Beheerde legenda: ingebouwde catalogus + de eigen omschrijving-snapshot van de
+        // legenda (DescriptionOverrides). Niet de live globale standaard, zodat die een
+        // bestaande legenda niet meer verandert.
+        var analysis = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, DescriptionCatalog.Default(), excluded);
         if (analysis.Entries.Count == 0)
             return UpdateResult.NoEntries;
 
@@ -86,12 +89,29 @@ public partial class Commands
         _pendingPurge.Clear();
     }
 
-    // Voert de eenmalige legacy-migratie uit binnen een bestaande transactie.
+    // Voert de eenmalige legacy- en omschrijving-snapshotmigratie uit binnen een bestaande
+    // transactie.
     private static void MaybeMigrate(Database db, Transaction tr, LegendRegistry registry)
     {
         try
         {
             LegendManagement.MigrateLegacyIfNeeded(db, tr, registry, LoadGlobalDefaults(), PluginVersion, out _);
+
+            // Oude legenda's (schema < 2) toonden de live globale omschrijvingen. Leg die nu
+            // vast onder hun eigen overrides, zodat latere globale wijzigingen ze niet meer
+            // veranderen; daarna is elke legenda onafhankelijk.
+            if (registry.SchemaVersion < 2 && registry.Legends.Count > 0)
+            {
+                var globalUser = LoadGlobalDescriptionDefaults();
+                foreach (var l in registry.Legends)
+                {
+                    var snap = globalUser.Clone();
+                    snap.MergeFrom(l.Settings.DescriptionOverrides);
+                    l.Settings.DescriptionOverrides = snap;
+                }
+                registry.SchemaVersion = 2;
+                LegendStore.Save(db, tr, registry);
+            }
         }
         catch
         {

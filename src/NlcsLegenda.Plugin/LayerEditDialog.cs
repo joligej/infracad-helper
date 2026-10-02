@@ -126,8 +126,8 @@ internal sealed class LayerEditDialog : Form
             if (exists)
             {
                 MergeIntoExisting = true;
-                lines.Add($"Let op: laag \"{name}\" bestaat al ({count} entiteit(en){(string.IsNullOrEmpty(info) ? "" : ", " + info)}).");
-                lines.Add("Hernoemen voegt samen: entiteiten gaan naar die laag en de bronlaag wordt verwijderd.");
+                lines.Add($"Let op: laag \"{name}\" bestaat al ({count} entiteit(en){(string.IsNullOrEmpty(info) ? "" : "; " + info)}).");
+                lines.Add("Hernoemen voegt samen: de entiteiten gaan naar die laag en de bronlaag wordt verwijderd. De eigenschappen van de bestaande laag blijven behouden.");
             }
         }
         if (_sourceLocked)
