@@ -7,11 +7,9 @@ public enum TriState
     Partial
 }
 
-// Groepsboom voor het samenstellen van een legenda: elke regel hoort bij een groep (bijv.
-// een KLIC-soort als "Data"). Een groep kan in één klik aan of uit; de groepsstatus volgt
-// uit de kinderen (aan, uit of gedeeltelijk). Puur datamodel, zodat de tri-state-logica
-// los van WinForms getest kan worden. Include/exclude staat los van groepering als concept:
-// deze boom bepaalt alleen wat wel/niet in de legenda komt.
+// Groepsboom voor het samenstellen: elke regel hoort bij een groep (bijv. KLIC-soort "Data").
+// Een groep kan in één klik aan/uit; de groepsstatus (aan/uit/gedeeltelijk) volgt uit de
+// kinderen. Puur datamodel zodat de tri-state-logica los van WinForms testbaar is.
 public sealed class CompositionTree
 {
     public sealed class Leaf

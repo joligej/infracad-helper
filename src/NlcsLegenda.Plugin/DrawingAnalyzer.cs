@@ -27,6 +27,7 @@ public static class DrawingAnalyzer
         public readonly Dictionary<string, HatchSample> Hatches = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, LayerMetric> Metrics = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, string> SymbolBlocks = new(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<string, string> SymbolTransforms = new(StringComparer.OrdinalIgnoreCase);
         public readonly HashSet<string> ExcludedNlcs = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, bool> Visible = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<ObjectId> Excluded = new();
@@ -95,7 +96,16 @@ public static class DrawingAnalyzer
             var hatch = c.Hatches.TryGetValue(name, out var h)
                 ? $"|H:{h.PatternName}:{h.PatternScale:0.###}:{h.PatternAngle:0.###}:{h.IsSolid}"
                 : string.Empty;
-            return (baseId ?? string.Empty) + hatch;
+            var sym = c.SymbolTransforms.TryGetValue(name, out var st) ? "|X:" + st : string.Empty;
+            return (baseId ?? string.Empty) + hatch + sym;
+        }
+
+        // Per-legenda omschrijvingen liggen bovenop de globale catalogus; leeg = volg globaal.
+        var effectiveCatalog = catalog;
+        if (settings.DescriptionOverrides.Elementen.Count > 0)
+        {
+            effectiveCatalog = (catalog ?? DescriptionCatalog.Default()).Clone();
+            effectiveCatalog.MergeFrom(settings.DescriptionOverrides);
         }
 
         var entries = LegendGrouping.Build(
@@ -103,7 +113,7 @@ public static class DrawingAnalyzer
             name => descriptions.TryGetValue(name, out var d) ? d : null,
             c.Metrics,
             name => c.SymbolBlocks.TryGetValue(name, out var b) ? b : null,
-            catalog,
+            effectiveCatalog,
             renderIds is null ? null : RenderId);
 
         return new AnalysisResult
@@ -207,7 +217,14 @@ public static class DrawingAnalyzer
         {
             var name = BlockName(symbolRef, tr);
             if (!string.IsNullOrEmpty(name) && !name.StartsWith('*'))
+            {
                 c.SymbolBlocks[nlcs.LocalName] = name;
+                // Effectieve bron-transform; alleen voor statusmerge (niet voor weergave, die
+                // normaliseert). Negatieve schaal = spiegeling.
+                var sf = symbolRef.ScaleFactors;
+                c.SymbolTransforms[nlcs.LocalName] =
+                    $"{sf.X:0.###}:{sf.Y:0.###}:{sf.Z:0.###}:{symbolRef.Rotation:0.###}";
+            }
         }
     }
 

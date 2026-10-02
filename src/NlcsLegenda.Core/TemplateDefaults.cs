@@ -3,9 +3,10 @@ namespace NlcsLegenda.Core;
 // Eén centrale bron voor de template-maatvoering van de legenda (papier-mm). De tekststijl en
 // teksthoogtes volgen de NLCS-tekststijl NLCS-ISO; de maten zijn afgestemd op de TAUW-
 // referentielegenda (relevante_bronnen/Templates/TAUW_LEGENDAS.dwt en
-// 03 Voorbeeldtekening BE/ref/SIT-NW-LEGENDA.dwg). Meting op die referentie op schaal 1:200:
-// omschrijvingstekst 0,5 m = 2,5 mm (dominant), kopregel 1,0 m = 5 mm; swatchbreedte ~4,0-4,8 m
-// = 20-24 mm. LegendSettings en reset-naar-template verwijzen hiernaar, zodat er geen parallelle
+// 03 Voorbeeldtekening BE/ref/SIT-NW-LEGENDA.dwg). Meting op die referentie: INSUNITS=6 (meters),
+// font NLCS-ISO.ttf met breedtefactor 1,0; tekststijlen NLCS-ISO-M200-T25 (0,5 m) en -T50 (1,0 m)
+// en -M1000-T25 (2,5 m)/-T50 (5,0 m) geven teksthoogtes 2,5 en 5 mm; swatchbreedte ~4,0-4,8 m =
+// 20-24 mm. LegendSettings en reset-naar-template verwijzen hiernaar, zodat er geen parallelle
 // magische getallen ontstaan.
 public static class TemplateDefaults
 {

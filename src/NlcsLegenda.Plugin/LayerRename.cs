@@ -95,15 +95,17 @@ internal static class LayerRename
             return false;
         }
 
+        // Bronlaag ontgrendelen zodat de entiteiten verplaatst mogen worden (lock blokkeert
+        // anders de wijziging). De bronlaag wordt daarna toch verwijderd.
+        var srcLtr = (LayerTableRecord)tr.GetObject(lt[plan.Source], OpenMode.ForWrite);
+        if (srcLtr.IsLocked)
+            srcLtr.IsLocked = false;
+
         ReassignEntities(db, tr, plan.Source, targetId);
 
         // Bronlaag opruimen als die niet in gebruik is (niet de huidige laag en leeg).
-        if (db.Clayer != lt[plan.Source])
-        {
-            var src = (LayerTableRecord)tr.GetObject(lt[plan.Source], OpenMode.ForWrite);
-            if (CountOnLayer(db, tr, plan.Source) == 0)
-                src.Erase();
-        }
+        if (db.Clayer != lt[plan.Source] && CountOnLayer(db, tr, plan.Source) == 0)
+            srcLtr.Erase();
         return true;
     }
 

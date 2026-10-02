@@ -55,4 +55,17 @@ public class TemplateDefaultsTests
         Assert.Equal(0.5, s.ToModel(s.TextHeightMm), 3);
         Assert.Equal(1.0, s.ToModel(s.HeaderTextHeightMm), 3);
     }
+
+    // Gemeten tekststijlen in SIT-NW-LEGENDA.dwg (INSUNITS=6 = meters, font NLCS-ISO.ttf, wf 1,0):
+    // NLCS-ISO-M200-T25 fixedH 0,500; -M200-T50 fixedH 1,000; -M1000-T25 fixedH 2,500;
+    // -M1000-T50 fixedH 5,000. De T25/T50-codes zijn dus 2,5 en 5 mm.
+    [Theory]
+    [InlineData(200, 0.5, 1.0)]
+    [InlineData(1000, 2.5, 5.0)]
+    public void ToModel_MatchesMeasuredStyleHeights(double scale, double expT25, double expT50)
+    {
+        var s = new LegendSettings { Scale = scale };
+        Assert.Equal(expT25, s.ToModel(TemplateDefaults.TextHeightMm), 3);
+        Assert.Equal(expT50, s.ToModel(TemplateDefaults.HeaderTextHeightMm), 3);
+    }
 }

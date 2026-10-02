@@ -43,6 +43,14 @@ public sealed class DescriptionCatalog
             Elementen[kv.Key] = kv.Value;
     }
 
+    public DescriptionCatalog Clone()
+    {
+        var copy = new DescriptionCatalog();
+        foreach (var kv in Elementen)
+            copy.Elementen[kv.Key] = new DescriptionEntry { Algemeen = kv.Value.Algemeen, Specifiek = kv.Value.Specifiek };
+        return copy;
+    }
+
     public DescriptionCatalog Diff(DescriptionCatalog baseline)
     {
         var result = new DescriptionCatalog();
@@ -130,6 +138,29 @@ public sealed class DescriptionCatalog
         catch
         {
             return new DescriptionCatalog();
+        }
+    }
+
+    // Strikt lezen voor kritieke migratiestaat: false bij ongeldige JSON, zodat oude data niet
+    // stil door een lege catalogus wordt vervangen en vervolgens gewist.
+    public static bool TryParse(string? json, out DescriptionCatalog catalog)
+    {
+        catalog = new DescriptionCatalog();
+        if (string.IsNullOrWhiteSpace(json))
+            return false;
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<DescriptionCatalog>(json, Options);
+            if (parsed is null)
+                return false;
+            parsed.Elementen = new Dictionary<string, DescriptionEntry>(
+                parsed.Elementen ?? new(), StringComparer.OrdinalIgnoreCase);
+            catalog = parsed;
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 }

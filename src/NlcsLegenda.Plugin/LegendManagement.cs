@@ -197,50 +197,84 @@ internal static class LegendManagement
             && tr.GetObject(gd.GetAt(LegacyGroupName), OpenMode.ForRead) is Group lg
             && lg.GetAllEntityIds().Length > 0;
         var legacySettingsJson = DrawingStore.ReadSettings(db);
+        var legacyDescJson = DrawingStore.ReadDescriptions(db);
         bool hasLegacySettings = legacySettingsJson is not null;
+        bool hasLegacyDesc = legacyDescJson is not null;
 
-        if (!hasLegacyGroup && !hasLegacySettings)
+        if (!hasLegacyGroup && !hasLegacySettings && !hasLegacyDesc)
             return false;
 
-        var settings = hasLegacySettings
-            ? LegendSettings.FromJson(legacySettingsJson)
-            : globalDefaults.Clone();
-
-        if (hasLegacyGroup)
+        // Kritieke staat: onleesbare oude instellingen/omschrijvingen niet stil vervangen door
+        // defaults en daarna wissen. Migratie overslaan en de oude data laten staan.
+        LegendSettings settings;
+        if (hasLegacySettings)
         {
-            // De bestaande group hernoemen naar een beheerde group-naam, zodat de geometrie
-            // en positie behouden blijven.
-            var newGroupName = LegendRegistry.NewGroupName();
-            RenameGroup(db, tr, LegacyGroupName, newGroupName);
-            registry.Add(new LegendDefinition
+            if (!LegendSettings.TryParse(legacySettingsJson, out settings))
             {
-                Name = registry.NextDefaultName(),
-                Scope = LegendScope.WholeDrawing,
-                GroupName = newGroupName,
-                Settings = settings,
-                CreatedWithVersion = version
-            });
-            message = hasLegacySettings
-                ? "Bestaande legenda en tekeninginstellingen overgenomen."
-                : "Bestaande legenda overgenomen.";
+                message = "Oude tekeninginstellingen zijn onleesbaar; migratie overgeslagen zodat niets verloren gaat.";
+                return false;
+            }
         }
         else
         {
-            // Alleen legacy tekeninginstellingen, nog geen legenda: bewaar ze zodat de
-            // eerste nieuwe legenda ze als startpunt kan gebruiken (hier niet direct een
-            // legenda maken, want er is geen geometrie).
-            message = "Oude tekeninginstellingen gevonden; worden bij de volgende nieuwe legenda gebruikt.";
-            // We laten de legacy settings staan tot de eerste plaatsing die migreert.
+            settings = globalDefaults.Clone();
+        }
+
+        DescriptionCatalog? legacyDesc = null;
+        if (hasLegacyDesc && !DescriptionCatalog.TryParse(legacyDescJson, out legacyDesc))
+        {
+            message = "Oude omschrijvingen zijn onleesbaar; migratie overgeslagen zodat niets verloren gaat.";
             return false;
         }
 
-        // Legacy tekeninginstellingen gericht opruimen zodat ze niet als actieve
-        // gedeelde drawing-scope blijven werken.
-        if (hasLegacySettings)
-            DrawingStore.Clear(db);
+        if (!hasLegacyGroup)
+        {
+            // Alleen oude instellingen/omschrijvingen, nog geen legenda: niets wissen. Ze
+            // worden overgenomen zodra de eerste nieuwe legenda wordt geplaatst.
+            message = "Oude tekeninginstellingen/omschrijvingen gevonden; worden bij de volgende nieuwe legenda overgenomen.";
+            return false;
+        }
 
+        // Oude omschrijvingen als per-legenda overrides meenemen, zodat ze niet verloren gaan
+        // als drawing-wide override maar aan deze legenda hangen.
+        if (legacyDesc is not null && legacyDesc.Elementen.Count > 0)
+            settings.DescriptionOverrides = legacyDesc.Diff(DescriptionCatalog.Default());
+
+        var newGroupName = LegendRegistry.NewGroupName();
+        RenameGroup(db, tr, LegacyGroupName, newGroupName);
+        registry.Add(new LegendDefinition
+        {
+            Name = registry.NextDefaultName(),
+            Scope = LegendScope.WholeDrawing,
+            GroupName = newGroupName,
+            Settings = settings,
+            CreatedWithVersion = version
+        });
+        message = hasLegacySettings || hasLegacyDesc
+            ? "Bestaande legenda, instellingen en omschrijvingen overgenomen."
+            : "Bestaande legenda overgenomen.";
+
+        // Pas opruimen nadat instellingen en omschrijvingen veilig in de legenda staan.
+        DrawingStore.Clear(db);
         LegendStore.Save(db, tr, registry);
         return true;
+    }
+
+    // Neemt eenmalig oude tekeningbrede omschrijvingen/instellingen over in een nieuw geplaatste
+    // legenda (het geval "alleen oude config, nog geen legenda"). Daarna wordt de oude config
+    // gewist. Geen effect als er al legenda's zijn of niets leesbaars te migreren valt.
+    public static void AdoptPendingLegacyInto(Database db, Transaction tr, LegendDefinition def)
+    {
+        var descJson = DrawingStore.ReadDescriptions(db);
+        if (descJson is not null
+            && DescriptionCatalog.TryParse(descJson, out var desc)
+            && desc.Elementen.Count > 0
+            && def.Settings.DescriptionOverrides.Elementen.Count == 0)
+        {
+            def.Settings.DescriptionOverrides = desc.Diff(DescriptionCatalog.Default());
+        }
+        if (descJson is not null || DrawingStore.ReadSettings(db) is not null)
+            DrawingStore.Clear(db);
     }
 
     private static void RenameGroup(Database db, Transaction tr, string oldName, string newName)

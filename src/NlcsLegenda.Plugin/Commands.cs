@@ -70,15 +70,10 @@ public partial class Commands
     // De globale omschrijvingen (ingebouwde catalogus + globale gebruikersoverrides). Oude
     // tekeningspecifieke omschrijvingen worden nog ingelezen zodat bestaande tekeningen hun
     // teksten behouden, maar er wordt niets nieuws meer tekeningspecifiek weggeschreven.
-    private static DescriptionCatalog LoadCatalog(Database db)
-    {
-        var catalog = DescriptionCatalog.Default();
-        if (File.Exists(DescriptionsPath))
-            catalog.MergeFrom(DescriptionCatalog.Load(DescriptionsPath));
-        if (DrawingStore.ReadDescriptions(db) is { } json)
-            catalog.MergeFrom(DescriptionCatalog.FromJson(json));
-        return catalog;
-    }
+    // De gedeelde/globale omschrijvingen (ingebouwde catalogus + globale gebruikersdefaults).
+    // Legacy tekening-descriptions worden hier NIET meer gelezen; die komen via migratie in de
+    // per-legenda overrides terecht. Per-legenda overrides worden in de analyse toegevoegd.
+    private static DescriptionCatalog LoadCatalog(Database db) => LoadGlobalCatalog();
 
     private static DescriptionCatalog LoadGlobalCatalog()
     {
@@ -160,6 +155,8 @@ public partial class Commands
                         CreatedWithVersion = PluginVersion
                     };
                     FinalizePlacement(tr, db, br, settings, def.GroupName);
+                    if (registry.Legends.Count == 0)
+                        LegendManagement.AdoptPendingLegacyInto(db, tr, def);
                     registry.Add(def);
                     LegendStore.Save(db, tr, registry);
                     ed.WriteMessage($"\n\"{def.Name}\" geplaatst ({def.Scope.ToDisplay()}).");
@@ -727,16 +724,42 @@ public partial class Commands
 
         try
         {
-            using var dialog = new DescriptionsDialog(LoadGlobalCatalog());
-            dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nOmschrijvingen opgeslagen ({SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()))}).");
+            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+
+            var global = LoadGlobalCatalog();
+            DescriptionCatalog initial;
+            if (target.IsGlobal)
+            {
+                initial = global;
+            }
+            else
+            {
+                initial = global.Clone();
+                initial.MergeFrom(GetTargetSettings(db, target).DescriptionOverrides);
+            }
+
+            using var dialog = new DescriptionsDialog(initial);
+            void Apply()
+            {
+                if (target.IsGlobal)
+                {
+                    var where = SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()));
+                    ed.WriteMessage($"\nOmschrijvingen opgeslagen ({where}); bestaande legenda's blijven ongewijzigd.");
+                }
+                else
+                {
+                    var s = GetTargetSettings(db, target);
+                    s.DescriptionOverrides = dialog.ToCatalog().Diff(global);
+                    ApplyTargetSettings(ed, db, target, s, "Omschrijvingen");
+                }
+            }
+            dialog.ApplyRequested += (_, _) => Apply();
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            var where = SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()));
-            ed.WriteMessage($"\nOmschrijvingen opgeslagen ({where}).");
+            Apply();
         }
         catch (Exception ex)
         {
@@ -1677,19 +1700,26 @@ public partial class Commands
                 return;
             }
 
-            (bool exists, int count) Probe(string name)
+            (bool exists, int count, string info) Probe(string name)
             {
                 if (string.Equals(name, source, StringComparison.Ordinal))
-                    return (false, 0);
+                    return (false, 0, string.Empty);
                 using var tr = db.TransactionManager.StartTransaction();
                 var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
                 bool exists = lt.Has(name);
-                int count = exists ? LayerRename.CountOnLayer(db, tr, name) : 0;
+                int count = 0;
+                string info = string.Empty;
+                if (exists)
+                {
+                    count = LayerRename.CountOnLayer(db, tr, name);
+                    if (tr.GetObject(lt[name], OpenMode.ForRead) is LayerTableRecord ltr)
+                        info = $"kleur {ltr.Color}";
+                }
                 tr.Commit();
-                return (exists, count);
+                return (exists, count, info);
             }
 
-            using var dialog = new LayerEditDialog(comp, source, probe0.AffectedEntities, Probe);
+            using var dialog = new LayerEditDialog(comp, source, probe0.AffectedEntities, probe0.SourceLocked, Probe);
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
@@ -1697,6 +1727,13 @@ public partial class Commands
             }
 
             var target = dialog.Result.Compose();
+            // Samenvoegen is onomkeerbaar binnen de laag: expliciet laten bevestigen.
+            if (dialog.MergeIntoExisting
+                && !AskYesNo(ed, $"Laag \"{target}\" bestaat al. Entiteiten samenvoegen en bronlaag verwijderen?", false))
+            {
+                ed.WriteMessage("\nGeannuleerd.");
+                return;
+            }
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var plan = LayerRename.Analyze(db, tr, source, target);
@@ -1840,7 +1877,7 @@ public partial class Commands
 
         try
         {
-            string idA, idB, firstKey = string.Empty;
+            string idA, idB, idC = string.Empty, firstKey = string.Empty, descKey = string.Empty;
             int aRows, bRows;
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -1849,21 +1886,31 @@ public partial class Commands
                 var probe = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db), excludedIds: excluded);
                 if (probe.Entries.Count > 0)
                     firstKey = LegendSettings.EntryKey(probe.Entries[0]);
+                // Een niet-uitgevinkt element voor de tekst-isolatietest (laatste entry).
+                var descEntry = probe.Entries.Count > 0 ? probe.Entries[^1] : null;
+                if (descEntry is not null)
+                    descKey = $"{descEntry.Hoofdgroep}|{descEntry.Element.ToUpperInvariant()}";
 
                 var sA = LoadGlobalDefaults();
                 var sB = LoadGlobalDefaults();
                 sB.Scale = 500;
                 if (firstKey.Length > 0)
                     sB.ExcludedEntries.Add(firstKey);
+                if (descKey.Length > 0)
+                    sB.DescriptionOverrides.Elementen[descKey] = new DescriptionEntry { Specifiek = "EIGEN-B-TEKST" };
 
                 var defA = IsoDef(reg, sA);
                 var defB = IsoDef(reg, sB);
+                var defC = IsoDef(reg, LoadGlobalDefaults());  // nieuwe C krijgt de globale default
                 reg.Add(defA);
                 reg.Add(defB);
+                reg.Add(defC);
                 idA = defA.Id;
                 idB = defB.Id;
+                idC = defC.Id;
                 BuildManagedLegend(db, tr, reg, defA, out aRows, out _);
                 BuildManagedLegend(db, tr, reg, defB, out bRows, out _);
+                BuildManagedLegend(db, tr, reg, defC, out _, out _);
                 LegendStore.Save(db, tr, reg);
                 tr.Commit();
             }
@@ -1878,6 +1925,11 @@ public partial class Commands
                 ed.WriteMessage(
                     $"\nISO: persisted A.scale={a.Settings.Scale:0} A.excl={a.Settings.ExcludedEntries.Count} " +
                     $"B.scale={b.Settings.Scale:0} B.excl={b.Settings.ExcludedEntries.Count}");
+                var gd = LoadGlobalDefaults();
+                var cDef = reg.FindById(idC)!;
+                bool cOk = cDef.Settings.Scale == gd.Scale && cDef.Settings.ExcludedEntries.Count == 0
+                    && cDef.Settings.DescriptionOverrides.Elementen.Count == 0;
+                ed.WriteMessage($"\nISO: C.scale={cDef.Settings.Scale:0} (globaal {gd.Scale:0}) C.excl={cDef.Settings.ExcludedEntries.Count} -> {(cOk ? "OK" : "FAIL")}");
                 tr.Commit();
             }
 
@@ -1900,6 +1952,26 @@ public partial class Commands
                 $"\nISO: na A bewerken A rows={aRows2} (verwacht {(firstKey.Length > 0 ? aRows - 1 : aRows)}) " +
                 $"B rows={bAfter} (verwacht {bRows})");
             ed.WriteMessage($"\nISO: isolatie {(ok ? "OK" : "FAIL")}");
+
+            // Tekst-isolatie: B heeft een eigen omschrijving voor descKey, A niet. Na reload
+            // moet de geanalyseerde tekst per legenda verschillen.
+            if (descKey.Length > 0)
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var reg = LegendStore.Load(db, tr);
+                var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
+                string Text(LegendDefinition d)
+                {
+                    var an = DrawingAnalyzer.Analyze(db, tr, d.Settings, catalog: LoadCatalog(db), excludedIds: excluded);
+                    var e = an.Entries.FirstOrDefault(x => $"{x.Hoofdgroep}|{x.Element.ToUpperInvariant()}" == descKey);
+                    return e?.Description ?? "(geen)";
+                }
+                var aText = Text(reg.FindById(idA)!);
+                var bText = Text(reg.FindById(idB)!);
+                bool descOk = bText.Contains("EIGEN-B-TEKST") && !aText.Contains("EIGEN-B-TEKST");
+                ed.WriteMessage($"\nISO: tekst A=\"{aText}\" B=\"{bText}\" -> {(descOk ? "OK" : "FAIL")}");
+                tr.Commit();
+            }
         }
         catch (Exception ex)
         {
@@ -1979,9 +2051,10 @@ public partial class Commands
 
             foreach (var scale in new[] { 100.0, 200.0, 500.0, 1000.0 })
             {
-                var plan = ViewportMath.Compute(mw, mh, scale, 5.0);
+                const double margin = 5.0;
+                var plan = ViewportMath.Compute(mw, mh, scale, margin);
                 double paperPerModel = 1000.0 / scale;
-                double w, h, vh;
+                double w, h, vh, vw;
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
                     var lm = LayoutManager.Current;
@@ -1998,17 +2071,108 @@ public partial class Commands
                     w = vp.Width;
                     h = vp.Height;
                     vh = vp.ViewHeight;
+                    vw = vp.ViewHeight * (vp.Width / vp.Height); // zichtbare modelbreedte
                     tr.Commit();
                 }
-                double implied = h / vh;              // papier-mm per modeleenheid
+                double implied = h / vh;
                 bool exact = Math.Abs(implied - paperPerModel) < 1e-6;
+                // Marges: papiermaat moet legenda + 2x marge zijn (geen clipping, geen overmaat).
+                double expW = mw * paperPerModel + 2 * margin;
+                double expH = mh * paperPerModel + 2 * margin;
+                bool marginsOk = Math.Abs(w - expW) < 1e-3 && Math.Abs(h - expH) < 1e-3;
+                // Clipping: zichtbaar model moet de legenda volledig omvatten.
+                bool noClip = vw + 1e-6 >= mw && vh + 1e-6 >= mh;
                 ed.WriteMessage(
-                    $"\nVPTEST: 1:{scale:0} vp {w:0.0}x{h:0.0}mm viewH={vh:0.000} schaal 1:{1000.0 / implied:0} {(exact ? "OK" : "FAIL")}");
+                    $"\nVPTEST: 1:{scale:0} vp {w:0.0}x{h:0.0}mm schaal {(exact ? "OK" : "FAIL")} " +
+                    $"marges {(marginsOk ? "OK" : "FAIL")} clipping {(noClip ? "geen" : "FAIL")}");
             }
         }
         catch (Exception ex)
         {
             ed.WriteMessage($"\nVPTEST error: {ex.Message}");
+        }
+    }
+
+    // Headless bewijs van de laagnaam-rename: maakt testlagen met entiteiten, hernoemt (dry-run
+    // + apply in één transactie), test een botsing met samenvoegen en een vergrendelde bronlaag.
+    [CommandMethod("NLCSLEGENDALAAGNAAMTEST", CommandFlags.Modal)]
+    public void NlcsLegendaLaagnaamTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+
+        try
+        {
+            const string src = "N-WE-KL-RENTEST-G";
+            const string dst = "N-WE-KL-RENDONE-G";
+            const string merge = "N-WE-KL-MERGED-G";
+
+            void MakeLayerLine(string layer, bool locked)
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                if (!lt.Has(layer))
+                {
+                    var ltr = new LayerTableRecord { Name = layer, IsLocked = locked };
+                    lt.Add(ltr);
+                    tr.AddNewlyCreatedDBObject(ltr, true);
+                }
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                var line = new Autodesk.AutoCAD.DatabaseServices.Line(Point3d.Origin, new Point3d(1, 1, 0)) { Layer = layer };
+                ms.AppendEntity(line);
+                tr.AddNewlyCreatedDBObject(line, true);
+                tr.Commit();
+            }
+
+            MakeLayerLine(src, locked: true);
+
+            LayerRename.Plan plan;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                plan = LayerRename.Analyze(db, tr, src, dst);
+                tr.Commit();
+            }
+            ed.WriteMessage($"\nRENTEST: dry-run {src}->{dst} affected={plan.AffectedEntities} locked={plan.SourceLocked} targetExists={plan.TargetExists}");
+
+            bool renamed;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var p = LayerRename.Analyze(db, tr, src, dst);
+                renamed = LayerRename.Apply(db, tr, p, false, out var err);
+                if (!renamed) ed.WriteMessage($"\nRENTEST: rename fout {err}");
+                tr.Commit();
+            }
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+                ed.WriteMessage($"\nRENTEST: na rename src bestaat={lt.Has(src)} dst bestaat={lt.Has(dst)} dstCount={LayerRename.CountOnLayer(db, tr, dst)}");
+                tr.Commit();
+            }
+
+            // Botsing + samenvoegen.
+            MakeLayerLine(merge, locked: false);
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var p = LayerRename.Analyze(db, tr, dst, merge);
+                var ok = LayerRename.Apply(db, tr, p, true, out var err);
+                if (!ok) ed.WriteMessage($"\nRENTEST: merge fout {err}");
+                tr.Commit();
+            }
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+                int c = LayerRename.CountOnLayer(db, tr, merge);
+                bool ok = !lt.Has(dst) && lt.Has(merge) && c == 2;
+                ed.WriteMessage($"\nRENTEST: na merge dst weg={!lt.Has(dst)} mergeCount={c} -> {(ok ? "OK" : "FAIL")}");
+                tr.Commit();
+            }
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nRENTEST error: {ex.Message}");
         }
     }
 
