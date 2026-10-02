@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.20.0 - 2026-10-02
+
+- Omschrijvingen kunnen nu per legenda verschillen: `NLCSLEGENDAOMSCHRIJVINGEN` vraagt waarop
+  je het toepast (globale standaard of één legenda). Oude tekeningbrede omschrijvingen worden
+  bij het openen netjes overgenomen in de betreffende legenda in plaats van gedeeld te blijven.
+- Onleesbare oude configuratie wordt niet meer stil vervangen en gewist; de migratie slaat
+  dan over zodat er niets verloren gaat.
+- Gelijke statussen samenvoegen houdt nu ook rekening met de symboolschaal, -rotatie en
+  -spiegeling.
+- Laagnaameditor: vergrendelde bronlaag wordt gemeld en veilig behandeld, samenvoegen met een
+  bestaande laag vraagt een expliciete bevestiging en toont de doellaag.
+
 ## 1.19.0 - 2026-10-02
 
 - Instelcommando's werken nu per legenda of op de globale standaard: je kiest het doel en een

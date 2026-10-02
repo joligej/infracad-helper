@@ -89,6 +89,9 @@
   "textOverrides": {
     "OPENVERHARDING_BETONSTRAATSTEEN": "Betonstraatsteen"
   },
+  "descriptionOverrides": {
+    "elementen": {}
+  },
   "excludedEntries": [],
   "manualEntries": [],
   "xrefInclusion": {},
