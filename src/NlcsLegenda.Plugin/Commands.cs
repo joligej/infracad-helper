@@ -1877,7 +1877,7 @@ public partial class Commands
 
         try
         {
-            string idA, idB, firstKey = string.Empty, descKey = string.Empty;
+            string idA, idB, idC = string.Empty, firstKey = string.Empty, descKey = string.Empty;
             int aRows, bRows;
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -1901,12 +1901,16 @@ public partial class Commands
 
                 var defA = IsoDef(reg, sA);
                 var defB = IsoDef(reg, sB);
+                var defC = IsoDef(reg, LoadGlobalDefaults());  // nieuwe C krijgt de globale default
                 reg.Add(defA);
                 reg.Add(defB);
+                reg.Add(defC);
                 idA = defA.Id;
                 idB = defB.Id;
+                idC = defC.Id;
                 BuildManagedLegend(db, tr, reg, defA, out aRows, out _);
                 BuildManagedLegend(db, tr, reg, defB, out bRows, out _);
+                BuildManagedLegend(db, tr, reg, defC, out _, out _);
                 LegendStore.Save(db, tr, reg);
                 tr.Commit();
             }
@@ -1921,6 +1925,11 @@ public partial class Commands
                 ed.WriteMessage(
                     $"\nISO: persisted A.scale={a.Settings.Scale:0} A.excl={a.Settings.ExcludedEntries.Count} " +
                     $"B.scale={b.Settings.Scale:0} B.excl={b.Settings.ExcludedEntries.Count}");
+                var gd = LoadGlobalDefaults();
+                var cDef = reg.FindById(idC)!;
+                bool cOk = cDef.Settings.Scale == gd.Scale && cDef.Settings.ExcludedEntries.Count == 0
+                    && cDef.Settings.DescriptionOverrides.Elementen.Count == 0;
+                ed.WriteMessage($"\nISO: C.scale={cDef.Settings.Scale:0} (globaal {gd.Scale:0}) C.excl={cDef.Settings.ExcludedEntries.Count} -> {(cOk ? "OK" : "FAIL")}");
                 tr.Commit();
             }
 
