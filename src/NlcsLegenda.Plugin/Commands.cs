@@ -2102,6 +2102,69 @@ public partial class Commands
         }
     }
 
+    // Echte xref-integratie: analyseert het gastbestand met per xref een eigen inclusie en
+    // toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. Verwacht >= 2 xrefs.
+    [CommandMethod("NLCSLEGENDAXREFANALYSE", CommandFlags.Modal)]
+    public void NlcsLegendaXrefAnalyse()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+            var xrefs = new List<string>();
+            foreach (ObjectId id in bt)
+                if (tr.GetObject(id, OpenMode.ForRead) is BlockTableRecord btr && btr.IsFromExternalReference)
+                    xrefs.Add(btr.Name);
+            xrefs.Sort(StringComparer.OrdinalIgnoreCase);
+            ed.WriteMessage($"\nXREFAN: xrefs = {string.Join(", ", xrefs)}");
+            if (xrefs.Count < 2)
+            {
+                ed.WriteMessage("\nXREFAN: minstens 2 xrefs nodig.");
+                tr.Commit();
+                return;
+            }
+
+            string Elements(string? onlyXref)
+            {
+                var s = LoadGlobalDefaults();
+                s.ExcludedDisciplines.Clear();
+                s.ExcludedHoofdgroepen.Clear();
+                s.XrefInclusion.Clear();
+                if (onlyXref is null)
+                {
+                    s.IncludeXrefLayers = true; // alles aan
+                }
+                else
+                {
+                    s.IncludeXrefLayers = false; // alleen de genoemde xref via de dict
+                    s.XrefInclusion[onlyXref] = true;
+                }
+                var an = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db));
+                return string.Join(",", an.Entries.Select(e => e.Element).OrderBy(e => e, StringComparer.OrdinalIgnoreCase));
+            }
+
+            var a = Elements(xrefs[0]);
+            var b = Elements(xrefs[1]);
+            var both = Elements(null);
+            ed.WriteMessage($"\nXREFAN: alleen {xrefs[0]} -> [{a}]");
+            ed.WriteMessage($"\nXREFAN: alleen {xrefs[1]} -> [{b}]");
+            // A en B bevatten elk iets, verschillen van elkaar, en beide zitten in de alles-aan set.
+            bool ok = a.Length > 0 && b.Length > 0 && a != b
+                && both.Contains(a.Split(',')[0]) && both.Contains(b.Split(',')[0]);
+            ed.WriteMessage($"\nXREFAN: isolatie (A!=B, beide in alles-aan) -> {(ok ? "OK" : "FAIL")}");
+            tr.Commit();
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nXREFAN error: {ex.Message}");
+        }
+    }
+
     // Headless bewijs van de echte viewport-flow: plaatst een legenda, maakt in een layout een
     // viewport om de werkelijke legenda-extents op meerdere schalen en controleert dat de
     // viewport exact op schaal staat (papier-mm / modeleenheid = 1000 / schaal).
