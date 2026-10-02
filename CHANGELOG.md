@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.19.0 - 2026-10-02
+
+- Instelcommando's werken nu per legenda of op de globale standaard: je kiest het doel en een
+  bestaande legenda wordt meteen bijgewerkt. Teksten kunnen zo per legenda verschillen.
+- Samenstellen heeft een groepsboom met drie-standen-vinkjes (groep in één klik aan/uit) en
+  een filter.
+- Instellingenvenster met tabbladen (Algemeen, Inhoud, Opmaak, Teksten, Hoeveelheden,
+  Schaalbalk / Extra) in plaats van één lange lijst.
+- Nieuw commando `NLCSLEGENDALAAGNAAM`: een NLCS-laagnaam component voor component bewerken
+  met live preview en validatie, en de laag hernoemen in één (ongedaan te maken) stap.
+- Gelijke statussen samenvoegen kijkt nu ook naar arcering (patroon/schaal/hoek) en
+  transparantie.
+- Template-maten staan op één centrale plek, afgestemd op de referentielegenda.
+
 ## 1.18.0 - 2026-10-01
 
 - Gelijke statussen samenvoegen: voegt dezelfde regel uit verschillende statussen samen,
