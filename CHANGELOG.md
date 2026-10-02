@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.21.0 - 2026-10-02
+
+- Veiliger overnemen van oude tekeningconfiguratie: oude instellingen en omschrijvingen worden
+  nu in dezelfde stap overgenomen en pas daarna opgeruimd (bij een afbreking blijft de oude
+  configuratie dus volledig bestaan). Onleesbare oude configuratie wordt niet overgenomen en
+  niet gewist.
+- Omschrijvingen per legenda zijn nu een onafhankelijke momentopname: wijzig je later de
+  globale omschrijvingen, dan verandert een bestaande legenda niet meer mee. Een nieuwe legenda
+  krijgt wel de nieuwe globale tekst.
+- Omschrijvingen en elementteksten gebruiken intern één model.
+- Laagnaameditor toont bij een naamsbotsing de volledige eigenschappen van de bestaande laag.
+
 ## 1.20.0 - 2026-10-02
 
 - Omschrijvingen kunnen nu per legenda verschillen: `NLCSLEGENDAOMSCHRIJVINGEN` vraagt waarop
