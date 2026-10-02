@@ -90,4 +90,49 @@ public class LegendSettingsCloneTests
         Assert.Contains("n|we|ri|riool", restored.ExcludedEntries);
         Assert.True(restored.TextOverrides.ContainsKey("ELEMENT"));
     }
+
+    // De instellingen-dialog bewerkt een werkkopie en past die bij Opslaan/Toepassen toe via
+    // CopyFrom. Dit borgt dat toepassen de doel-collecties volledig vervangt en dat bron en doel
+    // daarna geen enkele collectie-instance delen (annuleren laat het doel dus ongemoeid).
+    [Fact]
+    public void CopyFrom_VervangtInhoudCollectiesEnBlijftOnafhankelijk()
+    {
+        var target = new LegendSettings { Scale = 100 };
+        target.ExcludedEntries.Add("oud");
+        target.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-OUD-G", Description = "oud" });
+        target.CustomStatuses.Add(new CustomStatus { Name = "OudeStatus", Members = { "a" } });
+        target.XrefInclusion["oud"] = true;
+
+        var working = new LegendSettings { Scale = 500 };
+        working.ExcludedEntries.Add("nieuw");
+        working.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-NIEUW-G", Description = "nieuw" });
+        working.CustomStatuses.Add(new CustomStatus { Name = "NieuweStatus", Members = { "b", "c" } });
+        working.XrefInclusion["nieuw"] = false;
+
+        target.CopyFrom(working);
+
+        // Doel is nu gelijk aan de werkkopie, niet gemengd met de oude inhoud.
+        Assert.Equal(500, target.Scale);
+        Assert.Contains("nieuw", target.ExcludedEntries);
+        Assert.DoesNotContain("oud", target.ExcludedEntries);
+        Assert.Single(target.ManualEntries);
+        Assert.Equal("nieuw", target.ManualEntries[0].Description);
+        Assert.Single(target.CustomStatuses);
+        Assert.Equal("NieuweStatus", target.CustomStatuses[0].Name);
+        Assert.True(target.XrefInclusion.ContainsKey("nieuw"));
+        Assert.False(target.XrefInclusion.ContainsKey("oud"));
+
+        // Geen gedeelde instances: na toepassen blijft het doel los van de werkkopie.
+        Assert.NotSame(working.ExcludedEntries, target.ExcludedEntries);
+        Assert.NotSame(working.ManualEntries, target.ManualEntries);
+        Assert.NotSame(working.ManualEntries[0], target.ManualEntries[0]);
+        Assert.NotSame(working.CustomStatuses[0].Members, target.CustomStatuses[0].Members);
+
+        working.ManualEntries[0].Description = "gewijzigd";
+        working.CustomStatuses[0].Members.Add("d");
+        working.ExcludedEntries.Add("later");
+        Assert.Equal("nieuw", target.ManualEntries[0].Description);
+        Assert.Equal(2, target.CustomStatuses[0].Members.Count);
+        Assert.DoesNotContain("later", target.ExcludedEntries);
+    }
 }
