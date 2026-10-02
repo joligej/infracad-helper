@@ -1637,6 +1637,107 @@ public partial class Commands
         return "voor alle tekeningen";
     }
 
+    // Bewerkt een NLCS-laagnaam component voor component en hernoemt de laag in één
+    // transactie (één Undo). Dry-run via de live preview/validatie; botsing met een bestaande
+    // laag voegt samen; xref-afhankelijke lagen worden geweigerd.
+    [CommandMethod("NLCSLEGENDALAAGNAAM", CommandFlags.Modal)]
+    public void NlcsLegendaLaagnaam()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        if (!RequireInteractive(ed, "NLCSLEGENDALAAGNAAM")) return;
+
+        try
+        {
+            var source = PromptLayerName(ed, db);
+            if (source is null)
+            {
+                ed.WriteMessage("\nGeannuleerd.");
+                return;
+            }
+
+            if (!NlcsLayerComponents.TryParse(source, out var comp, out var perr))
+            {
+                ed.WriteMessage($"\n\"{source}\" is geen NLCS-laagnaam ({perr}).");
+                return;
+            }
+
+            LayerRename.Plan probe0;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                probe0 = LayerRename.Analyze(db, tr, source, source);
+                tr.Commit();
+            }
+            if (probe0.Blocked)
+            {
+                ed.WriteMessage($"\nKan niet: {probe0.Reason}.");
+                return;
+            }
+
+            (bool exists, int count) Probe(string name)
+            {
+                if (string.Equals(name, source, StringComparison.Ordinal))
+                    return (false, 0);
+                using var tr = db.TransactionManager.StartTransaction();
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+                bool exists = lt.Has(name);
+                int count = exists ? LayerRename.CountOnLayer(db, tr, name) : 0;
+                tr.Commit();
+                return (exists, count);
+            }
+
+            using var dialog = new LayerEditDialog(comp, source, probe0.AffectedEntities, Probe);
+            if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
+            {
+                ed.WriteMessage("\nGesloten.");
+                return;
+            }
+
+            var target = dialog.Result.Compose();
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var plan = LayerRename.Analyze(db, tr, source, target);
+                if (!LayerRename.Apply(db, tr, plan, dialog.MergeIntoExisting, out var err))
+                {
+                    tr.Abort();
+                    ed.WriteMessage($"\nHernoemen mislukt: {err}.");
+                    return;
+                }
+                tr.Commit();
+            }
+            ed.WriteMessage($"\nLaag hernoemd naar \"{target}\". Gebruik U om terug te draaien.");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nNLCSLEGENDALAAGNAAM fout: {ex.Message}");
+        }
+    }
+
+    // Laagnaam kiezen: een object aanwijzen (dan geldt zijn laag) of de naam typen.
+    private static string? PromptLayerName(Editor ed, Database db)
+    {
+        var peo = new PromptEntityOptions("\nSelecteer een object van de laag [Typen]", "Typen");
+        peo.AllowNone = false;
+        var per = ed.GetEntity(peo);
+        if (per.Status == PromptStatus.Keyword && per.StringResult == "Typen")
+        {
+            var pso = new PromptStringOptions("\nLaagnaam:") { AllowSpaces = true };
+            var sr = ed.GetString(pso);
+            return sr.Status == PromptStatus.OK && !string.IsNullOrWhiteSpace(sr.StringResult)
+                ? sr.StringResult.Trim()
+                : null;
+        }
+        if (per.Status != PromptStatus.OK)
+            return null;
+        using var tr = db.TransactionManager.StartTransaction();
+        var layer = ((Entity)tr.GetObject(per.ObjectId, OpenMode.ForRead)).Layer;
+        tr.Commit();
+        return layer;
+    }
+
     private static bool AskYesNo(Editor ed, string question, bool defaultYes)
     {
         // Headless geen native keyword-prompt; neem de standaardkeuze.

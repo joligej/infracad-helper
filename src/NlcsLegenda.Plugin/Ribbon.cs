@@ -94,6 +94,8 @@ internal static class RibbonBuilder
             "Klik een element aan en pas alleen die tekst aan."));
         beheer.Items.Add(Button("Statussen", "NLCSLEGENDASTATUS",
             "Eigen statussen maken en er regels aan toewijzen."));
+        beheer.Items.Add(Button("Laagnaam", "NLCSLEGENDALAAGNAAM",
+            "Een NLCS-laagnaam component voor component bewerken en de laag hernoemen."));
         beheer.Items.Add(Button("Xrefs", "NLCSLEGENDAXREFS",
             "Per gekoppelde xref instellen of die wordt meegenomen."));
         beheer.Items.Add(Button("Profielen", "NLCSLEGENDAPRESET",
