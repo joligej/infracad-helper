@@ -102,8 +102,32 @@ public partial class Commands
 
         try
         {
-            // Nieuwe legenda begint bij de globale standaard; wordt daarna een eigen snapshot.
+            // Nieuwe legenda begint bij de globale standaard. Is de registry nog leeg en staat
+            // er oude tekeningconfig, dan vormt die de basis - vóór de opties en vóór het
+            // renderen, zodat de geometrie en de opgeslagen snapshot gelijk zijn.
             var settings = LoadGlobalDefaults();
+            bool adoptedLegacy = false;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                if (reg.Legends.Count == 0)
+                {
+                    var adoption = LegendManagement.TryReadLegacyStart(
+                        db, tr, LoadGlobalDefaults(), out var startSettings, out var legacyMsg);
+                    if (adoption == LegendManagement.LegacyAdoption.Adopted)
+                    {
+                        settings = startSettings;
+                        adoptedLegacy = true;
+                        ed.WriteMessage("\n" + legacyMsg);
+                    }
+                    else if (adoption == LegendManagement.LegacyAdoption.Corrupt)
+                    {
+                        ed.WriteMessage("\n" + legacyMsg);
+                    }
+                }
+                tr.Commit();
+            }
+
             if (!PromptOptions(ed, settings, out var selection))
             {
                 ed.WriteMessage("\nGeannuleerd.");
@@ -155,9 +179,10 @@ public partial class Commands
                         CreatedWithVersion = PluginVersion
                     };
                     FinalizePlacement(tr, db, br, settings, def.GroupName);
-                    if (registry.Legends.Count == 0)
-                        LegendManagement.AdoptPendingLegacyInto(db, tr, def);
                     registry.Add(def);
+                    // Oude tekeningconfig pas nu wissen: atomair met het opslaan van de legenda.
+                    if (adoptedLegacy)
+                        DrawingStore.Clear(db, tr);
                     LegendStore.Save(db, tr, registry);
                     ed.WriteMessage($"\n\"{def.Name}\" geplaatst ({def.Scope.ToDisplay()}).");
                 }
@@ -2173,6 +2198,75 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nRENTEST error: {ex.Message}");
+        }
+    }
+
+    // Headless bewijs van veilige legacy-migratie: adoptie leest instellingen + omschrijvingen,
+    // lezen wist niets, wissen is atomair (rollback bewaart de oude data), en corrupte kritieke
+    // staat wordt niet overgenomen en niet gewist.
+    [CommandMethod("NLCSLEGENDAMIGRATIETEST", CommandFlags.Modal)]
+    public void NlcsLegendaMigratieTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+
+        void Setup(string? settingsJson, string? descJson)
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            DrawingStore.Clear(db, tr);
+            if (settingsJson is not null) DrawingStore.Write(db, tr, true, settingsJson);
+            if (descJson is not null) DrawingStore.Write(db, tr, false, descJson);
+            tr.Commit();
+        }
+
+        bool LegacyExists()
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var any = DrawingStore.HasAny(db, tr);
+            tr.Commit();
+            return any;
+        }
+
+        try
+        {
+            // CASE D: instellingen + omschrijvingen. Adoptie leest beide, wist niets.
+            Setup("{\"scale\":777}", "{\"elementen\":{\"RI|PUT\":{\"specifiek\":\"LEGACY-PUT\"}}}");
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var ad = LegendManagement.TryReadLegacyStart(db, tr, LoadGlobalDefaults(), out var start, out _);
+                ed.WriteMessage($"\nMIG: adopt={ad} scale={start.Scale:0} descOverrides={start.DescriptionOverrides.Elementen.Count}");
+                tr.Commit();
+            }
+            ed.WriteMessage($"\nMIG: na read legacy bestaat={LegacyExists()} (verwacht True)");
+
+            // Atomaire clear bij 'opslaan'.
+            using (var tr = db.TransactionManager.StartTransaction()) { DrawingStore.Clear(db, tr); tr.Commit(); }
+            ed.WriteMessage($"\nMIG: na clear legacy bestaat={LegacyExists()} (verwacht False)");
+
+            // Rollback: clear binnen een transactie die abort -> legacy overleeft.
+            Setup("{\"scale\":42}", null);
+            using (var tr = db.TransactionManager.StartTransaction()) { DrawingStore.Clear(db, tr); tr.Abort(); }
+            ed.WriteMessage($"\nMIG: na rollback legacy bestaat={LegacyExists()} (verwacht True)");
+
+            // Corrupt: kapotte kritieke staat niet overnemen, niet wissen.
+            Setup("{ kapot", null);
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var ad = LegendManagement.TryReadLegacyStart(db, tr, LoadGlobalDefaults(), out _, out _);
+                ed.WriteMessage($"\nMIG: corrupt adopt={ad} (verwacht Corrupt)");
+                tr.Commit();
+            }
+            ed.WriteMessage($"\nMIG: corrupt legacy bestaat={LegacyExists()} (verwacht True, niet gewist)");
+
+            using (var tr = db.TransactionManager.StartTransaction()) { DrawingStore.Clear(db, tr); tr.Commit(); }
+            ed.WriteMessage("\nMIG: klaar");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nMIG error: {ex.Message}");
         }
     }
 
