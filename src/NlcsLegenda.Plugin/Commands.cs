@@ -1885,6 +1885,7 @@ public partial class Commands
         try
         {
             string idA, idB, idC = string.Empty, firstKey = string.Empty, descKey = string.Empty;
+            string bGeomBefore = string.Empty;
             int aRows, bRows;
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -1921,6 +1922,7 @@ public partial class Commands
                 BuildManagedLegend(db, tr, reg, defA, out aRows, out _);
                 BuildManagedLegend(db, tr, reg, defB, out bRows, out _);
                 BuildManagedLegend(db, tr, reg, defC, out _, out _);
+                bGeomBefore = GeomHash(db, tr, defB.GroupName);
                 LegendStore.Save(db, tr, reg);
                 tr.Commit();
             }
@@ -1949,21 +1951,29 @@ public partial class Commands
                 tr.Commit();
             }
 
+            // Geometrie-hash van B vóór het bewerken van A is in het bouwblok gemeten (bGeomBefore).
             int aRows2, bAfter;
+            string bGeomAfter = string.Empty;
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var reg = LegendStore.Load(db, tr);
                 var a = reg.FindById(idA)!;
+                var bDef = reg.FindById(idB)!;
                 if (firstKey.Length > 0)
                     a.Settings.ExcludedEntries.Add(firstKey);
                 BuildManagedLegend(db, tr, reg, a, out aRows2, out _);
-                BuildManagedLegend(db, tr, reg, reg.FindById(idB)!, out bAfter, out _);
+                BuildManagedLegend(db, tr, reg, bDef, out bAfter, out _);
+                bGeomAfter = GeomHash(db, tr, bDef.GroupName);
                 LegendStore.Save(db, tr, reg);
                 tr.Commit();
             }
             PurgePending(db);
 
-            bool ok = (firstKey.Length == 0 || aRows2 == aRows - 1) && bAfter == bRows;
+            // B's geometrie mag niet veranderen doordat A is bewerkt (geometrie-isolatie).
+            bool geomOk = bGeomBefore.Length > 0 && bGeomBefore == bGeomAfter;
+            ed.WriteMessage($"\nISO: B-geometrie {(geomOk ? "ongewijzigd" : "GEWIJZIGD")} ({bGeomAfter})");
+
+            bool ok = (firstKey.Length == 0 || aRows2 == aRows - 1) && bAfter == bRows && geomOk;
             ed.WriteMessage(
                 $"\nISO: na A bewerken A rows={aRows2} (verwacht {(firstKey.Length > 0 ? aRows - 1 : aRows)}) " +
                 $"B rows={bAfter} (verwacht {bRows})");
@@ -2003,6 +2013,13 @@ public partial class Commands
         Settings = settings.Clone(),
         CreatedWithVersion = PluginVersion
     };
+
+    // Compacte geometrie-vingerafdruk van een legenda-groep: afgeronde extents, in dezelfde
+    // transactie gemeten (losse read-transacties geven in de Core Console geen bounds terug).
+    private static string GeomHash(Database db, Transaction tr, string groupName) =>
+        LegendManagement.TryGetGroupExtents(db, tr, groupName, out var e)
+            ? $"{e.MinPoint.X:0.0},{e.MinPoint.Y:0.0},{e.MaxPoint.X:0.0},{e.MaxPoint.Y:0.0}"
+            : string.Empty;
 
     // Xref-isolatie over opslaan/heropenen. SETUP maakt drie legenda's met eigen xref-keuzes en
     // bewaart ze in de tekening; na QSAVE + heropenen controleert VERIFY dat elke legenda zijn
@@ -2099,6 +2116,69 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nXREF verify error: {ex.Message}");
+        }
+    }
+
+    // Echte xref-integratie: analyseert het gastbestand met per xref een eigen inclusie en
+    // toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. Verwacht >= 2 xrefs.
+    [CommandMethod("NLCSLEGENDAXREFANALYSE", CommandFlags.Modal)]
+    public void NlcsLegendaXrefAnalyse()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+            var xrefs = new List<string>();
+            foreach (ObjectId id in bt)
+                if (tr.GetObject(id, OpenMode.ForRead) is BlockTableRecord btr && btr.IsFromExternalReference)
+                    xrefs.Add(btr.Name);
+            xrefs.Sort(StringComparer.OrdinalIgnoreCase);
+            ed.WriteMessage($"\nXREFAN: xrefs = {string.Join(", ", xrefs)}");
+            if (xrefs.Count < 2)
+            {
+                ed.WriteMessage("\nXREFAN: minstens 2 xrefs nodig.");
+                tr.Commit();
+                return;
+            }
+
+            string Elements(string? onlyXref)
+            {
+                var s = LoadGlobalDefaults();
+                s.ExcludedDisciplines.Clear();
+                s.ExcludedHoofdgroepen.Clear();
+                s.XrefInclusion.Clear();
+                if (onlyXref is null)
+                {
+                    s.IncludeXrefLayers = true; // alles aan
+                }
+                else
+                {
+                    s.IncludeXrefLayers = false; // alleen de genoemde xref via de dict
+                    s.XrefInclusion[onlyXref] = true;
+                }
+                var an = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db));
+                return string.Join(",", an.Entries.Select(e => e.Element).OrderBy(e => e, StringComparer.OrdinalIgnoreCase));
+            }
+
+            var a = Elements(xrefs[0]);
+            var b = Elements(xrefs[1]);
+            var both = Elements(null);
+            ed.WriteMessage($"\nXREFAN: alleen {xrefs[0]} -> [{a}]");
+            ed.WriteMessage($"\nXREFAN: alleen {xrefs[1]} -> [{b}]");
+            // A en B bevatten elk iets, verschillen van elkaar, en beide zitten in de alles-aan set.
+            bool ok = a.Length > 0 && b.Length > 0 && a != b
+                && both.Contains(a.Split(',')[0]) && both.Contains(b.Split(',')[0]);
+            ed.WriteMessage($"\nXREFAN: isolatie (A!=B, beide in alles-aan) -> {(ok ? "OK" : "FAIL")}");
+            tr.Commit();
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nXREFAN error: {ex.Message}");
         }
     }
 
@@ -2227,6 +2307,28 @@ public partial class Commands
                 ed.WriteMessage($"\nVPTEST: kaal {mw2:0.0} x {mh2:0.0} modeleenheden");
                 CheckAt("kaal", mw2, mh2, c2, 200.0);
             }
+
+            // Variant 4: drie kolommen (breder profiel).
+            var threeCol = LoadGlobalDefaults();
+            threeCol.Columns = 3;
+            if (Measure(threeCol, out var mw3, out var mh3, out var c3))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: 3-koloms {mw3:0.0} x {mh3:0.0} modeleenheden");
+                CheckAt("3-koloms", mw3, mh3, c3, 200.0);
+            }
+
+            // Variant 5: hoeveelheden + opmerkingen + schaalbalk (volledige breedte) op 1:500.
+            var full = LoadGlobalDefaults();
+            full.IncludeQuantities = true;
+            full.IncludeRemarks = true;
+            full.IncludeScaleBar = true;
+            if (Measure(full, out var mw4, out var mh4, out var c4))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: volledig {mw4:0.0} x {mh4:0.0} modeleenheden");
+                CheckAt("volledig", mw4, mh4, c4, 500.0);
+            }
         }
         catch (Exception ex)
         {
@@ -2255,6 +2357,8 @@ public partial class Commands
             double mmPerModel = (db.Insunits == UnitsValue.Millimeters ? 1.0 : 1000.0) / scale;
 
             var samples = new List<(double w, double h, double cx, double cy)>();
+            var frames = new List<double>();
+            var symbols = new List<(string block, double sx, double sy, double rot, double w, double h)>();
             var texts = new List<(double height, double x, double y)>();
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -2263,7 +2367,15 @@ public partial class Commands
                 foreach (ObjectId id in ms)
                 {
                     var ent = tr.GetObject(id, OpenMode.ForRead);
-                    if (ent is Curve crv and (Polyline or Line))
+                    if (ent is Polyline pl && pl.Closed && pl.NumberOfVertices is 4 or 5)
+                    {
+                        // Swatchkader: gesloten rechthoek, breder dan hoog, in swatch-bereik.
+                        var ext = pl.GeometricExtents;
+                        double fw = ext.MaxPoint.X - ext.MinPoint.X, fh = ext.MaxPoint.Y - ext.MinPoint.Y;
+                        if (fw > 2 && fw < 8 && fh > 0.3 && fh < 3 && fw > fh)
+                            frames.Add(fw);
+                    }
+                    else if (ent is Curve crv and (Polyline or Line))
                     {
                         var ext = crv.GeometricExtents;
                         double w = ext.MaxPoint.X - ext.MinPoint.X;
@@ -2271,6 +2383,15 @@ public partial class Commands
                         // Liggende swatch-sample: brede, lage horizontale lijn/polyline.
                         if (w > 2 && w < 8 && h < 1.5)
                             samples.Add((w, h, (ext.MinPoint.X + ext.MaxPoint.X) / 2.0, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2.0));
+                    }
+                    else if (ent is BlockReference br)
+                    {
+                        // Symbool: insertschaal/rotatie + werkelijke bounds (voor paper-mm).
+                        double w = 0, h = 0;
+                        try { var ext = br.GeometricExtents; w = ext.MaxPoint.X - ext.MinPoint.X; h = ext.MaxPoint.Y - ext.MinPoint.Y; }
+                        catch { /* lege/ongeldige block-extents overslaan */ }
+                        if (br.ScaleFactors.X > 0 && w > 0 && w < 12 && h < 12)
+                            symbols.Add((br.Name, br.ScaleFactors.X, br.ScaleFactors.Y, br.Rotation, w, h));
                     }
                     else if (ent is DBText t && t.Height > 0)
                         texts.Add((t.Height, t.Position.X, t.Position.Y));
@@ -2295,6 +2416,21 @@ public partial class Commands
 
             // Swatchbreedte = dominante breedte van de horizontale samples.
             double swW = Mode(samples.Select(x => x.w), 0.2);
+            // Swatchkader apart: de gesloten rechthoek is doorgaans iets breder dan de sample-lijn.
+            double frameW = frames.Count > 0 ? Mode(frames, 0.2) : 0;
+
+            // Dominant symbool: meest voorkomende insertschaal + resulterende papiermaat.
+            double symScale = 0, symPaperW = 0, symPaperH = 0;
+            int symCount = symbols.Count;
+            string symBlock = "";
+            if (symbols.Count > 0)
+            {
+                symScale = Mode(symbols.Select(s => s.sx), 0.05);
+                var dom = symbols.Where(s => Math.Abs(s.sx - symScale) <= 0.05).ToList();
+                symBlock = dom.GroupBy(s => s.block).OrderByDescending(g => g.Count()).First().Key;
+                symPaperW = Mode(dom.Select(s => s.w), 0.2) * mmPerModel;
+                symPaperH = Mode(dom.Select(s => s.h), 0.2) * mmPerModel;
+            }
 
             // Rijafstand uit de omschrijvingsteksten (kleinste teksthoogte = T25): per kolom (X)
             // de dichtstbevolkte nemen en de mediaan van opeenvolgende verticale sprongen.
@@ -2315,20 +2451,23 @@ public partial class Commands
                 .OrderByDescending(g => g.Count()).Take(3)
                 .Select(g => g.Average() * mmPerModel).OrderBy(v => v).ToList();
 
-            double swWmm = swW * mmPerModel, pitchMm = pitch * mmPerModel;
+            double swWmm = swW * mmPerModel, pitchMm = pitch * mmPerModel, frameWmm = frameW * mmPerModel;
             ed.WriteMessage($"\nMETEN: INSUNITS={insunits} schaal 1:{scale:0} mm/model={mmPerModel:0.###}");
-            ed.WriteMessage($"\nMETEN: swatchbreedte {swWmm:0.0} mm (n={samples.Count})");
+            ed.WriteMessage($"\nMETEN: lijnsample {swWmm:0.0} mm (n={samples.Count}); swatchkader {frameWmm:0.0} mm (n={frames.Count})");
             ed.WriteMessage($"\nMETEN: rijafstand {pitchMm:0.0} mm (n={gaps.Count}, kolom {column.Count})");
             ed.WriteMessage($"\nMETEN: teksthoogtes mm = {string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}");
+            ed.WriteMessage($"\nMETEN: symbool insertschaal {symScale:0.###} ({symBlock}) -> {symPaperW:0.0}x{symPaperH:0.0} mm (n={symCount})");
 
             var json = new StringBuilder();
             json.Append("{\n");
             json.Append($"  \"bron\": \"{Path.GetFileName(db.Filename)}\",\n");
             json.Append($"  \"schaal\": {scale:0},\n");
             json.Append($"  \"insunits\": {insunits},\n");
-            json.Append($"  \"swatchBreedteMm\": {swWmm:0.0},\n");
+            json.Append($"  \"lijnSampleBreedteMm\": {swWmm:0.0},\n");
+            json.Append($"  \"swatchKaderBreedteMm\": {frameWmm:0.0},\n");
             json.Append($"  \"rijafstandMm\": {pitchMm:0.0},\n");
-            json.Append($"  \"teksthoogtesMm\": [{string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}]\n");
+            json.Append($"  \"teksthoogtesMm\": [{string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}],\n");
+            json.Append($"  \"symbool\": {{ \"insertSchaal\": {symScale:0.###}, \"paperBreedteMm\": {symPaperW:0.0}, \"paperHoogteMm\": {symPaperH:0.0}, \"aantal\": {symCount} }}\n");
             json.Append("}\n");
             string outPath = Environment.GetEnvironmentVariable("NLCS_CONTRACT_OUT")
                 ?? Path.Combine(Path.GetTempPath(), "nlcs-template-contract.json");

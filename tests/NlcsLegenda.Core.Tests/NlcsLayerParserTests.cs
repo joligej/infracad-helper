@@ -27,6 +27,8 @@ public class NlcsLayerParserTests
     [InlineData("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A", NlcsDrawType.Arcering)]
     [InlineData("N-WE-VH-GESLOTENVERHARDING_ASFALT-V", NlcsDrawType.Vlakvulling)]
     [InlineData("V-WE-RI-HWA_RIOOLLEIDING_PVC_160-G", NlcsDrawType.Geometrie)]
+    [InlineData("N-WE-RI-HWA_RIOOLLEIDING_PVC_160-GD", NlcsDrawType.Geometrie)]
+    [InlineData("N-WE-RI-HWA_RIOOLLEIDING_PVC_160-GS", NlcsDrawType.Geometrie)]
     [InlineData("B-WE-OG-TERREIN_ERF-GV", NlcsDrawType.Vlak)]
     [InlineData("N-WE-RI-VWA_RIOOLPUT-S", NlcsDrawType.Symbool)]
     [InlineData("X-XX-AL-TEKENBLAD_KADER-T35", NlcsDrawType.Tekst)]

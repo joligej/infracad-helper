@@ -1,9 +1,11 @@
 {
-  "_herkomst": "Gemeten met NLCSLEGENDATEMPLATEMETEN (accoreconsole, .NET-API) op de TAUW-referentielegenda relevante_bronnen/03 Voorbeeldtekening BE/ref/SIT-NW-LEGENDA.dwg, schaal 1:200. Reproduceren: zie reference/README.md. Dit is de onafhankelijke meetwaarde; TemplateDefaults wordt hiertegen getoetst.",
+  "_herkomst": "Gemeten met NLCSLEGENDATEMPLATEMETEN (accoreconsole, .NET-API) op de TAUW-referentielegenda relevante_bronnen/03 Voorbeeldtekening BE/ref/SIT-NW-LEGENDA.dwg, schaal 1:200. Reproduceren: zie reference/README.md. Onafhankelijke meetwaarde; TemplateDefaults en de symboolschaal worden hiertegen getoetst.",
   "bron": "SIT-NW-LEGENDA.dwg",
   "schaal": 200,
   "insunits": 6,
-  "swatchBreedteMm": 22.4,
+  "lijnSampleBreedteMm": 22.4,
+  "swatchKaderBreedteMm": 20.0,
   "rijafstandMm": 6.3,
-  "teksthoogtesMm": [2.5, 5.0, 10.0]
+  "teksthoogtesMm": [2.5, 5.0, 10.0],
+  "symbool": { "insertSchaal": 0.2, "paperBreedteMm": 3.9, "paperHoogteMm": 2.2, "aantal": 43 }
 }
