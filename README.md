@@ -174,11 +174,12 @@ nieuw, B voor bestaand, V voor vervallen, enzovoort); de rest beschrijft het ele
 en het tekentype: lijn, arcering of symbool. De volledige opbouw staat in
 [docs/NLCS-conventies.md](docs/NLCS-conventies.md).
 
-Voor de tekst naast een symbool kijkt de plugin op volgorde naar: je eigen
-`textOverrides`, de laagbeschrijving die InfraCAD invult, het omschrijvingenbestand,
-en anders een opgeschoonde laagnaam. Er is geen koppeling met InfraCAD of een externe
-database; alles komt uit de tekening zelf. `NLCSLEGENDAINFO` laat zien welke regels op
-de laagnaam terugvallen, zodat je gericht een eigen omschrijving kunt toevoegen.
+Voor de tekst naast een symbool kijkt de plugin op volgorde naar: de laagbeschrijving die
+InfraCAD invult, de omschrijvingen (de ingebouwde NLCS-catalogus plus je eigen per-legenda
+omschrijvingen uit `NLCSLEGENDAOMSCHRIJVINGEN`), en anders een opgeschoonde laagnaam. Er is
+geen koppeling met InfraCAD of een externe database; alles komt uit de tekening zelf.
+`NLCSLEGENDAINFO` laat zien welke regels op de laagnaam terugvallen, zodat je gericht een
+eigen omschrijving kunt toevoegen.
 
 Een omschrijving heeft een algemeen en een specifiek deel, bijvoorbeeld "Verharding"
 en "Betonstraatsteen". Standaard toont de legenda alleen het specifieke deel; met de
