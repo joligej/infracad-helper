@@ -228,46 +228,46 @@ public sealed class LegendSettings
     // ---- Maatvoering (papier-mm) ----
 
     [Category("Maatvoering (mm)"), DisplayName("Swatch breedte")]
-    public double SwatchWidthMm { get; set; } = 24.0;
+    public double SwatchWidthMm { get; set; } = TemplateDefaults.SwatchWidthMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Swatch hoogte")]
-    public double SwatchHeightMm { get; set; } = 5.0;
+    public double SwatchHeightMm { get; set; } = TemplateDefaults.SwatchHeightMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Regelafstand")]
-    public double RowPitchMm { get; set; } = 6.3;
+    public double RowPitchMm { get; set; } = TemplateDefaults.RowPitchMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Regelhoogte-factor tekst")]
-    public double LineSpacingFactor { get; set; } = 1.35;
+    public double LineSpacingFactor { get; set; } = TemplateDefaults.LineSpacingFactor;
 
     [Category("Maatvoering (mm)"), DisplayName("Breedte opmerkingen")]
-    public double RemarksWidthMm { get; set; } = 90.0;
+    public double RemarksWidthMm { get; set; } = TemplateDefaults.RemarksWidthMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Ruimte swatch-tekst")]
-    public double TextGapMm { get; set; } = 8.0;
+    public double TextGapMm { get; set; } = TemplateDefaults.TextGapMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Teksthoogte omschrijving")]
-    public double TextHeightMm { get; set; } = 2.5;
+    public double TextHeightMm { get; set; } = TemplateDefaults.TextHeightMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Teksthoogte kopregel")]
-    public double HeaderTextHeightMm { get; set; } = 5.0;
+    public double HeaderTextHeightMm { get; set; } = TemplateDefaults.HeaderTextHeightMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Teksthoogte titel")]
-    public double TitleTextHeightMm { get; set; } = 7.0;
+    public double TitleTextHeightMm { get; set; } = TemplateDefaults.TitleTextHeightMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Witruimte boven kopregel")]
-    public double HeaderSpacingMm { get; set; } = 6.0;
+    public double HeaderSpacingMm { get; set; } = TemplateDefaults.HeaderSpacingMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Kolombreedte")]
-    public double ColumnWidthMm { get; set; } = 67.0;
+    public double ColumnWidthMm { get; set; } = TemplateDefaults.ColumnWidthMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Kolomtussenruimte")]
-    public double ColumnGapMm { get; set; } = 10.0;
+    public double ColumnGapMm { get; set; } = TemplateDefaults.ColumnGapMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Hoeveelheidkolom breedte")]
-    public double QuantityColumnWidthMm { get; set; } = 18.0;
+    public double QuantityColumnWidthMm { get; set; } = TemplateDefaults.QuantityColumnWidthMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Kadermarge")]
-    public double BorderMarginMm { get; set; } = 5.0;
+    public double BorderMarginMm { get; set; } = TemplateDefaults.BorderMarginMm;
 
     // ---- Lagen ----
 
