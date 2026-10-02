@@ -70,15 +70,10 @@ public partial class Commands
     // De globale omschrijvingen (ingebouwde catalogus + globale gebruikersoverrides). Oude
     // tekeningspecifieke omschrijvingen worden nog ingelezen zodat bestaande tekeningen hun
     // teksten behouden, maar er wordt niets nieuws meer tekeningspecifiek weggeschreven.
-    private static DescriptionCatalog LoadCatalog(Database db)
-    {
-        var catalog = DescriptionCatalog.Default();
-        if (File.Exists(DescriptionsPath))
-            catalog.MergeFrom(DescriptionCatalog.Load(DescriptionsPath));
-        if (DrawingStore.ReadDescriptions(db) is { } json)
-            catalog.MergeFrom(DescriptionCatalog.FromJson(json));
-        return catalog;
-    }
+    // De gedeelde/globale omschrijvingen (ingebouwde catalogus + globale gebruikersdefaults).
+    // Legacy tekening-descriptions worden hier NIET meer gelezen; die komen via migratie in de
+    // per-legenda overrides terecht. Per-legenda overrides worden in de analyse toegevoegd.
+    private static DescriptionCatalog LoadCatalog(Database db) => LoadGlobalCatalog();
 
     private static DescriptionCatalog LoadGlobalCatalog()
     {
@@ -160,6 +155,8 @@ public partial class Commands
                         CreatedWithVersion = PluginVersion
                     };
                     FinalizePlacement(tr, db, br, settings, def.GroupName);
+                    if (registry.Legends.Count == 0)
+                        LegendManagement.AdoptPendingLegacyInto(db, tr, def);
                     registry.Add(def);
                     LegendStore.Save(db, tr, registry);
                     ed.WriteMessage($"\n\"{def.Name}\" geplaatst ({def.Scope.ToDisplay()}).");
@@ -727,16 +724,42 @@ public partial class Commands
 
         try
         {
-            using var dialog = new DescriptionsDialog(LoadGlobalCatalog());
-            dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nOmschrijvingen opgeslagen ({SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()))}).");
+            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+
+            var global = LoadGlobalCatalog();
+            DescriptionCatalog initial;
+            if (target.IsGlobal)
+            {
+                initial = global;
+            }
+            else
+            {
+                initial = global.Clone();
+                initial.MergeFrom(GetTargetSettings(db, target).DescriptionOverrides);
+            }
+
+            using var dialog = new DescriptionsDialog(initial);
+            void Apply()
+            {
+                if (target.IsGlobal)
+                {
+                    var where = SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()));
+                    ed.WriteMessage($"\nOmschrijvingen opgeslagen ({where}); bestaande legenda's blijven ongewijzigd.");
+                }
+                else
+                {
+                    var s = GetTargetSettings(db, target);
+                    s.DescriptionOverrides = dialog.ToCatalog().Diff(global);
+                    ApplyTargetSettings(ed, db, target, s, "Omschrijvingen");
+                }
+            }
+            dialog.ApplyRequested += (_, _) => Apply();
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            var where = SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()));
-            ed.WriteMessage($"\nOmschrijvingen opgeslagen ({where}).");
+            Apply();
         }
         catch (Exception ex)
         {
@@ -1840,7 +1863,7 @@ public partial class Commands
 
         try
         {
-            string idA, idB, firstKey = string.Empty;
+            string idA, idB, firstKey = string.Empty, descKey = string.Empty;
             int aRows, bRows;
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -1849,12 +1872,18 @@ public partial class Commands
                 var probe = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db), excludedIds: excluded);
                 if (probe.Entries.Count > 0)
                     firstKey = LegendSettings.EntryKey(probe.Entries[0]);
+                // Een niet-uitgevinkt element voor de tekst-isolatietest (laatste entry).
+                var descEntry = probe.Entries.Count > 0 ? probe.Entries[^1] : null;
+                if (descEntry is not null)
+                    descKey = $"{descEntry.Hoofdgroep}|{descEntry.Element.ToUpperInvariant()}";
 
                 var sA = LoadGlobalDefaults();
                 var sB = LoadGlobalDefaults();
                 sB.Scale = 500;
                 if (firstKey.Length > 0)
                     sB.ExcludedEntries.Add(firstKey);
+                if (descKey.Length > 0)
+                    sB.DescriptionOverrides.Elementen[descKey] = new DescriptionEntry { Specifiek = "EIGEN-B-TEKST" };
 
                 var defA = IsoDef(reg, sA);
                 var defB = IsoDef(reg, sB);
@@ -1900,6 +1929,26 @@ public partial class Commands
                 $"\nISO: na A bewerken A rows={aRows2} (verwacht {(firstKey.Length > 0 ? aRows - 1 : aRows)}) " +
                 $"B rows={bAfter} (verwacht {bRows})");
             ed.WriteMessage($"\nISO: isolatie {(ok ? "OK" : "FAIL")}");
+
+            // Tekst-isolatie: B heeft een eigen omschrijving voor descKey, A niet. Na reload
+            // moet de geanalyseerde tekst per legenda verschillen.
+            if (descKey.Length > 0)
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var reg = LegendStore.Load(db, tr);
+                var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
+                string Text(LegendDefinition d)
+                {
+                    var an = DrawingAnalyzer.Analyze(db, tr, d.Settings, catalog: LoadCatalog(db), excludedIds: excluded);
+                    var e = an.Entries.FirstOrDefault(x => $"{x.Hoofdgroep}|{x.Element.ToUpperInvariant()}" == descKey);
+                    return e?.Description ?? "(geen)";
+                }
+                var aText = Text(reg.FindById(idA)!);
+                var bText = Text(reg.FindById(idB)!);
+                bool descOk = bText.Contains("EIGEN-B-TEKST") && !aText.Contains("EIGEN-B-TEKST");
+                ed.WriteMessage($"\nISO: tekst A=\"{aText}\" B=\"{bText}\" -> {(descOk ? "OK" : "FAIL")}");
+                tr.Commit();
+            }
         }
         catch (Exception ex)
         {

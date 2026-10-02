@@ -389,6 +389,12 @@ public sealed class LegendSettings
     public Dictionary<string, string> TextOverrides { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // Per-legenda omschrijvingen: overschrijven de globale catalogus/standaard alleen voor
+    // deze legenda. Zo kunnen A en B in dezelfde tekening eigen teksten hebben. Leeg = volg
+    // de globale omschrijvingen.
+    [Browsable(false)]
+    public DescriptionCatalog DescriptionOverrides { get; set; } = new();
+
     [Browsable(false)]
     public HashSet<string> ExcludedEntries { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -474,6 +480,7 @@ public sealed class LegendSettings
         ExcludedHoofdgroepen = new HashSet<string>(other.ExcludedHoofdgroepen, StringComparer.OrdinalIgnoreCase);
         ExcludedEntries = new HashSet<string>(other.ExcludedEntries, StringComparer.OrdinalIgnoreCase);
         TextOverrides = new Dictionary<string, string>(other.TextOverrides, StringComparer.OrdinalIgnoreCase);
+        DescriptionOverrides = other.DescriptionOverrides.Clone();
         XrefInclusion = new Dictionary<string, bool>(other.XrefInclusion, StringComparer.OrdinalIgnoreCase);
         ManualEntries = other.ManualEntries.Select(m => m.Clone()).ToList();
         CustomStatuses = other.CustomStatuses.Select(cs => cs.Clone()).ToList();
@@ -524,7 +531,7 @@ public sealed class LegendSettings
         p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries) or nameof(TextOverrides)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
-            or nameof(MergedDimensions);
+            or nameof(MergedDimensions) or nameof(DescriptionOverrides);
 
     [JsonIgnore, Browsable(false)]
     public double ModelUnitsPerPaperMm => Scale / 1000.0;
@@ -596,6 +603,8 @@ public sealed class LegendSettings
         ExcludedEntries = ToCi(ExcludedEntries);
         TextOverrides = ToCi(TextOverrides);
         XrefInclusion = ToCi(XrefInclusion);
+        DescriptionOverrides ??= new DescriptionCatalog();
+        DescriptionOverrides.Elementen = ToCi(DescriptionOverrides.Elementen);
         return this;
     }
 
