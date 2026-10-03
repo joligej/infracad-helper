@@ -159,4 +159,49 @@ public class LegendPresetsTests : IDisposable
         Assert.Throws<FileNotFoundException>(
             () => LegendPresets.Export(_dir, "bestaatniet", Path.Combine(_dir, "uit.json")));
     }
+
+    // Een preset is configuratie, geen instance-identiteit. Het opgeslagen bestand mag geen
+    // LegendId/groupname/source handles/insertion point bevatten.
+    [Fact]
+    public void Preset_File_HasNoInstanceIdentity()
+    {
+        var s = new LegendSettings { Scale = 200, Title = "Test" };
+        s.ExcludedEntries.Add("N|WE|VH|X");
+        s.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-X-G", Description = "Eigen" });
+        var path = LegendPresets.Save(_dir, "Identiteit", s);
+
+        var json = File.ReadAllText(path).ToLowerInvariant();
+        foreach (var forbidden in new[] { "legendid", "groupname", "sourcehandles", "insertionpoint", "\"id\"" })
+            Assert.DoesNotContain(forbidden, json);
+    }
+
+    // De vier doel-combinaties lopen via dezelfde snapshot + CopyFrom. Globaal->legenda en
+    // legenda A->legenda B delen daarna geen enkele mutable collectie (deep copy).
+    [Fact]
+    public void Preset_SaveFromLegendA_LoadToLegendB_IsIndependentSnapshot()
+    {
+        // "Legenda A" met eigen inhoud; opslaan als preset = snapshot van A's instellingen.
+        var legendA = new LegendSettings { Scale = 500, Title = "A" };
+        legendA.ExcludedEntries.Add("N|WE|RI|RIOOL");
+        legendA.CustomStatuses.Add(new CustomStatus { Name = "A-status", Members = { "x" } });
+        LegendPresets.Save(_dir, "VanA", legendA);
+
+        // Laden en toepassen op "legenda B" via CopyFrom (zoals ApplyTargetSettings doet).
+        var preset = LegendPresets.Load(_dir, "VanA");
+        Assert.NotNull(preset);
+        var legendB = new LegendSettings { Scale = 100, Title = "B" };
+        legendB.CopyFrom(preset!);
+
+        // B heeft nu A's configuratie.
+        Assert.Equal(500, legendB.Scale);
+        Assert.Equal("A", legendB.Title);
+        Assert.Contains("n|we|ri|riool", legendB.ExcludedEntries);
+        Assert.Single(legendB.CustomStatuses);
+
+        // En deelt daarna geen collectie-instance met de preset of met A.
+        Assert.NotSame(preset!.ExcludedEntries, legendB.ExcludedEntries);
+        Assert.NotSame(preset.CustomStatuses, legendB.CustomStatuses);
+        preset.CustomStatuses[0].Members.Add("y");
+        Assert.Single(legendB.CustomStatuses[0].Members);
+    }
 }

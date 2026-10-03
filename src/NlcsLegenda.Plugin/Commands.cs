@@ -1246,6 +1246,8 @@ public partial class Commands
 
     private void PresetSave(Editor ed, Database db)
     {
+        // Bron van de preset kiezen: de globale standaard of een bestaande legenda-snapshot.
+        if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
         var name = AskPresetName(ed);
         if (name is null)
             return;
@@ -1255,8 +1257,11 @@ public partial class Commands
             ed.WriteMessage("\nGeannuleerd.");
             return;
         }
-        LegendPresets.Save(PresetsDir, name, LoadGlobalDefaults());
-        ed.WriteMessage($"\nProfiel \"{name}\" opgeslagen.");
+        // Snapshot van het gekozen doel (globale defaults of de legenda-instellingen), nooit
+        // instance-identiteit: LegendPresets slaat alleen LegendSettings op.
+        var settings = GetTargetSettings(db, target);
+        LegendPresets.Save(PresetsDir, name, settings);
+        ed.WriteMessage($"\nProfiel \"{name}\" opgeslagen vanuit {target.ContextLabel}.");
     }
 
     private void PresetLoad(Editor ed, Database db)
