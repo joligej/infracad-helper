@@ -112,7 +112,7 @@ een opzet met collega's kunt delen.
 | `NLCSLEGENDAEXPORT` | De regels wegschrijven als CSV en JSON, met hoeveelheden en de herkomst van elke omschrijving. |
 | `NLCSLEGENDABATCH` | Alle DWG's in een map samen in één uittrekstaat (CSV/JSON) met een kolom Tekening. |
 | `NLCSLEGENDAVIEWPORT` | Een viewport in de huidige layout rond de legenda, op schaal. |
-| `NLCSLEGENDAOPTIES` | Alle instellingen bewerken in een venster (schaal, teksten, opmaak). |
+| `NLCSLEGENDAOPTIES` | Alle instellingen bewerken in een venster met normale tabbladen (schaal, inhoud, opmaak, teksten). |
 | `NLCSLEGENDAOMSCHRIJVINGEN` | De omschrijvingen per element bewerken in een tabel. |
 | `NLCSLEGENDATEKST` | Klik een element aan en pas de tekst ervan aan (meerdere regels mogelijk). |
 | `NLCSLEGENDASAMENSTELLEN` | Regels uitvinken en eigen regels toevoegen in één venster. |
@@ -121,7 +121,7 @@ een opzet met collega's kunt delen.
 | `NLCSLEGENDASTATUS` | Eigen statussen maken en er regels aan toewijzen (naast Nieuw/Bestaand/...). |
 | `NLCSLEGENDALAAGNAAM` | Een NLCS-laagnaam component voor component bewerken en de laag hernoemen. |
 | `NLCSLEGENDAXREFS` | Per gekoppelde xref kiezen of die in de legenda wordt meegenomen. |
-| `NLCSLEGENDAPRESET` | Legenda-instellingen als profiel opslaan, laden, en im-/exporteren als bestand. |
+| `NLCSLEGENDAPRESET` | Instellingen van de globale standaard of een gekozen legenda als profiel opslaan, laden, en im-/exporteren. |
 | `NLCSLEGENDACONFIG` | De globale configuratiebestanden aanmaken en de paden tonen. |
 | `NLCSLEGENDATEST` | Plaatsen zonder vragen; bedoeld voor scripts en tests. |
 
