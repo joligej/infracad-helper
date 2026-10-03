@@ -1246,6 +1246,8 @@ public partial class Commands
 
     private void PresetSave(Editor ed, Database db)
     {
+        // Bron van de preset kiezen: de globale standaard of een bestaande legenda-snapshot.
+        if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
         var name = AskPresetName(ed);
         if (name is null)
             return;
@@ -1255,8 +1257,11 @@ public partial class Commands
             ed.WriteMessage("\nGeannuleerd.");
             return;
         }
-        LegendPresets.Save(PresetsDir, name, LoadGlobalDefaults());
-        ed.WriteMessage($"\nProfiel \"{name}\" opgeslagen.");
+        // Snapshot van het gekozen doel (globale defaults of de legenda-instellingen), nooit
+        // instance-identiteit: LegendPresets slaat alleen LegendSettings op.
+        var settings = GetTargetSettings(db, target);
+        LegendPresets.Save(PresetsDir, name, settings);
+        ed.WriteMessage($"\nProfiel \"{name}\" opgeslagen vanuit {target.ContextLabel}.");
     }
 
     private void PresetLoad(Editor ed, Database db)
@@ -2153,6 +2158,126 @@ public partial class Commands
         }
     }
 
+    // Twee-run A/B/C-persistentie: ABCSETUP bouwt drie legenda's met uiteenlopende instellingen
+    // en slaat ze op; na QSAVE/_.QUIT/heropenen controleert ABCVERIFY dat elk met zijn eigen
+    // instellingen én getekende geometrie terugkomt en dat A bewerken B/C ongemoeid laat. Zo is
+    // de persistentie over een echte schijf-rondgang bewezen, niet alleen een store-herlaad.
+    [CommandMethod("NLCSLEGENDAABCSETUP", CommandFlags.Modal)]
+    public void NlcsLegendaAbcSetup()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            string firstKey = string.Empty;
+            using var tr = db.TransactionManager.StartTransaction();
+            var reg = LegendStore.Load(db, tr);
+            var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
+            var probe = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db), excludedIds: excluded);
+            if (probe.Entries.Count > 0)
+                firstKey = LegendSettings.EntryKey(probe.Entries[0]);
+
+            var sA = LoadGlobalDefaults();
+            sA.Title = "ABC-A";
+            sA.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VV-ABC-G", Type = NlcsDrawType.Geometrie, Description = "ABC-handregel A" });
+            sA.CustomStatuses.Add(new CustomStatus { Name = "ABC-STATUS-A" });
+
+            var sB = LoadGlobalDefaults();
+            sB.Title = "ABC-B";
+            sB.Scale = 500;
+            if (firstKey.Length > 0)
+                sB.ExcludedEntries.Add(firstKey);
+
+            var sC = LoadGlobalDefaults();
+            sC.Title = "ABC-C";
+
+            foreach (var s in new[] { sA, sB, sC })
+            {
+                var def = IsoDef(reg, s);
+                reg.Add(def);
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
+            }
+            LegendStore.Save(db, tr, reg);
+            tr.Commit();
+            ed.WriteMessage("\nABC: setup klaar. QSAVE, heropenen, dan NLCSLEGENDAABCVERIFY.");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nABC setup error: {ex.Message}");
+        }
+    }
+
+    [CommandMethod("NLCSLEGENDAABCVERIFY", CommandFlags.Modal)]
+    public void NlcsLegendaAbcVerify()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            string bBefore = string.Empty, cBefore = string.Empty;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                LegendDefinition? Find(string t) =>
+                    reg.Legends.FirstOrDefault(l => string.Equals(l.Settings.Title, t, StringComparison.Ordinal));
+                var a = Find("ABC-A");
+                var b = Find("ABC-B");
+                var c = Find("ABC-C");
+                if (a is null || b is null || c is null)
+                {
+                    ed.WriteMessage("\nABC: legenda's niet gevonden na heropenen -> FAIL");
+                    tr.Commit();
+                    return;
+                }
+
+                var gd = LoadGlobalDefaults();
+                bool settingsOk =
+                    a.Settings.Scale == gd.Scale && a.Settings.ManualEntries.Count == 1 && a.Settings.CustomStatuses.Count == 1 &&
+                    b.Settings.Scale == 500 && b.Settings.ManualEntries.Count == 0 &&
+                    c.Settings.Scale == gd.Scale && c.Settings.ManualEntries.Count == 0 && c.Settings.ExcludedEntries.Count == 0;
+                ed.WriteMessage($"\nABC: instellingen A(sc={a.Settings.Scale:0},man={a.Settings.ManualEntries.Count},st={a.Settings.CustomStatuses.Count}) " +
+                    $"B(sc={b.Settings.Scale:0}) C(sc={c.Settings.Scale:0},excl={c.Settings.ExcludedEntries.Count}) -> {(settingsOk ? "OK" : "FAIL")}");
+
+                string ga = GeomHash(db, tr, a.GroupName);
+                string gb = GeomHash(db, tr, b.GroupName);
+                string gc = GeomHash(db, tr, c.GroupName);
+                bool geomOk = ga.Length > 0 && gb.Length > 0 && gc.Length > 0;
+                ed.WriteMessage($"\nABC: geometrie A={ga} B={gb} C={gc} -> {(geomOk ? "OK" : "FAIL")}");
+                bBefore = gb; cBefore = gc;
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            string bAfter, cAfter;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var a = reg.Legends.First(l => l.Settings.Title == "ABC-A");
+                a.Settings.Scale = 1000;
+                BuildManagedLegend(db, tr, reg, a, out _, out _);
+                var b = reg.Legends.First(l => l.Settings.Title == "ABC-B");
+                var c = reg.Legends.First(l => l.Settings.Title == "ABC-C");
+                bAfter = GeomHash(db, tr, b.GroupName);
+                cAfter = GeomHash(db, tr, c.GroupName);
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+            }
+            PurgePending(db);
+            bool isoOk = bBefore == bAfter && cBefore == cAfter;
+            ed.WriteMessage($"\nABC: na A bewerken B/C-geometrie {(isoOk ? "ongewijzigd" : "GEWIJZIGD")} (B {bBefore}->{bAfter} C {cBefore}->{cAfter})");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nABC verify error: {ex.Message}");
+        }
+    }
+
     // Echte xref-integratie: analyseert het gastbestand met per xref een eigen inclusie en
     // toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. Verwacht >= 2 xrefs.
     [CommandMethod("NLCSLEGENDAXREFANALYSE", CommandFlags.Modal)]
@@ -2363,6 +2488,47 @@ public partial class Commands
                 ed.WriteMessage($"\nVPTEST: volledig {mw4:0.0} x {mh4:0.0} modeleenheden");
                 CheckAt("volledig", mw4, mh4, c4, 500.0);
             }
+
+            // Variant 6: verplaatste legenda. Na een handmatige verschuiving moet de viewport de
+            // nieuwe positie volgen (extents worden live gemeten), niet terugspringen (sectie 30).
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, LoadGlobalDefaults());
+                reg.Add(def);
+                if (BuildManagedLegend(db, tr, reg, def, out _, out _) == UpdateResult.Updated)
+                {
+                    LegendStore.Save(db, tr, reg);
+                    LegendManagement.TryGetGroupExtents(db, tr, def.GroupName, out var before);
+                    var cBefore = new Point2d(
+                        (before.MinPoint.X + before.MaxPoint.X) / 2.0,
+                        (before.MinPoint.Y + before.MaxPoint.Y) / 2.0);
+
+                    var move = Matrix3d.Displacement(new Vector3d(1000, 500, 0));
+                    var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+                    var g = (Group)tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead);
+                    foreach (var id in g.GetAllEntityIds())
+                        if (tr.GetObject(id, OpenMode.ForWrite) is Entity ent && !ent.IsErased)
+                            ent.TransformBy(move);
+
+                    LegendManagement.TryGetGroupExtents(db, tr, def.GroupName, out var after);
+                    var cAfter = new Point2d(
+                        (after.MinPoint.X + after.MaxPoint.X) / 2.0,
+                        (after.MinPoint.Y + after.MaxPoint.Y) / 2.0);
+                    double mwm = after.MaxPoint.X - after.MinPoint.X;
+                    double mhm = after.MaxPoint.Y - after.MinPoint.Y;
+                    bool moved = Math.Abs(cAfter.X - (cBefore.X + 1000)) < 1e-3
+                        && Math.Abs(cAfter.Y - (cBefore.Y + 500)) < 1e-3;
+                    tr.Commit();
+                    PurgePending(db);
+                    ed.WriteMessage($"\nVPTEST: verplaatst center {(moved ? "OK" : "FAIL")}");
+                    CheckAt("verplaatst", mwm, mhm, cAfter, 200.0);
+                }
+                else
+                {
+                    tr.Commit();
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -2511,6 +2677,104 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nMETEN error: {ex.Message}");
+        }
+    }
+
+    // Performance-harness op de echte KLIC-bron: meet parse/analyse, groepering, CompositionTree
+    // en export (CSV/JSON). Rapporteert entity/laag-aantallen en de mediaan over meerdere runs.
+    [CommandMethod("NLCSLEGENDAPERFTEST", CommandFlags.Modal)]
+    public void NlcsLegendaPerfTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            var settings = LoadGlobalDefaults();
+            settings.ExcludedDisciplines.Clear();
+            settings.ExcludedHoofdgroepen.Clear();
+
+            int entities = 0, layers = 0, entries = 0;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+                var ms = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+                foreach (var _ in ms) entities++;
+                layers = ((LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead)).Cast<ObjectId>().Count();
+                tr.Commit();
+            }
+
+            double Median(List<double> xs) { xs.Sort(); return xs.Count == 0 ? 0 : xs[xs.Count / 2]; }
+            var tAnalyze = new List<double>();
+            var tTree = new List<double>();
+            var tCsv = new List<double>();
+            var tJson = new List<double>();
+            const int runs = 5;
+            for (int i = 0; i < runs; i++)
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var excluded = LegendManagement.CollectManagedIds(db, tr, LegendStore.Load(db, tr));
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded);
+                sw.Stop(); tAnalyze.Add(sw.Elapsed.TotalMilliseconds);
+                entries = analysis.Entries.Count;
+
+                var items = analysis.Entries.Select(e =>
+                    (LegendSettings.EntryKey(e), $"[{e.Status.DisplayName()}] {e.Description}", EntryGroupLabel(e)));
+                sw.Restart();
+                CompositionTree.Build(items, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+                sw.Stop(); tTree.Add(sw.Elapsed.TotalMilliseconds);
+
+                sw.Restart(); LegendExport.ToCsv(analysis.Entries); sw.Stop(); tCsv.Add(sw.Elapsed.TotalMilliseconds);
+                sw.Restart(); LegendExport.ToJson(analysis.Entries); sw.Stop(); tJson.Add(sw.Elapsed.TotalMilliseconds);
+                tr.Commit();
+            }
+
+            ed.WriteMessage($"\nPERF: entities={entities} layers={layers} entries={entries} runs={runs}");
+            ed.WriteMessage($"\nPERF: analyse mediaan {Median(tAnalyze):0.0} ms (groepering inbegrepen)");
+            ed.WriteMessage($"\nPERF: tree mediaan {Median(tTree):0.0} ms");
+            ed.WriteMessage($"\nPERF: csv mediaan {Median(tCsv):0.0} ms");
+            ed.WriteMessage($"\nPERF: json mediaan {Median(tJson):0.0} ms");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nPERF error: {ex.Message}");
+        }
+    }
+
+    // Bewijst dat de echte OMSCHRIJVING uit KLIC-symboolattributen in de omschrijving terechtkomt
+    // (bron = laagbeschrijving) in plaats van de onderdrukte placeholder/laagnaam.
+    [CommandMethod("NLCSLEGENDAKLICATTRTEST", CommandFlags.Modal)]
+    public void NlcsLegendaKlicAttrTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            var settings = LoadGlobalDefaults();
+            settings.ExcludedDisciplines.Clear();
+            settings.ExcludedHoofdgroepen.Clear();
+            settings.IncludeInvisibleLayers = true;
+            settings.IncludeXrefLayers = true;
+            using var tr = db.TransactionManager.StartTransaction();
+            var excluded = LegendManagement.CollectManagedIds(db, tr, LegendStore.Load(db, tr));
+            var an = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded);
+            var fromDrawing = an.Entries
+                .Where(e => e.DescriptionSource == DescriptionSource.Laagbeschrijving)
+                .ToList();
+            ed.WriteMessage($"\nKLICATTR: entries={an.Entries.Count} attr-lagen={an.AttrDescribedLayerCount} laagdesc-lagen={an.DescribedLayerCount} met laagbeschrijving-bron={fromDrawing.Count}");
+            foreach (var e in fromDrawing.Take(6))
+                ed.WriteMessage($"\n  {e.Element} -> \"{e.Description}\"");
+            tr.Commit();
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nKLICATTR error: {ex.Message}");
         }
     }
 

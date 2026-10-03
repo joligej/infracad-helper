@@ -43,14 +43,24 @@ public class TemplateContractTests
     }
 
     [Fact]
-    public void Swatchkader_is_niet_smaller_dan_de_gemeten_lijnsample_en_blijft_dichtbij()
+    public void SwatchWidth_is_bewuste_keuze_afgeleid_van_de_gemeten_lijnsample()
     {
-        // De gemeten lijnsample zit binnen het swatchvak; het kader (SwatchWidthMm) mag iets breder.
+        // SwatchWidthMm is de swatch/sample-breedte die de renderer tekent. Het is een bewuste
+        // afronding van de gemeten lijnsample (22,4 mm) met een kleine marge (ontwerpkeuze),
+        // niet het losse swatchkader (dat in deze referentie n=1 is en niet maatgevend).
         double sample = Load().LijnSampleMm;
-        Assert.True(TemplateDefaults.SwatchWidthMm >= sample - 0.1,
-            $"kader {TemplateDefaults.SwatchWidthMm} < sample {sample}");
-        Assert.True(TemplateDefaults.SwatchWidthMm <= sample + 3.0,
-            $"kader {TemplateDefaults.SwatchWidthMm} te breed t.o.v. sample {sample}");
+        Assert.True(TemplateDefaults.SwatchWidthMm >= sample,
+            $"SwatchWidthMm {TemplateDefaults.SwatchWidthMm} < gemeten lijnsample {sample}");
+        Assert.True(TemplateDefaults.SwatchWidthMm <= sample + 2.0,
+            $"SwatchWidthMm {TemplateDefaults.SwatchWidthMm} te ver boven lijnsample {sample} (marge > 2 mm)");
+    }
+
+    [Fact]
+    public void Swatchkader_is_als_supplementaire_meting_vastgelegd()
+    {
+        // Het losse swatchkader is apart gemeten (n=1, niet maatgevend) en moet wel in het
+        // contract staan zodat de meting traceerbaar blijft.
+        Assert.True(Load().SwatchKaderMm > 0, "swatchkader-meting ontbreekt in het contract");
     }
 
     [Fact]

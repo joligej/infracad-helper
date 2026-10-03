@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.23.0 - 2026-10-03
+
+- KLIC-symbolen gebruiken nu de echte omschrijving uit het attribuut OMSCHRIJVING (bijv.
+  "Distributieleiding") in plaats van alleen de laagnaam.
+- Het instellingenvenster heeft normale bedieningselementen voor Algemeen en Inhoud (schaal,
+  titel, aankruisvakjes) in plaats van alleen een eigenschappenlijst.
+- Een profiel opslaan bewaart nu de instellingen van de gekozen bron (globale standaard of een
+  gekozen legenda), niet altijd de globale standaard.
+- Bij het bijwerken wordt een waarschuwing getoond als een regel niet kon worden getekend.
+
 ## 1.22.0 - 2026-10-03
 
 - Samenstellen (uitsluitingen en eigen regels) is nu ook bereikbaar vanuit het

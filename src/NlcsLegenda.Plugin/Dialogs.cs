@@ -56,6 +56,7 @@ internal sealed class ButtonBar : FlowLayoutPanel
 internal sealed class SettingsDialog : Form
 {
     private readonly List<PropertyGrid> _grids = new();
+    private readonly List<Action> _resync = new();
     private readonly LegendSettings _settings;
     private readonly IReadOnlyList<EntryCheckItem>? _composition;
 
@@ -100,8 +101,8 @@ internal sealed class SettingsDialog : Form
         };
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
-        tabs.TabPages.Add(Tab("Algemeen", p => InCategory(p, "Algemeen", "Viewport")));
-        tabs.TabPages.Add(Tab("Inhoud", p => InCategory(p, "Elementsoorten", "Statussen", "Groepering", "Lagen")));
+        tabs.TabPages.Add(BuildAlgemeenTab());
+        tabs.TabPages.Add(BuildInhoudTab());
         tabs.TabPages.Add(Tab("Opmaak", p => InCategory(p, "Weergave", "Kolommen", "Koppen")));
         tabs.TabPages.Add(Tab("Teksten", p => InCategory(p, "Teksten", "Opmerkingen") && !QuantityProps.Contains(p.Name)));
         tabs.TabPages.Add(Tab("Hoeveelheden", p => QuantityProps.Contains(p.Name)));
@@ -136,6 +137,9 @@ internal sealed class SettingsDialog : Form
 
     public LegendSettings Settings => _settings;
 
+    private static bool InCategory(PropertyDescriptor p, params string[] categories)
+        => categories.Contains(p.Category, StringComparer.Ordinal);
+
     private TabPage Tab(string title, Func<PropertyDescriptor, bool> include)
     {
         var grid = new PropertyGrid
@@ -152,13 +156,128 @@ internal sealed class SettingsDialog : Form
         return page;
     }
 
-    private static bool InCategory(PropertyDescriptor p, params string[] categories)
-        => categories.Contains(p.Category, StringComparer.Ordinal);
+    // Een gebonden aankruisvakje op de werkkopie: wijzigen werkt direct op _settings, en bij een
+    // reset van buitenaf wordt het vakje opnieuw gesynchroniseerd (_resync).
+    private CheckBox BoundCheck(string text, Func<bool> get, Action<bool> set)
+    {
+        var cb = new CheckBox { Text = text, Checked = get(), AutoSize = true, Margin = new Padding(3, 3, 12, 3) };
+        cb.CheckedChanged += (_, _) => set(cb.Checked);
+        _resync.Add(() => cb.Checked = get());
+        return cb;
+    }
+
+    private static GroupBox Group(string title, params Control[] controls)
+    {
+        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(6) };
+        flow.Controls.AddRange(controls);
+        var box = new GroupBox { Text = title, Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(6) };
+        box.Controls.Add(flow);
+        return box;
+    }
+
+    // Tab Algemeen met normale controls i.p.v. een PropertyGrid.
+    private TabPage BuildAlgemeenTab()
+    {
+        var page = new TabPage("Algemeen") { Padding = new Padding(10), AutoScroll = true };
+        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+
+        var scale = new NumericUpDown { Minimum = 1, Maximum = 1_000_000, Value = (decimal)Math.Clamp(_settings.Scale, 1, 1_000_000), Width = 100 };
+        scale.ValueChanged += (_, _) => _settings.Scale = (double)scale.Value;
+        _resync.Add(() => scale.Value = (decimal)Math.Clamp(_settings.Scale, 1, 1_000_000));
+        var title = new TextBox { Text = _settings.Title, Width = 260 };
+        title.TextChanged += (_, _) => _settings.Title = title.Text;
+        _resync.Add(() => title.Text = _settings.Title);
+        var margin = new NumericUpDown { Minimum = 0, Maximum = 100, DecimalPlaces = 1, Increment = 0.5M, Value = (decimal)Math.Clamp(_settings.ViewportMarginMm, 0, 100), Width = 80 };
+        margin.ValueChanged += (_, _) => _settings.ViewportMarginMm = (double)margin.Value;
+        _resync.Add(() => margin.Value = (decimal)Math.Clamp(_settings.ViewportMarginMm, 0, 100));
+
+        root.Controls.Add(LabeledRow("Schaal 1:", scale));
+        root.Controls.Add(LabeledRow("Titel:", title));
+        root.Controls.Add(LabeledRow("Viewportmarge (mm):", margin));
+        root.Controls.Add(Group("Weergave",
+            BoundCheck("Titel tonen", () => _settings.IncludeTitle, v => _settings.IncludeTitle = v),
+            BoundCheck("Tekst naast de vakjes tonen", () => _settings.IncludeText, v => _settings.IncludeText = v),
+            BoundCheck("Kader om de legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
+            BoundCheck("Schaalbalk tonen", () => _settings.IncludeScaleBar, v => _settings.IncludeScaleBar = v),
+            BoundCheck("Hoeveelheden tonen", () => _settings.IncludeQuantities, v => _settings.IncludeQuantities = v)));
+        page.Controls.Add(root);
+        return page;
+    }
+
+    // Tab Inhoud met normale controls; subdialogs voor samenstellen en eigen statussen.
+    private TabPage BuildInhoudTab()
+    {
+        var page = new TabPage("Inhoud") { Padding = new Padding(10), AutoScroll = true };
+        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+
+        root.Controls.Add(Group("Elementsoorten",
+            BoundCheck("Geometrie / lijnen", () => _settings.ToonGeometrie, v => _settings.ToonGeometrie = v),
+            BoundCheck("Vlakken", () => _settings.ToonVlakken, v => _settings.ToonVlakken = v),
+            BoundCheck("Arceringen", () => _settings.ToonArceringen, v => _settings.ToonArceringen = v),
+            BoundCheck("Vlakvullingen", () => _settings.ToonVlakvullingen, v => _settings.ToonVlakvullingen = v),
+            BoundCheck("Symbolen", () => _settings.ToonSymbolen, v => _settings.ToonSymbolen = v)));
+        root.Controls.Add(Group("Statussen",
+            BoundCheck("Nieuw", () => _settings.ToonNieuw, v => _settings.ToonNieuw = v),
+            BoundCheck("Bestaand", () => _settings.ToonBestaand, v => _settings.ToonBestaand = v),
+            BoundCheck("Vervallen", () => _settings.ToonVervallen, v => _settings.ToonVervallen = v),
+            BoundCheck("Tijdelijk", () => _settings.ToonTijdelijk, v => _settings.ToonTijdelijk = v),
+            BoundCheck("Revisie", () => _settings.ToonRevisie, v => _settings.ToonRevisie = v),
+            BoundCheck("Gelijke statussen samenvoegen (alleen bij identieke weergave)", () => _settings.MergeIdenticalStatuses, v => _settings.MergeIdenticalStatuses = v)));
+        root.Controls.Add(Group("KLIC-groepering",
+            BoundCheck("Soort samenvoegen", () => _settings.SamenvoegenSoort, v => _settings.SamenvoegenSoort = v),
+            BoundCheck("Spanning/druk samenvoegen", () => _settings.SamenvoegenSpecificatie, v => _settings.SamenvoegenSpecificatie = v),
+            BoundCheck("Uitvoering samenvoegen", () => _settings.SamenvoegenUitvoering, v => _settings.SamenvoegenUitvoering = v),
+            BoundCheck("Volgnummer samenvoegen", () => _settings.SamenvoegenNummer, v => _settings.SamenvoegenNummer = v),
+            BoundCheck("KLIC-placeholdertekst weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v)));
+        root.Controls.Add(Group("Lagen",
+            BoundCheck("Onzichtbare (bevroren/uit) lagen meenemen", () => _settings.IncludeInvisibleLayers, v => _settings.IncludeInvisibleLayers = v),
+            BoundCheck("Xref-lagen meenemen", () => _settings.IncludeXrefLayers, v => _settings.IncludeXrefLayers = v)));
+
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Padding = new Padding(3) };
+        if (_composition is not null)
+        {
+            var samen = new Button { Text = "Samenstellen\u2026", AutoSize = true };
+            samen.Click += (_, _) => EditComposition();
+            actions.Controls.Add(samen);
+        }
+        var statussen = new Button { Text = "Eigen statussen\u2026", AutoSize = true };
+        statussen.Click += (_, _) => EditCustomStatusNames();
+        actions.Controls.Add(statussen);
+        root.Controls.Add(actions);
+        page.Controls.Add(root);
+        return page;
+    }
+
+    private static Panel LabeledRow(string label, Control control)
+    {
+        var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Margin = new Padding(3) };
+        panel.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 6, 0) });
+        panel.Controls.Add(control);
+        return panel;
+    }
+
+    // Eenvoudige editor voor de namen van eigen statussen op de werkkopie. Leden toewijzen blijft
+    // via NLCSLEGENDASTATUS (dat de tekening nodig heeft); dit venster beheert alleen de namen.
+    private void EditCustomStatusNames()
+    {
+        using var dlg = new StringListEditDialog("Eigen statussen",
+            _settings.CustomStatuses.Select(c => c.Name));
+        if (dlg.ShowDialog(this) != DialogResult.OK)
+            return;
+        var byName = _settings.CustomStatuses.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
+        var result = new List<CustomStatus>();
+        foreach (var name in dlg.Values)
+            result.Add(byName.TryGetValue(name, out var existing) ? existing : new CustomStatus { Name = name });
+        _settings.CustomStatuses = result;
+    }
 
     private void RefreshGrids()
     {
         foreach (var grid in _grids)
             grid.Refresh();
+        // Normale controls op Algemeen/Inhoud opnieuw gelijkzetten met de werkkopie (na reset).
+        foreach (var sync in _resync)
+            sync();
     }
 
     private void EditRemarks()
@@ -211,6 +330,76 @@ internal sealed class SettingsDialog : Form
                 continue;
             property.SetValue(target, property.GetValue(defaults));
         }
+    }
+}
+
+// Eenvoudige lijsteditor voor namen (bijv. eigen statussen): toevoegen, hernoemen, verwijderen.
+// Geeft bij OK de bewerkte lijst terug; de aanroeper mapt die op de werkkopie.
+internal sealed class StringListEditDialog : Form
+{
+    private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false };
+
+    public StringListEditDialog(string title, IEnumerable<string> values)
+    {
+        Text = title;
+        Font = SystemFonts.MessageBoxFont;
+        ClientSize = new Size(360, 320);
+        MinimumSize = new Size(320, 240);
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        ShowInTaskbar = false;
+        ShowIcon = false;
+        MinimizeBox = false;
+
+        foreach (var v in values)
+            if (!string.IsNullOrWhiteSpace(v))
+                _list.Items.Add(v.Trim());
+
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        var add = new Button { Text = "Toevoegen", AutoSize = true };
+        add.Click += (_, _) => { var n = Prompt("Nieuwe naam:"); if (!string.IsNullOrWhiteSpace(n)) _list.Items.Add(n.Trim()); };
+        var rename = new Button { Text = "Hernoemen", AutoSize = true };
+        rename.Click += (_, _) =>
+        {
+            if (_list.SelectedIndex < 0) return;
+            var n = Prompt("Nieuwe naam:", (string)_list.SelectedItem!);
+            if (!string.IsNullOrWhiteSpace(n)) _list.Items[_list.SelectedIndex] = n.Trim();
+        };
+        var remove = new Button { Text = "Verwijderen", AutoSize = true };
+        remove.Click += (_, _) => { if (_list.SelectedIndex >= 0) _list.Items.RemoveAt(_list.SelectedIndex); };
+        bar.Controls.AddRange(new Control[] { add, rename, remove });
+
+        var buttons = new ButtonBar(withApply: false);
+        AcceptButton = buttons.Ok;
+        CancelButton = buttons.Cancel;
+
+        Controls.Add(_list);
+        Controls.Add(bar);
+        Controls.Add(buttons);
+    }
+
+    public IReadOnlyList<string> Values => _list.Items.Cast<string>().ToList();
+
+    private string? Prompt(string label, string initial = "")
+    {
+        using var dlg = new Form
+        {
+            Text = label,
+            Font = SystemFonts.MessageBoxFont,
+            ClientSize = new Size(320, 110),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            ShowInTaskbar = false,
+            ShowIcon = false,
+            MinimizeBox = false,
+            MaximizeBox = false
+        };
+        var tb = new TextBox { Text = initial, Dock = DockStyle.Top, Margin = new Padding(8) };
+        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom };
+        dlg.AcceptButton = ok;
+        dlg.Controls.Add(tb);
+        dlg.Controls.Add(ok);
+        return dlg.ShowDialog(this) == DialogResult.OK ? tb.Text : null;
     }
 }
 

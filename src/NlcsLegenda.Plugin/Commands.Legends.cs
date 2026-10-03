@@ -53,6 +53,9 @@ public partial class Commands
         bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out var topLeft);
 
         var btrId = LegendBuilder.BuildBlock(db, tr, analysis, def.Settings, out rows, out var issues);
+        // Semantiek bij tekenfouten (bewuste keuze A): de legenda wordt bijgewerkt met wat wél
+        // kon renderen (partieel geldig), maar de aanroeper meldt de fouten als duidelijke
+        // waarschuwing. Nooit stil als volledig succes beschouwen.
         if (issues.Count > 0)
             note = AppendNote(note, $"{issues.Count} regel(s) met tekenfouten ({issues[0].SourceLayer}: {issues[0].Reason})");
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
@@ -414,7 +417,9 @@ public partial class Commands
             }
             PurgePending(db);
             ed.WriteMessage(result == UpdateResult.Updated
-                ? "\nBron aangepast en legenda bijgewerkt."
+                ? (note.Length > 0
+                    ? $"\nBron aangepast en legenda bijgewerkt. Let op: {note}."
+                    : "\nBron aangepast en legenda bijgewerkt.")
                 : $"\nBron aangepast, maar geen inhoud om te tekenen ({note}).");
         }
         catch (Exception ex)
@@ -444,7 +449,9 @@ public partial class Commands
             PurgePending(db);
             ed.WriteMessage(r switch
             {
-                UpdateResult.Updated => "\nInstellingen toegepast en legenda bijgewerkt.",
+                UpdateResult.Updated => note.Length > 0
+                    ? $"\nInstellingen toegepast en legenda bijgewerkt. Let op: {note}."
+                    : "\nInstellingen toegepast en legenda bijgewerkt.",
                 UpdateResult.NoEntries => $"\nGeen inhoud om te tekenen met deze instellingen ({note}); oude legenda blijft staan.",
                 _ => "\nBijwerken mislukt; de oude legenda blijft staan."
             });

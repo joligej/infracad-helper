@@ -7,5 +7,14 @@
   "swatchKaderBreedteMm": 20.0,
   "rijafstandMm": 6.3,
   "teksthoogtesMm": [2.5, 5.0, 10.0],
-  "symbool": { "insertSchaal": 0.2, "paperBreedteMm": 3.9, "paperHoogteMm": 2.2, "aantal": 43 }
+  "symbool": { "insertSchaal": 0.2, "paperBreedteMm": 3.9, "paperHoogteMm": 2.2, "aantal": 43 },
+  "provenance": {
+    "lijnSampleBreedteMm": { "objectType": "LWPOLYLINE/LINE", "sampleCount": 54, "rawModelMeters": 4.48, "paperMm": 22.4, "toleranceMm": 0.5, "herkomst": "gemeten" },
+    "swatchKaderBreedteMm": { "objectType": "closed LWPOLYLINE", "sampleCount": 1, "rawModelMeters": 4.0, "paperMm": 20.0, "toleranceMm": 2.0, "herkomst": "gemeten (niet maatgevend, n=1)" },
+    "rijafstandMm": { "objectType": "DBText (T25) baseline-afstand", "sampleCount": 41, "rawModelMeters": 1.26, "paperMm": 6.3, "toleranceMm": 0.2, "herkomst": "gemeten" },
+    "teksthoogtesMm": { "objectType": "DBText/MText height", "sampleCount": "T25/T50/titel", "paperMm": [2.5, 5.0, 10.0], "toleranceMm": 0.1, "herkomst": "gemeten" },
+    "symbool.insertSchaal": { "objectType": "BlockReference ScaleFactors.X", "sampleCount": 43, "value": 0.2, "herkomst": "gemeten = schaal/1000" },
+    "TemplateDefaults.SwatchWidthMm": { "value": 24.0, "herkomst": "ontwerpkeuze: afronding van lijnsample 22,4 mm met kleine marge" }
+  }
 }
+
