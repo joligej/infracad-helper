@@ -680,7 +680,7 @@ public partial class Commands
         {
             if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
             var settings = GetTargetSettings(db, target);
-            using var dialog = new SettingsDialog(settings, target.ContextLabel, BuildCompositionItems(db, settings));
+            using var dialog = new SettingsDialog(settings, target.ContextLabel, BuildCompositionItems(db, settings), CollectXrefNames(db));
             dialog.ApplyRequested += (_, _) => ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
@@ -1047,6 +1047,29 @@ public partial class Commands
         {
             return null;
         }
+    }
+
+    // Namen van gekoppelde xrefs (niet de geneste/afhankelijke), gesorteerd. Voor de per-xref
+    // keuze in het instellingenvenster; dezelfde selectie als NLCSLEGENDAXREFS.
+    private static IReadOnlyList<string> CollectXrefNames(Database db)
+    {
+        var xrefs = new List<string>();
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+            foreach (ObjectId id in bt)
+                if (tr.GetObject(id, OpenMode.ForRead) is BlockTableRecord btr
+                    && btr.IsFromExternalReference && !btr.IsDependent)
+                    xrefs.Add(btr.Name);
+            tr.Commit();
+        }
+        catch
+        {
+            return xrefs;
+        }
+        xrefs.Sort(StringComparer.CurrentCultureIgnoreCase);
+        return xrefs;
     }
 
     [CommandMethod("NLCSLEGENDAXREFS", CommandFlags.Modal)]

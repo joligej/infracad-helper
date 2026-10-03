@@ -55,28 +55,24 @@ internal sealed class ButtonBar : FlowLayoutPanel
 
 internal sealed class SettingsDialog : Form
 {
-    private readonly List<PropertyGrid> _grids = new();
     private readonly List<Action> _resync = new();
     private readonly LegendSettings _settings;
     private readonly IReadOnlyList<EntryCheckItem>? _composition;
+    private readonly IReadOnlyList<string> _xrefNames;
+    private bool _syncing;
 
     public event EventHandler? ApplyRequested;
-
-    // Quantity-properties krijgen een eigen tabblad; ze zitten qua categorie verspreid.
-    private static readonly HashSet<string> QuantityProps = new(StringComparer.Ordinal)
-    {
-        "IncludeQuantities", "UnitCount", "UnitLength", "UnitArea", "QuantityDecimals",
-        "IncludeTotalsRow", "TotalsPrefix", "QuantityColumnWidthMm"
-    };
 
     // Bewerkt precies één instellingenobject (een werkkopie). De aanroeper bepaalt de scope
     // (globale standaard of één specifieke legenda) en past het resultaat toe. Geef je de
     // geanalyseerde entries mee, dan kan de gebruiker vanuit dit venster ook samenstellen
-    // (uitsluitingen + eigen regels) via dezelfde boom-editor als het losse commando.
+    // (uitsluitingen + eigen regels) en eigen statussen leden toewijzen; de xref-namen voeden
+    // de per-xref keuze.
     public SettingsDialog(LegendSettings settings, string contextLabel,
-        IReadOnlyList<EntryCheckItem>? composition = null)
+        IReadOnlyList<EntryCheckItem>? composition = null, IReadOnlyList<string>? xrefNames = null)
     {
         _composition = composition;
+        _xrefNames = xrefNames ?? Array.Empty<string>();
         _settings = settings;
 
         Text = "NLCS Legenda \u2013 instellingen";
@@ -103,10 +99,10 @@ internal sealed class SettingsDialog : Form
         var tabs = new TabControl { Dock = DockStyle.Fill };
         tabs.TabPages.Add(BuildAlgemeenTab());
         tabs.TabPages.Add(BuildInhoudTab());
-        tabs.TabPages.Add(Tab("Opmaak", p => InCategory(p, "Weergave", "Kolommen", "Koppen")));
-        tabs.TabPages.Add(Tab("Teksten", p => InCategory(p, "Teksten", "Opmerkingen") && !QuantityProps.Contains(p.Name)));
-        tabs.TabPages.Add(Tab("Hoeveelheden", p => QuantityProps.Contains(p.Name)));
-        tabs.TabPages.Add(Tab("Schaalbalk / Extra", p => InCategory(p, "Schaalbalk", "Maatvoering (mm)")));
+        tabs.TabPages.Add(BuildOpmaakTab());
+        tabs.TabPages.Add(BuildTekstenTab());
+        tabs.TabPages.Add(BuildHoeveelhedenTab());
+        tabs.TabPages.Add(BuildSchaalbalkTab());
 
         var buttons = new ButtonBar(withApply: true);
         buttons.Apply!.Click += (_, _) =>
@@ -137,31 +133,72 @@ internal sealed class SettingsDialog : Form
 
     public LegendSettings Settings => _settings;
 
-    private static bool InCategory(PropertyDescriptor p, params string[] categories)
-        => categories.Contains(p.Category, StringComparer.Ordinal);
-
-    private TabPage Tab(string title, Func<PropertyDescriptor, bool> include)
+    // Zet alle gebonden controls opnieuw gelijk met de werkkopie. De guard voorkomt dat het
+    // terugschrijven van een control zijn eigen change-handler weer laat terugsyncen.
+    private void SyncAll()
     {
-        var grid = new PropertyGrid
-        {
-            Dock = DockStyle.Fill,
-            SelectedObject = new FilteredSettings(_settings, include),
-            PropertySort = PropertySort.Categorized,
-            ToolbarVisible = false,
-            HelpVisible = true
-        };
-        _grids.Add(grid);
-        var page = new TabPage(title) { Padding = new Padding(4) };
-        page.Controls.Add(grid);
-        return page;
+        if (_syncing) return;
+        _syncing = true;
+        try { foreach (var s in _resync) s(); }
+        finally { _syncing = false; }
     }
 
-    // Een gebonden aankruisvakje op de werkkopie: wijzigen werkt direct op _settings, en bij een
-    // reset van buitenaf wordt het vakje opnieuw gesynchroniseerd (_resync).
+    private Panel NumRow(string label, Func<double> get, Action<double> set,
+        decimal min, decimal max, int decimals = 1, decimal increment = 0.5M, int width = 90)
+    {
+        var n = new NumericUpDown
+        {
+            Minimum = min, Maximum = max, DecimalPlaces = decimals, Increment = increment,
+            Width = width, Value = ClampDecimal((decimal)get(), min, max)
+        };
+        n.ValueChanged += (_, _) => { if (!_syncing) set((double)n.Value); };
+        _resync.Add(() => n.Value = ClampDecimal((decimal)get(), min, max));
+        return LabeledRow(label, n);
+    }
+
+    private Panel IntRow(string label, Func<int> get, Action<int> set, int min, int max, int width = 70)
+    {
+        var n = new NumericUpDown
+        {
+            Minimum = min, Maximum = max, DecimalPlaces = 0, Increment = 1,
+            Width = width, Value = Math.Clamp(get(), min, max)
+        };
+        n.ValueChanged += (_, _) => { if (!_syncing) set((int)n.Value); };
+        _resync.Add(() => n.Value = Math.Clamp(get(), min, max));
+        return LabeledRow(label, n);
+    }
+
+    private Panel TextRow(string label, Func<string> get, Action<string> set, int width = 220)
+    {
+        var t = new TextBox { Text = get(), Width = width };
+        t.TextChanged += (_, _) => { if (!_syncing) set(t.Text); };
+        _resync.Add(() => { if (t.Text != get()) t.Text = get(); });
+        return LabeledRow(label, t);
+    }
+
+    private Panel ComboRow<TEnum>(string label, Func<TEnum> get, Action<TEnum> set) where TEnum : struct, Enum
+    {
+        var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+        combo.Items.AddRange(Enum.GetNames<TEnum>());
+        combo.SelectedItem = get().ToString();
+        combo.SelectedIndexChanged += (_, _) =>
+        {
+            if (!_syncing && combo.SelectedItem is string s && Enum.TryParse<TEnum>(s, out var v))
+                set(v);
+        };
+        _resync.Add(() => combo.SelectedItem = get().ToString());
+        return LabeledRow(label, combo);
+    }
+
+    private static decimal ClampDecimal(decimal value, decimal min, decimal max)
+        => value < min ? min : value > max ? max : value;
+
+    // Een gebonden aankruisvakje op de werkkopie: wijzigen werkt direct op _settings. SyncAll
+    // houdt eventuele tweede vakje voor dezelfde setting (bv. op Algemeen) gelijk.
     private CheckBox BoundCheck(string text, Func<bool> get, Action<bool> set)
     {
         var cb = new CheckBox { Text = text, Checked = get(), AutoSize = true, Margin = new Padding(3, 3, 12, 3) };
-        cb.CheckedChanged += (_, _) => set(cb.Checked);
+        cb.CheckedChanged += (_, _) => { if (_syncing) return; set(cb.Checked); SyncAll(); };
         _resync.Add(() => cb.Checked = get());
         return cb;
     }
@@ -175,7 +212,7 @@ internal sealed class SettingsDialog : Form
         return box;
     }
 
-    // Tab Algemeen met normale controls i.p.v. een PropertyGrid.
+    // Tab Algemeen: schaal, titel, viewportmarge en de hoofdschakelaars.
     private TabPage BuildAlgemeenTab()
     {
         var page = new TabPage("Algemeen") { Padding = new Padding(10), AutoScroll = true };
@@ -204,7 +241,8 @@ internal sealed class SettingsDialog : Form
         return page;
     }
 
-    // Tab Inhoud met normale controls; subdialogs voor samenstellen en eigen statussen.
+    // Tab Inhoud: elementsoorten, statussen, KLIC-groepering en lagen; subvensters voor
+    // samenstellen, eigen statussen met leden en de per-xref keuze.
     private TabPage BuildInhoudTab()
     {
         var page = new TabPage("Inhoud") { Padding = new Padding(10), AutoScroll = true };
@@ -241,8 +279,11 @@ internal sealed class SettingsDialog : Form
             actions.Controls.Add(samen);
         }
         var statussen = new Button { Text = "Eigen statussen\u2026", AutoSize = true };
-        statussen.Click += (_, _) => EditCustomStatusNames();
+        statussen.Click += (_, _) => EditStatusMembers();
         actions.Controls.Add(statussen);
+        var xrefs = new Button { Text = "Xrefs\u2026", AutoSize = true };
+        xrefs.Click += (_, _) => EditXrefInclusion();
+        actions.Controls.Add(xrefs);
         root.Controls.Add(actions);
         page.Controls.Add(root);
         return page;
@@ -256,29 +297,180 @@ internal sealed class SettingsDialog : Form
         return panel;
     }
 
-    // Eenvoudige editor voor de namen van eigen statussen op de werkkopie. Leden toewijzen blijft
-    // via NLCSLEGENDASTATUS (dat de tekening nodig heeft); dit venster beheert alleen de namen.
-    private void EditCustomStatusNames()
+    // Tab Opmaak met normale controls; de canonieke maatvoering staat onder "Geavanceerd".
+    private TabPage BuildOpmaakTab()
     {
-        using var dlg = new StringListEditDialog("Eigen statussen",
-            _settings.CustomStatuses.Select(c => c.Name));
-        if (dlg.ShowDialog(this) != DialogResult.OK)
-            return;
-        var byName = _settings.CustomStatuses.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
-        var result = new List<CustomStatus>();
-        foreach (var name in dlg.Values)
-            result.Add(byName.TryGetValue(name, out var existing) ? existing : new CustomStatus { Name = name });
-        _settings.CustomStatuses = result;
+        var page = new TabPage("Opmaak") { Padding = new Padding(10), AutoScroll = true };
+        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+
+        root.Controls.Add(Group("Weergave",
+            BoundCheck("Kader rond legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
+            BoundCheck("Kader per swatch", () => _settings.DrawSwatchFrame, v => _settings.DrawSwatchFrame = v),
+            BoundCheck("Symboolblokken invoegen", () => _settings.InsertSymbolBlocks, v => _settings.InsertSymbolBlocks = v),
+            BoundCheck("Exploderen bij plaatsen", () => _settings.ExplodeOnPlace, v => _settings.ExplodeOnPlace = v)));
+        root.Controls.Add(ComboRow("Sortering:", () => _settings.SortMode, v => _settings.SortMode = v));
+        root.Controls.Add(NumRow("Arceerschaal-factor:", () => _settings.HatchScaleFactor, v => _settings.HatchScaleFactor = v, 0.01M, 100M, 2, 0.1M));
+        root.Controls.Add(Group("Koppen",
+            BoundCheck("Statuskoppen tonen", () => _settings.IncludeGroupHeaders, v => _settings.IncludeGroupHeaders = v),
+            BoundCheck("Hoofdgroep-subkoppen tonen", () => _settings.IncludeHoofdgroepHeaders, v => _settings.IncludeHoofdgroepHeaders = v)));
+        root.Controls.Add(Group("Kolommen",
+            IntRow("Vast aantal (0 = auto):", () => _settings.Columns, v => _settings.Columns = v, 0, 20),
+            IntRow("Max. regels per kolom:", () => _settings.MaxRowsPerColumn, v => _settings.MaxRowsPerColumn = v, 1, 1000, 80),
+            BoundCheck("Kolommen balanceren", () => _settings.BalanceColumns, v => _settings.BalanceColumns = v),
+            NumRow("Max. hoogte (mm, 0 = uit):", () => _settings.MaxLegendHeightMm, v => _settings.MaxLegendHeightMm = v, 0, 10000, 1, 5)));
+        root.Controls.Add(Group("Stijl en lagen",
+            TextRow("Tekststijl (leeg = huidige):", () => _settings.TextStyle, v => _settings.TextStyle = v, 180),
+            TextRow("Kaderlaag:", () => _settings.FrameLayer, v => _settings.FrameLayer = v, 180),
+            TextRow("Tekstlaag omschrijvingen:", () => _settings.TextLayer, v => _settings.TextLayer = v, 180),
+            TextRow("Tekstlaag koppen/titel:", () => _settings.HeaderTextLayer, v => _settings.HeaderTextLayer = v, 180)));
+        page.Controls.Add(root);
+        return page;
     }
 
-    private void RefreshGrids()
+    // Tab Teksten met normale controls; omschrijvingen en opmerkingen via subvensters op dezelfde
+    // werkkopie (hetzelfde DescriptionOverrides-model als het losse omschrijvingencommando).
+    private TabPage BuildTekstenTab()
     {
-        foreach (var grid in _grids)
-            grid.Refresh();
-        // Normale controls op Algemeen/Inhoud opnieuw gelijkzetten met de werkkopie (na reset).
-        foreach (var sync in _resync)
-            sync();
+        var page = new TabPage("Teksten") { Padding = new Padding(10), AutoScroll = true };
+        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+
+        root.Controls.Add(Group("Omschrijvingen",
+            BoundCheck("Omschrijvingen tonen", () => _settings.IncludeText, v => _settings.IncludeText = v),
+            BoundCheck("Algemeen deel tonen", () => _settings.IncludeGeneralDescription, v => _settings.IncludeGeneralDescription = v)));
+        root.Controls.Add(TextRow("Scheidingsteken alg./spec.:", () => _settings.GeneralSeparator, v => _settings.GeneralSeparator = v, 120));
+        root.Controls.Add(Group("Statuslabels",
+            TextRow("Nieuw:", () => _settings.LabelNieuw, v => _settings.LabelNieuw = v, 160),
+            TextRow("Bestaand:", () => _settings.LabelBestaand, v => _settings.LabelBestaand = v, 160),
+            TextRow("Vervallen:", () => _settings.LabelVervallen, v => _settings.LabelVervallen = v, 160),
+            TextRow("Tijdelijk:", () => _settings.LabelTijdelijk, v => _settings.LabelTijdelijk = v, 160),
+            TextRow("Revisie:", () => _settings.LabelRevisie, v => _settings.LabelRevisie = v, 160)));
+        root.Controls.Add(Group("Voet- en datumregel",
+            BoundCheck("Voetregel tonen", () => _settings.IncludeFooter, v => _settings.IncludeFooter = v),
+            BoundCheck("Datum tonen", () => _settings.IncludeDate, v => _settings.IncludeDate = v)));
+        root.Controls.Add(TextRow("Schaal-formaat:", () => _settings.ScaleFormat, v => _settings.ScaleFormat = v, 160));
+        root.Controls.Add(TextRow("Datum-formaat:", () => _settings.DateFormat, v => _settings.DateFormat = v, 160));
+        root.Controls.Add(Group("Opmerkingen",
+            BoundCheck("Opmerkingen tonen", () => _settings.IncludeRemarks, v => _settings.IncludeRemarks = v)));
+
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Top, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Padding = new Padding(3) };
+        var omschr = new Button { Text = "Omschrijvingen\u2026", AutoSize = true };
+        omschr.Click += (_, _) => EditDescriptions();
+        actions.Controls.Add(omschr);
+        var opm = new Button { Text = "Opmerkingen\u2026", AutoSize = true };
+        opm.Click += (_, _) => EditRemarks();
+        actions.Controls.Add(opm);
+        root.Controls.Add(actions);
+        page.Controls.Add(root);
+        return page;
     }
+
+    private TabPage BuildHoeveelhedenTab()
+    {
+        var page = new TabPage("Hoeveelheden") { Padding = new Padding(10), AutoScroll = true };
+        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+
+        root.Controls.Add(BoundCheck("Hoeveelheden tonen", () => _settings.IncludeQuantities, v => _settings.IncludeQuantities = v));
+        root.Controls.Add(Group("Eenheden",
+            TextRow("Aantal:", () => _settings.UnitCount, v => _settings.UnitCount = v, 100),
+            TextRow("Lengte:", () => _settings.UnitLength, v => _settings.UnitLength = v, 100),
+            TextRow("Oppervlak:", () => _settings.UnitArea, v => _settings.UnitArea = v, 100)));
+        root.Controls.Add(IntRow("Decimalen:", () => _settings.QuantityDecimals, v => _settings.QuantityDecimals = v, 0, 6));
+        root.Controls.Add(Group("Totaalregel",
+            BoundCheck("Totaalregel tonen", () => _settings.IncludeTotalsRow, v => _settings.IncludeTotalsRow = v),
+            TextRow("Voorvoegsel:", () => _settings.TotalsPrefix, v => _settings.TotalsPrefix = v, 160)));
+        root.Controls.Add(NumRow("Kolombreedte hoeveelheden (mm):", () => _settings.QuantityColumnWidthMm, v => _settings.QuantityColumnWidthMm = v, 1, 200, 1, 0.5M));
+        page.Controls.Add(root);
+        return page;
+    }
+
+    private TabPage BuildSchaalbalkTab()
+    {
+        var page = new TabPage("Schaalbalk / Extra") { Padding = new Padding(10), AutoScroll = true };
+        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+
+        root.Controls.Add(Group("Schaalbalk",
+            BoundCheck("Schaalbalk tonen", () => _settings.IncludeScaleBar, v => _settings.IncludeScaleBar = v),
+            IntRow("Aantal segmenten:", () => _settings.ScaleBarSegments, v => _settings.ScaleBarSegments = v, 1, 50),
+            NumRow("Meters per segment (0 = auto):", () => _settings.ScaleBarSegmentMeters, v => _settings.ScaleBarSegmentMeters = v, 0, 10000, 2, 1),
+            NumRow("Hoogte (mm):", () => _settings.ScaleBarHeightMm, v => _settings.ScaleBarHeightMm = v, 0.5M, 50, 1, 0.5M)));
+        root.Controls.Add(Group("Viewport",
+            BoundCheck("Viewport zelf tekenen", () => _settings.ViewportManual, v => _settings.ViewportManual = v)));
+        root.Controls.Add(Group("Geavanceerd \u2013 maatvoering (mm)",
+            NumRow("Swatch breedte:", () => _settings.SwatchWidthMm, v => _settings.SwatchWidthMm = v, 1, 200, 1, 0.5M),
+            NumRow("Swatch hoogte:", () => _settings.SwatchHeightMm, v => _settings.SwatchHeightMm = v, 1, 200, 1, 0.5M),
+            NumRow("Regelafstand:", () => _settings.RowPitchMm, v => _settings.RowPitchMm = v, 1, 100, 1, 0.1M),
+            NumRow("Regelhoogte-factor tekst:", () => _settings.LineSpacingFactor, v => _settings.LineSpacingFactor = v, 0.5M, 5, 2, 0.05M),
+            NumRow("Breedte opmerkingen:", () => _settings.RemarksWidthMm, v => _settings.RemarksWidthMm = v, 1, 500, 1, 1),
+            NumRow("Ruimte swatch-tekst:", () => _settings.TextGapMm, v => _settings.TextGapMm = v, 0, 50, 1, 0.5M),
+            NumRow("Teksthoogte omschrijving:", () => _settings.TextHeightMm, v => _settings.TextHeightMm = v, 0.5M, 50, 2, 0.1M),
+            NumRow("Teksthoogte kopregel:", () => _settings.HeaderTextHeightMm, v => _settings.HeaderTextHeightMm = v, 0.5M, 50, 2, 0.1M),
+            NumRow("Teksthoogte titel:", () => _settings.TitleTextHeightMm, v => _settings.TitleTextHeightMm = v, 0.5M, 50, 2, 0.1M),
+            NumRow("Witruimte boven kopregel:", () => _settings.HeaderSpacingMm, v => _settings.HeaderSpacingMm = v, 0, 50, 1, 0.5M),
+            NumRow("Kolombreedte:", () => _settings.ColumnWidthMm, v => _settings.ColumnWidthMm = v, 1, 500, 1, 1),
+            NumRow("Kolomtussenruimte:", () => _settings.ColumnGapMm, v => _settings.ColumnGapMm = v, 0, 100, 1, 0.5M),
+            NumRow("Hoeveelheidkolom breedte:", () => _settings.QuantityColumnWidthMm, v => _settings.QuantityColumnWidthMm = v, 1, 200, 1, 0.5M),
+            NumRow("Kadermarge:", () => _settings.BorderMarginMm, v => _settings.BorderMarginMm = v, 0, 50, 1, 0.5M)));
+        page.Controls.Add(root);
+        return page;
+    }
+
+    // Eigen statussen beheren en leden toewijzen op de werkkopie. Dezelfde CustomStatus.Members
+    // (entry-keys) als NLCSLEGENDASTATUS; de keuzelijst komt uit de geanalyseerde entries plus de
+    // eigen regels. Annuleren laat de werkkopie ongemoeid.
+    private void EditStatusMembers()
+    {
+        var available = new List<(string Key, string Label)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (_composition is not null)
+            foreach (var item in _composition)
+                if (seen.Add(item.Key))
+                    available.Add((item.Key, item.Label));
+        foreach (var manual in _settings.ManualEntries)
+        {
+            if (!manual.IsValid) continue;
+            var key = LegendSettings.EntryKey(manual.ToLegendEntry());
+            if (seen.Add(key))
+                available.Add((key, $"[eigen] {manual.Description}"));
+        }
+
+        using var dlg = new CustomStatusDialog(_settings.CustomStatuses, available);
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _settings.CustomStatuses = dlg.Result;
+            SyncAll();
+        }
+    }
+
+    // Per-xref keuze op de werkkopie; dezelfde XrefInclusion-dictionary als NLCSLEGENDAXREFS.
+    private void EditXrefInclusion()
+    {
+        if (_xrefNames.Count == 0)
+        {
+            MessageBox.Show(this, "Deze tekening heeft geen gekoppelde xrefs.", "NLCS Legenda",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        using var dlg = new XrefInclusionDialog(_xrefNames, _settings);
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _settings.XrefInclusion = dlg.Result;
+            SyncAll();
+        }
+    }
+
+    // Omschrijvingen bewerken op de werkkopie; hetzelfde DescriptionOverrides-model als het losse
+    // commando. Alleen OK schrijft terug (Cancel = geen mutatie).
+    private void EditDescriptions()
+    {
+        using var dlg = new DescriptionsDialog(_settings.DescriptionOverrides.Clone());
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _settings.DescriptionOverrides = dlg.ToCatalog();
+            SyncAll();
+        }
+    }
+
+    private void RefreshGrids() => SyncAll();
 
     private void EditRemarks()
     {
@@ -333,17 +525,19 @@ internal sealed class SettingsDialog : Form
     }
 }
 
-// Eenvoudige lijsteditor voor namen (bijv. eigen statussen): toevoegen, hernoemen, verwijderen.
-// Geeft bij OK de bewerkte lijst terug; de aanroeper mapt die op de werkkopie.
-internal sealed class StringListEditDialog : Form
+// Per-xref keuze: een aankruislijst met de gekoppelde xrefs. Begint bij de huidige effectieve
+// keuze (IsXrefIncluded, inclusief de default-fallback) en geeft bij OK een expliciete map terug.
+internal sealed class XrefInclusionDialog : Form
 {
-    private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false };
+    private readonly CheckedListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false, CheckOnClick = true };
+    private readonly IReadOnlyList<string> _names;
 
-    public StringListEditDialog(string title, IEnumerable<string> values)
+    public XrefInclusionDialog(IReadOnlyList<string> names, LegendSettings settings)
     {
-        Text = title;
+        _names = names;
+        Text = "NLCS Legenda \u2013 xrefs";
         Font = SystemFonts.MessageBoxFont;
-        ClientSize = new Size(360, 320);
+        ClientSize = new Size(380, 340);
         MinimumSize = new Size(320, 240);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
@@ -351,23 +545,15 @@ internal sealed class StringListEditDialog : Form
         ShowIcon = false;
         MinimizeBox = false;
 
-        foreach (var v in values)
-            if (!string.IsNullOrWhiteSpace(v))
-                _list.Items.Add(v.Trim());
+        foreach (var name in names)
+            _list.Items.Add(name, settings.IsXrefIncluded(name));
 
         var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
-        var add = new Button { Text = "Toevoegen", AutoSize = true };
-        add.Click += (_, _) => { var n = Prompt("Nieuwe naam:"); if (!string.IsNullOrWhiteSpace(n)) _list.Items.Add(n.Trim()); };
-        var rename = new Button { Text = "Hernoemen", AutoSize = true };
-        rename.Click += (_, _) =>
-        {
-            if (_list.SelectedIndex < 0) return;
-            var n = Prompt("Nieuwe naam:", (string)_list.SelectedItem!);
-            if (!string.IsNullOrWhiteSpace(n)) _list.Items[_list.SelectedIndex] = n.Trim();
-        };
-        var remove = new Button { Text = "Verwijderen", AutoSize = true };
-        remove.Click += (_, _) => { if (_list.SelectedIndex >= 0) _list.Items.RemoveAt(_list.SelectedIndex); };
-        bar.Controls.AddRange(new Control[] { add, rename, remove });
+        var all = new Button { Text = "Alles aan", AutoSize = true };
+        all.Click += (_, _) => SetAll(true);
+        var none = new Button { Text = "Alles uit", AutoSize = true };
+        none.Click += (_, _) => SetAll(false);
+        bar.Controls.AddRange(new Control[] { all, none });
 
         var buttons = new ButtonBar(withApply: false);
         AcceptButton = buttons.Ok;
@@ -378,7 +564,146 @@ internal sealed class StringListEditDialog : Form
         Controls.Add(buttons);
     }
 
-    public IReadOnlyList<string> Values => _list.Items.Cast<string>().ToList();
+    public Dictionary<string, bool> Result
+    {
+        get
+        {
+            var map = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < _names.Count; i++)
+                map[_names[i]] = _list.GetItemChecked(i);
+            return map;
+        }
+    }
+
+    private void SetAll(bool value)
+    {
+        for (int i = 0; i < _list.Items.Count; i++)
+            _list.SetItemChecked(i, value);
+    }
+}
+
+// Eigen statussen beheren en leden toewijzen. Werkt op een diepe kopie en geeft bij OK de nieuwe
+// lijst terug. Leden zijn entry-keys (zelfde model als NLCSLEGENDASTATUS); toewijzen gebeurt via
+// de aankruislijst met de beschikbare regels uit de analyse en de eigen regels.
+internal sealed class CustomStatusDialog : Form
+{
+    private readonly List<CustomStatus> _statuses;
+    private readonly IReadOnlyList<(string Key, string Label)> _available;
+    private readonly ListBox _statusList = new() { Dock = DockStyle.Fill, IntegralHeight = false };
+    private readonly CheckedListBox _members = new() { Dock = DockStyle.Fill, IntegralHeight = false, CheckOnClick = true };
+    private bool _loading;
+
+    public CustomStatusDialog(IReadOnlyList<CustomStatus> initial, IReadOnlyList<(string Key, string Label)> available)
+    {
+        _statuses = initial.Select(c => c.Clone()).ToList();
+        _available = available;
+
+        Text = "NLCS Legenda \u2013 eigen statussen";
+        Font = SystemFonts.MessageBoxFont;
+        ClientSize = new Size(640, 440);
+        MinimumSize = new Size(520, 320);
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        ShowInTaskbar = false;
+        ShowIcon = false;
+        MinimizeBox = false;
+
+        var split = new SplitContainer { Dock = DockStyle.Fill };
+
+        var leftButtons = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        var add = new Button { Text = "Nieuw", AutoSize = true };
+        add.Click += (_, _) =>
+        {
+            var n = Prompt("Naam van de status:");
+            if (!string.IsNullOrWhiteSpace(n)) { _statuses.Add(new CustomStatus { Name = n.Trim() }); ReloadStatuses(_statuses.Count - 1); }
+        };
+        var rename = new Button { Text = "Hernoemen", AutoSize = true };
+        rename.Click += (_, _) =>
+        {
+            int i = _statusList.SelectedIndex;
+            if (i < 0) return;
+            var n = Prompt("Nieuwe naam:", _statuses[i].Name);
+            if (!string.IsNullOrWhiteSpace(n)) { _statuses[i].Name = n.Trim(); ReloadStatuses(i); }
+        };
+        var remove = new Button { Text = "Verwijderen", AutoSize = true };
+        remove.Click += (_, _) =>
+        {
+            int i = _statusList.SelectedIndex;
+            if (i < 0) return;
+            _statuses.RemoveAt(i);
+            ReloadStatuses(Math.Min(i, _statuses.Count - 1));
+        };
+        leftButtons.Controls.AddRange(new Control[] { add, rename, remove });
+        split.Panel1.Controls.Add(_statusList);
+        split.Panel1.Controls.Add(leftButtons);
+
+        var memberLabel = new Label { Dock = DockStyle.Top, Text = "Toegewezen regels:", Height = 22, TextAlign = ContentAlignment.MiddleLeft };
+        split.Panel2.Controls.Add(_members);
+        split.Panel2.Controls.Add(memberLabel);
+
+        _statusList.SelectedIndexChanged += (_, _) => LoadMembers();
+        _members.ItemCheck += OnMemberCheck;
+
+        var buttons = new ButtonBar(withApply: false);
+        AcceptButton = buttons.Ok;
+        CancelButton = buttons.Cancel;
+
+        Controls.Add(split);
+        Controls.Add(buttons);
+
+        // De splitter pas instellen als het venster een breedte heeft (anders gooit WinForms).
+        Load += (_, _) => { try { split.SplitterDistance = 220; } catch { /* standaardverdeling */ } };
+
+        ReloadStatuses(_statuses.Count > 0 ? 0 : -1);
+    }
+
+    public List<CustomStatus> Result => _statuses;
+
+    private void ReloadStatuses(int select)
+    {
+        _statusList.BeginUpdate();
+        _statusList.Items.Clear();
+        foreach (var s in _statuses)
+            _statusList.Items.Add($"{s.Name} ({s.Members.Count})");
+        _statusList.EndUpdate();
+        if (select >= 0 && select < _statusList.Items.Count)
+            _statusList.SelectedIndex = select;
+        else
+            LoadMembers();
+    }
+
+    private void LoadMembers()
+    {
+        _loading = true;
+        _members.BeginUpdate();
+        _members.Items.Clear();
+        int sel = _statusList.SelectedIndex;
+        var members = sel >= 0 ? _statuses[sel].Members : null;
+        foreach (var (key, label) in _available)
+            _members.Items.Add(label, members is not null && members.Contains(key, StringComparer.OrdinalIgnoreCase));
+        _members.EndUpdate();
+        _members.Enabled = sel >= 0;
+        _loading = false;
+    }
+
+    private void OnMemberCheck(object? sender, ItemCheckEventArgs e)
+    {
+        if (_loading) return;
+        int sel = _statusList.SelectedIndex;
+        if (sel < 0) return;
+        var key = _available[e.Index].Key;
+        var members = _statuses[sel].Members;
+        if (e.NewValue == CheckState.Checked)
+        {
+            if (!members.Contains(key, StringComparer.OrdinalIgnoreCase))
+                members.Add(key);
+        }
+        else
+        {
+            members.RemoveAll(m => string.Equals(m, key, StringComparison.OrdinalIgnoreCase));
+        }
+        _statusList.Items[sel] = $"{_statuses[sel].Name} ({members.Count})";
+    }
 
     private string? Prompt(string label, string initial = "")
     {
