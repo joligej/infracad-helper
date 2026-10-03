@@ -19,6 +19,7 @@ controle onmogelijk maken.
 | `NLCSLEGENDATEMPLATEMETEN` | Meet de legendageometrie tegen de referentietemplate. |
 | `NLCSLEGENDAUNDOSETUP` / `NLCSLEGENDAUNDORENAME` | Zetten een laaghernoem-/undo-regressie klaar en voeren die uit. |
 | `NLCSLEGENDAABCSETUP` / `NLCSLEGENDAABCVERIFY` | Bouwen drie legenda's en verifiëren na QSAVE/heropenen instellingen, geometrie en update-isolatie. |
+| `NLCSLEGENDACONSUMERTEST` | Controleert dat zichtbare schakelaars (kader, swatchkader, schaalbalk, titel, opmerkingen, hoeveelheden, symbolen) de getekende geometrie veranderen. |
 | `NLCSLEGENDAVIEWPORTTEST` | Controleert viewport-plaatsing en -schaal rond de legenda. |
 | `NLCSLEGENDAXREFSETUP` / `NLCSLEGENDAXREFVERIFY` | Bouwen een xref-scenario en verifiëren de opname ervan. |
 

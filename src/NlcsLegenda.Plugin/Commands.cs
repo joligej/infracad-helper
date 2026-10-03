@@ -2301,6 +2301,76 @@ public partial class Commands
         }
     }
 
+    // Consumer-audit op de echte host: elke zichtbare schakelaar moet de getekende geometrie
+    // veranderen. Bouwt telkens een verse legenda en vergelijkt het aantal entiteiten met de
+    // schakelaar aan en uit, zodat bewezen is dat de renderer de instelling echt verbruikt.
+    [CommandMethod("NLCSLEGENDACONSUMERTEST", CommandFlags.Modal)]
+    public void NlcsLegendaConsumerTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            int Count(Action<LegendSettings> tweak)
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var reg = LegendStore.Load(db, tr);
+                var s = LoadGlobalDefaults();
+                tweak(s);
+                var def = IsoDef(reg, s);
+                reg.Add(def);
+                int n = 0;
+                if (BuildManagedLegend(db, tr, reg, def, out _, out _) == UpdateResult.Updated)
+                {
+                    var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+                    if (gd.Contains(def.GroupName) && tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead) is Group g)
+                        foreach (var id in g.GetAllEntityIds())
+                        {
+                            if (tr.GetObject(id, OpenMode.ForRead) is not Entity e || e.IsErased)
+                                continue;
+                            // De legenda is een managed block; tel de geometrie in de definitie.
+                            if (e is BlockReference br
+                                && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord btr)
+                            {
+                                foreach (ObjectId bid in btr)
+                                    if (tr.GetObject(bid, OpenMode.ForRead) is Entity be && !be.IsErased)
+                                        n++;
+                            }
+                            else
+                            {
+                                n++;
+                            }
+                        }
+                }
+                tr.Commit();
+                PurgePending(db);
+                return n;
+            }
+
+            void Check(string label, Action<LegendSettings> on, Action<LegendSettings> off)
+            {
+                int a = Count(on);
+                int b = Count(off);
+                ed.WriteMessage($"\nCONSUMER: {label} aan={a} uit={b} -> {(a != b ? "OK" : "GEEN VERSCHIL")}");
+            }
+
+            Check("kader", s => s.DrawBorder = true, s => s.DrawBorder = false);
+            Check("swatchkader", s => s.DrawSwatchFrame = true, s => s.DrawSwatchFrame = false);
+            Check("schaalbalk", s => s.IncludeScaleBar = true, s => s.IncludeScaleBar = false);
+            Check("titel", s => s.IncludeTitle = true, s => s.IncludeTitle = false);
+            Check("opmerkingen", s => s.IncludeRemarks = true, s => s.IncludeRemarks = false);
+            Check("hoeveelheden", s => s.IncludeQuantities = true, s => s.IncludeQuantities = false);
+            Check("symbolen", s => s.InsertSymbolBlocks = true, s => s.InsertSymbolBlocks = false);
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nCONSUMER error: {ex.Message}");
+        }
+    }
+
     // Echte xref-integratie: analyseert het gastbestand met per xref een eigen inclusie en
     // toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. Verwacht >= 2 xrefs.
     [CommandMethod("NLCSLEGENDAXREFANALYSE", CommandFlags.Modal)]
