@@ -15,6 +15,8 @@ public sealed class AnalysisResult
 
     public int DescribedLayerCount { get; init; }
 
+    public int AttrDescribedLayerCount { get; init; }
+
     public int ExcludedNlcsLayerCount { get; init; }
 }
 
@@ -27,6 +29,10 @@ public static class DrawingAnalyzer
         public readonly Dictionary<string, HatchSample> Hatches = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, LayerMetric> Metrics = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, string> SymbolBlocks = new(StringComparer.OrdinalIgnoreCase);
+        // Per laag de getelde OMSCHRIJVING-attribuutwaarden van KLIC-symbolen; de meest
+        // voorkomende niet-lege waarde is de echte omschrijving uit de tekening.
+        public readonly Dictionary<string, Dictionary<string, int>> AttrOms =
+            new(StringComparer.OrdinalIgnoreCase);
         public readonly HashSet<string> ExcludedNlcs = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, bool> Visible = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<ObjectId> Excluded = new();
@@ -64,6 +70,11 @@ public static class DrawingAnalyzer
         }
 
         var descriptions = ReadLayerDescriptions(db, tr, c.Parsed.Values);
+        // De echte OMSCHRIJVING uit de KLIC-symboolattributen krijgt voorrang op de laag-
+        // beschrijving (die bij KLIC vaak de lege template "TYPE \ LABEL \ OMSCHRIJVING" is).
+        var attrDesc = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in c.AttrOms)
+            attrDesc[kv.Key] = kv.Value.OrderByDescending(x => x.Value).ThenBy(x => x.Key, StringComparer.Ordinal).First().Key;
 
         foreach (var manual in settings.ManualEntries)
         {
@@ -104,7 +115,8 @@ public static class DrawingAnalyzer
         // alleen de basiscatalogus doorgeven.
         var entries = LegendGrouping.Build(
             c.Parsed.Values, settings,
-            name => descriptions.TryGetValue(name, out var d) ? d : null,
+            name => attrDesc.TryGetValue(name, out var a) ? a
+                  : descriptions.TryGetValue(name, out var d) ? d : null,
             c.Metrics,
             name => c.SymbolBlocks.TryGetValue(name, out var b) ? b : null,
             catalog,
@@ -116,6 +128,7 @@ public static class DrawingAnalyzer
             HatchSamples = c.Hatches,
             UsedNlcsLayerCount = c.Parsed.Count,
             DescribedLayerCount = descriptions.Count,
+            AttrDescribedLayerCount = attrDesc.Count,
             ExcludedNlcsLayerCount = c.ExcludedNlcs.Count
         };
     }
@@ -206,13 +219,46 @@ public static class DrawingAnalyzer
         if (ent is Hatch hatch && !c.Hatches.ContainsKey(layerName))
             c.Hatches[layerName] = HatchSample.From(hatch);
 
-        if (ent is BlockReference symbolRef && nlcs.DrawType == NlcsDrawType.Symbool
-            && !c.SymbolBlocks.ContainsKey(nlcs.LocalName))
+        if (ent is BlockReference symbolRef && nlcs.DrawType == NlcsDrawType.Symbool)
         {
-            var name = BlockName(symbolRef, tr);
-            if (!string.IsNullOrEmpty(name) && !name.StartsWith('*'))
-                c.SymbolBlocks[nlcs.LocalName] = name;
+            if (!c.SymbolBlocks.ContainsKey(nlcs.LocalName))
+            {
+                var name = BlockName(symbolRef, tr);
+                if (!string.IsNullOrEmpty(name) && !name.StartsWith('*'))
+                    c.SymbolBlocks[nlcs.LocalName] = name;
+            }
+            // KLIC-symbolen dragen de echte omschrijving in het attribuut OMSCHRIJVING. Tel de
+            // niet-lege waarden per laag; de meest voorkomende wint bij de omschrijving.
+            var oms = ReadAttribute(symbolRef, tr, "OMSCHRIJVING");
+            if (!string.IsNullOrWhiteSpace(oms))
+            {
+                if (!c.AttrOms.TryGetValue(nlcs.LocalName, out var counts))
+                {
+                    counts = new Dictionary<string, int>(StringComparer.Ordinal);
+                    c.AttrOms[nlcs.LocalName] = counts;
+                }
+                counts.TryGetValue(oms, out var n);
+                counts[oms] = n + 1;
+            }
         }
+    }
+
+    // Leest de waarde van een attribuut (op tag) uit een blokreferentie; lege string als het
+    // attribuut ontbreekt. Constante attributen zitten niet in AttributeCollection en worden
+    // hier bewust overgeslagen (die dragen geen tekening-specifieke waarde).
+    private static string ReadAttribute(BlockReference br, Transaction tr, string tag)
+    {
+        try
+        {
+            foreach (ObjectId attId in br.AttributeCollection)
+            {
+                if (tr.GetObject(attId, OpenMode.ForRead) is AttributeReference att
+                    && string.Equals(att.Tag, tag, StringComparison.OrdinalIgnoreCase))
+                    return att.TextString?.Trim() ?? string.Empty;
+            }
+        }
+        catch { /* beschadigde/niet-leesbare attributen overslaan */ }
+        return string.Empty;
     }
 
     private static void AddMetric(Entity ent, string localLayer, Collector c, Matrix3d transform)

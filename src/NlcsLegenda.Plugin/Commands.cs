@@ -2519,6 +2519,104 @@ public partial class Commands
         }
     }
 
+    // Performance-harness op de echte KLIC-bron: meet parse/analyse, groepering, CompositionTree
+    // en export (CSV/JSON). Rapporteert entity/laag-aantallen en de mediaan over meerdere runs.
+    [CommandMethod("NLCSLEGENDAPERFTEST", CommandFlags.Modal)]
+    public void NlcsLegendaPerfTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            var settings = LoadGlobalDefaults();
+            settings.ExcludedDisciplines.Clear();
+            settings.ExcludedHoofdgroepen.Clear();
+
+            int entities = 0, layers = 0, entries = 0;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+                var ms = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+                foreach (var _ in ms) entities++;
+                layers = ((LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead)).Cast<ObjectId>().Count();
+                tr.Commit();
+            }
+
+            double Median(List<double> xs) { xs.Sort(); return xs.Count == 0 ? 0 : xs[xs.Count / 2]; }
+            var tAnalyze = new List<double>();
+            var tTree = new List<double>();
+            var tCsv = new List<double>();
+            var tJson = new List<double>();
+            const int runs = 5;
+            for (int i = 0; i < runs; i++)
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var excluded = LegendManagement.CollectManagedIds(db, tr, LegendStore.Load(db, tr));
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded);
+                sw.Stop(); tAnalyze.Add(sw.Elapsed.TotalMilliseconds);
+                entries = analysis.Entries.Count;
+
+                var items = analysis.Entries.Select(e =>
+                    (LegendSettings.EntryKey(e), $"[{e.Status.DisplayName()}] {e.Description}", EntryGroupLabel(e)));
+                sw.Restart();
+                CompositionTree.Build(items, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+                sw.Stop(); tTree.Add(sw.Elapsed.TotalMilliseconds);
+
+                sw.Restart(); LegendExport.ToCsv(analysis.Entries); sw.Stop(); tCsv.Add(sw.Elapsed.TotalMilliseconds);
+                sw.Restart(); LegendExport.ToJson(analysis.Entries); sw.Stop(); tJson.Add(sw.Elapsed.TotalMilliseconds);
+                tr.Commit();
+            }
+
+            ed.WriteMessage($"\nPERF: entities={entities} layers={layers} entries={entries} runs={runs}");
+            ed.WriteMessage($"\nPERF: analyse mediaan {Median(tAnalyze):0.0} ms (groepering inbegrepen)");
+            ed.WriteMessage($"\nPERF: tree mediaan {Median(tTree):0.0} ms");
+            ed.WriteMessage($"\nPERF: csv mediaan {Median(tCsv):0.0} ms");
+            ed.WriteMessage($"\nPERF: json mediaan {Median(tJson):0.0} ms");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nPERF error: {ex.Message}");
+        }
+    }
+
+    // Bewijst dat de echte OMSCHRIJVING uit KLIC-symboolattributen in de omschrijving terechtkomt
+    // (bron = laagbeschrijving) in plaats van de onderdrukte placeholder/laagnaam.
+    [CommandMethod("NLCSLEGENDAKLICATTRTEST", CommandFlags.Modal)]
+    public void NlcsLegendaKlicAttrTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            var settings = LoadGlobalDefaults();
+            settings.ExcludedDisciplines.Clear();
+            settings.ExcludedHoofdgroepen.Clear();
+            settings.IncludeInvisibleLayers = true;
+            settings.IncludeXrefLayers = true;
+            using var tr = db.TransactionManager.StartTransaction();
+            var excluded = LegendManagement.CollectManagedIds(db, tr, LegendStore.Load(db, tr));
+            var an = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded);
+            var fromDrawing = an.Entries
+                .Where(e => e.DescriptionSource == DescriptionSource.Laagbeschrijving)
+                .ToList();
+            ed.WriteMessage($"\nKLICATTR: entries={an.Entries.Count} attr-lagen={an.AttrDescribedLayerCount} laagdesc-lagen={an.DescribedLayerCount} met laagbeschrijving-bron={fromDrawing.Count}");
+            foreach (var e in fromDrawing.Take(6))
+                ed.WriteMessage($"\n  {e.Element} -> \"{e.Description}\"");
+            tr.Commit();
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nKLICATTR error: {ex.Message}");
+        }
+    }
+
     // Headless bewijs van de laagnaam-rename: maakt testlagen met entiteiten, hernoemt (dry-run
     // + apply in één transactie), test een botsing met samenvoegen en een vergrendelde bronlaag.
     [CommandMethod("NLCSLEGENDALAAGNAAMTEST", CommandFlags.Modal)]
