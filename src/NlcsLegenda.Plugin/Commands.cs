@@ -2083,6 +2083,63 @@ public partial class Commands
             ? $"{e.MinPoint.X:0.0},{e.MinPoint.Y:0.0},{e.MaxPoint.X:0.0},{e.MaxPoint.Y:0.0}"
             : string.Empty;
 
+    // Inhoudelijke vingerafdruk van een legenda-groep: per getekende entiteit soort|laag|
+    // afgeronde bounds|tekst, gesorteerd en gehasht. Fijner dan alleen de extents: andere inhoud
+    // met dezelfde omhullende geeft een andere hash. Deterministisch.
+    private static string ContentFingerprint(Database db, Transaction tr, string groupName)
+    {
+        var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+        if (!gd.Contains(groupName) || tr.GetObject(gd.GetAt(groupName), OpenMode.ForRead) is not Group g)
+            return string.Empty;
+
+        var parts = new List<string>();
+        void Add(Entity e)
+        {
+            string bounds = e.Bounds is { } b
+                ? $"{b.MinPoint.X:0.0},{b.MinPoint.Y:0.0},{b.MaxPoint.X:0.0},{b.MaxPoint.Y:0.0}"
+                : "-";
+            string text = e switch { DBText t => t.TextString, MText m => m.Contents, _ => string.Empty };
+            parts.Add($"{e.GetType().Name}|{e.Layer}|{bounds}|{text}");
+        }
+
+        foreach (var id in g.GetAllEntityIds())
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity e || e.IsErased)
+                continue;
+            if (e is BlockReference br && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord btr)
+                foreach (ObjectId bid in btr)
+                {
+                    if (tr.GetObject(bid, OpenMode.ForRead) is Entity be && !be.IsErased)
+                        Add(be);
+                }
+            else
+                Add(e);
+        }
+        parts.Sort(StringComparer.Ordinal);
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(string.Join("\n", parts)));
+        return parts.Count + ":" + Convert.ToHexString(hash, 0, 6);
+    }
+
+    // Handles van NLCS-objecten in model space, voor selectie-gebonden legenda's in de testharness.
+    private static List<string> CollectNlcsHandles(Database db, Transaction tr, int max)
+    {
+        var handles = new List<string>();
+        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        var ms = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+        foreach (ObjectId id in ms)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is Entity e && !e.IsErased
+                && NlcsLayerParser.TryParse(e.Layer, out _))
+            {
+                handles.Add(e.Handle.ToString());
+                if (handles.Count >= max)
+                    break;
+            }
+        }
+        return handles;
+    }
+
     // Xref-isolatie over opslaan/heropenen. SETUP maakt drie legenda's met eigen xref-keuzes en
     // bewaart ze in de tekening; na QSAVE + heropenen controleert VERIFY dat elke legenda zijn
     // eigen xref-inclusie houdt en dat een andere legenda of de globale default A/B niet raakt.
@@ -2193,43 +2250,108 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
+
+        // Globale config exact bewaren; de global-change hieronder zet 'm in finally terug.
+        byte[]? origConfig = File.Exists(ConfigPath) ? File.ReadAllBytes(ConfigPath) : null;
         try
         {
-            string firstKey = string.Empty;
             using var tr = db.TransactionManager.StartTransaction();
             var reg = LegendStore.Load(db, tr);
             var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
-            var probe = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db), excludedIds: excluded);
-            if (probe.Entries.Count > 0)
-                firstKey = LegendSettings.EntryKey(probe.Entries[0]);
 
+            // Twee disjuncte selecties als verschillende bronnen voor A en B; C is de hele tekening.
+            var handles = CollectNlcsHandles(db, tr, 400);
+            int half = handles.Count / 2;
+            var handlesA = handles.Take(half).ToList();
+            var handlesB = handles.Skip(half).ToList();
+
+            var probe = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db), excludedIds: excluded);
+            string firstKey = probe.Entries.Count > 0 ? LegendSettings.EntryKey(probe.Entries[0]) : string.Empty;
+
+            // A: selectie-bron, eigen schaal, handregel, eigen status + lid, omschrijving, 1 kolom.
             var sA = LoadGlobalDefaults();
             sA.Title = "ABC-A";
+            sA.Scale = 200;
+            sA.Columns = 1;
+            sA.RemarksText = "ABC-A opmerking";
             sA.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VV-ABC-G", Type = NlcsDrawType.Geometrie, Description = "ABC-handregel A" });
-            sA.CustomStatuses.Add(new CustomStatus { Name = "ABC-STATUS-A" });
+            var statusA = new CustomStatus { Name = "ABC-STATUS-A" };
+            if (firstKey.Length > 0) statusA.Members.Add(firstKey);
+            sA.CustomStatuses.Add(statusA);
+            if (firstKey.Length > 0)
+                sA.DescriptionOverrides.Elementen[firstKey] = new DescriptionEntry { Specifiek = "ABC-A-TEKST" };
 
+            // B: andere selectie-bron, andere schaal, uitsluiting, groepering aan, 2 kolommen.
             var sB = LoadGlobalDefaults();
             sB.Title = "ABC-B";
             sB.Scale = 500;
-            if (firstKey.Length > 0)
-                sB.ExcludedEntries.Add(firstKey);
+            sB.Columns = 2;
+            sB.RemarksText = "ABC-B opmerking";
+            sB.MergedDimensions.Add(GroupDimension.Soort);
+            if (firstKey.Length > 0) sB.ExcludedEntries.Add(firstKey);
 
+            var defA = IsoDef(reg, sA);
+            defA.Scope = handlesA.Count > 0 ? LegendScope.Selection : LegendScope.WholeDrawing;
+            defA.SourceHandles = handlesA;
+            var defB = IsoDef(reg, sB);
+            defB.Scope = handlesB.Count > 0 ? LegendScope.Selection : LegendScope.WholeDrawing;
+            defB.SourceHandles = handlesB;
+            reg.Add(defA);
+            reg.Add(defB);
+            BuildManagedLegend(db, tr, reg, defA, out _, out _);
+            BuildManagedLegend(db, tr, reg, defB, out _, out _);
+
+            // Global wijzigen en C met de nieuwe global maken (hele tekening). A/B zijn al gebouwd
+            // met hun eigen snapshot en mogen hier niet door veranderen.
+            var ng = LoadGlobalDefaults();
+            ng.Scale = 1000;
+            ng.DrawBorder = false;
+            SaveGlobalDefaults(ng);
             var sC = LoadGlobalDefaults();
             sC.Title = "ABC-C";
+            var defC = IsoDef(reg, sC);
+            reg.Add(defC);
+            BuildManagedLegend(db, tr, reg, defC, out _, out _);
 
-            foreach (var s in new[] { sA, sB, sC })
-            {
-                var def = IsoDef(reg, s);
-                reg.Add(def);
-                BuildManagedLegend(db, tr, reg, def, out _, out _);
-            }
             LegendStore.Save(db, tr, reg);
             tr.Commit();
-            ed.WriteMessage("\nABC: setup klaar. QSAVE, heropenen, dan NLCSLEGENDAABCVERIFY.");
+            ed.WriteMessage($"\nABC: setup klaar (A-selectie={handlesA.Count}, B-selectie={handlesB.Count}). QSAVE, heropenen, dan NLCSLEGENDAABCVERIFY.");
         }
         catch (Exception ex)
         {
             ed.WriteMessage($"\nABC setup error: {ex.Message}");
+        }
+        finally
+        {
+            // Globale config exact terugzetten (data-veiligheid).
+            if (origConfig is null)
+            {
+                try { if (File.Exists(ConfigPath)) File.Delete(ConfigPath); } catch { /* geen config om te herstellen */ }
+            }
+            else
+            {
+                File.WriteAllBytes(ConfigPath, origConfig);
+            }
+        }
+    }
+
+    // Analyseert één legenda (met zijn eigen bron en instellingen) en levert de uittrekstaat-CSV.
+    private string ExportCsv(Database db, Transaction tr, LegendDefinition def)
+    {
+        try
+        {
+            var reg = LegendStore.Load(db, tr);
+            var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
+            ObjectId[]? selection = def.Scope == LegendScope.Selection
+                ? LegendManagement.ResolveHandles(db, def.SourceHandles, out _)
+                : null;
+            var entries = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, LoadCatalog(db), excluded).Entries;
+            return LegendExport.ToCsv(entries, def.Settings.QuantityDecimals,
+                def.Settings.UnitArea, def.Settings.UnitLength, def.Settings.UnitCount);
+        }
+        catch
+        {
+            return string.Empty;
         }
     }
 
@@ -2243,7 +2365,7 @@ public partial class Commands
         var db = doc.Database;
         try
         {
-            string bBefore = string.Empty, cBefore = string.Empty;
+            string fpBbefore = string.Empty, fpCbefore = string.Empty;
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var reg = LegendStore.Load(db, tr);
@@ -2259,41 +2381,61 @@ public partial class Commands
                     return;
                 }
 
-                var gd = LoadGlobalDefaults();
-                bool settingsOk =
-                    a.Settings.Scale == gd.Scale && a.Settings.ManualEntries.Count == 1 && a.Settings.CustomStatuses.Count == 1 &&
-                    b.Settings.Scale == 500 && b.Settings.ManualEntries.Count == 0 &&
-                    c.Settings.Scale == gd.Scale && c.Settings.ManualEntries.Count == 0 && c.Settings.ExcludedEntries.Count == 0;
-                ed.WriteMessage($"\nABC: instellingen A(sc={a.Settings.Scale:0},man={a.Settings.ManualEntries.Count},st={a.Settings.CustomStatuses.Count}) " +
-                    $"B(sc={b.Settings.Scale:0}) C(sc={c.Settings.Scale:0},excl={c.Settings.ExcludedEntries.Count}) -> {(settingsOk ? "OK" : "FAIL")}");
+                // Bronnen overleefden de schijf-rondgang: A/B zijn selecties, C de hele tekening.
+                bool sourcesOk = a.Scope == LegendScope.Selection && a.SourceHandles.Count > 0
+                    && b.Scope == LegendScope.Selection && b.SourceHandles.Count > 0
+                    && c.Scope == LegendScope.WholeDrawing;
+                ed.WriteMessage($"\nABC: bronnen A={a.Scope}({a.SourceHandles.Count}) B={b.Scope}({b.SourceHandles.Count}) C={c.Scope} -> {(sourcesOk ? "OK" : "FAIL")}");
 
-                string ga = GeomHash(db, tr, a.GroupName);
-                string gb = GeomHash(db, tr, b.GroupName);
-                string gc = GeomHash(db, tr, c.GroupName);
-                bool geomOk = ga.Length > 0 && gb.Length > 0 && gc.Length > 0;
-                ed.WriteMessage($"\nABC: geometrie A={ga} B={gb} C={gc} -> {(geomOk ? "OK" : "FAIL")}");
-                bBefore = gb; cBefore = gc;
+                bool configOk = a.Settings.Scale == 200 && a.Settings.Columns == 1 && a.Settings.ManualEntries.Count == 1
+                    && a.Settings.CustomStatuses.Count == 1
+                    && b.Settings.Scale == 500 && b.Settings.Columns == 2 && b.Settings.MergedDimensions.Count >= 1
+                    && b.Settings.ExcludedEntries.Count >= 1;
+                ed.WriteMessage($"\nABC: config A(sc={a.Settings.Scale:0},kol={a.Settings.Columns},man={a.Settings.ManualEntries.Count},st={a.Settings.CustomStatuses.Count}) " +
+                    $"B(sc={b.Settings.Scale:0},kol={b.Settings.Columns},groep={b.Settings.MergedDimensions.Count},excl={b.Settings.ExcludedEntries.Count}) -> {(configOk ? "OK" : "FAIL")}");
+
+                // Global-isolatie: global is gewijzigd vóór C; A/B hielden hun eigen schaal, C kreeg de nieuwe.
+                bool globalIso = a.Settings.Scale == 200 && b.Settings.Scale == 500
+                    && c.Settings.Scale == 1000 && !c.Settings.DrawBorder;
+                ed.WriteMessage($"\nABC: global-isolatie C(sc={c.Settings.Scale:0},kader={c.Settings.DrawBorder}) -> {(globalIso ? "OK" : "FAIL")}");
+
+                // Inhoudelijke vingerafdrukken: geometrie overleefde en A/B/C verschillen echt.
+                string fpA = ContentFingerprint(db, tr, a.GroupName);
+                string fpB = ContentFingerprint(db, tr, b.GroupName);
+                string fpC = ContentFingerprint(db, tr, c.GroupName);
+                bool fpOk = fpA.Length > 0 && fpB.Length > 0 && fpC.Length > 0 && fpA != fpB && fpA != fpC && fpB != fpC;
+                ed.WriteMessage($"\nABC: vingerafdruk A={fpA} B={fpB} C={fpC} -> {(fpOk ? "verschillend OK" : "FAIL")}");
+                fpBbefore = fpB;
+                fpCbefore = fpC;
+
+                // Export-isolatie: A en B leveren een verschillende uittrekstaat (eigen bron + config).
+                string csvA = ExportCsv(db, tr, a);
+                string csvB = ExportCsv(db, tr, b);
+                bool exportOk = csvA.Length > 0 && csvB.Length > 0 && csvA != csvB;
+                ed.WriteMessage($"\nABC: export A={csvA.Length}tk B={csvB.Length}tk -> {(exportOk ? "verschillend OK" : "FAIL")}");
+
                 tr.Commit();
             }
             PurgePending(db);
 
-            string bAfter, cAfter;
+            // Na heropenen A bewerken mag B/C inhoudelijk niet raken (update-isolatie blijft gelden).
+            string fpBafter, fpCafter;
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var reg = LegendStore.Load(db, tr);
                 var a = reg.Legends.First(l => l.Settings.Title == "ABC-A");
-                a.Settings.Scale = 1000;
+                a.Settings.Scale = 300;
                 BuildManagedLegend(db, tr, reg, a, out _, out _);
                 var b = reg.Legends.First(l => l.Settings.Title == "ABC-B");
                 var c = reg.Legends.First(l => l.Settings.Title == "ABC-C");
-                bAfter = GeomHash(db, tr, b.GroupName);
-                cAfter = GeomHash(db, tr, c.GroupName);
+                fpBafter = ContentFingerprint(db, tr, b.GroupName);
+                fpCafter = ContentFingerprint(db, tr, c.GroupName);
                 LegendStore.Save(db, tr, reg);
                 tr.Commit();
             }
             PurgePending(db);
-            bool isoOk = bBefore == bAfter && cBefore == cAfter;
-            ed.WriteMessage($"\nABC: na A bewerken B/C-geometrie {(isoOk ? "ongewijzigd" : "GEWIJZIGD")} (B {bBefore}->{bAfter} C {cBefore}->{cAfter})");
+            bool isoOk = fpBbefore == fpBafter && fpCbefore == fpCafter;
+            ed.WriteMessage($"\nABC: na A bewerken B/C-vingerafdruk {(isoOk ? "ongewijzigd" : "GEWIJZIGD")}");
         }
         catch (Exception ex)
         {
