@@ -180,7 +180,7 @@ public static class LegendBuilder
         int segments = Math.Max(1, s.ScaleBarSegments);
         double segMeters = s.ScaleBarSegmentMeters > 0
             ? s.ScaleBarSegmentMeters
-            : NiceStep(50.0 * s.Scale / 1000.0 / segments); // richt op ~50 mm papier totaal
+            : ScaleBarMath.NiceStep(50.0 * s.Scale / 1000.0 / segments); // richt op ~50 mm papier totaal
         if (segMeters <= 0)
             segMeters = 1.0;
 
@@ -244,27 +244,11 @@ public static class LegendBuilder
         mt.Width = Math.Max(widthModel, textH * 4);
         mt.Attachment = AttachmentPoint.TopLeft;
         mt.Location = new Point3d(left, y, 0);
-        mt.Contents = ToMTextContents(s.RemarksText);
+        mt.Contents = MTextFormat.Escape(s.RemarksText);
         btr.AppendEntity(mt);
         tr.AddNewlyCreatedDBObject(mt, true);
 
         return y - mt.ActualHeight;
-    }
-
-    // MText heeft eigen escapes voor accolades, backslashes en regeleindes.
-    private static string ToMTextContents(string text) =>
-        text.Replace("\\", "\\\\").Replace("{", "\\{").Replace("}", "\\}")
-            .Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "\\P");
-
-    private static double NiceStep(double value)
-    {
-        if (value <= 0)
-            return 1.0;
-        double exp = Math.Floor(Math.Log10(value));
-        double pow = Math.Pow(10, exp);
-        double f = value / pow;
-        double nice = f < 1.5 ? 1 : f < 3 ? 2 : f < 4 ? 2.5 : f < 7.5 ? 5 : 10;
-        return nice * pow;
     }
 
     private static double TextWidthEstimate(string text, double height) => text.Length * height * 0.6;
@@ -358,7 +342,7 @@ public static class LegendBuilder
             mt.Width = textColWidth;
             mt.Attachment = AttachmentPoint.MiddleLeft;
             mt.Location = new Point3d(x + swatchW + textGap, top - item.RowHeight / 2.0, 0);
-            mt.Contents = ToMTextContents(entry.Description);
+            mt.Contents = MTextFormat.Escape(entry.Description);
             btr.AppendEntity(mt);
             tr.AddNewlyCreatedDBObject(mt, true);
         }
