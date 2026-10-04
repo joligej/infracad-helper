@@ -43,6 +43,9 @@ instellingen waarmee hij is gemaakt. De instelcommando's (`NLCSLEGENDAOPTIES`,
 het toepast: op een bestaande legenda (die wordt dan meteen bijgewerkt) of op de globale
 standaard voor nieuwe legenda's. Bestaat er nog geen legenda, dan geldt vanzelf de globale
 standaard. De instellingen van één bestaande legenda bewerk je ook via `NLCSLEGENDABEHEER`.
+Het instellingenvenster bundelt alles in tabbladen: naast schaal, inhoud, opmaak, teksten,
+hoeveelheden en schaalbalk zitten daar ook de per-xref keuze, de eigen statussen inclusief
+ledentoewijzing en de omschrijvingen. De losse commando's blijven als snelkoppeling bestaan.
 De omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`, en `NLCSLEGENDATEKST` past de
 tekst van één aangeklikt element aan. Een nieuwe legenda wordt standaard als één blok
 geplaatst; met *Exploderen bij plaatsen* kies je losse entiteiten.
