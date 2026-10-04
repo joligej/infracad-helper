@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.24.0 - 2026-10-04
+
+- Het instellingenvenster is nu volledig met normale bedieningselementen op elk tabblad. De
+  per-xref keuze, eigen statussen inclusief ledentoewijzing en de omschrijvingen stel je in
+  vanuit datzelfde venster; de losse commando's blijven als snelkoppeling bestaan.
+- NLCS-symbolen en arceringen in doorsnede en niet-zichtbare symbolen (aspectcodes AD, SD, SN,
+  SV) worden nu als symbool of arcering herkend.
+
 ## 1.23.0 - 2026-10-03
 
 - KLIC-symbolen gebruiken nu de echte omschrijving uit het attribuut OMSCHRIJVING (bijv.
