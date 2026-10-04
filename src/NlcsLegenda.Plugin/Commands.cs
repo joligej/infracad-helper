@@ -2769,6 +2769,30 @@ public partial class Commands
                     tr.Commit();
                 }
             }
+
+            // Variant 7: symboolzware legenda (alleen symbolen) frameren.
+            var sym = LoadGlobalDefaults();
+            sym.ToonGeometrie = false; sym.ToonVlakken = false; sym.ToonArceringen = false;
+            sym.ToonVlakvullingen = false; sym.ToonSymbolen = true; sym.InsertSymbolBlocks = true;
+            if (Measure(sym, out var mw5, out var mh5, out var c5))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: symboolzwaar {mw5:0.0} x {mh5:0.0} modeleenheden");
+                CheckAt("symboolzwaar", mw5, mh5, c5, 200.0);
+            }
+
+            // Variant 8: lange meerregelige opmerkingen maken de legenda hoger; de viewport moet
+            // die extra hoogte meenemen (geen clipping).
+            var rem = LoadGlobalDefaults();
+            rem.IncludeRemarks = true;
+            rem.RemarksText = string.Join("\n",
+                Enumerable.Range(1, 18).Select(i => $"Opmerkingregel {i} met wat extra tekst om te laten teruglopen"));
+            if (Measure(rem, out var mw6, out var mh6, out var c6))
+            {
+                PurgePending(db);
+                ed.WriteMessage($"\nVPTEST: opmerkingzwaar {mw6:0.0} x {mh6:0.0} modeleenheden");
+                CheckAt("opmerkingzwaar", mw6, mh6, c6, 200.0);
+            }
         }
         catch (Exception ex)
         {
