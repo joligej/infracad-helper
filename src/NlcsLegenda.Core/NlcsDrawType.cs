@@ -20,9 +20,9 @@ public static class NlcsDrawTypeExtensions
     {
         var s = (suffix ?? string.Empty).Trim().ToUpperInvariant();
         if (s.Length == 0) return NlcsDrawType.Overig;
-        if (s == "A") return NlcsDrawType.Arcering;
+        if (s == "A" || s == "AD") return NlcsDrawType.Arcering;          // AD = arcering in doorsnede
         if (s == "V") return NlcsDrawType.Vlakvulling;
-        if (s == "S") return NlcsDrawType.Symbool;
+        if (s == "S" || s == "SD" || s == "SN" || s == "SV") return NlcsDrawType.Symbool; // symbool in doorsnede/niet zichtbaar/verticaal
         if (s == "GV") return NlcsDrawType.Vlak;
         if (s == "G" || s == "GD" || s == "GS") return NlcsDrawType.Geometrie;
         // T gevolgd door een schaalgetal (T25/T35/T50) of enkel "T".

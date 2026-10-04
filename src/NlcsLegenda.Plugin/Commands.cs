@@ -2506,6 +2506,11 @@ public partial class Commands
             Check("opmerkingen", s => s.IncludeRemarks = true, s => s.IncludeRemarks = false);
             Check("hoeveelheden", s => s.IncludeQuantities = true, s => s.IncludeQuantities = false);
             Check("symbolen", s => s.InsertSymbolBlocks = true, s => s.InsertSymbolBlocks = false);
+
+            // Beide plaatsingspaden moeten geometrie opleveren: blok behouden en exploderen.
+            int exploded = Count(s => s.ExplodeOnPlace = true);
+            int retained = Count(s => s.ExplodeOnPlace = false);
+            ed.WriteMessage($"\nCONSUMER: exploderen={exploded} behouden={retained} -> {(exploded > 0 && retained > 0 ? "OK" : "FAIL")}");
         }
         catch (Exception ex)
         {
