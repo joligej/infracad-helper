@@ -115,5 +115,7 @@ public enum DescriptionSource
 
     Handmatig,
 
-    Laagnaam
+    Laagnaam,
+
+    EigenKoppeling
 }

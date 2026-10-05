@@ -12,7 +12,7 @@ public class CustomLayerRuleTests
     {
         var settings = new LegendSettings();
         settings.CustomLayerRules.Add(rule);
-        var canonical = rule.ToCanonical(string.Empty);
+        var canonical = rule.ToCanonical(string.Empty, rule.Layer);
         var metrics = new Dictionary<string, LayerMetric> { [canonical.LocalName] = metric };
         var entries = LegendGrouping.Build(
             new[] { canonical }, settings,
@@ -47,7 +47,7 @@ public class CustomLayerRuleTests
         // per ongeluk wegvallen.
         var settings = new LegendSettings();
         var rule = new CustomLayerRule { Layer = "Eigen laag", Element = "E", Type = NlcsDrawType.Geometrie, Description = "E" };
-        Assert.True(settings.IsIncluded(rule.ToCanonical(string.Empty)));
+        Assert.True(settings.IsIncluded(rule.ToCanonical(string.Empty, rule.Layer)));
     }
 
     [Fact]
@@ -59,8 +59,8 @@ public class CustomLayerRuleTests
         settings.CustomLayerRules.Add(line);
         settings.CustomLayerRules.Add(hatch);
 
-        var cl = line.ToCanonical(string.Empty);
-        var ch = hatch.ToCanonical(string.Empty);
+        var cl = line.ToCanonical(string.Empty, line.Layer);
+        var ch = hatch.ToCanonical(string.Empty, hatch.Layer);
         var entries = LegendGrouping.Build(new[] { cl, ch }, settings,
             layerDescription: _ => "Eigen asfalt");
 
@@ -107,5 +107,64 @@ public class CustomLayerRuleTests
         Assert.True(specific.Matches("L", "ref1"));
         Assert.False(specific.Matches("L", "ref2"));
         Assert.False(specific.Matches("L", string.Empty));
+    }
+
+    [Fact]
+    public void Matches_StripsXrefPrefix_FromDatabaseLayerName()
+    {
+        // Een xref-afhankelijke laag heet in de host-database "xrefnaam|laag"; de regel matcht
+        // op de lokale laagnaam, niet op de volledige host-gekwalificeerde naam.
+        var any = new CustomLayerRule { Layer = "Eigen kabels", Element = "E", Scope = CustomSourceScope.AnySource };
+        Assert.True(any.Matches("XREFA|Eigen kabels", "XREFA"));
+
+        var specific = new CustomLayerRule { Layer = "Eigen kabels", Element = "E", Scope = CustomSourceScope.SpecificXref, XrefName = "XREFA" };
+        Assert.True(specific.Matches("XREFA|Eigen kabels", "XREFA"));
+        Assert.False(specific.Matches("XREFB|Eigen kabels", "XREFB"));
+    }
+
+    [Fact]
+    public void Matches_BlockFilter_DoesNotBypassScope()
+    {
+        // Een blokfilter mag de bron-check niet kortsluiten: een SpecificXref-regel matcht nooit
+        // op de hoofdtekening, ook niet als er een bloknaam is ingevuld.
+        var rule = new CustomLayerRule
+        {
+            Layer = "L", Element = "E", Scope = CustomSourceScope.SpecificXref, XrefName = "ref1", BlockName = "PUT"
+        };
+        Assert.False(rule.Matches("L", string.Empty));
+        Assert.True(rule.Matches("L", "ref1"));
+    }
+
+    [Fact]
+    public void MatchtBlok_FiltersOnBlockName()
+    {
+        var any = new CustomLayerRule { Layer = "L", Element = "E" };
+        Assert.True(any.MatchtBlok("WAT_DAN_OOK"));
+
+        var filtered = new CustomLayerRule { Layer = "L", Element = "E", BlockName = "PUT" };
+        Assert.True(filtered.MatchtBlok("PUT"));
+        Assert.True(filtered.MatchtBlok("put"));
+        Assert.False(filtered.MatchtBlok("KAST"));
+        Assert.False(filtered.MatchtBlok(string.Empty));
+    }
+
+    [Fact]
+    public void ToCanonical_Raw_IsDatabaseLayerName_ForXref()
+    {
+        // Raw voedt stijl-/beschrijvingslookups; voor een xref-laag moet dat de source-
+        // gekwalificeerde host-naam zijn, anders wordt de laagtabelrecord niet gevonden.
+        var rule = new CustomLayerRule { Layer = "Eigen kabels", Element = "E", Scope = CustomSourceScope.SpecificXref, XrefName = "XREFA" };
+        var canonical = rule.ToCanonical("XREFA", "XREFA|Eigen kabels");
+        Assert.Equal("XREFA|Eigen kabels", canonical.Raw);
+        Assert.Equal("XREFA|Eigen kabels", canonical.LocalName);
+        Assert.True(canonical.IsXref);
+        Assert.Equal("XREFA", canonical.XrefName);
+    }
+
+    [Fact]
+    public void Matches_RequiresValidRule()
+    {
+        var invalid = new CustomLayerRule { Layer = "", Element = "E" };
+        Assert.False(invalid.Matches("", string.Empty));
     }
 }

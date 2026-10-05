@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.26.1 - 2026-10-05
+
+- Eigen bronlagen in een xref werken nu echt: de bron *elke bron* en *specifieke xref* tellen
+  de laag in de host en in xrefs correct op, ook als dezelfde laagnaam in host en xref voorkomt.
+- Een bevroren of uitgezette eigen laag valt nu net als een NLCS-laag weg, tenzij je
+  *onzichtbare lagen meenemen* aanzet.
+- De omschrijving van een eigen laag toont in de export de herkomst *eigen koppeling* in plaats
+  van *laagbeschrijving*, en `NLCSLEGENDAINFO` telt eigen lagen apart van de NLCS-lagen.
+- De bronkeuze in het venster *Eigen lagen* staat nu in het Nederlands (lokaal, elke bron,
+  specifieke xref).
+
 ## 1.26.0 - 2026-10-05
 
 - Je kunt nu eigen (niet-NLCS) lagen als echte bron koppelen via *Eigen lagen* in het

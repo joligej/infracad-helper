@@ -86,6 +86,7 @@ try {
     Write-Host "==> Scenario 1: een legenda" -ForegroundColor Cyan
     $dwg1 = Join-Path $work "one.dwg"
     Copy-Item $Drawing $dwg1
+    Set-ItemProperty $dwg1 -Name IsReadOnly -Value $false
     $base = [System.IO.Path]::GetFileNameWithoutExtension($dwg1)
     $csv = Join-Path $work "$($base)_Legenda-Legenda 1.csv"
     $json = Join-Path $work "$($base)_Legenda-Legenda 1.json"
@@ -107,6 +108,7 @@ try {
     Write-Host "==> Scenario 2: twee legenda's (crashregressie)" -ForegroundColor Cyan
     $dwg2 = Join-Path $work "two.dwg"
     Copy-Item $Drawing $dwg2
+    Set-ItemProperty $dwg2 -Name IsReadOnly -Value $false
     $make = "$load`nNLCSLEGENDATEST`nNLCSLEGENDATEST`n_.QSAVE`n_.QUIT`n"
     $rMake = Invoke-Accore $dwg2 $make "make" $null
     Check "Twee legenda's geplaatst" (([regex]::Matches($rMake.Out, 'NLCSTEST placed rows=')).Count -ge 2)

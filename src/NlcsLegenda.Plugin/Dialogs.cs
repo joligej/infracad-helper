@@ -1123,12 +1123,16 @@ internal sealed class CustomLayerDialog : Form
         var status = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
         status.Items.AddRange(Enum.GetNames<NlcsStatus>());
         status.SelectedItem = rule.Status.ToString();
-        var qmode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
-        qmode.Items.AddRange(Enum.GetNames<CustomQuantityMode>());
-        qmode.SelectedItem = rule.QuantityMode.ToString();
-        var scope = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
-        scope.Items.AddRange(Enum.GetNames<CustomSourceScope>());
-        scope.SelectedItem = rule.Scope.ToString();
+        var qmode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+        var qmodeValues = new[] { CustomQuantityMode.Auto, CustomQuantityMode.Geen, CustomQuantityMode.Aantal, CustomQuantityMode.Lengte, CustomQuantityMode.Oppervlak };
+        var qmodeLabels = new[] { "Automatisch", "Geen", "Aantal", "Lengte", "Oppervlak" };
+        qmode.Items.AddRange(qmodeLabels);
+        qmode.SelectedIndex = Math.Max(0, Array.IndexOf(qmodeValues, rule.QuantityMode));
+        var scope = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
+        var scopeValues = new[] { CustomSourceScope.Local, CustomSourceScope.AnySource, CustomSourceScope.SpecificXref };
+        var scopeLabels = new[] { "Lokaal (hoofdtekening)", "Elke bron", "Specifieke xref" };
+        scope.Items.AddRange(scopeLabels);
+        scope.SelectedIndex = Math.Max(0, Array.IndexOf(scopeValues, rule.Scope));
         var xref = new TextBox { Text = rule.XrefName, Width = 160 };
         var block = new TextBox { Text = rule.BlockName ?? string.Empty, Width = 160 };
 
@@ -1164,8 +1168,8 @@ internal sealed class CustomLayerDialog : Form
             rule.Description = desc.Text.Trim();
             rule.Type = (NlcsDrawType)type.SelectedItem!;
             rule.Status = Enum.Parse<NlcsStatus>((string)status.SelectedItem!);
-            rule.QuantityMode = Enum.Parse<CustomQuantityMode>((string)qmode.SelectedItem!);
-            rule.Scope = Enum.Parse<CustomSourceScope>((string)scope.SelectedItem!);
+            rule.QuantityMode = qmodeValues[Math.Max(0, qmode.SelectedIndex)];
+            rule.Scope = scopeValues[Math.Max(0, scope.SelectedIndex)];
             rule.XrefName = xref.Text.Trim();
             rule.BlockName = string.IsNullOrWhiteSpace(block.Text) ? null : block.Text.Trim();
             if (!LayerNaming.IsValid(rule.Layer) || string.IsNullOrWhiteSpace(rule.Layer))

@@ -2585,6 +2585,197 @@ public partial class Commands
         }
     }
 
+    // Echte eigen bronlagen in xrefs: dezelfde lokale laagnaam "Eigen kabels" komt voor in de
+    // host (3 m) én in twee xrefs (5 m en 11 m). Bewijst dat scope de bron echt filtert: Lokaal
+    // telt alleen de host, SpecificXref alleen de genoemde xref, ElkeBron alle bronnen samen, en
+    // dat xref-uitsluiting de classificatie overruled (geen regel = geen regel).
+    [CommandMethod("NLCSLEGENDAEIGENXREFTEST", CommandFlags.Modal)]
+    public void NlcsLegendaEigenXrefTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
+        string pathA = Path.Combine(dir, "eigen_xref_a.dwg");
+        string pathB = Path.Combine(dir, "eigen_xref_b.dwg");
+        try
+        {
+            CreateXrefLineDwg(pathA, "Eigen kabels", 5.0);
+            CreateXrefLineDwg(pathB, "Eigen kabels", 11.0);
+
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                ObjectId host = lt.Has("Eigen kabels") ? lt["Eigen kabels"]
+                    : AddLayer(lt, tr, "Eigen kabels");
+                var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+                var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+                var l3 = new Line(new Point3d(0, 0, 0), new Point3d(3, 0, 0)) { LayerId = host };
+                ms.AppendEntity(l3); tr.AddNewlyCreatedDBObject(l3, true);
+                tr.Commit();
+            }
+
+            ObjectId xrefA = db.AttachXref(pathA, "EIGENXREFA");
+            ObjectId xrefB = db.AttachXref(pathB, "EIGENXREFB");
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+                var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+                foreach (var id in new[] { xrefA, xrefB })
+                {
+                    var br = new BlockReference(Point3d.Origin, id);
+                    ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
+                }
+                tr.Commit();
+            }
+
+            LegendSettings Config(CustomSourceScope scope, string xref, bool includeXref,
+                bool? incA = null, bool? incB = null)
+            {
+                var s = LoadGlobalDefaults();
+                s.IncludeXrefLayers = includeXref;
+                if (incA is not null) s.XrefInclusion["EIGENXREFA"] = incA.Value;
+                if (incB is not null) s.XrefInclusion["EIGENXREFB"] = incB.Value;
+                s.CustomLayerRules.Add(new CustomLayerRule
+                {
+                    Layer = "Eigen kabels", Element = "Kabel", Type = NlcsDrawType.Geometrie,
+                    Description = "Kabel", QuantityMode = CustomQuantityMode.Lengte,
+                    Scope = scope, XrefName = xref
+                });
+                return s;
+            }
+
+            double Length(LegendSettings s)
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var e = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db)).Entries
+                    .FirstOrDefault(x => x.Element == "Kabel");
+                tr.Commit();
+                return e?.Metric.Length ?? -1;
+            }
+
+            double local = Length(Config(CustomSourceScope.Local, "", includeXref: true));
+            double specA = Length(Config(CustomSourceScope.SpecificXref, "EIGENXREFA", includeXref: true));
+            double any = Length(Config(CustomSourceScope.AnySource, "", includeXref: true));
+            // Xref-uitsluiting overruled de classificatie: SpecificXref EIGENXREFA maar de xref is
+            // uitgesloten -> geen enkele regel (Length == -1).
+            double overruled = Length(Config(CustomSourceScope.SpecificXref, "EIGENXREFA",
+                includeXref: false, incA: false, incB: false));
+
+            bool ok = Math.Abs(local - 3) < 0.1 && Math.Abs(specA - 5) < 0.1
+                && Math.Abs(any - 19) < 0.1 && overruled < 0;
+            ed.WriteMessage($"\nEIGENXREF: lokaal={local:0.0} (verw 3) specifiekA={specA:0.0} (verw 5) " +
+                $"elkeBron={any:0.0} (verw 19) uitgesloten={(overruled < 0 ? "geen regel" : overruled.ToString("0.0"))} (verw geen regel)");
+            ed.WriteMessage($"\nEIGENXREF: matrix -> {(ok ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nEIGENXREF error: {ex.Message}");
+        }
+        finally
+        {
+            try { if (File.Exists(pathA)) File.Delete(pathA); } catch { }
+            try { if (File.Exists(pathB)) File.Delete(pathB); } catch { }
+        }
+    }
+
+    private static ObjectId AddLayer(LayerTable lt, Transaction tr, string name)
+    {
+        var ltr = new LayerTableRecord { Name = name };
+        var id = lt.Add(ltr);
+        tr.AddNewlyCreatedDBObject(ltr, true);
+        return id;
+    }
+
+    // Zichtbaarheid moet voor eigen bronlagen exact zo werken als voor NLCS-lagen: een bevroren
+    // laag telt niet mee tenzij "onzichtbare lagen meenemen" aan staat. Maakt een eigen en een
+    // NLCS-laag, bevriest beide, en controleert dat ze in beide standen gelijk reageren.
+    [CommandMethod("NLCSLEGENDAEIGENZICHTBAARTEST", CommandFlags.Modal)]
+    public void NlcsLegendaEigenZichtbaarTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                var eigen = AddLayer(lt, tr, "Eigen vis");
+                var nlcs = AddLayer(lt, tr, "N-WE-VH-ZICHTTEST-G");
+                ((LayerTableRecord)tr.GetObject(eigen, OpenMode.ForWrite)).IsFrozen = true;
+                ((LayerTableRecord)tr.GetObject(nlcs, OpenMode.ForWrite)).IsFrozen = true;
+                var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+                var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+                var le = new Line(new Point3d(0, 0, 0), new Point3d(4, 0, 0)) { LayerId = eigen };
+                ms.AppendEntity(le); tr.AddNewlyCreatedDBObject(le, true);
+                var ln = new Line(new Point3d(0, 5, 0), new Point3d(6, 5, 0)) { LayerId = nlcs };
+                ms.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true);
+                tr.Commit();
+            }
+
+            (bool eigen, bool nlcs) Measure(bool includeInvisible)
+            {
+                var s = LoadGlobalDefaults();
+                s.IncludeInvisibleLayers = includeInvisible;
+                s.CustomLayerRules.Add(new CustomLayerRule
+                {
+                    Layer = "Eigen vis", Element = "Eigen vis element", Type = NlcsDrawType.Geometrie,
+                    Description = "Eigen vis", QuantityMode = CustomQuantityMode.Lengte
+                });
+                using var tr = db.TransactionManager.StartTransaction();
+                var es = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db)).Entries;
+                tr.Commit();
+                return (es.Any(e => e.Element == "Eigen vis element"), es.Any(e => e.Element == "ZICHTTEST"));
+            }
+
+            var off = Measure(includeInvisible: false);
+            var on = Measure(includeInvisible: true);
+            // Pariteit: bevroren -> beide weg; meenemen -> beide aanwezig. Eigen == NLCS.
+            bool ok = !off.eigen && !off.nlcs && on.eigen && on.nlcs;
+            ed.WriteMessage($"\nEIGENZICHT: bevroren eigen={off.eigen} nlcs={off.nlcs} (verw false/false); " +
+                $"meenemen eigen={on.eigen} nlcs={on.nlcs} (verw true/true) -> {(ok ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nEIGENZICHT error: {ex.Message}");
+        }
+    }
+
+    // Zoals CreateXrefSourceDwg, maar met instelbare lijnlengte en willekeurige (eigen) laagnaam.
+    private static void CreateXrefLineDwg(string path, string layer, double length)
+    {
+        var prev = HostApplicationServices.WorkingDatabase;
+        using var xdb = new Database(buildDefaultDrawing: true, noDocument: true);
+        HostApplicationServices.WorkingDatabase = xdb;
+        try
+        {
+            using (var tr = xdb.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(xdb.LayerTableId, OpenMode.ForWrite);
+                if (!lt.Has(layer))
+                {
+                    var ltr = new LayerTableRecord { Name = layer };
+                    lt.Add(ltr); tr.AddNewlyCreatedDBObject(ltr, true);
+                }
+                var msId = SymbolUtilityServices.GetBlockModelSpaceId(xdb);
+                var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+                var line = new Line(new Point3d(0, 0, 0), new Point3d(length, 0, 0)) { Layer = layer };
+                ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
+                tr.Commit();
+            }
+            xdb.SaveAs(path, DwgVersion.Current);
+        }
+        finally
+        {
+            HostApplicationServices.WorkingDatabase = prev;
+        }
+    }
+
     // Maakt een losse bron-DWG met één NLCS-polyline op de gegeven laag, om als xref te koppelen.
     // In de Core Console moet de nieuwe database tijdelijk de werkdatabase zijn, anders is de
     // modelspace nog niet opgebouwd (eKeyNotFound).
@@ -3563,6 +3754,9 @@ public partial class Commands
         ed.WriteMessage(
             $"\n{analysis.Entries.Count} legenda-regel(s) uit {analysis.UsedNlcsLayerCount} " +
             $"gebruikte NLCS-laag/-lagen ({analysis.DescribedLayerCount} met laagbeschrijving).");
+        if (analysis.UsedCustomLayerCount > 0)
+            ed.WriteMessage(
+                $"\n{analysis.UsedCustomLayerCount} eigen bronlaag/-lagen meegeteld via koppelregels.");
         if (analysis.ExcludedNlcsLayerCount > 0)
             ed.WriteMessage(
                 $"\n{analysis.ExcludedNlcsLayerCount} NLCS-laag/-lagen vielen buiten de legenda door de " +
@@ -3575,7 +3769,10 @@ public partial class Commands
         var sb = new StringBuilder();
         sb.Append($"\nNLCS Legenda {PluginVersion} — instellingen uit: {configSource}.");
         sb.Append($"\nOverzicht: {analysis.Entries.Count} regel(s) uit " +
-                  $"{analysis.UsedNlcsLayerCount} gebruikte laag/-lagen.");
+                  $"{analysis.UsedNlcsLayerCount} gebruikte NLCS-laag/-lagen" +
+                  (analysis.UsedCustomLayerCount > 0
+                      ? $" + {analysis.UsedCustomLayerCount} eigen bronlaag/-lagen."
+                      : "."));
         if (analysis.ExcludedNlcsLayerCount > 0)
             sb.Append($"\n({analysis.ExcludedNlcsLayerCount} NLCS-laag/-lagen buiten de legenda door filters; " +
                       "tekst-/overige lagen krijgen geen eigen regel.)");

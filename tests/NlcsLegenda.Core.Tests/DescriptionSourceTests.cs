@@ -71,4 +71,27 @@ public class DescriptionSourceTests
         var entry = manual.ToLegendEntry();
         Assert.Equal(DescriptionSource.Handmatig, entry.DescriptionSource);
     }
+
+    [Fact]
+    public void CustomRuleDescription_HasEigenKoppelingSource()
+    {
+        // De omschrijving van een eigen-laagregel komt uit de config, niet uit de tekening;
+        // de herkomst moet daarom EigenKoppeling zijn, niet Laagbeschrijving.
+        var rule = new CustomLayerRule
+        {
+            Layer = "Eigen kabels", Element = "Datakabel", Type = NlcsDrawType.Geometrie, Description = "Datakabel"
+        };
+        var settings = new LegendSettings();
+        settings.CustomLayerRules.Add(rule);
+        var canonical = rule.ToCanonical(string.Empty, rule.Layer);
+
+        var entries = LegendGrouping.Build(
+            new[] { canonical }, settings,
+            layerDescription: name => name == canonical.LocalName ? rule.Description : null,
+            descriptionSourceOf: name => name == canonical.LocalName ? DescriptionSource.EigenKoppeling : null);
+
+        var entry = Assert.Single(entries);
+        Assert.Equal("Datakabel", entry.Description);
+        Assert.Equal(DescriptionSource.EigenKoppeling, entry.DescriptionSource);
+    }
 }
