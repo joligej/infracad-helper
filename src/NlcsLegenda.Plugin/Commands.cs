@@ -2355,9 +2355,10 @@ public partial class Commands
             return LegendExport.ToCsv(entries, def.Settings.QuantityDecimals,
                 def.Settings.UnitArea, def.Settings.UnitLength, def.Settings.UnitCount);
         }
-        catch
+        catch (Exception ex)
         {
-            return string.Empty;
+            // Fout zichtbaar maken i.p.v. stil als lege export; de verify-check ziet het verschil.
+            return "[export-fout: " + ex.Message + "]";
         }
     }
 
@@ -2418,7 +2419,7 @@ public partial class Commands
                 string csvA = ExportCsv(db, tr, a);
                 string csvB = ExportCsv(db, tr, b);
                 string csvC = ExportCsv(db, tr, c);
-                bool exportOk = csvA.Length > 0 && csvB.Length > 0 && csvC.Length > 0
+                bool exportOk = new[] { csvA, csvB, csvC }.All(s => s.Length > 0 && !s.StartsWith("[export-fout"))
                     && csvA != csvB && csvA != csvC && csvB != csvC;
                 ed.WriteMessage($"\nABC: export A={csvA.Length}tk B={csvB.Length}tk C={csvC.Length}tk -> {(exportOk ? "verschillend OK" : "FAIL")}");
 
