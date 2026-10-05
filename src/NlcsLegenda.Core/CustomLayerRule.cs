@@ -59,16 +59,22 @@ public sealed class CustomLayerRule
         !string.IsNullOrWhiteSpace(Layer) && LayerNaming.IsValid(Layer)
         && !string.IsNullOrWhiteSpace(Element);
 
-    // Matcht de regel een object op deze laag uit deze bron? sourceXref is leeg voor de
-    // hoofdtekening of de naam van de xref waarin het object zit.
-    public bool Matches(string layerName, string sourceXref)
-    {
-        if (!string.Equals(layerName, Layer, StringComparison.OrdinalIgnoreCase))
-            return false;
-        if (BlockName is { Length: > 0 })
-            return true; // blokfilter wordt op entiteitsniveau gecontroleerd
-        return ScopeMatches(sourceXref);
-    }
+    // Matcht de regel een object op deze laag uit deze bron? databaseLayerName is de laagnaam
+    // zoals AutoCAD die kent (voor xref-objecten source-gekwalificeerd: "xrefnaam|laag");
+    // sourceXref is leeg voor de hoofdtekening of de xref waarin het object zit. Een echte
+    // match vergt álle voorwaarden: geldige regel, gelijke lokale laag én passende bron. Het
+    // optionele blokfilter wordt op entiteitsniveau met MatchtBlok gecontroleerd.
+    public bool Matches(string databaseLayerName, string sourceXref) =>
+        IsValid && LaagMatcht(databaseLayerName) && ScopeMatches(sourceXref);
+
+    public bool LaagMatcht(string databaseLayerName) =>
+        string.Equals(LayerNaming.LocalName(databaseLayerName), Layer, StringComparison.OrdinalIgnoreCase);
+
+    // Blokfilter voor symboollagen met meerdere bloksoorten: zonder filter matcht elk blok,
+    // met filter alleen het genoemde blok.
+    public bool MatchtBlok(string? entityBlockName) =>
+        string.IsNullOrEmpty(BlockName)
+        || string.Equals(entityBlockName, BlockName, StringComparison.OrdinalIgnoreCase);
 
     public bool ScopeMatches(string sourceXref) => Scope switch
     {
@@ -85,9 +91,12 @@ public sealed class CustomLayerRule
             ? XrefName + "|" + Layer
             : Layer;
 
-    public NlcsLayerName ToCanonical(string sourceXref) => new()
+    // databaseLayerName is de echte laagnaam in de host-database (source-gekwalificeerd bij
+    // xref); die gaat naar Raw zodat stijl- en beschrijvingslookups de juiste laagtabelrecord
+    // vinden, ook voor xref-afhankelijke lagen. LocalName blijft de canonieke sleutel.
+    public NlcsLayerName ToCanonical(string sourceXref, string databaseLayerName) => new()
     {
-        Raw = Layer,
+        Raw = string.IsNullOrEmpty(databaseLayerName) ? Layer : databaseLayerName,
         LocalName = CanonicalLayer,
         IsXref = !string.IsNullOrEmpty(sourceXref),
         XrefName = sourceXref,

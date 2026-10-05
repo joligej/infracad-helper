@@ -538,12 +538,22 @@ public partial class Commands
         LegendDefinition? target, ObjectId entId, out string localName)
     {
         localName = string.Empty;
+        var ent = tr.GetObject(entId, OpenMode.ForRead) as Entity;
 
-        // Expliciete eigen-laagkoppeling wint van NLCS-herkenning: als de laag gekoppeld is, is
-        // het object opgenomen (behoudens elementsoort-/selectiefilter).
-        var rule = settings.CustomLayerRules.FirstOrDefault(r => r.IsValid
-            && string.Equals(r.Layer, layerName, StringComparison.OrdinalIgnoreCase)
-            && r.ScopeMatches(string.Empty));
+        // Gemeenschappelijke geschiktheid eerst: een onzichtbare laag telt nooit mee, of de laag
+        // nu NLCS is of een eigen koppeling heeft. Zelfde volgorde als de analyzer.
+        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        if (lt.Has(layerName) && tr.GetObject(lt[layerName], OpenMode.ForRead) is LayerTableRecord ltr
+            && !settings.IncludeInvisibleLayers && (ltr.IsOff || ltr.IsFrozen))
+            return "de laag staat uit of is bevroren (zet 'Onzichtbare lagen meenemen' aan om hem toch mee te nemen)";
+
+        // Expliciete eigen-laagkoppeling wint van NLCS-herkenning. Een rechtstreeks aangewezen
+        // object zit in de hoofdtekening (lege bron); SpecificXref-regels gelden daarom alleen
+        // voor objecten binnen de xref, niet voor een directe modelspace-selectie.
+        var rule = settings.CustomLayerRules.FirstOrDefault(r =>
+            ent is not null && r.Matches(layerName, string.Empty)
+            && DrawingAnalyzer.EntityMatchesType(ent, r.Type)
+            && r.MatchtBlok(ent is BlockReference br ? DrawingAnalyzer.BlockName(br, tr) : string.Empty));
         if (rule is not null)
         {
             localName = rule.Element;
@@ -557,11 +567,6 @@ public partial class Commands
             }
             return null;
         }
-
-        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-        if (lt.Has(layerName) && tr.GetObject(lt[layerName], OpenMode.ForRead) is LayerTableRecord ltr
-            && !settings.IncludeInvisibleLayers && (ltr.IsOff || ltr.IsFrozen))
-            return "de laag staat uit of is bevroren (zet 'Onzichtbare lagen meenemen' aan om hem toch mee te nemen)";
 
         if (!NlcsLayerParser.TryParse(layerName, out var parsed))
             return "deze laag is niet NLCS en heeft geen eigen koppeling";

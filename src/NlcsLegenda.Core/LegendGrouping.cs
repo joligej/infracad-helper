@@ -14,7 +14,8 @@ public static class LegendGrouping
         IReadOnlyDictionary<string, LayerMetric>? metrics = null,
         Func<string, string?>? symbolBlock = null,
         DescriptionCatalog? catalog = null,
-        Func<string, string?>? renderIdentity = null)
+        Func<string, string?>? renderIdentity = null,
+        Func<string, DescriptionSource?>? descriptionSourceOf = null)
     {
         // Per-legenda omschrijvingen liggen bovenop de (globale) catalogus. Dit is de enige plek
         // waar ze worden toegepast, zodat elke aanroeper dezelfde effectieve teksten krijgt.
@@ -74,7 +75,7 @@ public static class LegendGrouping
                 Hoofdgroep = representative.Hoofdgroep,
                 Element = representative.Element,
                 Description = ResolveDescription(
-                    group, representative, settings, layerDescription, descriptions, out var descSource),
+                    group, representative, settings, layerDescription, descriptions, descriptionSourceOf, out var descSource),
                 DescriptionSource = descSource,
                 LayersByType = byType,
                 Metric = metric,
@@ -213,7 +214,8 @@ public static class LegendGrouping
     // Het canonieke per-legenda model is DescriptionOverrides (zit in de catalogus verwerkt).
     private static string ResolveDescription(
         List<NlcsLayerName> group, NlcsLayerName representative, LegendSettings settings,
-        Func<string, string?>? layerDescription, DescriptionCatalog catalog, out DescriptionSource source)
+        Func<string, string?>? layerDescription, DescriptionCatalog catalog,
+        Func<string, DescriptionSource?>? descriptionSourceOf, out DescriptionSource source)
     {
         if (layerDescription is not null)
         {
@@ -226,7 +228,9 @@ public static class LegendGrouping
                 // slaan we over en vallen terug op de catalogus/laagnaam.
                 if (settings.SuppressKlicPlaceholders && PlaceholderText.IsGeneric(desc))
                     continue;
-                source = DescriptionSource.Laagbeschrijving;
+                // Een eigen-laagkoppeling levert de tekst uit de regel (niet uit de tekening);
+                // dan is EigenKoppeling de juiste herkomst in plaats van laagbeschrijving.
+                source = descriptionSourceOf?.Invoke(layer.LocalName) ?? DescriptionSource.Laagbeschrijving;
                 return desc.Trim();
             }
         }

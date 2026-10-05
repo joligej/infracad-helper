@@ -13,6 +13,8 @@ public sealed class AnalysisResult
 
     public int UsedNlcsLayerCount { get; init; }
 
+    public int UsedCustomLayerCount { get; init; }
+
     public int DescribedLayerCount { get; init; }
 
     public int AttrDescribedLayerCount { get; init; }
@@ -123,13 +125,17 @@ public static class DrawingAnalyzer
             c.Metrics,
             name => c.SymbolBlocks.TryGetValue(name, out var b) ? b : null,
             catalog,
-            renderIds is null ? null : RenderId);
+            renderIds is null ? null : RenderId,
+            name => c.CustomDesc.ContainsKey(name) ? DescriptionSource.EigenKoppeling : (DescriptionSource?)null);
 
         return new AnalysisResult
         {
             Entries = entries,
             HatchSamples = c.Hatches,
-            UsedNlcsLayerCount = c.Parsed.Count,
+            // c.Parsed bevat nu zowel NLCS- als eigen bronlagen; eigen lagen apart tellen zodat
+            // de INFO-melding geen eigen lagen als "NLCS" presenteert.
+            UsedNlcsLayerCount = c.Parsed.Count - c.CustomDesc.Count,
+            UsedCustomLayerCount = c.CustomDesc.Count,
             DescribedLayerCount = descriptions.Count,
             AttrDescribedLayerCount = attrDesc.Count,
             ExcludedNlcsLayerCount = c.ExcludedNlcs.Count
@@ -186,6 +192,12 @@ public static class DrawingAnalyzer
     {
         var layerName = ent.Layer;
 
+        // Gemeenschappelijke geschiktheid, bron-onafhankelijk: een onzichtbare laag (uit of
+        // bevroren) telt nooit mee, of de laag nu NLCS is of een eigen koppeling heeft. Deze
+        // controle staat vóór de classificatie zodat zichtbaarheid voor beide gelijk werkt.
+        if (!settings.IncludeInvisibleLayers && !IsVisible(layerName, tr, c))
+            return;
+
         // Expliciete eigen-laagkoppeling wint van NLCS-herkenning: precies één interpretatie.
         if (settings.CustomLayerRules.Count > 0
             && TryMatchCustomRule(ent, tr, settings, layerName, sourceXref, out var rule, out var canonical))
@@ -196,12 +208,6 @@ public static class DrawingAnalyzer
 
         if (c.NonNlcs.Contains(layerName))
             return;
-
-        if (!settings.IncludeInvisibleLayers && !IsVisible(layerName, tr, c))
-        {
-            c.NonNlcs.Add(layerName);
-            return;
-        }
 
         if (!c.Parsed.TryGetValue(layerName, out var nlcs))
         {
@@ -305,28 +311,41 @@ public static class DrawingAnalyzer
     }
 
     // Zoekt de eerste eigen-laagregel die op dit object past (expliciete volgorde = deterministisch).
+    // Matcht op de lokale laagnaam (xref-prefix wordt gestript), de bron (scope), de elementsoort
+    // van de entiteit en een optioneel blokfilter.
     private static bool TryMatchCustomRule(
         Entity ent, Transaction tr, LegendSettings settings, string layerName, string sourceXref,
         out CustomLayerRule? rule, out NlcsLayerName? canonical)
     {
         foreach (var r in settings.CustomLayerRules)
         {
-            if (!r.IsValid || !r.ScopeMatches(sourceXref)) continue;
-            if (!string.Equals(layerName, r.Layer, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!r.Matches(layerName, sourceXref)) continue;
+            if (!EntityMatchesType(ent, r.Type)) continue;
             if (r.BlockName is { Length: > 0 })
             {
-                if (ent is not BlockReference br
-                    || !string.Equals(BlockName(br, tr), r.BlockName, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                var entBlock = ent is BlockReference br ? BlockName(br, tr) : string.Empty;
+                if (!r.MatchtBlok(entBlock)) continue;
             }
             rule = r;
-            canonical = r.ToCanonical(sourceXref);
+            canonical = r.ToCanonical(sourceXref, layerName);
             return true;
         }
         rule = null;
         canonical = null;
         return false;
     }
+
+    // Broncompatibiliteit: een regel telt alleen objecten die bij de elementsoort passen, zodat
+    // een gemengde laag geen onzin oplevert (bijv. een blok dat als geometrielengte meetelt).
+    internal static bool EntityMatchesType(Entity ent, NlcsDrawType type) => type switch
+    {
+        NlcsDrawType.Symbool => ent is BlockReference,
+        NlcsDrawType.Arcering => ent is Hatch,
+        NlcsDrawType.Vlakvulling => ent is Hatch or Curve,
+        NlcsDrawType.Vlak => ent is Curve or Hatch,
+        NlcsDrawType.Geometrie => ent is Curve,
+        _ => true
+    };
 
     private static void RecordCustom(
         Entity ent, Transaction tr, Collector c, LegendSettings settings, Matrix3d transform,
@@ -429,7 +448,7 @@ public static class DrawingAnalyzer
         catch { return 0.0; }
     }
 
-    private static string BlockName(BlockReference br, Transaction tr)
+    internal static string BlockName(BlockReference br, Transaction tr)
     {
         try
         {

@@ -75,9 +75,15 @@ en de eigen regels horen bij de globale standaard of bij één legenda.
 Heb je eigen (niet-NLCS) lagen die als echte bron moeten meetellen, dan koppel je die in
 het instellingenvenster onder *Eigen lagen*. Zo'n koppeling werkt als een NLCS-laag: je
 kiest de laag, het type en de hoeveelheid (lengte, aantal of oppervlak), en de legenda
-leest de echte geometrie van die laag. Anders dan een handmatige regel verschijnt een
-eigen laag alleen als er objecten op staan, en de hoeveelheden komen uit de tekening. Je
-koppelt alleen de lagen die je zelf aanwijst; hulp- en annotatielagen blijven buiten beeld.
+leest de echte geometrie van die laag. Je kiest ook de bron: alleen de hoofdtekening
+(lokaal), elke meegenomen bron, of één specifieke xref. Zit dezelfde laagnaam zowel in de
+host als in een xref, dan houdt de bron ze uit elkaar. Het verschil met NLCS zit alleen in
+de herkenning: een NLCS-laag wordt automatisch uit de laagnaam geclassificeerd, een eigen
+laag expliciet via jouw regel; daarna doorlopen beide exact dezelfde legendapipeline
+(groeperen, hoeveelheden, zichtbaarheid, filters, rendering). Anders dan een handmatige
+regel (die vast is) verschijnt een eigen laag alleen als er objecten op staan, en de
+hoeveelheden komen uit de tekening. Je koppelt alleen de lagen die je zelf aanwijst;
+hulp- en annotatielagen blijven buiten beeld.
 
 Je kunt ook per elementsoort kiezen wat in de legenda komt: geometrie/lijnen, vlakken,
 arceringen, vlakvullingen en symbolen zijn afzonderlijk aan of uit te zetten. Standaard

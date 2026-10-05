@@ -22,6 +22,8 @@ controle onmogelijk maken.
 | `NLCSLEGENDAABCXREFSETUP` / `NLCSLEGENDAABCXREFVERIFY` | Koppelen twee synthetische xrefs en controleren na heropenen dat A alleen xref A meeneemt, B alleen xref B en C allebei. |
 | `NLCSLEGENDACONSUMERTEST` | Controleert dat zichtbare schakelaars (kader, swatchkader, schaalbalk, titel, opmerkingen, hoeveelheden, symbolen) de getekende geometrie veranderen. |
 | `NLCSLEGENDACUSTOMTEST` | Maakt geometrie op niet-NLCS-lagen en controleert dat gekoppelde eigen lagen gelijkwaardig meetellen (lengte/aantal/oppervlak, selectie, blok-identiteit). |
+| `NLCSLEGENDAEIGENXREFTEST` | Koppelt dezelfde eigen laagnaam in host (3 m) en twee xrefs (5 m en 11 m) en controleert dat Lokaal alleen de host telt (3), SpecifiekeXref alleen die xref (5), ElkeBron alle bronnen (19) en dat xref-uitsluiting geen regel oplevert. |
+| `NLCSLEGENDAEIGENZICHTBAARTEST` | Bevriest een eigen laag en een NLCS-laag en controleert dat beide gelijk reageren op "onzichtbare lagen meenemen". |
 | `NLCSLEGENDAVIEWPORTTEST` | Controleert viewport-plaatsing en -schaal rond de legenda. |
 | `NLCSLEGENDAXREFSETUP` / `NLCSLEGENDAXREFVERIFY` | Bouwen een xref-scenario en verifiëren de opname ervan. |
 | `NLCSLEGENDAXREFANALYSE` | Analyseert een tekening met echte xrefs en toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. |
