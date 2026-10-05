@@ -145,10 +145,13 @@ internal sealed class SettingsDialog : Form
     private Panel NumRow(string label, Func<double> get, Action<double> set,
         decimal min, decimal max, int decimals = 1, decimal increment = 0.5M, int width = 90)
     {
+        decimal start = ClampDecimal((decimal)get(), min, max);
+        // Buiten bereik opgeslagen waarde meteen gelijktrekken, anders tonen UI en opslag iets anders.
+        if ((double)start != get()) set((double)start);
         var n = new NumericUpDown
         {
             Minimum = min, Maximum = max, DecimalPlaces = decimals, Increment = increment,
-            Width = width, Value = ClampDecimal((decimal)get(), min, max)
+            Width = width, Value = start
         };
         n.ValueChanged += (_, _) => { if (!_syncing) set((double)n.Value); };
         _resync.Add(() => n.Value = ClampDecimal((decimal)get(), min, max));
@@ -157,10 +160,12 @@ internal sealed class SettingsDialog : Form
 
     private Panel IntRow(string label, Func<int> get, Action<int> set, int min, int max, int width = 70)
     {
+        int start = Math.Clamp(get(), min, max);
+        if (start != get()) set(start);
         var n = new NumericUpDown
         {
             Minimum = min, Maximum = max, DecimalPlaces = 0, Increment = 1,
-            Width = width, Value = Math.Clamp(get(), min, max)
+            Width = width, Value = start
         };
         n.ValueChanged += (_, _) => { if (!_syncing) set((int)n.Value); };
         _resync.Add(() => n.Value = Math.Clamp(get(), min, max));
