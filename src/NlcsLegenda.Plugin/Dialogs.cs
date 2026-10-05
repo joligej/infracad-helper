@@ -236,7 +236,7 @@ internal sealed class SettingsDialog : Form
         root.Controls.Add(Group("Weergave",
             BoundCheck("Titel tonen", () => _settings.IncludeTitle, v => _settings.IncludeTitle = v),
             BoundCheck("Tekst naast de vakjes tonen", () => _settings.IncludeText, v => _settings.IncludeText = v),
-            BoundCheck("Kader om de legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
+            BoundCheck("Kader rond legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
             BoundCheck("Schaalbalk tonen", () => _settings.IncludeScaleBar, v => _settings.IncludeScaleBar = v),
             BoundCheck("Hoeveelheden tonen", () => _settings.IncludeQuantities, v => _settings.IncludeQuantities = v)));
         page.Controls.Add(root);
@@ -606,7 +606,10 @@ internal sealed class CustomStatusDialog : Form
         add.Click += (_, _) =>
         {
             var n = Prompt("Naam van de status:");
-            if (!string.IsNullOrWhiteSpace(n)) { _statuses.Add(new CustomStatus { Name = n.Trim() }); ReloadStatuses(_statuses.Count - 1); }
+            if (string.IsNullOrWhiteSpace(n)) return;
+            if (NameExists(n.Trim(), -1)) { WarnDuplicate(n.Trim()); return; }
+            _statuses.Add(new CustomStatus { Name = n.Trim() });
+            ReloadStatuses(_statuses.Count - 1);
         };
         var rename = new Button { Text = "Hernoemen", AutoSize = true };
         rename.Click += (_, _) =>
@@ -614,7 +617,10 @@ internal sealed class CustomStatusDialog : Form
             int i = _statusList.SelectedIndex;
             if (i < 0) return;
             var n = Prompt("Nieuwe naam:", _statuses[i].Name);
-            if (!string.IsNullOrWhiteSpace(n)) { _statuses[i].Name = n.Trim(); ReloadStatuses(i); }
+            if (string.IsNullOrWhiteSpace(n)) return;
+            if (NameExists(n.Trim(), i)) { WarnDuplicate(n.Trim()); return; }
+            _statuses[i].Name = n.Trim();
+            ReloadStatuses(i);
         };
         var remove = new Button { Text = "Verwijderen", AutoSize = true };
         remove.Click += (_, _) =>
@@ -649,6 +655,18 @@ internal sealed class CustomStatusDialog : Form
     }
 
     public List<CustomStatus> Result => _statuses;
+
+    private bool NameExists(string name, int excludeIndex)
+    {
+        for (int i = 0; i < _statuses.Count; i++)
+            if (i != excludeIndex && string.Equals(_statuses[i].Name, name, StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
+    }
+
+    private void WarnDuplicate(string name) =>
+        MessageBox.Show(this, $"Er bestaat al een status met de naam \u201c{name}\u201d.", "NLCS Legenda",
+            MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
     private void ReloadStatuses(int select)
     {

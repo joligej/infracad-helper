@@ -1270,7 +1270,8 @@ public partial class Commands
     private void PresetSave(Editor ed, Database db)
     {
         // Bron van de preset kiezen: de globale standaard of een bestaande legenda-snapshot.
-        if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+        if (!ResolveMutationTarget(ed, db, out var target, "Waarvan opslaan", "opslaan vanuit"))
+        { ed.WriteMessage("\nGeannuleerd."); return; }
         var name = AskPresetName(ed);
         if (name is null)
             return;
@@ -1304,7 +1305,8 @@ public partial class Commands
             ed.WriteMessage("\nProfiel niet gevonden.");
             return;
         }
-        if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+        if (!ResolveMutationTarget(ed, db, out var target, "Waarnaar laden", "laden naar"))
+        { ed.WriteMessage("\nGeannuleerd."); return; }
         ed.WriteMessage($"\nProfiel \"{names[idx]}\" geladen.");
         ApplyTargetSettings(ed, db, target, settings, "Profiel");
     }
