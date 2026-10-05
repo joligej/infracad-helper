@@ -25,7 +25,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <!-- Voor het ribbonpaneel (Autodesk.Windows is WPF-gebaseerd). -->
     <UseWPF>true</UseWPF>
-    <!-- Voor de instellingen- en omschrijvingen-dialogen (PropertyGrid/DataGridView). -->
+    <!-- Voor de instellingen- en omschrijvingenvensters (WinForms). -->
     <UseWindowsForms>true</UseWindowsForms>
     <!-- AutoCAD/Civil3D-DLL's worden door de host geladen; niet mee kopieren. -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>

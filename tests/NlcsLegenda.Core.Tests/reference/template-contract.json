@@ -14,7 +14,7 @@
     "rijafstandMm": { "objectType": "DBText (T25) baseline-afstand", "sampleCount": 41, "rawModelMeters": 1.26, "paperMm": 6.3, "toleranceMm": 0.2, "herkomst": "gemeten" },
     "teksthoogtesMm": { "objectType": "DBText/MText height", "sampleCount": "T25/T50/titel", "paperMm": [2.5, 5.0, 10.0], "toleranceMm": 0.1, "herkomst": "gemeten" },
     "symbool.insertSchaal": { "objectType": "BlockReference ScaleFactors.X", "sampleCount": 43, "value": 0.2, "herkomst": "gemeten = schaal/1000" },
-    "TemplateDefaults.SwatchWidthMm": { "value": 24.0, "herkomst": "ontwerpkeuze: afronding van lijnsample 22,4 mm met kleine marge" }
+    "TemplateDefaults.SwatchWidthMm": { "value": 24.0, "herkomst": "afgeleid", "derivedFrom": ["lijnSampleBreedteMm"], "formule": "afronding van 22,4 mm naar boven met marge" }
   }
 }
 

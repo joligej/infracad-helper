@@ -32,7 +32,8 @@ public partial class Commands
     // Met legenda's ligt de bestaande legenda voor de hand, maar globaal blijft kiesbaar zodat
     // je bewust de standaard voor nieuwe legenda's kunt zetten. Headless is er geen prompt: bij
     // precies één legenda wordt die gekozen, anders de globale standaard.
-    private static bool ResolveMutationTarget(Editor ed, Database db, out MutationTarget target)
+    private static bool ResolveMutationTarget(Editor ed, Database db, out MutationTarget target,
+        string promptVerb = "Waarop toepassen", string pickVerb = "aanpassen")
     {
         target = MutationTarget.Global;
         LegendRegistry reg;
@@ -51,7 +52,7 @@ public partial class Commands
             return true;
         }
 
-        var pko = new PromptKeywordOptions("\nWaarop toepassen");
+        var pko = new PromptKeywordOptions("\n" + promptVerb);
         pko.Keywords.Add("Legenda");
         pko.Keywords.Add("Globaal");
         pko.Keywords.Default = "Legenda";
@@ -62,7 +63,7 @@ public partial class Commands
         if (res.StringResult == "Globaal")
             return true;
 
-        var def = PickLegendFromList(ed, reg, "aanpassen");
+        var def = PickLegendFromList(ed, reg, pickVerb);
         if (def is null)
             return false;
         target = MutationTarget.ForLegend(def);

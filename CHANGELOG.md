@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.25.0 - 2026-10-05
+
+- Eigen statussen met dezelfde naam worden nu geweigerd, zodat je geen dubbele kopregels krijgt.
+- Het label voor het legendakader is overal gelijk, en bij het opslaan en laden van een profiel
+  is duidelijk of je dat vanuit of naar de globale standaard of een legenda doet.
+- Een instelling buiten het toegestane bereik wordt in het instellingenvenster meteen
+  gelijkgetrokken met wat je ziet.
+
 ## 1.24.0 - 2026-10-04
 
 - Het instellingenvenster is nu volledig met normale bedieningselementen op elk tabblad. De

@@ -290,8 +290,7 @@ public partial class Commands
         ApplySettingsAndRebuild(ed, db, target.Id, source.Settings);
     }
 
-    // Zet de instellingen van een legenda als globale standaard voor nieuwe legenda's (U6).
-    // Bestaande legenda's veranderen niet.
+    // Bestaande legenda's veranderen niet mee.
     private void ManagerMakeGlobalDefault(Editor ed, Database db, LegendRegistry registry)
     {
         var def = PickLegendFromList(ed, registry, "als globale standaard gebruiken");

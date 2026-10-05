@@ -133,8 +133,7 @@ internal sealed class SettingsDialog : Form
 
     public LegendSettings Settings => _settings;
 
-    // Zet alle gebonden controls opnieuw gelijk met de werkkopie. De guard voorkomt dat het
-    // terugschrijven van een control zijn eigen change-handler weer laat terugsyncen.
+    // De guard voorkomt dat terugschrijven naar een control zijn eigen change-handler weer laat syncen.
     private void SyncAll()
     {
         if (_syncing) return;
@@ -146,10 +145,13 @@ internal sealed class SettingsDialog : Form
     private Panel NumRow(string label, Func<double> get, Action<double> set,
         decimal min, decimal max, int decimals = 1, decimal increment = 0.5M, int width = 90)
     {
+        decimal start = ClampDecimal((decimal)get(), min, max);
+        // Buiten bereik opgeslagen waarde meteen gelijktrekken, anders tonen UI en opslag iets anders.
+        if ((double)start != get()) set((double)start);
         var n = new NumericUpDown
         {
             Minimum = min, Maximum = max, DecimalPlaces = decimals, Increment = increment,
-            Width = width, Value = ClampDecimal((decimal)get(), min, max)
+            Width = width, Value = start
         };
         n.ValueChanged += (_, _) => { if (!_syncing) set((double)n.Value); };
         _resync.Add(() => n.Value = ClampDecimal((decimal)get(), min, max));
@@ -158,10 +160,12 @@ internal sealed class SettingsDialog : Form
 
     private Panel IntRow(string label, Func<int> get, Action<int> set, int min, int max, int width = 70)
     {
+        int start = Math.Clamp(get(), min, max);
+        if (start != get()) set(start);
         var n = new NumericUpDown
         {
             Minimum = min, Maximum = max, DecimalPlaces = 0, Increment = 1,
-            Width = width, Value = Math.Clamp(get(), min, max)
+            Width = width, Value = start
         };
         n.ValueChanged += (_, _) => { if (!_syncing) set((int)n.Value); };
         _resync.Add(() => n.Value = Math.Clamp(get(), min, max));
@@ -193,8 +197,7 @@ internal sealed class SettingsDialog : Form
     private static decimal ClampDecimal(decimal value, decimal min, decimal max)
         => value < min ? min : value > max ? max : value;
 
-    // Een gebonden aankruisvakje op de werkkopie: wijzigen werkt direct op _settings. SyncAll
-    // houdt eventuele tweede vakje voor dezelfde setting (bv. op Algemeen) gelijk.
+    // SyncAll houdt een tweede vakje voor dezelfde setting (bijv. op Algemeen) gelijk.
     private CheckBox BoundCheck(string text, Func<bool> get, Action<bool> set)
     {
         var cb = new CheckBox { Text = text, Checked = get(), AutoSize = true, Margin = new Padding(3, 3, 12, 3) };
@@ -212,7 +215,6 @@ internal sealed class SettingsDialog : Form
         return box;
     }
 
-    // Tab Algemeen: schaal, titel, viewportmarge en de hoofdschakelaars.
     private TabPage BuildAlgemeenTab()
     {
         var page = new TabPage("Algemeen") { Padding = new Padding(10), AutoScroll = true };
@@ -234,15 +236,13 @@ internal sealed class SettingsDialog : Form
         root.Controls.Add(Group("Weergave",
             BoundCheck("Titel tonen", () => _settings.IncludeTitle, v => _settings.IncludeTitle = v),
             BoundCheck("Tekst naast de vakjes tonen", () => _settings.IncludeText, v => _settings.IncludeText = v),
-            BoundCheck("Kader om de legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
+            BoundCheck("Kader rond legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
             BoundCheck("Schaalbalk tonen", () => _settings.IncludeScaleBar, v => _settings.IncludeScaleBar = v),
             BoundCheck("Hoeveelheden tonen", () => _settings.IncludeQuantities, v => _settings.IncludeQuantities = v)));
         page.Controls.Add(root);
         return page;
     }
 
-    // Tab Inhoud: elementsoorten, statussen, KLIC-groepering en lagen; subvensters voor
-    // samenstellen, eigen statussen met leden en de per-xref keuze.
     private TabPage BuildInhoudTab()
     {
         var page = new TabPage("Inhoud") { Padding = new Padding(10), AutoScroll = true };
@@ -297,7 +297,6 @@ internal sealed class SettingsDialog : Form
         return panel;
     }
 
-    // Tab Opmaak met normale controls; de canonieke maatvoering staat onder "Geavanceerd".
     private TabPage BuildOpmaakTab()
     {
         var page = new TabPage("Opmaak") { Padding = new Padding(10), AutoScroll = true };
@@ -327,8 +326,6 @@ internal sealed class SettingsDialog : Form
         return page;
     }
 
-    // Tab Teksten met normale controls; omschrijvingen en opmerkingen via subvensters op dezelfde
-    // werkkopie (hetzelfde DescriptionOverrides-model als het losse omschrijvingencommando).
     private TabPage BuildTekstenTab()
     {
         var page = new TabPage("Teksten") { Padding = new Padding(10), AutoScroll = true };
@@ -414,9 +411,7 @@ internal sealed class SettingsDialog : Form
         return page;
     }
 
-    // Eigen statussen beheren en leden toewijzen op de werkkopie. Dezelfde CustomStatus.Members
-    // (entry-keys) als NLCSLEGENDASTATUS; de keuzelijst komt uit de geanalyseerde entries plus de
-    // eigen regels. Annuleren laat de werkkopie ongemoeid.
+    // Dezelfde CustomStatus.Members (entry-keys) als NLCSLEGENDASTATUS.
     private void EditStatusMembers()
     {
         var available = new List<(string Key, string Label)>();
@@ -441,7 +436,7 @@ internal sealed class SettingsDialog : Form
         }
     }
 
-    // Per-xref keuze op de werkkopie; dezelfde XrefInclusion-dictionary als NLCSLEGENDAXREFS.
+    // Dezelfde XrefInclusion als NLCSLEGENDAXREFS.
     private void EditXrefInclusion()
     {
         if (_xrefNames.Count == 0)
@@ -458,8 +453,7 @@ internal sealed class SettingsDialog : Form
         }
     }
 
-    // Omschrijvingen bewerken op de werkkopie; hetzelfde DescriptionOverrides-model als het losse
-    // commando. Alleen OK schrijft terug (Cancel = geen mutatie).
+    // Hetzelfde DescriptionOverrides-model als het losse commando.
     private void EditDescriptions()
     {
         using var dlg = new DescriptionsDialog(_settings.DescriptionOverrides.Clone());
@@ -483,8 +477,7 @@ internal sealed class SettingsDialog : Form
         }
     }
 
-    // Samenstellen vanuit het instellingenvenster: dezelfde boom-editor als het losse commando,
-    // maar op dezelfde werkkopie. Annuleren laat de werkkopie ongemoeid (Cancel = geen mutatie).
+    // Dezelfde boom-editor als het losse commando, op de werkkopie.
     private void EditComposition()
     {
         if (_composition is null)
@@ -525,8 +518,8 @@ internal sealed class SettingsDialog : Form
     }
 }
 
-// Per-xref keuze: een aankruislijst met de gekoppelde xrefs. Begint bij de huidige effectieve
-// keuze (IsXrefIncluded, inclusief de default-fallback) en geeft bij OK een expliciete map terug.
+// Begint bij de effectieve keuze (IsXrefIncluded, inclusief default-fallback) en geeft bij OK een
+// expliciete map terug.
 internal sealed class XrefInclusionDialog : Form
 {
     private readonly CheckedListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false, CheckOnClick = true };
@@ -582,9 +575,7 @@ internal sealed class XrefInclusionDialog : Form
     }
 }
 
-// Eigen statussen beheren en leden toewijzen. Werkt op een diepe kopie en geeft bij OK de nieuwe
-// lijst terug. Leden zijn entry-keys (zelfde model als NLCSLEGENDASTATUS); toewijzen gebeurt via
-// de aankruislijst met de beschikbare regels uit de analyse en de eigen regels.
+// Werkt op een diepe kopie; leden zijn entry-keys (zelfde model als NLCSLEGENDASTATUS).
 internal sealed class CustomStatusDialog : Form
 {
     private readonly List<CustomStatus> _statuses;
@@ -615,7 +606,10 @@ internal sealed class CustomStatusDialog : Form
         add.Click += (_, _) =>
         {
             var n = Prompt("Naam van de status:");
-            if (!string.IsNullOrWhiteSpace(n)) { _statuses.Add(new CustomStatus { Name = n.Trim() }); ReloadStatuses(_statuses.Count - 1); }
+            if (string.IsNullOrWhiteSpace(n)) return;
+            if (NameExists(n.Trim(), -1)) { WarnDuplicate(n.Trim()); return; }
+            _statuses.Add(new CustomStatus { Name = n.Trim() });
+            ReloadStatuses(_statuses.Count - 1);
         };
         var rename = new Button { Text = "Hernoemen", AutoSize = true };
         rename.Click += (_, _) =>
@@ -623,7 +617,10 @@ internal sealed class CustomStatusDialog : Form
             int i = _statusList.SelectedIndex;
             if (i < 0) return;
             var n = Prompt("Nieuwe naam:", _statuses[i].Name);
-            if (!string.IsNullOrWhiteSpace(n)) { _statuses[i].Name = n.Trim(); ReloadStatuses(i); }
+            if (string.IsNullOrWhiteSpace(n)) return;
+            if (NameExists(n.Trim(), i)) { WarnDuplicate(n.Trim()); return; }
+            _statuses[i].Name = n.Trim();
+            ReloadStatuses(i);
         };
         var remove = new Button { Text = "Verwijderen", AutoSize = true };
         remove.Click += (_, _) =>
@@ -658,6 +655,18 @@ internal sealed class CustomStatusDialog : Form
     }
 
     public List<CustomStatus> Result => _statuses;
+
+    private bool NameExists(string name, int excludeIndex)
+    {
+        for (int i = 0; i < _statuses.Count; i++)
+            if (i != excludeIndex && string.Equals(_statuses[i].Name, name, StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
+    }
+
+    private void WarnDuplicate(string name) =>
+        MessageBox.Show(this, $"Er bestaat al een status met de naam \u201c{name}\u201d.", "NLCS Legenda",
+            MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
     private void ReloadStatuses(int select)
     {
