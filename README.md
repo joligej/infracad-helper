@@ -16,8 +16,8 @@ zitten en zet daar de bijbehorende legenda bij, in dezelfde stijl.
 Start `NLCSLEGENDA`. Je kunt eerst nog de schaal of een paar opties zetten; daarna
 hangt de legenda aan je cursor en zet je hem naast de tekening neer. Standaard maakt hij
 een legenda van de hele tekening; kies je in het optiemenu `Selecteren`, dan komt er een
-legenda van alleen die selectie. Alles komt als losse objecten in de model space, op de
-eigen NLCS-lagen, dus kleur en lijntype kloppen meteen. Wie liever klikt dan typt vindt
+legenda van alleen die selectie. Alles komt in de model space op de eigen NLCS-lagen, dus
+kleur en lijntype kloppen meteen. Wie liever klikt dan typt vindt
 in het lint een tab **NLCS Legenda** met dezelfde functies.
 
 Je kunt meerdere legenda's naast elkaar in één tekening hebben, bijvoorbeeld één voor de
