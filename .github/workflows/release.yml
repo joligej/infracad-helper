@@ -58,15 +58,15 @@ jobs:
           dotnet tool update --global wix --version 5.0.2 | Out-Null
           $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
           $version = "${{ github.ref_name }}".TrimStart("v")
-          if ($env:CODESIGN_PFX_BASE64) {
-            $pfx = Join-Path $env:RUNNER_TEMP "codesign.pfx"
-            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CODESIGN_PFX_BASE64))
-            $pw = ConvertTo-SecureString $env:CODESIGN_PFX_PASSWORD -AsPlainText -Force
-            ./dev/scripts/Build-Installer.ps1 -Version $version -PfxPath $pfx -PfxPassword $pw
-            Remove-Item $pfx -Force
-          } else {
-            ./dev/scripts/Build-Installer.ps1 -Version $version
-          }
+          # Fail-closed: een publieke release moet ondertekend zijn. Zonder de signing-secrets
+          # stopt de release in plaats van een niet-ondertekende MSI te publiceren.
+          if (-not $env:CODESIGN_PFX_BASE64) { throw "CODESIGN_PFX_BASE64 ontbreekt; een publieke release moet ondertekend worden." }
+          if (-not $env:CODESIGN_PFX_PASSWORD) { throw "CODESIGN_PFX_PASSWORD ontbreekt; een publieke release moet ondertekend worden." }
+          $pfx = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CODESIGN_PFX_BASE64))
+          $pw = ConvertTo-SecureString $env:CODESIGN_PFX_PASSWORD -AsPlainText -Force
+          ./dev/scripts/Build-Installer.ps1 -Version $version -PfxPath $pfx -PfxPassword $pw
+          Remove-Item $pfx -Force
 
       - name: Release aanmaken
         shell: pwsh

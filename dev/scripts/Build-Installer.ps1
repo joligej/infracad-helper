@@ -128,6 +128,21 @@ if ($PfxPath) {
     Write-Host "==> MSI ondertekenen..." -ForegroundColor Cyan
     & $signtool.FullName sign /fd SHA256 /f $PfxPath /p $plainPw /tr $TimestampUrl /td SHA256 $msi
     if ($LASTEXITCODE -ne 0) { throw "Ondertekenen mislukt." }
+
+    # 6) Handtekening verifieren tegen het publieke certificaat. De verwachte thumbprint komt uit
+    #    deploy/joligej-codesign.cer, zodat een certificaatrotatie niet in dit script hoeft. Het
+    #    certificaat is self-signed, dus de keten is niet publiek vertrouwd (Status UnknownError is
+    #    normaal); we eisen een aanwezige handtekening, de juiste signer en een ongewijzigd bestand.
+    $cerPath = Join-Path $repoRoot "deploy\joligej-codesign.cer"
+    if (-not (Test-Path $cerPath)) { throw "Publiek certificaat ontbreekt: $cerPath" }
+    $expected = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cerPath)).Thumbprint
+    $sig = Get-AuthenticodeSignature $msi
+    if ($null -eq $sig.SignerCertificate) { throw "MSI is niet ondertekend." }
+    if ($sig.Status -eq 'HashMismatch') { throw "MSI is na ondertekenen gewijzigd (HashMismatch)." }
+    if ($sig.SignerCertificate.Thumbprint -ne $expected) {
+        throw "Signer-thumbprint ($($sig.SignerCertificate.Thumbprint)) komt niet overeen met deploy/joligej-codesign.cer ($expected)."
+    }
+    Write-Host "==> Handtekening geverifieerd: $($sig.SignerCertificate.Subject), thumbprint $($sig.SignerCertificate.Thumbprint)" -ForegroundColor Green
 }
 
 Write-Host "==> Klaar: $msi" -ForegroundColor Green
