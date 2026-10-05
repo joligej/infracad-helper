@@ -18,7 +18,8 @@ controle onmogelijk maken.
 | `NLCSLEGENDAPERFTEST` | Meet de analysetijd op een grote KLIC-tekening. |
 | `NLCSLEGENDATEMPLATEMETEN` | Meet de legendageometrie tegen de referentietemplate. |
 | `NLCSLEGENDAUNDOSETUP` / `NLCSLEGENDAUNDORENAME` | Zetten een laaghernoem-/undo-regressie klaar en voeren die uit. |
-| `NLCSLEGENDAABCSETUP` / `NLCSLEGENDAABCVERIFY` | Bouwen drie legenda's met verschillende bronnen (twee selecties + hele tekening) en config; na QSAVE/heropenen controleren ze bronnen, instellingen, global-isolatie, inhoudelijke vingerafdrukken, export-isolatie en update-isolatie. |
+| `NLCSLEGENDAABCSETUP` / `NLCSLEGENDAABCVERIFY` | Bouwen drie legenda's met verschillende bronnen (twee selecties + hele tekening) en config; na QSAVE/heropenen controleren ze bronnen, instellingen, global-isolatie, inhoudelijke vingerafdrukken, export- en viewport-isolatie en update-isolatie. |
+| `NLCSLEGENDAABCXREFSETUP` / `NLCSLEGENDAABCXREFVERIFY` | Koppelen twee synthetische xrefs en controleren na heropenen dat A alleen xref A meeneemt, B alleen xref B en C allebei. |
 | `NLCSLEGENDACONSUMERTEST` | Controleert dat zichtbare schakelaars (kader, swatchkader, schaalbalk, titel, opmerkingen, hoeveelheden, symbolen) de getekende geometrie veranderen. |
 | `NLCSLEGENDAVIEWPORTTEST` | Controleert viewport-plaatsing en -schaal rond de legenda. |
 | `NLCSLEGENDAXREFSETUP` / `NLCSLEGENDAXREFVERIFY` | Bouwen een xref-scenario en verifiëren de opname ervan. |

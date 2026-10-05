@@ -2084,8 +2084,8 @@ public partial class Commands
             : string.Empty;
 
     // Inhoudelijke vingerafdruk van een legenda-groep: per getekende entiteit soort|laag|
-    // afgeronde bounds|tekst, gesorteerd en gehasht. Fijner dan alleen de extents: andere inhoud
-    // met dezelfde omhullende geeft een andere hash. Deterministisch.
+    // afgeronde bounds|tekst|detail, gesorteerd en gehasht. Detail legt blok- en arcering-identiteit
+    // vast zodat andere inhoud met dezelfde omhullende een andere hash geeft. Deterministisch.
     private static string ContentFingerprint(Database db, Transaction tr, string groupName)
     {
         var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
@@ -2099,7 +2099,13 @@ public partial class Commands
                 ? $"{b.MinPoint.X:0.0},{b.MinPoint.Y:0.0},{b.MaxPoint.X:0.0},{b.MaxPoint.Y:0.0}"
                 : "-";
             string text = e switch { DBText t => t.TextString, MText m => m.Contents, _ => string.Empty };
-            parts.Add($"{e.GetType().Name}|{e.Layer}|{bounds}|{text}");
+            string detail = e switch
+            {
+                Hatch h => $"hatch:{h.PatternName}:{h.PatternScale:0.##}",
+                BlockReference b2 when tr.GetObject(b2.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord r => $"blk:{r.Name}",
+                _ => string.Empty
+            };
+            parts.Add($"{e.GetType().Name}|{e.Layer}|{bounds}|{text}|{detail}");
         }
 
         foreach (var id in g.GetAllEntityIds())
@@ -2408,11 +2414,28 @@ public partial class Commands
                 fpBbefore = fpB;
                 fpCbefore = fpC;
 
-                // Export-isolatie: A en B leveren een verschillende uittrekstaat (eigen bron + config).
+                // Export-isolatie: A/B/C leveren elk een eigen uittrekstaat (eigen bron + config).
                 string csvA = ExportCsv(db, tr, a);
                 string csvB = ExportCsv(db, tr, b);
-                bool exportOk = csvA.Length > 0 && csvB.Length > 0 && csvA != csvB;
-                ed.WriteMessage($"\nABC: export A={csvA.Length}tk B={csvB.Length}tk -> {(exportOk ? "verschillend OK" : "FAIL")}");
+                string csvC = ExportCsv(db, tr, c);
+                bool exportOk = csvA.Length > 0 && csvB.Length > 0 && csvC.Length > 0
+                    && csvA != csvB && csvA != csvC && csvB != csvC;
+                ed.WriteMessage($"\nABC: export A={csvA.Length}tk B={csvB.Length}tk C={csvC.Length}tk -> {(exportOk ? "verschillend OK" : "FAIL")}");
+
+                // Viewport per legenda: elk om de eigen extents, op schaal, zonder clipping.
+                string VpCheck(LegendDefinition d)
+                {
+                    if (!LegendManagement.TryGetGroupExtents(db, tr, d.GroupName, out var ext))
+                        return "geen-extents";
+                    double mw = ext.MaxPoint.X - ext.MinPoint.X;
+                    double mh = ext.MaxPoint.Y - ext.MinPoint.Y;
+                    var plan = ViewportMath.Compute(mw, mh, d.Settings.Scale, 5.0);
+                    double paperPerModel = 1000.0 / d.Settings.Scale;
+                    bool marginsOk = Math.Abs(plan.PaperWidthMm - (mw * paperPerModel + 10)) < 1e-3
+                        && Math.Abs(plan.PaperHeightMm - (mh * paperPerModel + 10)) < 1e-3;
+                    return marginsOk ? "OK" : "FAIL";
+                }
+                ed.WriteMessage($"\nABC: viewport A={VpCheck(a)} B={VpCheck(b)} C={VpCheck(c)}");
 
                 tr.Commit();
             }
@@ -2440,6 +2463,158 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nABC verify error: {ex.Message}");
+        }
+    }
+
+    // Maakt een losse bron-DWG met één NLCS-polyline op de gegeven laag, om als xref te koppelen.
+    // In de Core Console moet de nieuwe database tijdelijk de werkdatabase zijn, anders is de
+    // modelspace nog niet opgebouwd (eKeyNotFound).
+    private static void CreateXrefSourceDwg(string path, string layer)
+    {
+        var prev = HostApplicationServices.WorkingDatabase;
+        using var xdb = new Database(buildDefaultDrawing: true, noDocument: true);
+        HostApplicationServices.WorkingDatabase = xdb;
+        try
+        {
+            using (var tr = xdb.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(xdb.LayerTableId, OpenMode.ForWrite);
+                if (!lt.Has(layer))
+                {
+                    var ltr = new LayerTableRecord { Name = layer };
+                    lt.Add(ltr);
+                    tr.AddNewlyCreatedDBObject(ltr, true);
+                }
+                var msId = SymbolUtilityServices.GetBlockModelSpaceId(xdb);
+                var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+                var pl = new Polyline();
+                pl.AddVertexAt(0, new Point2d(0, 0), 0, 0, 0);
+                pl.AddVertexAt(1, new Point2d(5, 0), 0, 0, 0);
+                pl.Layer = layer;
+                ms.AppendEntity(pl);
+                tr.AddNewlyCreatedDBObject(pl, true);
+                tr.Commit();
+            }
+            xdb.SaveAs(path, DwgVersion.Current);
+        }
+        finally
+        {
+            HostApplicationServices.WorkingDatabase = prev;
+        }
+    }
+
+    // Echte xref-isolatie in de A/B/C-flow: koppelt twee synthetische xrefs met elk een eigen
+    // NLCS-element. A neemt alleen xref A mee, B alleen xref B, C allebei (globale default aan).
+    // Na QSAVE/heropenen moeten de geanalyseerde elementen per legenda echt verschillen, niet
+    // alleen de instelling. De xref-bronbestanden komen naast de host te staan zodat heropenen ze
+    // vindt.
+    [CommandMethod("NLCSLEGENDAABCXREFSETUP", CommandFlags.Modal)]
+    public void NlcsLegendaAbcXrefSetup()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
+            string pathA = Path.Combine(dir, "abc_xref_a.dwg");
+            string pathB = Path.Combine(dir, "abc_xref_b.dwg");
+            CreateXrefSourceDwg(pathA, "N-WE-VH-XREFA-G");
+            CreateXrefSourceDwg(pathB, "N-WE-VH-XREFB-G");
+
+            ObjectId xrefA = db.AttachXref(pathA, "ABCXREFA");
+            ObjectId xrefB = db.AttachXref(pathB, "ABCXREFB");
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+                var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+                foreach (var id in new[] { xrefA, xrefB })
+                {
+                    var br = new BlockReference(Point3d.Origin, id);
+                    ms.AppendEntity(br);
+                    tr.AddNewlyCreatedDBObject(br, true);
+                }
+                tr.Commit();
+            }
+
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+
+                var sA = LoadGlobalDefaults();
+                sA.Title = "ABCX-A";
+                sA.IncludeXrefLayers = false;
+                sA.XrefInclusion["ABCXREFA"] = true;
+                sA.XrefInclusion["ABCXREFB"] = false;
+
+                var sB = LoadGlobalDefaults();
+                sB.Title = "ABCX-B";
+                sB.IncludeXrefLayers = false;
+                sB.XrefInclusion["ABCXREFA"] = false;
+                sB.XrefInclusion["ABCXREFB"] = true;
+
+                var sC = LoadGlobalDefaults();
+                sC.Title = "ABCX-C";
+                sC.IncludeXrefLayers = true;
+
+                foreach (var s in new[] { sA, sB, sC })
+                    reg.Add(IsoDef(reg, s));
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+            }
+            ed.WriteMessage("\nABCX: setup klaar (2 xrefs gekoppeld). QSAVE, heropenen, dan NLCSLEGENDAABCXREFVERIFY.");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nABCX setup error: {ex.Message}");
+        }
+    }
+
+    [CommandMethod("NLCSLEGENDAABCXREFVERIFY", CommandFlags.Modal)]
+    public void NlcsLegendaAbcXrefVerify()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var reg = LegendStore.Load(db, tr);
+            var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
+
+            LegendDefinition? Find(string t) =>
+                reg.Legends.FirstOrDefault(l => string.Equals(l.Settings.Title, t, StringComparison.Ordinal));
+            var a = Find("ABCX-A");
+            var b = Find("ABCX-B");
+            var c = Find("ABCX-C");
+            if (a is null || b is null || c is null)
+            {
+                ed.WriteMessage("\nABCX: legenda's niet gevonden -> FAIL");
+                tr.Commit();
+                return;
+            }
+
+            string Elements(LegendDefinition d)
+            {
+                var an = DrawingAnalyzer.Analyze(db, tr, d.Settings, catalog: LoadCatalog(db), excludedIds: excluded);
+                return string.Join(",", an.Entries.Select(e => e.Element).OrderBy(e => e, StringComparer.OrdinalIgnoreCase));
+            }
+
+            string ea = Elements(a), eb = Elements(b), ec = Elements(c);
+            bool aOk = ea.Contains("XREFA") && !ea.Contains("XREFB");
+            bool bOk = eb.Contains("XREFB") && !eb.Contains("XREFA");
+            bool cOk = ec.Contains("XREFA") && ec.Contains("XREFB");
+            ed.WriteMessage($"\nABCX: A=[{ea}] B=[{eb}] C=[{ec}]");
+            ed.WriteMessage($"\nABCX: xref-isolatie A={(aOk ? "OK" : "FAIL")} B={(bOk ? "OK" : "FAIL")} C={(cOk ? "OK" : "FAIL")} -> {(aOk && bOk && cOk ? "OK" : "FAIL")}");
+            tr.Commit();
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nABCX verify error: {ex.Message}");
         }
     }
 
