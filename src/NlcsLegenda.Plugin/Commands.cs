@@ -2286,6 +2286,7 @@ public partial class Commands
             var statusA = new CustomStatus { Name = "ABC-STATUS-A" };
             if (firstKey.Length > 0) statusA.Members.Add(firstKey);
             sA.CustomStatuses.Add(statusA);
+            sA.CustomLayerRules.Add(new CustomLayerRule { Layer = "ABC-eigen-laag", Element = "ABC-eigen", Type = NlcsDrawType.Geometrie, Description = "ABC eigen laag" });
             if (firstKey.Length > 0)
                 sA.DescriptionOverrides.Elementen[firstKey] = new DescriptionEntry { Specifiek = "ABC-A-TEKST" };
 
@@ -2398,10 +2399,11 @@ public partial class Commands
 
                 bool configOk = a.Settings.Scale == 200 && a.Settings.Columns == 1 && a.Settings.ManualEntries.Count == 1
                     && a.Settings.CustomStatuses.Count == 1
+                    && a.Settings.CustomLayerRules.Count == 1 && b.Settings.CustomLayerRules.Count == 0
                     && b.Settings.Scale == 500 && b.Settings.Columns == 2 && b.Settings.MergedDimensions.Count >= 1
                     && b.Settings.ExcludedEntries.Count >= 1;
-                ed.WriteMessage($"\nABC: config A(sc={a.Settings.Scale:0},kol={a.Settings.Columns},man={a.Settings.ManualEntries.Count},st={a.Settings.CustomStatuses.Count}) " +
-                    $"B(sc={b.Settings.Scale:0},kol={b.Settings.Columns},groep={b.Settings.MergedDimensions.Count},excl={b.Settings.ExcludedEntries.Count}) -> {(configOk ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nABC: config A(sc={a.Settings.Scale:0},kol={a.Settings.Columns},man={a.Settings.ManualEntries.Count},st={a.Settings.CustomStatuses.Count},eigenlaag={a.Settings.CustomLayerRules.Count}) " +
+                    $"B(sc={b.Settings.Scale:0},kol={b.Settings.Columns},groep={b.Settings.MergedDimensions.Count},excl={b.Settings.ExcludedEntries.Count},eigenlaag={b.Settings.CustomLayerRules.Count}) -> {(configOk ? "OK" : "FAIL")}");
 
                 // Global-isolatie: global is gewijzigd vóór C; A/B hielden hun eigen schaal, C kreeg de nieuwe.
                 bool globalIso = a.Settings.Scale == 200 && b.Settings.Scale == 500
