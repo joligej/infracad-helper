@@ -404,6 +404,11 @@ public sealed class LegendSettings
     [Browsable(false)]
     public List<CustomStatus> CustomStatuses { get; set; } = new();
 
+    // Expliciet gekoppelde eigen (niet-NLCS) bronlagen. Opt-in: alleen deze lagen tellen mee
+    // naast de automatisch herkende NLCS-lagen.
+    [Browsable(false)]
+    public List<CustomLayerRule> CustomLayerRules { get; set; } = new();
+
     public CustomStatus? FindCustomStatus(string entryKey)
     {
         if (string.IsNullOrEmpty(entryKey))
@@ -479,6 +484,7 @@ public sealed class LegendSettings
         XrefInclusion = new Dictionary<string, bool>(other.XrefInclusion, StringComparer.OrdinalIgnoreCase);
         ManualEntries = other.ManualEntries.Select(m => m.Clone()).ToList();
         CustomStatuses = other.CustomStatuses.Select(cs => cs.Clone()).ToList();
+        CustomLayerRules = other.CustomLayerRules.Select(r => r.Clone()).ToList();
         MergedDimensions = new HashSet<GroupDimension>(other.MergedDimensions);
     }
 
@@ -526,6 +532,7 @@ public sealed class LegendSettings
         p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
+            or nameof(CustomLayerRules)
             or nameof(MergedDimensions) or nameof(DescriptionOverrides);
 
     [JsonIgnore, Browsable(false)]
@@ -592,6 +599,7 @@ public sealed class LegendSettings
         IncludedDrawTypes ??= new HashSet<NlcsDrawType>();
         ManualEntries ??= new List<ManualEntry>();
         CustomStatuses ??= new List<CustomStatus>();
+        CustomLayerRules ??= new List<CustomLayerRule>();
         MergedDimensions ??= new HashSet<GroupDimension>();
         ExcludedDisciplines = ToCi(ExcludedDisciplines);
         ExcludedHoofdgroepen = ToCi(ExcludedHoofdgroepen);
