@@ -19,23 +19,23 @@ public static class TemplateProvenance
         new Dictionary<string, TemplateValueOrigin>
         {
             [nameof(TemplateDefaults.SwatchWidthMm)] =
-                new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.SwatchWidthMm,
-                    "afronding van de gemeten lijnsample (22,4 mm) met een kleine marge"),
+                new(TemplateOrigin.Afgeleid, TemplateDefaults.SwatchWidthMm,
+                    "afgeleid van de gemeten lijnsample (22,4 mm), naar boven afgerond met een kleine marge"),
             [nameof(TemplateDefaults.SwatchHeightMm)] =
                 new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.SwatchHeightMm,
-                    "vaste swatchhoogte voor een zichtbaar sample"),
+                    "twee keer de teksthoogte zodat het sample goed zichtbaar is naast de omschrijving"),
             [nameof(TemplateDefaults.RowPitchMm)] =
                 new(TemplateOrigin.Gemeten, TemplateDefaults.RowPitchMm,
                     "baseline-afstand van de T25-tekst in de referentie (n=41)"),
             [nameof(TemplateDefaults.LineSpacingFactor)] =
                 new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.LineSpacingFactor,
-                    "regelafstand binnen meerregelige omschrijvingen"),
+                    "typografische regelafstand (1,35x) voor leesbare meerregelige omschrijvingen"),
             [nameof(TemplateDefaults.RemarksWidthMm)] =
                 new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.RemarksWidthMm,
-                    "breedte van het opmerkingenblok"),
+                    "leesbare alineabreedte voor het opmerkingenblok (ca. 90 mm papier)"),
             [nameof(TemplateDefaults.TextGapMm)] =
                 new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.TextGapMm,
-                    "ruimte tussen de swatch en de omschrijving"),
+                    "ruimte tussen swatch en omschrijving zodat de tekst niet tegen het sample plakt"),
             [nameof(TemplateDefaults.TextHeightMm)] =
                 new(TemplateOrigin.Gemeten, TemplateDefaults.TextHeightMm,
                     "NLCS-ISO T25 (0,5 m op 1:200) in de referentie"),
@@ -47,18 +47,18 @@ public static class TemplateProvenance
                     "titel kleiner dan de gemeten sample-titel (10 mm) voor een compacte kop"),
             [nameof(TemplateDefaults.HeaderSpacingMm)] =
                 new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.HeaderSpacingMm,
-                    "witruimte boven een kopregel, ongeveer één regel"),
+                    "witruimte boven een kopregel, ongeveer één regelhoogte"),
             [nameof(TemplateDefaults.ColumnWidthMm)] =
                 new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.ColumnWidthMm,
-                    "kolombreedte voor swatch plus omschrijving"),
+                    "breedte voor swatch plus een regel omschrijving zonder vroeg afbreken"),
             [nameof(TemplateDefaults.ColumnGapMm)] =
                 new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.ColumnGapMm,
-                    "tussenruimte tussen twee kolommen"),
+                    "zichtbare scheiding tussen twee kolommen"),
             [nameof(TemplateDefaults.QuantityColumnWidthMm)] =
                 new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.QuantityColumnWidthMm,
-                    "breedte van de hoeveelheidkolom"),
+                    "breedte voor een getal met eenheid in de hoeveelheidkolom"),
             [nameof(TemplateDefaults.BorderMarginMm)] =
                 new(TemplateOrigin.Ontwerpkeuze, TemplateDefaults.BorderMarginMm,
-                    "kadermarge rond de legenda, gelijk aan de viewportmarge"),
+                    "kadermarge rond de legenda, gelijkgehouden aan de standaard viewportmarge"),
         };
 }

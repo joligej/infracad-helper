@@ -46,4 +46,11 @@ public class TemplateProvenanceTests
         Assert.Equal(TemplateOrigin.Gemeten, TemplateProvenance.ByField[nameof(TemplateDefaults.TextHeightMm)].Origin);
         Assert.Equal(TemplateOrigin.Gemeten, TemplateProvenance.ByField[nameof(TemplateDefaults.HeaderTextHeightMm)].Origin);
     }
+
+    [Fact]
+    public void SwatchWidth_IsDerivedFromMeasuredLineSample()
+    {
+        // 24 mm komt uit de gemeten lijnsample van 22,4 mm, dus afgeleid (geen vrije keuze).
+        Assert.Equal(TemplateOrigin.Afgeleid, TemplateProvenance.ByField[nameof(TemplateDefaults.SwatchWidthMm)].Origin);
+    }
 }
