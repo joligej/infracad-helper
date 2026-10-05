@@ -72,6 +72,13 @@ kiest het type (lijn, vlak, arcering, vlakvulling of symbool), de laag en de
 omschrijving. In `NLCSLEGENDABEHEER` staat dit bij elkaar in één venster. Het uitvinken
 en de eigen regels horen bij de globale standaard of bij één legenda.
 
+Heb je eigen (niet-NLCS) lagen die als echte bron moeten meetellen, dan koppel je die in
+het instellingenvenster onder *Eigen lagen*. Zo'n koppeling werkt als een NLCS-laag: je
+kiest de laag, het type en de hoeveelheid (lengte, aantal of oppervlak), en de legenda
+leest de echte geometrie van die laag. Anders dan een handmatige regel verschijnt een
+eigen laag alleen als er objecten op staan, en de hoeveelheden komen uit de tekening. Je
+koppelt alleen de lagen die je zelf aanwijst; hulp- en annotatielagen blijven buiten beeld.
+
 Je kunt ook per elementsoort kiezen wat in de legenda komt: geometrie/lijnen, vlakken,
 arceringen, vlakvullingen en symbolen zijn afzonderlijk aan of uit te zetten. Standaard
 staat alles aan. Je vindt dit in `NLCSLEGENDAOPTIES` onder *Elementsoorten* en in het

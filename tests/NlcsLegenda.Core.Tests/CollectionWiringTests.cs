@@ -18,6 +18,7 @@ public class CollectionWiringTests
         nameof(LegendSettings.ExcludedEntries),
         nameof(LegendSettings.ManualEntries),
         nameof(LegendSettings.CustomStatuses),
+        nameof(LegendSettings.CustomLayerRules),
         nameof(LegendSettings.XrefInclusion),
         nameof(LegendSettings.DescriptionOverrides),
         nameof(LegendSettings.ExcludedDisciplines),
@@ -55,6 +56,7 @@ public class CollectionWiringTests
         s.ExcludedEntries.Add("N|WE|VH|X");
         s.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-X-G", Description = "Eigen" });
         s.CustomStatuses.Add(new CustomStatus { Name = "Onder voorbehoud", Members = { "N|WE|RI|R" } });
+        s.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen kabels", Element = "Datakabel", Type = NlcsDrawType.Geometrie, Description = "Datakabel" });
         s.XrefInclusion["ref1"] = true;
         s.DescriptionOverrides.Elementen["VH|EL"] = new DescriptionEntry { Specifiek = "Tekst" };
         s.ExcludedDisciplines.Clear();
@@ -77,6 +79,9 @@ public class CollectionWiringTests
         Assert.Equal("Eigen", back.ManualEntries[0].Description);
         Assert.Single(back.CustomStatuses);
         Assert.Contains("N|WE|RI|R", back.CustomStatuses[0].Members);
+        Assert.Single(back.CustomLayerRules);
+        Assert.Equal("Eigen kabels", back.CustomLayerRules[0].Layer);
+        Assert.Equal("Datakabel", back.CustomLayerRules[0].Element);
         Assert.True(back.IsXrefIncluded("ref1"));
         Assert.Equal("Tekst", back.DescriptionOverrides.Elementen["VH|EL"].Specifiek);
         Assert.Contains("ZZ", back.ExcludedDisciplines);
@@ -95,6 +100,7 @@ public class CollectionWiringTests
         original.ExcludedEntries.Add("extra");
         original.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-Y-G", Description = "Extra" });
         original.CustomStatuses[0].Members.Add("extra");
+        original.CustomLayerRules.Add(new CustomLayerRule { Layer = "Extra laag", Element = "Extra" });
         original.XrefInclusion["ref2"] = false;
         original.DescriptionOverrides.Elementen["VH|EXTRA"] = new DescriptionEntry { Specifiek = "x" };
         original.ExcludedDisciplines.Add("extra");
@@ -106,6 +112,7 @@ public class CollectionWiringTests
         Assert.Single(clone.ExcludedEntries);
         Assert.Single(clone.ManualEntries);
         Assert.Single(clone.CustomStatuses[0].Members);
+        Assert.Single(clone.CustomLayerRules);
         Assert.Single(clone.XrefInclusion);
         Assert.Single(clone.DescriptionOverrides.Elementen);
         Assert.Single(clone.ExcludedDisciplines);

@@ -2286,6 +2286,7 @@ public partial class Commands
             var statusA = new CustomStatus { Name = "ABC-STATUS-A" };
             if (firstKey.Length > 0) statusA.Members.Add(firstKey);
             sA.CustomStatuses.Add(statusA);
+            sA.CustomLayerRules.Add(new CustomLayerRule { Layer = "ABC-eigen-laag", Element = "ABC-eigen", Type = NlcsDrawType.Geometrie, Description = "ABC eigen laag" });
             if (firstKey.Length > 0)
                 sA.DescriptionOverrides.Elementen[firstKey] = new DescriptionEntry { Specifiek = "ABC-A-TEKST" };
 
@@ -2398,10 +2399,11 @@ public partial class Commands
 
                 bool configOk = a.Settings.Scale == 200 && a.Settings.Columns == 1 && a.Settings.ManualEntries.Count == 1
                     && a.Settings.CustomStatuses.Count == 1
+                    && a.Settings.CustomLayerRules.Count == 1 && b.Settings.CustomLayerRules.Count == 0
                     && b.Settings.Scale == 500 && b.Settings.Columns == 2 && b.Settings.MergedDimensions.Count >= 1
                     && b.Settings.ExcludedEntries.Count >= 1;
-                ed.WriteMessage($"\nABC: config A(sc={a.Settings.Scale:0},kol={a.Settings.Columns},man={a.Settings.ManualEntries.Count},st={a.Settings.CustomStatuses.Count}) " +
-                    $"B(sc={b.Settings.Scale:0},kol={b.Settings.Columns},groep={b.Settings.MergedDimensions.Count},excl={b.Settings.ExcludedEntries.Count}) -> {(configOk ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nABC: config A(sc={a.Settings.Scale:0},kol={a.Settings.Columns},man={a.Settings.ManualEntries.Count},st={a.Settings.CustomStatuses.Count},eigenlaag={a.Settings.CustomLayerRules.Count}) " +
+                    $"B(sc={b.Settings.Scale:0},kol={b.Settings.Columns},groep={b.Settings.MergedDimensions.Count},excl={b.Settings.ExcludedEntries.Count},eigenlaag={b.Settings.CustomLayerRules.Count}) -> {(configOk ? "OK" : "FAIL")}");
 
                 // Global-isolatie: global is gewijzigd vóór C; A/B hielden hun eigen schaal, C kreeg de nieuwe.
                 bool globalIso = a.Settings.Scale == 200 && b.Settings.Scale == 500
@@ -2466,6 +2468,120 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nABC verify error: {ex.Message}");
+        }
+    }
+
+    // First-class eigen bronlagen op een echte host: maakt geometrie op niet-NLCS-lagen en
+    // controleert dat gekoppelde eigen lagen gelijkwaardig meetellen (lengte, aantal, oppervlak),
+    // zowel op de hele tekening als op een selectie, en dat een echte legenda wordt gebouwd.
+    [CommandMethod("NLCSLEGENDACUSTOMTEST", CommandFlags.Modal)]
+    public void NlcsLegendaCustomTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            ObjectId line5 = ObjectId.Null;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+                var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                ObjectId EnsureLayer(string name)
+                {
+                    if (lt.Has(name)) return lt[name];
+                    var ltr = new LayerTableRecord { Name = name };
+                    var id = lt.Add(ltr); tr.AddNewlyCreatedDBObject(ltr, true); return id;
+                }
+                var kabels = EnsureLayer("Eigen kabels");
+                var putten = EnsureLayer("Speciale putten");
+                var verharding = EnsureLayer("Eigen verharding");
+
+                // Eigen kabels: lijn van 5 m + polyline van 7 m = 12 m.
+                var l5 = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = kabels };
+                line5 = ms.AppendEntity(l5); tr.AddNewlyCreatedDBObject(l5, true);
+                var pl = new Polyline();
+                pl.AddVertexAt(0, new Point2d(0, 10), 0, 0, 0);
+                pl.AddVertexAt(1, new Point2d(7, 10), 0, 0, 0);
+                pl.LayerId = kabels;
+                ms.AppendEntity(pl); tr.AddNewlyCreatedDBObject(pl, true);
+
+                // Blok PUT (een cirkel) en 3 inserties op "Speciale putten".
+                var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
+                ObjectId putBlock;
+                if (bt.Has("PUT")) { putBlock = bt["PUT"]; }
+                else
+                {
+                    var bd = new BlockTableRecord { Name = "PUT" };
+                    putBlock = bt.Add(bd); tr.AddNewlyCreatedDBObject(bd, true);
+                    var circ = new Circle(Point3d.Origin, Vector3d.ZAxis, 0.5);
+                    bd.AppendEntity(circ); tr.AddNewlyCreatedDBObject(circ, true);
+                }
+                for (int i = 0; i < 3; i++)
+                {
+                    var brf = new BlockReference(new Point3d(i * 2, 20, 0), putBlock) { LayerId = putten };
+                    ms.AppendEntity(brf); tr.AddNewlyCreatedDBObject(brf, true);
+                }
+
+                // Eigen verharding: gesloten polyline van 10 x 5 = 50 m2.
+                var area = new Polyline();
+                area.AddVertexAt(0, new Point2d(0, 30), 0, 0, 0);
+                area.AddVertexAt(1, new Point2d(10, 30), 0, 0, 0);
+                area.AddVertexAt(2, new Point2d(10, 35), 0, 0, 0);
+                area.AddVertexAt(3, new Point2d(0, 35), 0, 0, 0);
+                area.Closed = true;
+                area.LayerId = verharding;
+                ms.AppendEntity(area); tr.AddNewlyCreatedDBObject(area, true);
+                tr.Commit();
+            }
+
+            var settings = LoadGlobalDefaults();
+            settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen kabels", Element = "Datakabel", Type = NlcsDrawType.Geometrie, Description = "Datakabel", QuantityMode = CustomQuantityMode.Lengte });
+            settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Speciale putten", Element = "Straatput", Type = NlcsDrawType.Symbool, Description = "Straatput", QuantityMode = CustomQuantityMode.Aantal, BlockName = "PUT" });
+            settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen verharding", Element = "Eigen verharding", Type = NlcsDrawType.Vlak, Description = "Eigen verharding", QuantityMode = CustomQuantityMode.Oppervlak });
+
+            LegendEntry? Find(IReadOnlyList<LegendEntry> es, string el) =>
+                es.FirstOrDefault(e => e.Element == el);
+
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var whole = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db)).Entries;
+                var kabel = Find(whole, "Datakabel");
+                var put = Find(whole, "Straatput");
+                var verh = Find(whole, "Eigen verharding");
+                ed.WriteMessage($"\nCUSTOM: hele tekening kabel={kabel?.Metric.Length:0.0}m (verw 12) put={put?.Metric.Count}x (verw 3) verharding={verh?.Metric.Area:0.0}m2 (verw 50)");
+                bool wholeOk = kabel is not null && Math.Abs(kabel.Metric.Length - 12) < 0.1
+                    && put is not null && put.Metric.Count == 3
+                    && verh is not null && Math.Abs(verh.Metric.Area - 50) < 0.1;
+                ed.WriteMessage($"\nCUSTOM: block-identiteit put={put?.SymbolBlockName} (verw PUT); hele tekening -> {(wholeOk ? "OK" : "FAIL")}");
+
+                // Selectie: alleen de 5 m-lijn -> 5 m.
+                var sel = DrawingAnalyzer.Analyze(db, tr, settings, new[] { line5 }, LoadCatalog(db)).Entries;
+                var selKabel = Find(sel, "Datakabel");
+                bool selOk = selKabel is not null && Math.Abs(selKabel.Metric.Length - 5) < 0.1;
+                ed.WriteMessage($"\nCUSTOM: selectie (1e lijn) kabel={selKabel?.Metric.Length:0.0}m (verw 5) -> {(selOk ? "OK" : "FAIL")}");
+                tr.Commit();
+            }
+
+            // Echte legenda bouwen met de eigen lagen erin.
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, settings);
+                reg.Add(def);
+                var result = BuildManagedLegend(db, tr, reg, def, out int rows, out _);
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+                PurgePending(db);
+                ed.WriteMessage($"\nCUSTOM: legenda gebouwd {result} met {rows} regels (incl. eigen lagen)");
+            }
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nCUSTOM error: {ex.Message}");
         }
     }
 

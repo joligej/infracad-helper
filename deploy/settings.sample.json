@@ -86,14 +86,24 @@
   "excludedHoofdgroepen": [
     "AL"
   ],
-  "textOverrides": {
-    "OPENVERHARDING_BETONSTRAATSTEEN": "Betonstraatsteen"
-  },
   "descriptionOverrides": {
     "elementen": {}
   },
   "excludedEntries": [],
   "manualEntries": [],
   "xrefInclusion": {},
-  "customStatuses": []
+  "customStatuses": [],
+  "customLayerRules": [
+    {
+      "layer": "Eigen kabels",
+      "scope": "Local",
+      "element": "Datakabel",
+      "type": "Geometrie",
+      "status": "Nieuw",
+      "discipline": "EI",
+      "hoofdgroep": "EI",
+      "description": "Datakabel",
+      "quantityMode": "Lengte"
+    }
+  ]
 }

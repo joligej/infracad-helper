@@ -147,7 +147,7 @@ internal sealed class SettingsDialog : Form
     {
         decimal start = ClampDecimal((decimal)get(), min, max);
         // Buiten bereik opgeslagen waarde meteen gelijktrekken, anders tonen UI en opslag iets anders.
-        if ((double)start != get()) set((double)start);
+        if (start != (decimal)get()) set((double)start);
         var n = new NumericUpDown
         {
             Minimum = min, Maximum = max, DecimalPlaces = decimals, Increment = increment,
@@ -284,6 +284,9 @@ internal sealed class SettingsDialog : Form
         var xrefs = new Button { Text = "Xrefs\u2026", AutoSize = true };
         xrefs.Click += (_, _) => EditXrefInclusion();
         actions.Controls.Add(xrefs);
+        var eigenLagen = new Button { Text = "Eigen lagen\u2026", AutoSize = true };
+        eigenLagen.Click += (_, _) => EditCustomLayers();
+        actions.Controls.Add(eigenLagen);
         root.Controls.Add(actions);
         page.Controls.Add(root);
         return page;
@@ -460,6 +463,17 @@ internal sealed class SettingsDialog : Form
         if (dlg.ShowDialog(this) == DialogResult.OK)
         {
             _settings.DescriptionOverrides = dlg.ToCatalog();
+            SyncAll();
+        }
+    }
+
+    // Eigen (niet-NLCS) bronlagen koppelen. Werkt op een kopie; alleen OK schrijft terug.
+    private void EditCustomLayers()
+    {
+        using var dlg = new CustomLayerDialog(_settings.CustomLayerRules);
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _settings.CustomLayerRules = dlg.Result;
             SyncAll();
         }
     }
@@ -1024,3 +1038,155 @@ internal sealed class TextEditDialog : Form
         ScrollBars = ScrollBars.Vertical
     };
 }
+
+// Beheert de eigen-laagkoppelingen: een lijst met toevoegen/bewerken/verwijderen. Werkt op een
+// diepe kopie; de aanroeper neemt het resultaat alleen bij OK over.
+internal sealed class CustomLayerDialog : Form
+{
+    private readonly List<CustomLayerRule> _rules;
+    private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false };
+
+    public CustomLayerDialog(IReadOnlyList<CustomLayerRule> initial)
+    {
+        _rules = initial.Select(r => r.Clone()).ToList();
+
+        Text = "NLCS Legenda \u2013 eigen lagen";
+        Font = SystemFonts.MessageBoxFont;
+        ClientSize = new Size(560, 420);
+        MinimumSize = new Size(460, 320);
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        ShowInTaskbar = false;
+        ShowIcon = false;
+        MinimizeBox = false;
+
+        var hint = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 36,
+            Text = "Koppel een eigen (niet-NLCS) laag als bron. Dit is iets anders dan een handmatige "
+                 + "regel: een eigen laag telt alleen mee als er objecten op die laag staan.",
+            Padding = new Padding(4, 2, 4, 2)
+        };
+
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        var add = new Button { Text = "Toevoegen\u2026", AutoSize = true };
+        add.Click += (_, _) => { var r = EditRule(new CustomLayerRule()); if (r is not null) { _rules.Add(r); Reload(_rules.Count - 1); } };
+        var edit = new Button { Text = "Bewerken\u2026", AutoSize = true };
+        edit.Click += (_, _) => { int i = _list.SelectedIndex; if (i < 0) return; var r = EditRule(_rules[i].Clone()); if (r is not null) { _rules[i] = r; Reload(i); } };
+        var remove = new Button { Text = "Verwijderen", AutoSize = true };
+        remove.Click += (_, _) => { int i = _list.SelectedIndex; if (i < 0) return; _rules.RemoveAt(i); Reload(Math.Min(i, _rules.Count - 1)); };
+        bar.Controls.AddRange(new Control[] { add, edit, remove });
+
+        var buttons = new ButtonBar(withApply: false);
+        AcceptButton = buttons.Ok;
+        CancelButton = buttons.Cancel;
+
+        Controls.Add(_list);
+        Controls.Add(bar);
+        Controls.Add(hint);
+        Controls.Add(buttons);
+        Reload(_rules.Count > 0 ? 0 : -1);
+    }
+
+    public List<CustomLayerRule> Result => _rules;
+
+    private void Reload(int select)
+    {
+        _list.BeginUpdate();
+        _list.Items.Clear();
+        foreach (var r in _rules)
+            _list.Items.Add($"{r.Layer}  \u2192  {r.Element} ({r.Type}, {r.QuantityMode})");
+        _list.EndUpdate();
+        if (select >= 0 && select < _list.Items.Count)
+            _list.SelectedIndex = select;
+    }
+
+    // Bewerkt één regel in een subvenster. Geeft de regel terug bij OK, anders null.
+    private CustomLayerRule? EditRule(CustomLayerRule rule)
+    {
+        using var dlg = new Form
+        {
+            Text = "Eigen laag",
+            Font = SystemFonts.MessageBoxFont,
+            ClientSize = new Size(420, 420),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            ShowInTaskbar = false, ShowIcon = false, MinimizeBox = false, MaximizeBox = false
+        };
+        var layer = new TextBox { Text = rule.Layer, Width = 240 };
+        var element = new TextBox { Text = rule.Element, Width = 240 };
+        var desc = new TextBox { Text = rule.Description, Width = 240 };
+        var type = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+        type.Items.AddRange(new object[] { NlcsDrawType.Geometrie, NlcsDrawType.Vlak, NlcsDrawType.Arcering, NlcsDrawType.Vlakvulling, NlcsDrawType.Symbool });
+        type.SelectedItem = rule.Type;
+        var status = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+        status.Items.AddRange(Enum.GetNames<NlcsStatus>());
+        status.SelectedItem = rule.Status.ToString();
+        var qmode = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+        qmode.Items.AddRange(Enum.GetNames<CustomQuantityMode>());
+        qmode.SelectedItem = rule.QuantityMode.ToString();
+        var scope = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+        scope.Items.AddRange(Enum.GetNames<CustomSourceScope>());
+        scope.SelectedItem = rule.Scope.ToString();
+        var xref = new TextBox { Text = rule.XrefName, Width = 160 };
+        var block = new TextBox { Text = rule.BlockName ?? string.Empty, Width = 160 };
+
+        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(8) };
+        FlowLayoutPanel Row(string label, Control c)
+        {
+            var p = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+            p.Controls.Add(new Label { Text = label, AutoSize = true, Width = 150, Padding = new Padding(0, 6, 0, 0) });
+            p.Controls.Add(c);
+            return p;
+        }
+        flow.Controls.Add(Row("Laagnaam:", layer));
+        flow.Controls.Add(Row("Logisch element:", element));
+        flow.Controls.Add(Row("Omschrijving:", desc));
+        flow.Controls.Add(Row("Type:", type));
+        flow.Controls.Add(Row("Status:", status));
+        flow.Controls.Add(Row("Hoeveelheid:", qmode));
+        flow.Controls.Add(Row("Bron:", scope));
+        flow.Controls.Add(Row("Xref-naam (bij xref):", xref));
+        flow.Controls.Add(Row("Alleen blok (symbool):", block));
+
+        var ok = new Button { Text = "OK", DialogResult = DialogResult.None, Width = 90 };
+        var cancel = new Button { Text = "Annuleren", DialogResult = DialogResult.Cancel, Width = 90 };
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Padding = new Padding(6) };
+        bar.Controls.Add(cancel); bar.Controls.Add(ok);
+        dlg.AcceptButton = ok; dlg.CancelButton = cancel;
+        dlg.Controls.Add(flow); dlg.Controls.Add(bar);
+
+        ok.Click += (_, _) =>
+        {
+            rule.Layer = layer.Text.Trim();
+            rule.Element = element.Text.Trim();
+            rule.Description = desc.Text.Trim();
+            rule.Type = (NlcsDrawType)type.SelectedItem!;
+            rule.Status = Enum.Parse<NlcsStatus>((string)status.SelectedItem!);
+            rule.QuantityMode = Enum.Parse<CustomQuantityMode>((string)qmode.SelectedItem!);
+            rule.Scope = Enum.Parse<CustomSourceScope>((string)scope.SelectedItem!);
+            rule.XrefName = xref.Text.Trim();
+            rule.BlockName = string.IsNullOrWhiteSpace(block.Text) ? null : block.Text.Trim();
+            if (!LayerNaming.IsValid(rule.Layer) || string.IsNullOrWhiteSpace(rule.Layer))
+            { Warn("Geef een geldige laagnaam op."); return; }
+            if (string.IsNullOrWhiteSpace(rule.Element))
+            { Warn("Geef een logisch element op."); return; }
+            if (_rules.Any(o => !ReferenceEquals(o, rule) && SameMapping(o, rule)))
+            { Warn("Er bestaat al een koppeling voor deze laag en bron."); return; }
+            dlg.DialogResult = DialogResult.OK;
+        };
+
+        return dlg.ShowDialog(this) == DialogResult.OK ? rule : null;
+    }
+
+    private static bool SameMapping(CustomLayerRule a, CustomLayerRule b) =>
+        string.Equals(a.Layer, b.Layer, StringComparison.OrdinalIgnoreCase)
+        && a.Scope == b.Scope
+        && string.Equals(a.XrefName, b.XrefName, StringComparison.OrdinalIgnoreCase)
+        && a.Type == b.Type;
+
+    private void Warn(string message) =>
+        MessageBox.Show(this, message, "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+}
+

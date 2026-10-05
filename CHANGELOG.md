@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.26.0 - 2026-10-05
+
+- Je kunt nu eigen (niet-NLCS) lagen als echte bron koppelen via *Eigen lagen* in het
+  instellingenvenster. Zo'n laag telt gelijkwaardig mee: lengte, aantal of oppervlak uit de
+  tekening, met eigen omschrijving, status en swatch, en werkt op de hele tekening, een selectie,
+  xrefs en in de uittrekstaat. Anders dan een handmatige regel verschijnt een eigen laag alleen
+  als er objecten op staan.
+
 ## 1.25.0 - 2026-10-05
 
 - Eigen statussen met dezelfde naam worden nu geweigerd, zodat je geen dubbele kopregels krijgt.

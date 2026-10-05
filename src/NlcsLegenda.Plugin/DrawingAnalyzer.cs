@@ -35,6 +35,8 @@ public static class DrawingAnalyzer
             new(StringComparer.OrdinalIgnoreCase);
         public readonly HashSet<string> ExcludedNlcs = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, bool> Visible = new(StringComparer.OrdinalIgnoreCase);
+        // Omschrijving per eigen-laag-sleutel (komt uit de regel, niet uit de NLCS-catalogus).
+        public readonly Dictionary<string, string> CustomDesc = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<ObjectId> Excluded = new();
         public LayerTable? Layers;
     }
@@ -61,12 +63,12 @@ public static class DrawingAnalyzer
         {
             foreach (var id in selection)
                 if (tr.GetObject(id, OpenMode.ForRead) is Entity ent)
-                    Process(ent, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false);
+                    Process(ent, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false, sourceXref: string.Empty);
         }
         else
         {
             var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
-            CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false);
+            CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false, sourceXref: string.Empty);
         }
 
         var descriptions = ReadLayerDescriptions(db, tr, c.Parsed.Values);
@@ -115,7 +117,8 @@ public static class DrawingAnalyzer
         // alleen de basiscatalogus doorgeven.
         var entries = LegendGrouping.Build(
             c.Parsed.Values, settings,
-            name => attrDesc.TryGetValue(name, out var a) ? a
+            name => c.CustomDesc.TryGetValue(name, out var cd) ? cd
+                  : attrDesc.TryGetValue(name, out var a) ? a
                   : descriptions.TryGetValue(name, out var d) ? d : null,
             c.Metrics,
             name => c.SymbolBlocks.TryGetValue(name, out var b) ? b : null,
@@ -135,7 +138,7 @@ public static class DrawingAnalyzer
 
     private static void CollectFromBlock(
         ObjectId btrId, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref, string sourceXref)
     {
         if (depth > MaxDepth || !path.Add(btrId))
             return;
@@ -143,20 +146,20 @@ public static class DrawingAnalyzer
         var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
         foreach (ObjectId id in btr)
             if (tr.GetObject(id, OpenMode.ForRead) is Entity ent)
-                Process(ent, tr, c, settings, path, depth, transform, insideIncludedXref);
+                Process(ent, tr, c, settings, path, depth, transform, insideIncludedXref, sourceXref);
 
         path.Remove(btrId);
     }
 
     private static void Process(
         Entity ent, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref, string sourceXref)
     {
         // Eigen legenda-geometrie telt nooit als bron.
         if (c.Excluded.Contains(ent.ObjectId))
             return;
 
-        Record(ent, tr, c, settings, transform);
+        Record(ent, tr, c, settings, transform, sourceXref);
 
         if (ent is BlockReference br && !br.BlockTableRecord.IsNull)
         {
@@ -168,19 +171,29 @@ public static class DrawingAnalyzer
                 {
                     bool included = insideIncludedXref || settings.IsXrefIncluded(def.Name);
                     if (included)
-                        CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref: true);
+                        CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref: true,
+                            sourceXref: string.IsNullOrEmpty(sourceXref) ? def.Name : sourceXref);
                 }
                 else
                 {
-                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref);
+                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref, sourceXref);
                 }
             }
         }
     }
 
-    private static void Record(Entity ent, Transaction tr, Collector c, LegendSettings settings, Matrix3d transform)
+    private static void Record(Entity ent, Transaction tr, Collector c, LegendSettings settings, Matrix3d transform, string sourceXref)
     {
         var layerName = ent.Layer;
+
+        // Expliciete eigen-laagkoppeling wint van NLCS-herkenning: precies één interpretatie.
+        if (settings.CustomLayerRules.Count > 0
+            && TryMatchCustomRule(ent, tr, settings, layerName, sourceXref, out var rule, out var canonical))
+        {
+            RecordCustom(ent, tr, c, settings, transform, rule!, canonical!);
+            return;
+        }
+
         if (c.NonNlcs.Contains(layerName))
             return;
 
@@ -289,6 +302,82 @@ public static class DrawingAnalyzer
         }
 
         c.Metrics[localLayer] = metric.Add(1, length, area);
+    }
+
+    // Zoekt de eerste eigen-laagregel die op dit object past (expliciete volgorde = deterministisch).
+    private static bool TryMatchCustomRule(
+        Entity ent, Transaction tr, LegendSettings settings, string layerName, string sourceXref,
+        out CustomLayerRule? rule, out NlcsLayerName? canonical)
+    {
+        foreach (var r in settings.CustomLayerRules)
+        {
+            if (!r.IsValid || !r.ScopeMatches(sourceXref)) continue;
+            if (!string.Equals(layerName, r.Layer, StringComparison.OrdinalIgnoreCase)) continue;
+            if (r.BlockName is { Length: > 0 })
+            {
+                if (ent is not BlockReference br
+                    || !string.Equals(BlockName(br, tr), r.BlockName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+            }
+            rule = r;
+            canonical = r.ToCanonical(sourceXref);
+            return true;
+        }
+        rule = null;
+        canonical = null;
+        return false;
+    }
+
+    private static void RecordCustom(
+        Entity ent, Transaction tr, Collector c, LegendSettings settings, Matrix3d transform,
+        CustomLayerRule rule, NlcsLayerName canonical)
+    {
+        var key = canonical.LocalName;
+        if (!c.Parsed.ContainsKey(key))
+        {
+            c.Parsed[key] = canonical;
+            c.CustomDesc[key] = rule.Description ?? string.Empty;
+        }
+
+        AddMetricMasked(ent, key, c, transform, rule.QuantityMode);
+
+        if (ent is Hatch hatch && !c.Hatches.ContainsKey(key))
+            c.Hatches[key] = HatchSample.From(hatch);
+
+        if (ent is BlockReference symbolRef && rule.Type == NlcsDrawType.Symbool
+            && !c.SymbolBlocks.ContainsKey(key))
+        {
+            var name = BlockName(symbolRef, tr);
+            if (!string.IsNullOrEmpty(name) && !name.StartsWith('*'))
+                c.SymbolBlocks[key] = name;
+        }
+    }
+
+    // Zoals AddMetric, maar met een expliciete hoeveelheidsmodus. Auto gedraagt zich als NLCS;
+    // de andere modi tellen alleen de gekozen component zodat de legenda de juiste eenheid toont.
+    private static void AddMetricMasked(Entity ent, string key, Collector c, Matrix3d transform, CustomQuantityMode mode)
+    {
+        if (mode == CustomQuantityMode.Geen)
+        {
+            // Wel als element registreren (telt mee voor rendering), maar zonder hoeveelheid.
+            if (!c.Metrics.ContainsKey(key)) c.Metrics[key] = LayerMetric.Empty;
+            return;
+        }
+        var before = c.Metrics.TryGetValue(key, out var m) ? m : LayerMetric.Empty;
+        AddMetric(ent, key, c, transform);
+        if (mode == CustomQuantityMode.Auto) return;
+
+        // De toegevoegde component maskeren naar de gekozen modus.
+        var after = c.Metrics[key];
+        var delta = after.Add(-before.Count, -before.Length, -before.Area);
+        var masked = mode switch
+        {
+            CustomQuantityMode.Aantal => before.Add(delta.Count, 0, 0),
+            CustomQuantityMode.Lengte => before.Add(0, delta.Length, 0),
+            CustomQuantityMode.Oppervlak => before.Add(0, 0, delta.Area),
+            _ => after
+        };
+        c.Metrics[key] = masked;
     }
 
     private static (double length, double area) MeasureTransformed(Curve curve, Matrix3d transform)
