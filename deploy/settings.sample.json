@@ -86,9 +86,6 @@
   "excludedHoofdgroepen": [
     "AL"
   ],
-  "textOverrides": {
-    "OPENVERHARDING_BETONSTRAATSTEEN": "Betonstraatsteen"
-  },
   "descriptionOverrides": {
     "elementen": {}
   },

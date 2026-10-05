@@ -5,7 +5,7 @@ namespace NlcsLegenda.Core.Tests;
 
 // Robuustheid van de config-datalaag: FromJson mag nooit crashen op kapotte of gedeeltelijke
 // data, en de registry roundtript stabiel en onafhankelijk per legenda.
-public class MigrationDataTests
+public class ConfigurationPersistenceTests
 {
     [Fact]
     public void FromJson_Corrupt_ReturnsDefaults()

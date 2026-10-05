@@ -22,7 +22,7 @@ public class SettingsUiMapTests
     // beide tabs in Tab; SyncAll houdt de controls gelijk.
     private static readonly Dictionary<string, Surface> Map = new()
     {
-        [nameof(LegendSettings.SchemaVersion)] = new("(intern: migratie)", Binding.Intern),
+        [nameof(LegendSettings.SchemaVersion)] = new("(intern: schema)", Binding.Intern),
         [nameof(LegendSettings.Scale)] = new("Algemeen", Binding.Numeric),
         [nameof(LegendSettings.Title)] = new("Algemeen", Binding.Text),
         [nameof(LegendSettings.ViewportMarginMm)] = new("Algemeen", Binding.Numeric),
