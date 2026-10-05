@@ -147,7 +147,7 @@ internal sealed class SettingsDialog : Form
     {
         decimal start = ClampDecimal((decimal)get(), min, max);
         // Buiten bereik opgeslagen waarde meteen gelijktrekken, anders tonen UI en opslag iets anders.
-        if ((double)start != get()) set((double)start);
+        if (start != (decimal)get()) set((double)start);
         var n = new NumericUpDown
         {
             Minimum = min, Maximum = max, DecimalPlaces = decimals, Increment = increment,
