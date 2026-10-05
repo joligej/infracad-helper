@@ -539,13 +539,32 @@ public partial class Commands
     {
         localName = string.Empty;
 
+        // Expliciete eigen-laagkoppeling wint van NLCS-herkenning: als de laag gekoppeld is, is
+        // het object opgenomen (behoudens elementsoort-/selectiefilter).
+        var rule = settings.CustomLayerRules.FirstOrDefault(r => r.IsValid
+            && string.Equals(r.Layer, layerName, StringComparison.OrdinalIgnoreCase)
+            && r.ScopeMatches(string.Empty));
+        if (rule is not null)
+        {
+            localName = rule.Element;
+            if (!settings.IsDrawTypeIncluded(rule.Type))
+                return $"elementsoort '{rule.Type.DisplayName()}' staat voor deze legenda uit";
+            if (target is { Scope: LegendScope.Selection })
+            {
+                var h = entId.Handle.Value.ToString("X");
+                if (!target.SourceHandles.Contains(h, StringComparer.OrdinalIgnoreCase))
+                    return "dit object hoort niet bij de bronselectie van deze legenda";
+            }
+            return null;
+        }
+
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (lt.Has(layerName) && tr.GetObject(lt[layerName], OpenMode.ForRead) is LayerTableRecord ltr
             && !settings.IncludeInvisibleLayers && (ltr.IsOff || ltr.IsFrozen))
             return "de laag staat uit of is bevroren (zet 'Onzichtbare lagen meenemen' aan om hem toch mee te nemen)";
 
         if (!NlcsLayerParser.TryParse(layerName, out var parsed))
-            return "dit is geen NLCS-laag (niet herkend aan de InfraCAD-laagnaamopbouw)";
+            return "deze laag is niet NLCS en heeft geen eigen koppeling";
         localName = parsed.LocalName;
 
         if (target is { Scope: LegendScope.Selection })
