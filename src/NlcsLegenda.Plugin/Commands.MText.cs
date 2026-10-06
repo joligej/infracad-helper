@@ -398,6 +398,65 @@ public partial class Commands
         }
     }
 
+    // Meet de opmaak van een door de plugin gebouwde legenda en vergelijkt met de instellingen:
+    // de MText-teksthoogtes moeten exact de ingestelde hoogtes zijn (geen schaalfactor) en de
+    // swatchbreedte moet kloppen. Zo is bewezen dat de DBText->MText-overstap de maat niet wijzigt.
+    [CommandMethod("NLCSLEGENDAOPMAAKMEETTEST", CommandFlags.Modal)]
+    public void NlcsLegendaOpmaakMeetTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            var s = MTextFixtureSettings();
+            s.DrawSwatchFrame = true;
+            using (var tr = db.TransactionManager.StartTransaction()) { EnsureMTextFixtureLayers(db, tr); tr.Commit(); }
+
+            double bodyH = s.ToModel(s.TextHeightMm), headH = s.ToModel(s.HeaderTextHeightMm);
+            double titleH = s.ToModel(s.TitleTextHeightMm), swW = s.ToModel(s.SwatchWidthMm);
+            var heights = new List<double>();
+            double frameW = 0; bool wrapSeen = false;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, s); reg.Add(def);
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
+                LegendStore.Save(db, tr, reg);
+                var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+                var g = (Group)tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead);
+                void Walk(ObjectId id, int depth)
+                {
+                    if (depth > 8 || tr.GetObject(id, OpenMode.ForRead) is not Entity e) return;
+                    if (e is MText m) { heights.Add(m.TextHeight); if (m.Width > 0) wrapSeen = true; }
+                    else if (e is Polyline p && string.Equals(p.Layer, s.FrameLayer, StringComparison.OrdinalIgnoreCase) && p.NumberOfVertices == 4)
+                    {
+                        var ext = p.GeometricExtents;
+                        double w = ext.MaxPoint.X - ext.MinPoint.X, h = ext.MaxPoint.Y - ext.MinPoint.Y;
+                        if (Math.Abs(w - swW) < 0.05 && h < swW) frameW = w; // swatchkader, niet het buitenkader
+                    }
+                    else if (e is BlockReference br && !br.BlockTableRecord.IsNull && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord r)
+                        foreach (ObjectId cid in r) Walk(cid, depth + 1);
+                }
+                foreach (ObjectId id in g.GetAllEntityIds()) Walk(id, 0);
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            bool Near(double a, double b) => Math.Abs(a - b) < 1e-6;
+            bool bodyOk = heights.Any(h => Near(h, bodyH));
+            bool headOk = heights.Any(h => Near(h, headH));
+            bool titleOk = heights.Any(h => Near(h, titleH));
+            bool swOk = Near(frameW, swW);
+            ed.WriteMessage($"\nOPMAAK: teksthoogtes body={bodyH:0.###}({bodyOk}) kop={headH:0.###}({headOk}) titel={titleH:0.###}({titleOk}) -> {(bodyOk && headOk && titleOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nOPMAAK: swatchbreedte verwacht={swW:0.###} gemeten={frameW:0.###} -> {(swOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nOPMAAK: body-MText wrapt (vaste breedte)={wrapSeen} -> {(wrapSeen ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nOPMAAK: totaal -> {(bodyOk && headOk && titleOk && swOk && wrapSeen ? "OK" : "FAIL")}");
+        }
+        catch (System.Exception ex) { ed.WriteMessage($"\nOPMAAK error: {ex.Message}"); }
+    }
+
     // Save/reopen van een oude DBText-legenda. SETUP maakt NLCS-content en een oude DBText-
     // Selection-legenda; na QSAVE + heropenen werkt VERIFY die bij en controleert dat de oude
     // tekst weg is, de output MText-only, de bronhandles exact behouden en de plaats gelijk.
