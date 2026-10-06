@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.28.0 - 2026-10-06
+
+- De tekst in een gegenereerde legenda bestaat nu volledig uit MText-objecten. Je kunt die in
+  AutoCAD net als gewone tekst selecteren en bewerken. De legenda ziet er hetzelfde uit.
+- Een bestaande legenda werk je gewoon bij met `NLCSLEGENDAUPDATE`; de oude tekst wordt daarbij
+  vervangen, met behoud van plek, bron en instellingen. Een apart conversiecommando is niet nodig.
+- Bij het bijwerken worden ongebruikte legenda-blokken opgeruimd, zodat er geen oude tekst
+  achterblijft in de tekening.
+- In het lint zijn alleen de hoofdacties groot; de overige knoppen staan compacter bij elkaar.
+
 ## 1.27.1 - 2026-10-06
 
 - Opgelost: de lint-tab *NLCS Legenda* verscheen niet altijd meteen bij het opstarten. De tab
