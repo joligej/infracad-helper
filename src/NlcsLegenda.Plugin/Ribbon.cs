@@ -10,6 +10,7 @@ internal static class RibbonBuilder
 {
     private const string TabId = "NLCSLEGENDA_TAB";
     private static bool _idleHooked;
+    private static string? _lastError;
 
     public static void Initialize()
     {
@@ -17,6 +18,7 @@ internal static class RibbonBuilder
             return;
         if (TryBuild())
             return;
+        // Ribbon nog niet beschikbaar bij het laden: één keer op de Idle-lus wachten tot hij er is.
         AcWindows.Idle += OnIdle;
         _idleHooked = true;
     }
@@ -30,6 +32,21 @@ internal static class RibbonBuilder
         _idleHooked = false;
     }
 
+    // Structurele beschrijving voor de GUI-diagnostic: is de tab aanwezig en met hoeveel knoppen?
+    public static (bool Tab, int Panels, int Buttons, string Note) Describe()
+    {
+        if (HostEnvironment.IsCoreConsole)
+            return (false, 0, 0, "core console: geen ribbon");
+        var ribbon = ComponentManager.Ribbon;
+        if (ribbon is null)
+            return (false, 0, 0, "ribbon nog niet beschikbaar");
+        var tab = ribbon.FindTab(TabId);
+        if (tab is null)
+            return (false, 0, 0, _lastError ?? "tab niet gevonden");
+        int buttons = tab.Panels.Sum(p => p.Source?.Items.Count ?? 0);
+        return (true, tab.Panels.Count, buttons, "ok");
+    }
+
     private static void OnIdle(object? sender, EventArgs e)
     {
         try
@@ -40,9 +57,10 @@ internal static class RibbonBuilder
                 _idleHooked = false;
             }
         }
-        catch
+        catch (System.Exception ex)
         {
-            // Nooit de Idle-lus laten crashen; zonder ribbon werkt de plugin via commando's.
+            // Nooit de Idle-lus laten crashen; zonder ribbon werkt de plugin via de commando's.
+            _lastError = ex.Message;
             AcWindows.Idle -= OnIdle;
             _idleHooked = false;
         }

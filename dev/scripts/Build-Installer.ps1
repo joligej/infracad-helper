@@ -83,7 +83,7 @@ function New-Component([string]$series, [string]$path, [string]$dotnet) {
   <Components Description="NLCS Legenda ($dotnet)">
     <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="$($series.Split('-')[0])" SeriesMax="$($series.Split('-')[1])" />
     <ComponentEntry AppName="NlcsLegenda" ModuleName="./Contents/$path/NlcsLegenda.dll" AppType=".NET"
-                    LoadOnAutoCADStartup="True" LoadOnCommandInvocation="True">
+                    LoadOnAutoCADStartup="True">
       <Commands GroupName="NLCS_LEGENDA">$commandsXml</Commands>
     </ComponentEntry>
   </Components>

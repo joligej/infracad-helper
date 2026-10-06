@@ -22,8 +22,7 @@
     <ComponentEntry AppName="NlcsLegenda"
                     ModuleName="./Contents/NlcsLegenda.dll"
                     AppType=".NET"
-                    LoadOnAutoCADStartup="True"
-                    LoadOnCommandInvocation="True">
+                    LoadOnAutoCADStartup="True">
       <Commands GroupName="NLCS_LEGENDA">
         <Command Global="NLCSLEGENDA" Local="NLCSLEGENDA" />
         <Command Global="NLCSLEGENDAUPDATE" Local="NLCSLEGENDAUPDATE" />
@@ -44,8 +43,6 @@
         <Command Global="NLCSLEGENDAXREFS" Local="NLCSLEGENDAXREFS" />
         <Command Global="NLCSLEGENDAPRESET" Local="NLCSLEGENDAPRESET" />
         <Command Global="NLCSLEGENDACONFIG" Local="NLCSLEGENDACONFIG" />
-        <Command Global="NLCSLEGENDATEST" Local="NLCSLEGENDATEST" />
-        <Command Global="NLCSLEGENDABATCHTEST" Local="NLCSLEGENDABATCHTEST" />
       </Commands>
     </ComponentEntry>
   </Components>
