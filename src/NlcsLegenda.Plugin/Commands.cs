@@ -2908,9 +2908,26 @@ public partial class Commands
                 && div.Any(e => Math.Abs(e.Metric.Length - 6) < 0.1);
             // Gelijk: één regel met opgetelde 10 m.
             bool eqOk = eq.Count == 1 && Math.Abs(eq[0].Metric.Length - 10) < 0.1;
+
+            // Divergente regels moeten ook echt renderen op geldige, bestaande lagen (geen crash,
+            // geen renderissue). Bouw een legenda met de divergente eigen bron.
+            int issues = -1; int rows = 0;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var s = LoadGlobalDefaults();
+                s.IncludeXrefLayers = true;
+                s.CustomLayerRules.Add(new CustomLayerRule { Layer = "Div kabels", Element = "Div kabel", Type = NlcsDrawType.Geometrie, Description = "Div kabel", QuantityMode = CustomQuantityMode.Lengte, Scope = CustomSourceScope.AnySource });
+                var analysis = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db));
+                LegendBuilder.BuildBlock(db, tr, analysis, s, out rows, out var iss);
+                issues = iss.Count;
+                tr.Commit();
+            }
+            bool renderOk = issues == 0 && rows >= 2;
+
             ed.WriteMessage($"\nEIGENANY: divergent regels={div.Count} lengtes=[{string.Join(",", div.Select(e => e.Metric.Length.ToString("0")))}] (verw 2: 4 en 6) -> {(divOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nEIGENANY: gelijk regels={eq.Count} lengte={(eq.Count > 0 ? eq[0].Metric.Length.ToString("0") : "-")} (verw 1: 10) -> {(eqOk ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nEIGENANY: totaal -> {(divOk && eqOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nEIGENANY: divergent render rijen={rows} renderissues={issues} (verw 0) -> {(renderOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nEIGENANY: totaal -> {(divOk && eqOk && renderOk ? "OK" : "FAIL")}");
         }
         catch (Exception ex)
         {

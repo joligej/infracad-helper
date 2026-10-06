@@ -463,9 +463,12 @@ public static class DrawingAnalyzer
                 string sourceLabel = string.Join(", ",
                     sourceIds.Select(s => s.Length == 0 ? "hoofdtekening" : s));
 
-                string finalKey = divergent
-                    ? rule.CanonicalLayer + "\u0001" + string.Join("+", sourceIds)
-                    : rule.CanonicalLayer;
+                // Sleutel = de echte database-laagnaam van de representatieve bron. Die bestaat en
+                // is geldig, zodat de renderer de swatch op een bestaande laag met de juiste stijl
+                // tekent (een synthetische sleutel met scheidingstekens zou een ongeldige laagnaam
+                // opleveren). Bij divergentie verschilt de Raw per partitie, dus de sleutels botsen
+                // niet; het element krijgt een bronaanduiding zodat de regels apart blijven.
+                string finalKey = rep.Parsed.Raw;
                 string element = divergent
                     ? rule.Element + " (" + sourceLabel + ")"
                     : rule.Element;
