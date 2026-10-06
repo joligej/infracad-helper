@@ -10,12 +10,20 @@ internal static class RibbonBuilder
 {
     private const string TabId = "NLCSLEGENDA_TAB";
     private static bool _idleHooked;
+    private static bool _sysvarHooked;
     private static string? _lastError;
 
     public static void Initialize()
     {
         if (HostEnvironment.IsCoreConsole)
             return;
+        // Een werkruimte-wissel of CUI-herlaad bouwt het lint opnieuw op en gooit runtime-tabs weg.
+        // Daarom luisteren we naar WSCURRENT en zetten de tab zo nodig terug.
+        if (!_sysvarHooked)
+        {
+            AcWindows.SystemVariableChanged += OnSystemVariableChanged;
+            _sysvarHooked = true;
+        }
         if (TryBuild())
             return;
         // Ribbon nog niet beschikbaar bij het laden: één keer op de Idle-lus wachten tot hij er is.
@@ -23,13 +31,39 @@ internal static class RibbonBuilder
         _idleHooked = true;
     }
 
-    // Afmelden bij terminate zodat er geen Idle-handler blijft hangen.
+    // Afmelden bij terminate zodat er geen handlers blijven hangen.
     public static void Shutdown()
     {
-        if (!_idleHooked)
+        if (_idleHooked)
+        {
+            AcWindows.Idle -= OnIdle;
+            _idleHooked = false;
+        }
+        if (_sysvarHooked)
+        {
+            AcWindows.SystemVariableChanged -= OnSystemVariableChanged;
+            _sysvarHooked = false;
+        }
+    }
+
+    // Na een werkruimte-wissel (WSCURRENT) is onze tab weg; opnieuw opbouwen als hij ontbreekt.
+    private static void OnSystemVariableChanged(object? sender,
+        Autodesk.AutoCAD.ApplicationServices.SystemVariableChangedEventArgs e)
+    {
+        if (!string.Equals(e.Name, "WSCURRENT", StringComparison.OrdinalIgnoreCase))
             return;
-        AcWindows.Idle -= OnIdle;
-        _idleHooked = false;
+        try
+        {
+            if (!TryBuild() && !_idleHooked)
+            {
+                AcWindows.Idle += OnIdle;
+                _idleHooked = true;
+            }
+        }
+        catch (System.Exception ex)
+        {
+            _lastError = ex.Message;
+        }
     }
 
     // Structurele beschrijving voor de GUI-diagnostic: is de tab aanwezig en met hoeveel knoppen?
