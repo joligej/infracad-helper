@@ -397,6 +397,11 @@ public sealed class LegendSettings
     [Browsable(false)]
     public List<ManualEntry> ManualEntries { get; set; } = new();
 
+    // Blanco (statische, bewust lege) legendaregels. Horen bij de legenda-inhoud, niet bij een
+    // bron; blijven dus bij update/opslaan/heropenen bestaan en worden per rebuild toegevoegd.
+    [Browsable(false)]
+    public List<BlankEntry> BlankEntries { get; set; } = new();
+
     [Browsable(false)]
     public Dictionary<string, bool> XrefInclusion { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
@@ -483,6 +488,7 @@ public sealed class LegendSettings
         DescriptionOverrides = other.DescriptionOverrides.Clone();
         XrefInclusion = new Dictionary<string, bool>(other.XrefInclusion, StringComparer.OrdinalIgnoreCase);
         ManualEntries = other.ManualEntries.Select(m => m.Clone()).ToList();
+        BlankEntries = other.BlankEntries.Select(b => b.Clone()).ToList();
         CustomStatuses = other.CustomStatuses.Select(cs => cs.Clone()).ToList();
         CustomLayerRules = other.CustomLayerRules.Select(r => r.Clone()).ToList();
         MergedDimensions = new HashSet<GroupDimension>(other.MergedDimensions);
@@ -532,7 +538,7 @@ public sealed class LegendSettings
         p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
-            or nameof(CustomLayerRules)
+            or nameof(CustomLayerRules) or nameof(BlankEntries)
             or nameof(MergedDimensions) or nameof(DescriptionOverrides);
 
     [JsonIgnore, Browsable(false)]
@@ -598,6 +604,7 @@ public sealed class LegendSettings
         IncludedStatuses ??= new HashSet<NlcsStatus>();
         IncludedDrawTypes ??= new HashSet<NlcsDrawType>();
         ManualEntries ??= new List<ManualEntry>();
+        BlankEntries ??= new List<BlankEntry>();
         CustomStatuses ??= new List<CustomStatus>();
         CustomLayerRules ??= new List<CustomLayerRule>();
         MergedDimensions ??= new HashSet<GroupDimension>();

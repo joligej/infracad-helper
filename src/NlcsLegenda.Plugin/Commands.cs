@@ -2471,6 +2471,140 @@ public partial class Commands
         }
     }
 
+    // Blanco legendaregels op een echte host: controleert dat ze als echte rijen worden gebouwd
+    // (leeg vakje, tekst "[blanco]"), dat extra blanco's de legenda hoger maken, dat ze geen
+    // renderissue geven en dat tekst-uit de regel laat staan maar de tekst verbergt.
+    [CommandMethod("NLCSLEGENDABLANCOTEST", CommandFlags.Modal)]
+    public void NlcsLegendaBlancoTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                ObjectId L(string n) { if (lt.Has(n)) return lt[n]; var r = new LayerTableRecord { Name = n }; var id = lt.Add(r); tr.AddNewlyCreatedDBObject(r, true); return id; }
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                foreach (var n in new[] { "N-WE-VH-BLTEST1-G", "N-WE-RI-BLTEST2-G" })
+                {
+                    var line = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = L(n) };
+                    ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
+                }
+                tr.Commit();
+            }
+
+            (int rows, int issues, double height, int blanks, bool textSeen) Build(int blankCount, bool includeText)
+            {
+                var s = LoadGlobalDefaults();
+                s.IncludeText = includeText;
+                for (int i = 0; i < blankCount; i++)
+                    s.BlankEntries.Add(new BlankEntry());
+                using var tr = db.TransactionManager.StartTransaction();
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, s);
+                reg.Add(def);
+                var res = BuildManagedLegend(db, tr, reg, def, out int rows, out _);
+                LegendStore.Save(db, tr, reg);
+                LegendManagement.TryGetGroupExtents(db, tr, def.GroupName, out var ext);
+                double h = ext.MaxPoint.Y - ext.MinPoint.Y;
+                var analysis = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db));
+                int blanks = analysis.Entries.Count(e => e.IsBlank);
+                bool txt = analysis.Entries.Any(e => e.IsBlank && e.Description == "[blanco]");
+                tr.Commit();
+                PurgePending(db);
+                return (rows, 0, h, blanks, txt);
+            }
+
+            var b0 = Build(0, includeText: true);
+            var b1 = Build(1, includeText: true);
+            var b5 = Build(5, includeText: true);
+            var bText = Build(3, includeText: false);
+
+            bool rowsOk = b1.rows == b0.rows + 1 && b5.rows == b0.rows + 5;
+            bool growOk = b5.height > b1.height && b1.height > b0.height;
+            bool blankOk = b1.blanks == 1 && b5.blanks == 5 && b1.textSeen;
+            bool textOffOk = bText.blanks == 3; // regels blijven bestaan ook met tekst uit
+            ed.WriteMessage($"\nBLANCO: rijen 0={b0.rows} 1={b1.rows} 5={b5.rows} (verw +1/+5) -> {(rowsOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nBLANCO: hoogte groeit {b0.height:0.0}<{b1.height:0.0}<{b5.height:0.0} -> {(growOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nBLANCO: entries IsBlank 1={b1.blanks} 5={b5.blanks} tekst=\"[blanco]\" -> {(blankOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nBLANCO: tekst-uit behoudt {bText.blanks} blanco-rijen -> {(textOffOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nBLANCO: totaal -> {(rowsOk && growOk && blankOk && textOffOk ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nBLANCO error: {ex.Message}");
+        }
+    }
+
+    // Systeemvariabele-isolatie: legt een set relevante sysvars plus de actieve laag/layout vast,
+    // draait de belangrijkste commando's (analyse, legenda, export, viewport-meting) en controleert
+    // dat elke waarde daarna exact gelijk is. Bewijst dat de plugin geen host-state laat lekken.
+    [CommandMethod("NLCSLEGENDASYSVARTEST", CommandFlags.Modal)]
+    public void NlcsLegendaSysvarTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        string[] names = { "FILEDIA", "SECURELOAD", "CMDECHO", "CLAYER", "CTAB", "TILEMODE", "OSMODE", "PICKSTYLE", "ATTREQ", "ATTDIA", "EXPERT" };
+        try
+        {
+            var before = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var n in names)
+            {
+                try { before[n] = AcApp.GetSystemVariable(n)?.ToString() ?? "<null>"; } catch { }
+            }
+
+            // Representatieve operaties die state zouden kunnen wijzigen.
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db));
+                tr.Commit();
+            }
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, LoadGlobalDefaults());
+                reg.Add(def);
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
+                LegendStore.Save(db, tr, reg);
+                tr.Commit();
+            }
+            PurgePending(db);
+            string tmp = Path.Combine(Path.GetTempPath(), "nlcs_sysvar_" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var analysis = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db));
+                File.WriteAllText(tmp, LegendExport.ToCsv(analysis.Entries));
+                tr.Commit();
+            }
+            finally { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { } }
+
+            int afwijkingen = 0;
+            foreach (var n in names)
+            {
+                string na;
+                try { na = AcApp.GetSystemVariable(n)?.ToString() ?? "<null>"; } catch { continue; }
+                if (before.TryGetValue(n, out var nb) && !string.Equals(nb, na, StringComparison.Ordinal))
+                {
+                    ed.WriteMessage($"\nSYSVAR: {n} {nb} -> {na} (GEWIJZIGD)");
+                    afwijkingen++;
+                }
+            }
+            ed.WriteMessage($"\nSYSVAR: {names.Length} variabele(n) gecontroleerd, {afwijkingen} gewijzigd -> {(afwijkingen == 0 ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nSYSVAR error: {ex.Message}");
+        }
+    }
+
     // First-class eigen bronlagen op een echte host: maakt geometrie op niet-NLCS-lagen en
     // controleert dat gekoppelde eigen lagen gelijkwaardig meetellen (lengte, aantal, oppervlak),
     // zowel op de hele tekening als op een selectie, en dat een echte legenda wordt gebouwd.
@@ -2689,6 +2823,103 @@ public partial class Commands
         return id;
     }
 
+    private static ObjectId AddLayer(LayerTable lt, Transaction tr, string name, short colorIndex)
+    {
+        var ltr = new LayerTableRecord { Name = name };
+        if (colorIndex > 0)
+            ltr.Color = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, colorIndex);
+        var id = lt.Add(ltr);
+        tr.AddNewlyCreatedDBObject(ltr, true);
+        return id;
+    }
+
+    // AnySource-bronidentiteit versus logische identiteit: dezelfde laagnaam in host en xref met
+    // VERSCHILLENDE kleur mag niet first-wins samenvallen, maar levert aparte regels per bron.
+    // Met GELIJKE kleur telt de hoeveelheid juist op tot één regel. Bewijst beide takken.
+    [CommandMethod("NLCSLEGENDAEIGENANYTEST", CommandFlags.Modal)]
+    public void NlcsLegendaEigenAnyTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
+        string divXref = Path.Combine(dir, "any_div.dwg");
+        string eqXref = Path.Combine(dir, "any_eq.dwg");
+        try
+        {
+            // Divergente tak: host "Div kabels" rood (4 m), xref groen (6 m).
+            CreateXrefLineDwg(divXref, "Div kabels", 6.0, colorIndex: 3); // groen
+            // Gelijke tak: host "Eq kabels" standaard (4 m), xref standaard (6 m).
+            CreateXrefLineDwg(eqXref, "Eq kabels", 6.0, colorIndex: 0);
+
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                var divLayer = lt.Has("Div kabels") ? lt["Div kabels"] : AddLayer(lt, tr, "Div kabels", 1); // rood
+                var eqLayer = lt.Has("Eq kabels") ? lt["Eq kabels"] : AddLayer(lt, tr, "Eq kabels");
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                var l1 = new Line(new Point3d(0, 0, 0), new Point3d(4, 0, 0)) { LayerId = divLayer };
+                ms.AppendEntity(l1); tr.AddNewlyCreatedDBObject(l1, true);
+                var l2 = new Line(new Point3d(0, 50, 0), new Point3d(4, 50, 0)) { LayerId = eqLayer };
+                ms.AppendEntity(l2); tr.AddNewlyCreatedDBObject(l2, true);
+                tr.Commit();
+            }
+            ObjectId xDiv = db.AttachXref(divXref, "ANYDIV");
+            ObjectId xEq = db.AttachXref(eqXref, "ANYEQ");
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                foreach (var id in new[] { xDiv, xEq })
+                {
+                    var br = new BlockReference(Point3d.Origin, id);
+                    ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
+                }
+                tr.Commit();
+            }
+
+            List<LegendEntry> Build(string layer, string element)
+            {
+                var s = LoadGlobalDefaults();
+                s.IncludeXrefLayers = true;
+                s.CustomLayerRules.Add(new CustomLayerRule
+                {
+                    Layer = layer, Element = element, Type = NlcsDrawType.Geometrie,
+                    Description = element, QuantityMode = CustomQuantityMode.Lengte,
+                    Scope = CustomSourceScope.AnySource
+                });
+                using var tr = db.TransactionManager.StartTransaction();
+                var es = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db)).Entries
+                    .Where(e => e.Element.StartsWith(element, StringComparison.Ordinal)).ToList();
+                tr.Commit();
+                return es;
+            }
+
+            var div = Build("Div kabels", "Div kabel");
+            var eq = Build("Eq kabels", "Eq kabel");
+
+            // Divergent: twee regels (host rood 4 m + xref groen 6 m), niet samengevoegd.
+            bool divOk = div.Count == 2
+                && div.Any(e => Math.Abs(e.Metric.Length - 4) < 0.1)
+                && div.Any(e => Math.Abs(e.Metric.Length - 6) < 0.1);
+            // Gelijk: één regel met opgetelde 10 m.
+            bool eqOk = eq.Count == 1 && Math.Abs(eq[0].Metric.Length - 10) < 0.1;
+            ed.WriteMessage($"\nEIGENANY: divergent regels={div.Count} lengtes=[{string.Join(",", div.Select(e => e.Metric.Length.ToString("0")))}] (verw 2: 4 en 6) -> {(divOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nEIGENANY: gelijk regels={eq.Count} lengte={(eq.Count > 0 ? eq[0].Metric.Length.ToString("0") : "-")} (verw 1: 10) -> {(eqOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nEIGENANY: totaal -> {(divOk && eqOk ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nEIGENANY error: {ex.Message}");
+        }
+        finally
+        {
+            try { if (File.Exists(divXref)) File.Delete(divXref); } catch { }
+            try { if (File.Exists(eqXref)) File.Delete(eqXref); } catch { }
+        }
+    }
+
     // Zichtbaarheid moet voor eigen bronlagen exact zo werken als voor NLCS-lagen: een bevroren
     // laag telt niet mee tenzij "onzichtbare lagen meenemen" aan staat. Maakt een eigen en een
     // NLCS-laag, bevriest beide, en controleert dat ze in beide standen gelijk reageren.
@@ -2747,7 +2978,7 @@ public partial class Commands
     }
 
     // Zoals CreateXrefSourceDwg, maar met instelbare lijnlengte en willekeurige (eigen) laagnaam.
-    private static void CreateXrefLineDwg(string path, string layer, double length)
+    private static void CreateXrefLineDwg(string path, string layer, double length, short colorIndex = 0)
     {
         var prev = HostApplicationServices.WorkingDatabase;
         using var xdb = new Database(buildDefaultDrawing: true, noDocument: true);
@@ -2760,6 +2991,8 @@ public partial class Commands
                 if (!lt.Has(layer))
                 {
                     var ltr = new LayerTableRecord { Name = layer };
+                    if (colorIndex > 0)
+                        ltr.Color = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, colorIndex);
                     lt.Add(ltr); tr.AddNewlyCreatedDBObject(ltr, true);
                 }
                 var msId = SymbolUtilityServices.GetBlockModelSpaceId(xdb);
@@ -3099,9 +3332,28 @@ public partial class Commands
                 ed.WriteMessage("\nVPTEST: geen papier-layout aanwezig.");
                 return;
             }
-            LayoutManager.Current.CurrentLayout = layoutName;
+            // Oorspronkelijke layout onthouden en na afloop exact terugzetten; een test mag de
+            // actieve tab (CTAB/TILEMODE) niet gewijzigd achterlaten.
+            string originalLayout = LayoutManager.Current.CurrentLayout;
+            try
+            {
+                LayoutManager.Current.CurrentLayout = layoutName;
+                RunViewportScaleChecks(ed, db);
+            }
+            finally
+            {
+                try { LayoutManager.Current.CurrentLayout = originalLayout; } catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nVPTEST error: {ex.Message}");
+        }
+    }
 
-            // Bouwt een legenda met de gegeven instellingen en geeft de werkelijke extents terug.
+    private void RunViewportScaleChecks(Editor ed, Database db)
+    {
+        {
             bool Measure(LegendSettings s, out double mw, out double mh, out Point2d center)
             {
                 mw = mh = 0; center = default;
@@ -3278,10 +3530,6 @@ public partial class Commands
                 ed.WriteMessage($"\nVPTEST: opmerkingzwaar {mw6:0.0} x {mh6:0.0} modeleenheden");
                 CheckAt("opmerkingzwaar", mw6, mh6, c6, 200.0);
             }
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nVPTEST error: {ex.Message}");
         }
     }
 
@@ -3757,6 +4005,9 @@ public partial class Commands
         if (analysis.UsedCustomLayerCount > 0)
             ed.WriteMessage(
                 $"\n{analysis.UsedCustomLayerCount} eigen bronlaag/-lagen meegeteld via koppelregels.");
+        int blanks = analysis.Entries.Count(e => e.IsBlank);
+        if (blanks > 0)
+            ed.WriteMessage($"\n{blanks} blanco regel(s) (geen bron, geen hoeveelheid).");
         if (analysis.ExcludedNlcsLayerCount > 0)
             ed.WriteMessage(
                 $"\n{analysis.ExcludedNlcsLayerCount} NLCS-laag/-lagen vielen buiten de legenda door de " +
@@ -3773,6 +4024,9 @@ public partial class Commands
                   (analysis.UsedCustomLayerCount > 0
                       ? $" + {analysis.UsedCustomLayerCount} eigen bronlaag/-lagen."
                       : "."));
+        int blancos = analysis.Entries.Count(e => e.IsBlank);
+        if (blancos > 0)
+            sb.Append($"\nWaarvan {blancos} blanco regel(s) (statisch, geen bron of hoeveelheid).");
         if (analysis.ExcludedNlcsLayerCount > 0)
             sb.Append($"\n({analysis.ExcludedNlcsLayerCount} NLCS-laag/-lagen buiten de legenda door filters; " +
                       "tekst-/overige lagen krijgen geen eigen regel.)");

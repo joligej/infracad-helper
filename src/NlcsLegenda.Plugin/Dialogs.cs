@@ -287,6 +287,9 @@ internal sealed class SettingsDialog : Form
         var eigenLagen = new Button { Text = "Eigen lagen\u2026", AutoSize = true };
         eigenLagen.Click += (_, _) => EditCustomLayers();
         actions.Controls.Add(eigenLagen);
+        var blanco = new Button { Text = "Blanco regels\u2026", AutoSize = true };
+        blanco.Click += (_, _) => EditBlankEntries();
+        actions.Controls.Add(blanco);
         root.Controls.Add(actions);
         page.Controls.Add(root);
         return page;
@@ -474,6 +477,16 @@ internal sealed class SettingsDialog : Form
         if (dlg.ShowDialog(this) == DialogResult.OK)
         {
             _settings.CustomLayerRules = dlg.Result;
+            SyncAll();
+        }
+    }
+
+    private void EditBlankEntries()
+    {
+        using var dlg = new BlankEntryDialog(_settings.BlankEntries);
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _settings.BlankEntries = dlg.Result;
             SyncAll();
         }
     }
@@ -1037,6 +1050,118 @@ internal sealed class TextEditDialog : Form
         WordWrap = true,
         ScrollBars = ScrollBars.Vertical
     };
+}
+
+// Beheert de blanco (statische, bewust lege) legendaregels: toevoegen, bewerken (tekst + status),
+// verwijderen en dupliceren. Werkt op een diepe kopie; de aanroeper neemt het resultaat alleen bij
+// OK over. Elke regel houdt zijn eigen identiteit, ook bij dupliceren met dezelfde tekst.
+internal sealed class BlankEntryDialog : Form
+{
+    private readonly List<BlankEntry> _items;
+    private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false };
+
+    public BlankEntryDialog(IReadOnlyList<BlankEntry> initial)
+    {
+        _items = initial.Select(b => b.Clone()).ToList();
+
+        Text = "NLCS Legenda \u2013 blanco regels";
+        Font = SystemFonts.MessageBoxFont;
+        ClientSize = new Size(520, 360);
+        MinimumSize = new Size(420, 280);
+        StartPosition = FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        ShowInTaskbar = false;
+        ShowIcon = false;
+        MinimizeBox = false;
+
+        var hint = new Label
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            Text = "Een blanco regel reserveert een lege regel in de legenda (leeg vakje, standaard "
+                 + "tekst \u201c[blanco]\u201d). Handig om later met de hand iets toe te voegen.",
+            Padding = new Padding(4, 2, 4, 2)
+        };
+
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+        var add = new Button { Text = "Toevoegen", AutoSize = true };
+        add.Click += (_, _) => { _items.Add(new BlankEntry()); Reload(_items.Count - 1); };
+        var edit = new Button { Text = "Bewerken\u2026", AutoSize = true };
+        edit.Click += (_, _) => { int i = _list.SelectedIndex; if (i < 0) return; if (EditItem(_items[i])) Reload(i); };
+        var dup = new Button { Text = "Dupliceren", AutoSize = true };
+        dup.Click += (_, _) => { int i = _list.SelectedIndex; if (i < 0) return; _items.Insert(i + 1, _items[i].CloneWithNewId()); Reload(i + 1); };
+        var remove = new Button { Text = "Verwijderen", AutoSize = true };
+        remove.Click += (_, _) => { int i = _list.SelectedIndex; if (i < 0) return; _items.RemoveAt(i); Reload(Math.Min(i, _items.Count - 1)); };
+        bar.Controls.AddRange(new Control[] { add, edit, dup, remove });
+
+        var buttons = new ButtonBar(withApply: false);
+        AcceptButton = buttons.Ok;
+        CancelButton = buttons.Cancel;
+
+        _list.DoubleClick += (_, _) => { int i = _list.SelectedIndex; if (i >= 0 && EditItem(_items[i])) Reload(i); };
+
+        Controls.Add(_list);
+        Controls.Add(bar);
+        Controls.Add(hint);
+        Controls.Add(buttons);
+        Reload(_items.Count > 0 ? 0 : -1);
+    }
+
+    public List<BlankEntry> Result => _items;
+
+    private void Reload(int select)
+    {
+        _list.BeginUpdate();
+        _list.Items.Clear();
+        foreach (var b in _items)
+            _list.Items.Add($"[blanco]  \u2013  \u201c{b.EffectiveText}\u201d ({b.Status.DisplayName()})");
+        _list.EndUpdate();
+        if (select >= 0 && select < _list.Items.Count)
+            _list.SelectedIndex = select;
+    }
+
+    // Bewerkt tekst en status van één blanco regel. True bij OK.
+    private bool EditItem(BlankEntry item)
+    {
+        using var dlg = new Form
+        {
+            Text = "Blanco regel",
+            Font = SystemFonts.MessageBoxFont,
+            ClientSize = new Size(360, 150),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            ShowInTaskbar = false, ShowIcon = false, MinimizeBox = false, MaximizeBox = false
+        };
+        var text = new TextBox { Text = item.Text, Width = 220 };
+        var status = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
+        status.Items.AddRange(Enum.GetNames<NlcsStatus>());
+        status.SelectedItem = item.Status.ToString();
+
+        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(8) };
+        FlowLayoutPanel Row(string label, Control c)
+        {
+            var p = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
+            p.Controls.Add(new Label { Text = label, AutoSize = true, Width = 120, Padding = new Padding(0, 6, 0, 0) });
+            p.Controls.Add(c);
+            return p;
+        }
+        flow.Controls.Add(Row("Tekst:", text));
+        flow.Controls.Add(Row("Status:", status));
+        flow.Controls.Add(new Label { Text = "Leeg laten = \u201c[blanco]\u201d.", AutoSize = true, ForeColor = SystemColors.GrayText });
+
+        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 90 };
+        var cancel = new Button { Text = "Annuleren", DialogResult = DialogResult.Cancel, Width = 90 };
+        var barBtn = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Padding = new Padding(6) };
+        barBtn.Controls.Add(cancel); barBtn.Controls.Add(ok);
+        dlg.AcceptButton = ok; dlg.CancelButton = cancel;
+        dlg.Controls.Add(flow); dlg.Controls.Add(barBtn);
+
+        if (dlg.ShowDialog(this) != DialogResult.OK)
+            return false;
+        item.Text = text.Text;
+        item.Status = Enum.Parse<NlcsStatus>((string)status.SelectedItem!);
+        return true;
+    }
 }
 
 // Beheert de eigen-laagkoppelingen: een lijst met toevoegen/bewerken/verwijderen. Werkt op een

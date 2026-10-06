@@ -17,6 +17,7 @@ public class CollectionWiringTests
         nameof(LegendSettings.MergedDimensions),
         nameof(LegendSettings.ExcludedEntries),
         nameof(LegendSettings.ManualEntries),
+        nameof(LegendSettings.BlankEntries),
         nameof(LegendSettings.CustomStatuses),
         nameof(LegendSettings.CustomLayerRules),
         nameof(LegendSettings.XrefInclusion),
@@ -55,6 +56,7 @@ public class CollectionWiringTests
         s.MergedDimensions.Add(GroupDimension.Soort);
         s.ExcludedEntries.Add("N|WE|VH|X");
         s.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-X-G", Description = "Eigen" });
+        s.BlankEntries.Add(new BlankEntry { Text = "Reservering" });
         s.CustomStatuses.Add(new CustomStatus { Name = "Onder voorbehoud", Members = { "N|WE|RI|R" } });
         s.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen kabels", Element = "Datakabel", Type = NlcsDrawType.Geometrie, Description = "Datakabel" });
         s.XrefInclusion["ref1"] = true;
@@ -77,6 +79,8 @@ public class CollectionWiringTests
         Assert.Contains("N|WE|VH|X", back.ExcludedEntries);
         Assert.Single(back.ManualEntries);
         Assert.Equal("Eigen", back.ManualEntries[0].Description);
+        Assert.Single(back.BlankEntries);
+        Assert.Equal("Reservering", back.BlankEntries[0].Text);
         Assert.Single(back.CustomStatuses);
         Assert.Contains("N|WE|RI|R", back.CustomStatuses[0].Members);
         Assert.Single(back.CustomLayerRules);
@@ -99,6 +103,7 @@ public class CollectionWiringTests
         original.MergedDimensions.Add(GroupDimension.Specificatie);
         original.ExcludedEntries.Add("extra");
         original.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-Y-G", Description = "Extra" });
+        original.BlankEntries.Add(new BlankEntry { Text = "Extra" });
         original.CustomStatuses[0].Members.Add("extra");
         original.CustomLayerRules.Add(new CustomLayerRule { Layer = "Extra laag", Element = "Extra" });
         original.XrefInclusion["ref2"] = false;
@@ -111,6 +116,7 @@ public class CollectionWiringTests
         Assert.Single(clone.MergedDimensions);
         Assert.Single(clone.ExcludedEntries);
         Assert.Single(clone.ManualEntries);
+        Assert.Single(clone.BlankEntries);
         Assert.Single(clone.CustomStatuses[0].Members);
         Assert.Single(clone.CustomLayerRules);
         Assert.Single(clone.XrefInclusion);

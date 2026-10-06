@@ -100,6 +100,7 @@ public class SettingsUiMapTests
         [nameof(LegendSettings.MergedDimensions)] = new("Inhoud > KLIC-groepering", Binding.CheckBox),
         [nameof(LegendSettings.ExcludedEntries)] = new("Inhoud > Samenstellen", Binding.Subdialog),
         [nameof(LegendSettings.ManualEntries)] = new("Inhoud > Samenstellen", Binding.Subdialog),
+        [nameof(LegendSettings.BlankEntries)] = new("Inhoud > Samenstellen", Binding.Subdialog),
         [nameof(LegendSettings.CustomStatuses)] = new("Inhoud > Eigen statussen", Binding.Subdialog),
         [nameof(LegendSettings.CustomLayerRules)] = new("Inhoud > Eigen lagen", Binding.Subdialog),
         [nameof(LegendSettings.XrefInclusion)] = new("Inhoud > Xrefs", Binding.Subdialog),

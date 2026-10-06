@@ -94,4 +94,30 @@ public class DescriptionSourceTests
         Assert.Equal("Datakabel", entry.Description);
         Assert.Equal(DescriptionSource.EigenKoppeling, entry.DescriptionSource);
     }
+
+    [Fact]
+    public void CustomRuleDescription_CanBeOverriddenPerLegend()
+    {
+        // Een per-legenda override moet de basisomschrijving van een eigen-laagregel kunnen
+        // vervangen, via hetzelfde model als NLCS (herkomst wordt dan Catalogus).
+        var rule = new CustomLayerRule
+        {
+            Layer = "Eigen kabels", Element = "Datakabel", Hoofdgroep = "EI",
+            Type = NlcsDrawType.Geometrie, Description = "Datakabel"
+        };
+        var settings = new LegendSettings();
+        settings.CustomLayerRules.Add(rule);
+        settings.DescriptionOverrides.Elementen["EI|DATAKABEL"] =
+            new DescriptionEntry { Specifiek = "Glasvezelkabel" };
+        var canonical = rule.ToCanonical(string.Empty, rule.Layer);
+
+        var entries = LegendGrouping.Build(
+            new[] { canonical }, settings,
+            layerDescription: name => name == canonical.LocalName ? rule.Description : null,
+            descriptionSourceOf: name => name == canonical.LocalName ? DescriptionSource.EigenKoppeling : null);
+
+        var entry = Assert.Single(entries);
+        Assert.Equal("Glasvezelkabel", entry.Description);
+        Assert.Equal(DescriptionSource.Catalogus, entry.DescriptionSource);
+    }
 }
