@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.28.1 - 2026-10-06
+
+- Tekst in bronsymbolen wordt bij het overnemen ook MText, zodat een gegenereerde legenda
+  echt geen enkele DBText meer bevat.
+- README opgeschoond en overzichtelijker ingedeeld.
+
 ## 1.28.0 - 2026-10-06
 
 - De tekst in een gegenereerde legenda bestaat nu volledig uit MText-objecten. Je kunt die in

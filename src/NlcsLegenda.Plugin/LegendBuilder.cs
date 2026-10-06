@@ -416,8 +416,11 @@ public static class LegendBuilder
             {
                 if (tr.GetObject(id, OpenMode.ForWrite) is not Entity e)
                     continue;
-                e.TransformBy(m);
-                e.Layer = layer;
+                // Tekst uit het bronsymbool wordt MText, zodat de gegenereerde legenda nooit DBText
+                // bevat. De maatvoering hierboven is al op de oorspronkelijke tekst gemeten.
+                Entity place = e is DBText dbt ? SymbolTextToMText(btr, tr, dbt) : e;
+                place.TransformBy(m);
+                place.Layer = layer;
             }
             return true;
         }
@@ -519,6 +522,40 @@ public static class LegendBuilder
         pl.Closed = true;
         pl.Layer = layer;
         return pl;
+    }
+
+    // Zet een DBText uit een bronsymbool om naar een gelijkwaardige MText op dezelfde plek. De
+    // tekst wordt op zijn visuele midden geankerd (MiddleCenter) met dezelfde hoogte, rotatie,
+    // stijl en kleur; de oude DBText wordt gewist. De aanroeper transformeert en herlaagt nog.
+    private static MText SymbolTextToMText(BlockTableRecord btr, Transaction tr, DBText dbt)
+    {
+        Point3d anchor;
+        try
+        {
+            var ge = dbt.GeometricExtents;
+            anchor = new Point3d((ge.MinPoint.X + ge.MaxPoint.X) / 2.0,
+                (ge.MinPoint.Y + ge.MaxPoint.Y) / 2.0, (ge.MinPoint.Z + ge.MaxPoint.Z) / 2.0);
+        }
+        catch
+        {
+            anchor = dbt.Position;
+        }
+
+        var mt = new MText();
+        mt.SetDatabaseDefaults();
+        mt.Layer = dbt.Layer;
+        mt.Color = dbt.Color;
+        if (!dbt.TextStyleId.IsNull)
+            mt.TextStyleId = dbt.TextStyleId;
+        mt.TextHeight = dbt.Height > 1e-9 ? dbt.Height : mt.TextHeight;
+        mt.Rotation = dbt.Rotation;
+        mt.Attachment = AttachmentPoint.MiddleCenter;
+        mt.Location = anchor;
+        mt.Contents = MTextFormat.Escape(dbt.TextString);
+        btr.AppendEntity(mt);
+        tr.AddNewlyCreatedDBObject(mt, true);
+        dbt.Erase();
+        return mt;
     }
 
     // Alle door de plugin getekende legendatekst is MText. DBText-baseline en MText-attachment
