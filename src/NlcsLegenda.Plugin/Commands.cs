@@ -2676,6 +2676,9 @@ public partial class Commands
             settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen kabels", Element = "Datakabel", Type = NlcsDrawType.Geometrie, Description = "Datakabel", QuantityMode = CustomQuantityMode.Lengte });
             settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Speciale putten", Element = "Straatput", Type = NlcsDrawType.Symbool, Description = "Straatput", QuantityMode = CustomQuantityMode.Aantal, BlockName = "PUT" });
             settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen verharding", Element = "Eigen verharding", Type = NlcsDrawType.Vlak, Description = "Eigen verharding", QuantityMode = CustomQuantityMode.Oppervlak });
+            // Twee blanco regels meenemen, zodat de save/reopen-test ook blanco-persistentie dekt.
+            settings.BlankEntries.Add(new BlankEntry());
+            settings.BlankEntries.Add(new BlankEntry { Text = "Handmatig in te vullen" });
 
             LegendEntry? Find(IReadOnlyList<LegendEntry> es, string el) =>
                 es.FirstOrDefault(e => e.Element == el);
