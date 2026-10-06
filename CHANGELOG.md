@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.27.1 - 2026-10-06
+
+- Opgelost: de lint-tab *NLCS Legenda* verscheen niet altijd meteen bij het opstarten. De tab
+  komt nu direct in beeld en blijft ook staan na het wisselen van werkruimte.
+- Een blanco regel toont geen hoofdgroepkop meer en blijft leeg in de CSV/JSON-export; de
+  overige regels veranderen niet.
+
 ## 1.27.0 - 2026-10-06
 
 - Nieuw: blanco legendaregels. Via *Blanco regels* in het instellingenvenster reserveer je een
