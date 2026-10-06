@@ -239,7 +239,9 @@ public partial class Commands
 
     // Bouwt een blok dat een v1.27.x-legenda nabootst: tekst als DBText. Registreert het als
     // beheerde legenda (behouden blok) zodat we het bijwerkpad vanaf oude output kunnen testen.
-    private static (string id, string group, Point3d topLeft) SeedOldDbTextLegend(Database db, Transaction tr, LegendSettings s)
+    private static (string id, string group, Point3d topLeft) SeedOldDbTextLegend(
+        Database db, Transaction tr, LegendSettings s,
+        LegendScope scope = LegendScope.WholeDrawing, List<string>? handles = null)
     {
         // De lagen die de oude output gebruikte moeten bestaan voordat we er entiteiten op zetten.
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
@@ -282,7 +284,8 @@ public partial class Commands
         var def = new LegendDefinition
         {
             Name = reg.NextDefaultName(),
-            Scope = LegendScope.WholeDrawing,
+            Scope = scope,
+            SourceHandles = handles ?? new(),
             GroupName = LegendRegistry.NewGroupName(),
             Settings = s.Clone(),
             CreatedWithVersion = "1.27.1"
@@ -292,6 +295,181 @@ public partial class Commands
         LegendStore.Save(db, tr, reg);
         LegendManagement.TryGetGroupExtents(db, tr, def.GroupName, out var ext);
         return (def.Id, def.GroupName, new Point3d(ext.MinPoint.X, ext.MaxPoint.Y, 0));
+    }
+
+    // Breed bijwerkbewijs voor oude DBText-legenda's: dekt WholeDrawing, Selection (met echte
+    // bronhandles), een eigen bronlaag, blanco regels en xref-instellingen. Elke oude legenda
+    // wordt met de normale updateflow bijgewerkt; daarna moet id/groep/scope/bron/instellingen en
+    // plaats behouden zijn, de oude DBText weg, de nieuwe output MText-only en geen orphan-blok.
+    [CommandMethod("NLCSLEGENDAOLDUPDATEBROADTEST", CommandFlags.Modal)]
+    public void NlcsLegendaOldUpdateBroadTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            // NLCS-bronlagen + een eigen (niet-NLCS) laag met geometrie; bronhandles voor selectie.
+            var handles = new List<string>();
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                ObjectId L(string n) { if (lt.Has(n)) return lt[n]; var r = new LayerTableRecord { Name = n }; var id2 = lt.Add(r); tr.AddNewlyCreatedDBObject(r, true); return id2; }
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                foreach (var n in new[] { "N-WE-VH-BREEDA-G", "N-WE-RI-BREEDB-G", "B-WE-VH-BREEDC-G" })
+                {
+                    var ln = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = L(n) };
+                    ms.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true);
+                    handles.Add(ln.Handle.Value.ToString("X"));
+                }
+                var eigen = new Line(new Point3d(0, 0, 0), new Point3d(7, 0, 0)) { LayerId = L("Eigen breed") };
+                ms.AppendEntity(eigen); tr.AddNewlyCreatedDBObject(eigen, true);
+                tr.Commit();
+            }
+            var selHandles = handles.Take(2).ToList();
+
+            // (naam, settings bouwen, scope, handles, extra-check op de bijgewerkte def)
+            var scenarios = new (string Name, Func<LegendSettings> Make, LegendScope Scope, List<string>? Handles, Func<LegendDefinition, bool> Extra, string ExtraDesc)[]
+            {
+                ("WholeDrawing", () => LoadGlobalDefaults(), LegendScope.WholeDrawing, null, _ => true, "n.v.t."),
+                ("Selection", () => LoadGlobalDefaults(), LegendScope.Selection, selHandles,
+                    d => d.SourceHandles.Count == 2 && d.SourceHandles.SequenceEqual(selHandles), "handles behouden"),
+                ("EigenLaag", () => { var s = LoadGlobalDefaults(); s.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen breed", Element = "EIGENBREED", Type = NlcsDrawType.Geometrie }); return s; },
+                    LegendScope.WholeDrawing, null, d => d.Settings.CustomLayerRules.Count == 1 && d.Settings.CustomLayerRules[0].Layer == "Eigen breed", "eigen-laagregel behouden"),
+                ("Blanco", () => { var s = LoadGlobalDefaults(); s.BlankEntries.Add(new BlankEntry()); s.BlankEntries.Add(new BlankEntry()); return s; },
+                    LegendScope.WholeDrawing, null, d => d.Settings.BlankEntries.Count == 2, "2 blanco behouden"),
+                ("Xref", () => { var s = LoadGlobalDefaults(); s.XrefInclusion["breedxref"] = true; return s; },
+                    LegendScope.WholeDrawing, null, d => d.Settings.XrefInclusion.TryGetValue("breedxref", out var v) && v, "xref-config behouden"),
+            };
+
+            var ids = new List<string>();
+            bool all = true;
+            foreach (var sc in scenarios)
+            {
+                string id, group; Point3d before; int dbtBefore;
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    (id, group, before) = SeedOldDbTextLegend(db, tr, sc.Make(), sc.Scope, sc.Handles);
+                    (dbtBefore, _) = CountTextInGroup(db, tr, group);
+                    tr.Commit();
+                }
+                ids.Add(id);
+
+                int dbtAfter, mtAfter; Point3d after; bool sameId, sameGroup, sameScope, extraOk;
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    var reg = LegendStore.Load(db, tr);
+                    var def = reg.FindById(id);
+                    sameId = def is not null;
+                    sameGroup = def is not null && def.GroupName == group;
+                    sameScope = def is not null && def.Scope == sc.Scope;
+                    if (def is not null) BuildManagedLegend(db, tr, reg, def, out _, out _);
+                    LegendStore.Save(db, tr, reg);
+                    (dbtAfter, mtAfter) = CountTextInGroup(db, tr, group);
+                    LegendManagement.TryGetGroupExtents(db, tr, group, out var ext);
+                    after = new Point3d(ext.MinPoint.X, ext.MaxPoint.Y, 0);
+                    extraOk = def is not null && sc.Extra(reg.FindById(id)!);
+                    tr.Commit();
+                }
+                PurgePending(db);
+
+                bool posOk = before.DistanceTo(after) < 0.5;
+                bool ok = dbtBefore > 0 && dbtAfter == 0 && mtAfter > 0 && sameId && sameGroup && sameScope && posOk && extraOk;
+                all &= ok;
+                ed.WriteMessage($"\nBREED {sc.Name}: DBText {dbtBefore}->{dbtAfter} MText={mtAfter} id/groep/scope={sameId}/{sameGroup}/{sameScope} pos={posOk} {sc.ExtraDesc}={extraOk} -> {(ok ? "OK" : "FAIL")}");
+            }
+
+            // Geen orphan DBText-blokken, en alle legenda's bestaan nog naast elkaar (isolatie).
+            int orphan, legendsLeft;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                orphan = CountDbTextInLegendBlocks(db, tr);
+                var reg = LegendStore.Load(db, tr);
+                legendsLeft = ids.Count(i => reg.FindById(i) is not null);
+                tr.Commit();
+            }
+            ed.WriteMessage($"\nBREED: orphan-DBText-blokken={orphan} legenda's-naast-elkaar={legendsLeft}/{ids.Count} -> {(orphan == 0 && legendsLeft == ids.Count ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nBREED: totaal -> {(all && orphan == 0 && legendsLeft == ids.Count ? "OK" : "FAIL")}");
+        }
+        catch (System.Exception ex)
+        {
+            ed.WriteMessage($"\nBREED error: {ex.Message}");
+        }
+    }
+
+    // Save/reopen van een oude DBText-legenda. SETUP maakt NLCS-content en een oude DBText-
+    // Selection-legenda; na QSAVE + heropenen werkt VERIFY die bij en controleert dat de oude
+    // tekst weg is, de output MText-only, de bronhandles exact behouden en de plaats gelijk.
+    [CommandMethod("NLCSLEGENDAOLDREOPENSETUP", CommandFlags.Modal)]
+    public void NlcsLegendaOldReopenSetup()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+            ObjectId L(string n) { if (lt.Has(n)) return lt[n]; var r = new LayerTableRecord { Name = n }; var id2 = lt.Add(r); tr.AddNewlyCreatedDBObject(r, true); return id2; }
+            var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+            var handles = new List<string>();
+            foreach (var n in new[] { "N-WE-VH-HEROPENA-G", "N-WE-RI-HEROPENB-G" })
+            {
+                var ln = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = L(n) };
+                ms.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true);
+                handles.Add(ln.Handle.Value.ToString("X"));
+            }
+            var (id, group, _) = SeedOldDbTextLegend(db, tr, MTextFixtureSettings(), LegendScope.Selection, handles);
+            var (dbt, _) = CountTextInGroup(db, tr, group);
+            tr.Commit();
+            ed.WriteMessage($"\nHEROPEN: setup klaar, oude DBText={dbt} handles={handles.Count}. QSAVE, heropenen, dan NLCSLEGENDAOLDREOPENVERIFY.");
+        }
+        catch (System.Exception ex) { ed.WriteMessage($"\nHEROPEN setup error: {ex.Message}"); }
+    }
+
+    [CommandMethod("NLCSLEGENDAOLDREOPENVERIFY", CommandFlags.Modal)]
+    public void NlcsLegendaOldReopenVerify()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            string id, group, scope; int dbtBefore, dbtAfter, mtAfter, handlesAfter, orphan; Point3d before, after;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = reg.Legends.FirstOrDefault();
+                if (def is null) { ed.WriteMessage("\nHEROPEN: geen legenda gevonden -> FAIL"); tr.Commit(); return; }
+                id = def.Id; group = def.GroupName; scope = def.Scope.ToString();
+                (dbtBefore, _) = CountTextInGroup(db, tr, group);
+                LegendManagement.TryGetGroupExtents(db, tr, group, out var e0);
+                before = new Point3d(e0.MinPoint.X, e0.MaxPoint.Y, 0);
+                tr.Commit();
+            }
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = reg.FindById(id)!;
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
+                LegendStore.Save(db, tr, reg);
+                (dbtAfter, mtAfter) = CountTextInGroup(db, tr, group);
+                handlesAfter = reg.FindById(id)!.SourceHandles.Count;
+                LegendManagement.TryGetGroupExtents(db, tr, group, out var e1);
+                after = new Point3d(e1.MinPoint.X, e1.MaxPoint.Y, 0);
+                tr.Commit();
+            }
+            PurgePending(db);
+            using (var tr = db.TransactionManager.StartTransaction()) { orphan = CountDbTextInLegendBlocks(db, tr); tr.Commit(); }
+
+            bool posOk = before.DistanceTo(after) < 0.5;
+            bool ok = dbtBefore > 0 && dbtAfter == 0 && mtAfter > 0 && scope == "Selection" && handlesAfter == 2 && posOk && orphan == 0;
+            ed.WriteMessage($"\nHEROPEN: na reopen+update DBText {dbtBefore}->{dbtAfter} MText={mtAfter} scope={scope} handles={handlesAfter} pos={posOk} orphan={orphan} -> {(ok ? "OK" : "FAIL")}");
+        }
+        catch (System.Exception ex) { ed.WriteMessage($"\nHEROPEN verify error: {ex.Message}"); }
     }
 
     // Bijwerken van een oude DBText-legenda zonder apart migratiecommando: NLCSLEGENDAUPDATE moet
