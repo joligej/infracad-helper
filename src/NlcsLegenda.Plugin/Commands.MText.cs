@@ -149,6 +149,94 @@ public partial class Commands
         }
     }
 
+    // Zero-DBText met een bronsymbool dat intern DBText bevat. Bouwt een symboolblok met DBText,
+    // MText en een lijn, plaatst het op een NLCS-symboollaag en controleert dat de gebouwde legenda
+    // geen DBText bevat en dat de symbooltekst als MText is overgenomen (behouden én geëxplodeerd).
+    [CommandMethod("NLCSLEGENDASYMBOOLTEKSTTEST", CommandFlags.Modal)]
+    public void NlcsLegendaSymboolTekstTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        const string dbTextMark = "SYMDBTEKST";
+        const string mTextMark = "SYMMTEKST";
+        try
+        {
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
+                if (!bt.Has("SYMTEKSTBLOK"))
+                {
+                    var sbtr = new BlockTableRecord { Name = "SYMTEKSTBLOK", Origin = Point3d.Origin };
+                    bt.Add(sbtr); tr.AddNewlyCreatedDBObject(sbtr, true);
+                    var ln = new Line(new Point3d(0, 0, 0), new Point3d(1, 1, 0));
+                    sbtr.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true);
+                    var t = new DBText { TextString = dbTextMark, Height = 0.3, Position = new Point3d(0, 0, 0) };
+                    t.SetDatabaseDefaults();
+                    sbtr.AppendEntity(t); tr.AddNewlyCreatedDBObject(t, true);
+                    var inner = new MText { Contents = mTextMark, TextHeight = 0.3, Location = new Point3d(0.5, 0.5, 0) };
+                    inner.SetDatabaseDefaults();
+                    sbtr.AppendEntity(inner); tr.AddNewlyCreatedDBObject(inner, true);
+                }
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                const string symLayer = "N-WE-RI-SYMTEKST-S";
+                if (!lt.Has(symLayer)) { var lr = new LayerTableRecord { Name = symLayer }; lt.Add(lr); tr.AddNewlyCreatedDBObject(lr, true); }
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                var bref = new BlockReference(new Point3d(0, 0, 0), bt["SYMTEKSTBLOK"]) { Layer = symLayer };
+                ms.AppendEntity(bref); tr.AddNewlyCreatedDBObject(bref, true);
+                tr.Commit();
+            }
+
+            (int dbt, int mt, bool db2mt, bool keptMt) Build(bool explode)
+            {
+                var s = LoadGlobalDefaults();
+                s.InsertSymbolBlocks = true;
+                s.ExplodeOnPlace = explode;
+                using var tr = db.TransactionManager.StartTransaction();
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, s);
+                reg.Add(def);
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
+                LegendStore.Save(db, tr, reg);
+                var (dbt, mt) = CountTextInGroup(db, tr, def.GroupName);
+                var texts = CollectMTextContents(db, tr, def.GroupName);
+                tr.Commit();
+                PurgePending(db);
+                return (dbt, mt, texts.Any(x => x.Contains(dbTextMark)), texts.Any(x => x.Contains(mTextMark)));
+            }
+
+            var r = Build(explode: false);
+            ed.WriteMessage($"\nSYMTEKST: behouden DBText={r.dbt} MText={r.mt} bron-DBText->MText={r.db2mt} bron-MText-behouden={r.keptMt} -> {(r.dbt == 0 && r.db2mt && r.keptMt ? "OK" : "FAIL")}");
+            var e = Build(explode: true);
+            ed.WriteMessage($"\nSYMTEKST: geexplodeerd DBText={e.dbt} MText={e.mt} bron-DBText->MText={e.db2mt} -> {(e.dbt == 0 && e.db2mt ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nSYMTEKST: totaal -> {(r.dbt == 0 && r.db2mt && r.keptMt && e.dbt == 0 && e.db2mt ? "OK" : "FAIL")}");
+        }
+        catch (System.Exception ex)
+        {
+            ed.WriteMessage($"\nSYMTEKST error: {ex.Message}");
+        }
+    }
+
+    // Verzamelt de MText-inhoud (contents) binnen een beheerde legenda-groep, blokken recursief.
+    private static List<string> CollectMTextContents(Database db, Transaction tr, string groupName)
+    {
+        var result = new List<string>();
+        var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+        if (!gd.Contains(groupName) || tr.GetObject(gd.GetAt(groupName), OpenMode.ForRead) is not Group g)
+            return result;
+        void Walk(ObjectId id, int depth)
+        {
+            if (depth > 8 || tr.GetObject(id, OpenMode.ForRead) is not Entity e) return;
+            if (e is MText m) result.Add(m.Contents);
+            else if (e is BlockReference br && !br.BlockTableRecord.IsNull
+                     && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord r)
+                foreach (ObjectId cid in r) Walk(cid, depth + 1);
+        }
+        foreach (ObjectId id in g.GetAllEntityIds()) Walk(id, 0);
+        return result;
+    }
+
     // Bouwt een blok dat een v1.27.x-legenda nabootst: tekst als DBText. Registreert het als
     // beheerde legenda (behouden blok) zodat we het bijwerkpad vanaf oude output kunnen testen.
     private static (string id, string group, Point3d topLeft) SeedOldDbTextLegend(Database db, Transaction tr, LegendSettings s)
