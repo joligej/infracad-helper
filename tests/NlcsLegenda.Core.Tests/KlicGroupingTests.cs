@@ -14,7 +14,7 @@ public class KlicGroupingTests
         return list;
     }
 
-    // Echte KL-elementnamen uit SIT-BS-Klic-melding.dwg.
+    // Echte KL-elementnamen zoals ze in KLIC-tekeningen voorkomen.
     [Theory]
     [InlineData("DATA", "DATA", "", "", "")]
     [InlineData("DATA2", "DATA", "", "", "2")]

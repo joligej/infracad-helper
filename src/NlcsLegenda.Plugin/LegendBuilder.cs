@@ -400,10 +400,9 @@ public static class LegendBuilder
             }
 
             // NLCS-schaalafhankelijke symbolen staan op bronschaal: de blokdefinitie is in
-            // papier-mm en wordt met modeleenheden-per-papier-mm (Scale/1000) geplaatst. Gemeten
-            // op SIT-NW-LEGENDA.dwg: symbolen staan op insertschaal 0,2 bij 1:200. Zo verschijnt
-            // het symbool op zijn eigen papierformaat; alleen als het groter is dan het vakje
-            // schalen we het passend terug (geen vaste vulgraad).
+            // papier-mm en wordt met modeleenheden-per-papier-mm (Scale/1000) geplaatst, dus op
+            // 1:200 insertschaal 0,2. Zo verschijnt het symbool op zijn eigen papierformaat; alleen
+            // als het groter is dan het vakje schalen we het passend terug (geen vaste vulgraad).
             double fit = modelPerPaperMm;
             double maxFit = Math.Min(swatchW / extW, swatchH / extH);
             if (fit > maxFit)

@@ -3852,10 +3852,10 @@ public partial class Commands
         }
     }
 
-    // Meet de maatvoering van een bestaande referentielegenda (swatch, rijafstand, teksthoogtes) en
-    // schrijft een machineleesbaar contract. Model is in meters (INSUNITS=6); op schaal 1:S is
-    // 1 modelmeter = 1000/S mm papier. De schaal komt uit NLCS_MEET_SCALE (default 200), het
-    // doelbestand uit NLCS_CONTRACT_OUT. VLA/ActiveX werkt niet in accoreconsole, daarom .NET-API.
+    // Meet de maatvoering van een bestaande legenda (swatch, rijafstand, teksthoogtes) en schrijft
+    // het resultaat als JSON weg. Model is in meters (INSUNITS=6); op schaal 1:S is 1 modelmeter =
+    // 1000/S mm papier. De schaal komt uit NLCS_MEET_SCALE (default 200), het doelbestand uit
+    // NLCS_METING_OUT. VLA/ActiveX werkt niet in accoreconsole, daarom de .NET-API.
     [CommandMethod("NLCSLEGENDATEMPLATEMETEN", CommandFlags.Modal)]
     public void NlcsLegendaTemplateMeten()
     {
@@ -3985,10 +3985,10 @@ public partial class Commands
             json.Append($"  \"teksthoogtesMm\": [{string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}],\n");
             json.Append($"  \"symbool\": {{ \"insertSchaal\": {symScale:0.###}, \"paperBreedteMm\": {symPaperW:0.0}, \"paperHoogteMm\": {symPaperH:0.0}, \"aantal\": {symCount} }}\n");
             json.Append("}\n");
-            string outPath = Environment.GetEnvironmentVariable("NLCS_CONTRACT_OUT")
-                ?? Path.Combine(Path.GetTempPath(), "nlcs-template-contract.json");
+            string outPath = Environment.GetEnvironmentVariable("NLCS_METING_OUT")
+                ?? Path.Combine(Path.GetTempPath(), "nlcs-template-meting.json");
             File.WriteAllText(outPath, json.ToString());
-            ed.WriteMessage($"\nMETEN: contract geschreven naar {outPath}");
+            ed.WriteMessage($"\nMETEN: meting geschreven naar {outPath}");
         }
         catch (Exception ex)
         {
