@@ -39,6 +39,11 @@ public static class DrawingAnalyzer
         public readonly Dictionary<string, bool> Visible = new(StringComparer.OrdinalIgnoreCase);
         // Omschrijving per eigen-laag-sleutel (komt uit de regel, niet uit de NLCS-catalogus).
         public readonly Dictionary<string, string> CustomDesc = new(StringComparer.OrdinalIgnoreCase);
+        // Per-bron buckets voor AnySource-regels: sleutel -> (regel, bron-id). Na de collectie
+        // worden ze op render-identiteit samengevoegd: gelijk uiterlijk = één regel met opgetelde
+        // hoeveelheid, zichtbaar verschillend = aparte regels per bron (geen first-wins).
+        public readonly Dictionary<string, (CustomLayerRule Rule, string SourceId)> AnyBuckets =
+            new(StringComparer.Ordinal);
         public HashSet<ObjectId> Excluded = new();
         public LayerTable? Layers;
     }
@@ -72,6 +77,10 @@ public static class DrawingAnalyzer
             var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
             CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false, sourceXref: string.Empty);
         }
+
+        // AnySource-regels die meerdere bronnen raken samenvoegen op render-identiteit vóór de
+        // beschrijvings-/groepeerstap, zodat de swatch niet van de traversalevolgorde afhangt.
+        CoalesceAnySource(db, tr, c);
 
         var descriptions = ReadLayerDescriptions(db, tr, c.Parsed.Values);
         // De echte OMSCHRIJVING uit de KLIC-symboolattributen krijgt voorrang op de laag-
@@ -351,11 +360,27 @@ public static class DrawingAnalyzer
         Entity ent, Transaction tr, Collector c, LegendSettings settings, Matrix3d transform,
         CustomLayerRule rule, NlcsLayerName canonical)
     {
-        var key = canonical.LocalName;
-        if (!c.Parsed.ContainsKey(key))
+        string key;
+        if (rule.Scope == CustomSourceScope.AnySource)
         {
-            c.Parsed[key] = canonical;
-            c.CustomDesc[key] = rule.Description ?? string.Empty;
+            // Per bron een aparte bucket; coalescing voegt later gelijk-renderende bronnen samen.
+            string sourceId = canonical.IsXref ? canonical.XrefName : string.Empty;
+            key = "\u0001" + sourceId + "\u0001" + canonical.LocalName;
+            if (!c.Parsed.ContainsKey(key))
+            {
+                c.Parsed[key] = WithLocalName(canonical, key);
+                c.CustomDesc[key] = rule.Description ?? string.Empty;
+                c.AnyBuckets[key] = (rule, sourceId);
+            }
+        }
+        else
+        {
+            key = canonical.LocalName;
+            if (!c.Parsed.ContainsKey(key))
+            {
+                c.Parsed[key] = canonical;
+                c.CustomDesc[key] = rule.Description ?? string.Empty;
+            }
         }
 
         AddMetricMasked(ent, key, c, transform, rule.QuantityMode);
@@ -370,6 +395,127 @@ public static class DrawingAnalyzer
             if (!string.IsNullOrEmpty(name) && !name.StartsWith('*'))
                 c.SymbolBlocks[key] = name;
         }
+    }
+
+    private static NlcsLayerName WithLocalName(NlcsLayerName src, string localName) => new()
+    {
+        Raw = src.Raw,
+        LocalName = localName,
+        IsXref = src.IsXref,
+        XrefName = src.XrefName,
+        StatusCode = src.StatusCode,
+        Status = src.Status,
+        Discipline = src.Discipline,
+        Hoofdgroep = src.Hoofdgroep,
+        Element = src.Element,
+        TypeSuffix = src.TypeSuffix,
+        DrawType = src.DrawType,
+        Scale = src.Scale
+    };
+
+    // Voegt de per-bron AnySource-buckets samen. Buckets met gelijke render-identiteit (laagstijl
+    // + arcering + symbool) worden één legendaregel met opgetelde hoeveelheid; verschillen de
+    // bronnen zichtbaar, dan blijven het aparte regels, elk met een bronaanduiding in het element.
+    private static void CoalesceAnySource(Database db, Transaction tr, Collector c)
+    {
+        if (c.AnyBuckets.Count == 0)
+            return;
+
+        var snap = new Dictionary<string, (CustomLayerRule Rule, NlcsLayerName Parsed, string Sig, LayerMetric Metric, HatchSample? Hatch, string? Symbol)>(StringComparer.Ordinal);
+        foreach (var bk in c.AnyBuckets.Keys)
+        {
+            var p = c.Parsed[bk];
+            string style = ReadStyleSignature(db, tr, p.Raw);
+            HatchSample? h = c.Hatches.TryGetValue(bk, out var hv) ? hv : null;
+            string? sym = c.SymbolBlocks.TryGetValue(bk, out var sv) ? sv : null;
+            string hatchSig = h is not null ? $"H:{h.PatternName}:{h.PatternScale:0.###}:{h.PatternAngle:0.###}:{h.IsSolid}" : string.Empty;
+            string symSig = sym is not null ? "S:" + sym : string.Empty;
+            c.Metrics.TryGetValue(bk, out var metric);
+            snap[bk] = (c.AnyBuckets[bk].Rule, p, style + "|" + hatchSig + "|" + symSig, metric, h, sym);
+        }
+
+        foreach (var bk in snap.Keys)
+        {
+            c.Parsed.Remove(bk);
+            c.Metrics.Remove(bk);
+            c.Hatches.Remove(bk);
+            c.SymbolBlocks.Remove(bk);
+            c.CustomDesc.Remove(bk);
+        }
+        c.AnyBuckets.Clear();
+
+        foreach (var logical in snap.GroupBy(kv =>
+            $"{kv.Value.Parsed.StatusCode}|{kv.Value.Parsed.Discipline}|{kv.Value.Parsed.Hoofdgroep}|{kv.Value.Parsed.Element}"))
+        {
+            var rule = logical.First().Value.Rule;
+            var bySig = logical.GroupBy(kv => kv.Value.Sig).ToList();
+            bool divergent = bySig.Count > 1;
+
+            foreach (var sigGroup in bySig)
+            {
+                var members = sigGroup.ToList();
+                var rep = members[0].Value;
+                var sourceIds = members
+                    .Select(m => m.Value.Parsed.IsXref ? m.Value.Parsed.XrefName : string.Empty)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(s => s, StringComparer.Ordinal)
+                    .ToList();
+                string sourceLabel = string.Join(", ",
+                    sourceIds.Select(s => s.Length == 0 ? "hoofdtekening" : s));
+
+                // Sleutel = de echte database-laagnaam van de representatieve bron. Die bestaat en
+                // is geldig, zodat de renderer de swatch op een bestaande laag met de juiste stijl
+                // tekent (een synthetische sleutel met scheidingstekens zou een ongeldige laagnaam
+                // opleveren). Bij divergentie verschilt de Raw per partitie, dus de sleutels botsen
+                // niet; het element krijgt een bronaanduiding zodat de regels apart blijven.
+                string finalKey = rep.Parsed.Raw;
+                string element = divergent
+                    ? rule.Element + " (" + sourceLabel + ")"
+                    : rule.Element;
+
+                var metric = LayerMetric.Empty;
+                foreach (var m in members)
+                    metric += m.Value.Metric;
+
+                c.Parsed[finalKey] = new NlcsLayerName
+                {
+                    Raw = rep.Parsed.Raw,
+                    LocalName = finalKey,
+                    IsXref = rep.Parsed.IsXref,
+                    XrefName = rep.Parsed.XrefName,
+                    StatusCode = rep.Parsed.StatusCode,
+                    Status = rep.Parsed.Status,
+                    Discipline = rep.Parsed.Discipline,
+                    Hoofdgroep = rep.Parsed.Hoofdgroep,
+                    Element = element,
+                    TypeSuffix = rep.Parsed.TypeSuffix,
+                    DrawType = rep.Parsed.DrawType,
+                    Scale = rep.Parsed.Scale
+                };
+                c.Metrics[finalKey] = metric;
+                c.CustomDesc[finalKey] = rule.Description ?? string.Empty;
+                if (rep.Hatch is not null)
+                    c.Hatches[finalKey] = rep.Hatch;
+                if (rep.Symbol is not null)
+                    c.SymbolBlocks[finalKey] = rep.Symbol;
+            }
+        }
+    }
+
+    private static string ReadStyleSignature(Database db, Transaction tr, string rawLayer)
+    {
+        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        if (!lt.Has(rawLayer) || tr.GetObject(lt[rawLayer], OpenMode.ForRead) is not LayerTableRecord ltr)
+            return string.Empty;
+        string linetype = "Continuous";
+        try
+        {
+            if (tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord lype)
+                linetype = lype.Name;
+        }
+        catch { /* standaard */ }
+        var transp = ltr.Transparency.IsByAlpha ? ltr.Transparency.Alpha.ToString() : "L";
+        return $"{ltr.Color}|{linetype}|{ltr.LineWeight}|{transp}";
     }
 
     // Zoals AddMetric, maar met een expliciete hoeveelheidsmodus. Auto gedraagt zich als NLCS;

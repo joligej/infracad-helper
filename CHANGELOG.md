@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.27.0 - 2026-10-06
+
+- Nieuw: blanco legendaregels. Via *Blanco regels* in het instellingenvenster reserveer je een
+  of meer lege regels (leeg vakje, standaardtekst "[blanco]") om later met de hand iets toe te
+  voegen. Ze hebben geen bron en geen hoeveelheid, blijven bij bijwerken/opslaan/heropenen
+  bestaan en staan los van automatische NLCS-bronnen, gekoppelde eigen lagen en handmatige regels.
+- Opgelost: bij herhaald bijwerken kon een legenda zichzelf voeden. De vorige legenda bleef als
+  losse geometrie staan en werd bij een volgende update als bron meegeteld, waardoor lengtes en
+  aantallen opliepen. Een update houdt de beheergroep nu in stand, zodat oude geometrie
+  betrouwbaar wordt gewist.
+- Een eigen bronlaag die in meerdere bronnen (hoofdtekening/xref) voorkomt met een zichtbaar
+  andere weergave levert nu aparte legendaregels per bron in plaats van een willekeurige; bij
+  gelijke weergave telt de hoeveelheid op tot één regel.
+- De omschrijving van een eigen bronlaag kun je nu net als NLCS per legenda overschrijven.
+- De viewport-meettest laat de actieve layout niet meer gewijzigd achter.
+
 ## 1.26.1 - 2026-10-05
 
 - Eigen bronlagen in een xref werken nu echt: de bron *elke bron* en *specifieke xref* tellen

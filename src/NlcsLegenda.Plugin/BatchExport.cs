@@ -45,7 +45,8 @@ internal static class BatchExport
             var registry = LegendStore.Load(db, tr);
             var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
             var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: catalog, excludedIds: excluded);
-            var entries = analysis.Entries;
+            // Blanco regels zijn legenda-layout, geen brondata; ze horen niet in een uittrekstaat.
+            var entries = analysis.Entries.Where(e => !e.IsBlank).ToList();
             tr.Commit();
             return new BatchDrawingResult { Drawing = name, Path = path, Entries = entries };
         }

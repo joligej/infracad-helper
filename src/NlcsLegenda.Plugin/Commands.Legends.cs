@@ -50,7 +50,7 @@ public partial class Commands
             return UpdateResult.NoEntries;
 
         // Positie van de bestaande legenda vasthouden.
-        bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out var topLeft);
+        bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out var topLeft, keepGroup: true);
 
         var btrId = LegendBuilder.BuildBlock(db, tr, analysis, def.Settings, out rows, out var issues);
         // Semantiek bij tekenfouten (bewuste keuze A): de legenda wordt bijgewerkt met wat wél

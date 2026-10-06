@@ -138,6 +138,7 @@ public static class LegendExport
         DescriptionSource.Handmatig => "handmatig",
         DescriptionSource.Laagnaam => "laagnaam",
         DescriptionSource.EigenKoppeling => "eigen koppeling",
+        DescriptionSource.Blanco => "blanco",
         _ => string.Empty
     };
 

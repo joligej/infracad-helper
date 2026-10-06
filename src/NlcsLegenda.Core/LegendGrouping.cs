@@ -93,6 +93,17 @@ public static class LegendGrouping
             entries.Add(custom is null ? basic : manual.ToLegendEntry(custom));
         }
 
+        foreach (var blank in settings.BlankEntries)
+        {
+            var basic = blank.ToLegendEntry();
+            var custom = settings.FindCustomStatus(LegendSettings.EntryKey(basic))?.Name;
+            // Statusfilter geldt ook voor blanco's: een uitgeschakelde (standaard) status verbergt
+            // de regel, net als bij bronregels. Een eigen status plaatst de regel in zijn band.
+            if (custom is null && !settings.IncludedStatuses.Contains(blank.Status))
+                continue;
+            entries.Add(custom is null ? basic : blank.ToLegendEntry(custom));
+        }
+
         return Sort(Merge(entries, settings), settings);
     }
 
@@ -121,6 +132,11 @@ public static class LegendGrouping
         if (settings.MergedDimensions.Count == 0 && !mergeStatus)
             return entries;
 
+        // Blanco regels nooit samenvoegen: elke blanco is een losse invulregel met eigen
+        // identiteit, ook als meerdere dezelfde tekst hebben. Ze gaan buiten de merge om mee.
+        var blanks = entries.Where(e => e.IsBlank).ToList();
+        var mergeable = blanks.Count == 0 ? entries : entries.Where(e => !e.IsBlank).ToList();
+
         string KeyOf(LegendEntry e)
         {
             var props = ElementProperties.From(e.Element);
@@ -134,7 +150,7 @@ public static class LegendGrouping
 
         var merged = new List<LegendEntry>();
         var byKey = new Dictionary<string, List<LegendEntry>>();
-        foreach (var e in entries)
+        foreach (var e in mergeable)
         {
             var key = KeyOf(e);
             if (!byKey.TryGetValue(key, out var list))
@@ -152,6 +168,7 @@ public static class LegendGrouping
             if (group.Count > 1)
                 merged[i] = Combine(group);
         }
+        merged.AddRange(blanks);
         return merged;
     }
 
@@ -217,6 +234,24 @@ public static class LegendGrouping
         Func<string, string?>? layerDescription, DescriptionCatalog catalog,
         Func<string, DescriptionSource?>? descriptionSourceOf, out DescriptionSource source)
     {
+        // Precedence (één model voor NLCS én eigen bronnen):
+        //   1. per-legenda omschrijvingsoverride (expliciet door de gebruiker gezet);
+        //   2. basis: eigen-koppeling of laagbeschrijving uit de tekening;
+        //   3. effectieve catalogus;
+        //   4. nette laagnaam.
+        // Zo kan een eigen-bronomschrijving ("Datakabel") net als NLCS via de normale override
+        // worden gewijzigd ("Glasvezelkabel"), zonder apart custom-tekstmodel.
+        if (settings.DescriptionOverrides.Elementen.Count > 0)
+        {
+            var overridden = settings.DescriptionOverrides.Describe(
+                representative, settings.IncludeGeneralDescription, out var overrideMatched, settings.GeneralSeparator);
+            if (overrideMatched)
+            {
+                source = DescriptionSource.Catalogus;
+                return overridden;
+            }
+        }
+
         if (layerDescription is not null)
         {
             foreach (var layer in group.OrderBy(l => TypePriority(l.DrawType)))

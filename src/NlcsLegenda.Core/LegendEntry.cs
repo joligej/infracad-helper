@@ -20,6 +20,10 @@ public sealed class LegendEntry
 
     public DescriptionSource DescriptionSource { get; init; } = DescriptionSource.Catalogus;
 
+    // Blanco regel: bewust leeg (geen bron, geen hoeveelheid, leeg swatchvak). De renderer en
+    // export behandelen zo'n regel als statische invulregel, niet als ontbrekende bron.
+    public bool IsBlank => DescriptionSource == DescriptionSource.Blanco;
+
     public Dictionary<NlcsDrawType, string> LayersByType { get; init; } = new();
 
     // Alleen de echte G/GD/GS-laag. GV valt hier bewust niet onder: een vlak rendert als
@@ -117,5 +121,7 @@ public enum DescriptionSource
 
     Laagnaam,
 
-    EigenKoppeling
+    EigenKoppeling,
+
+    Blanco
 }

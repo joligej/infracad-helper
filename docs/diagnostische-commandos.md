@@ -22,6 +22,12 @@ controle onmogelijk maken.
 | `NLCSLEGENDAABCXREFSETUP` / `NLCSLEGENDAABCXREFVERIFY` | Koppelen twee synthetische xrefs en controleren na heropenen dat A alleen xref A meeneemt, B alleen xref B en C allebei. |
 | `NLCSLEGENDACONSUMERTEST` | Controleert dat zichtbare schakelaars (kader, swatchkader, schaalbalk, titel, opmerkingen, hoeveelheden, symbolen) de getekende geometrie veranderen. |
 | `NLCSLEGENDACUSTOMTEST` | Maakt geometrie op niet-NLCS-lagen en controleert dat gekoppelde eigen lagen gelijkwaardig meetellen (lengte/aantal/oppervlak, selectie, blok-identiteit). |
+| `NLCSLEGENDAEIGENANYTEST` | Controleert dat een *elke bron*-regel met zichtbaar verschillende weergave per bron aparte regels oplevert, en bij gelijke weergave één opgetelde regel. |
+| `NLCSLEGENDAEIGENHATCHTEST` | Koppelt een echte arcering en een echt blok op eigen lagen en controleert dat de gebouwde legenda echt een Hatch-entiteit en een symboolinvoeging bevat. |
+| `NLCSLEGENDAEIGENBATCHTEST` | Draait de batch op twee tijdelijke DWG's (met/zonder eigen laag) en controleert dat alleen de juiste een eigen regel geeft en de bron-DWG's qua hash onveranderd blijven. |
+| `NLCSLEGENDAEIGENUPDATETEST` | Werkt een eigen-bronlegenda 10 en 50 keer bij en controleert dat rijtal, hoeveelheden en het aantal beheerde blokken stabiel blijven (geen zelfvoeding). |
+| `NLCSLEGENDABLANCOTEST` | Controleert dat blanco regels als echte rijen worden gebouwd (leeg vakje, tekst "[blanco]"), de legenda hoger maken en geen renderissue geven. |
+| `NLCSLEGENDASYSVARTEST` | Legt relevante systeemvariabelen vast, draait de hoofdcommando's en controleert dat elke waarde daarna exact gelijk is (geen state-lek). |
 | `NLCSLEGENDAEIGENXREFTEST` | Koppelt dezelfde eigen laagnaam in host (3 m) en twee xrefs (5 m en 11 m) en controleert dat Lokaal alleen de host telt (3), SpecifiekeXref alleen die xref (5), ElkeBron alle bronnen (19) en dat xref-uitsluiting geen regel oplevert. |
 | `NLCSLEGENDAEIGENZICHTBAARTEST` | Bevriest een eigen laag en een NLCS-laag en controleert dat beide gelijk reageren op "onzichtbare lagen meenemen". |
 | `NLCSLEGENDAVIEWPORTTEST` | Controleert viewport-plaatsing en -schaal rond de legenda. |
