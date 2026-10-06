@@ -85,6 +85,12 @@ regel (die vast is) verschijnt een eigen laag alleen als er objecten op staan, e
 hoeveelheden komen uit de tekening. Je koppelt alleen de lagen die je zelf aanwijst;
 hulp- en annotatielagen blijven buiten beeld.
 
+Wil je bewust lege ruimte in de legenda reserveren, bijvoorbeeld om er later met de hand
+iets bij te tekenen, gebruik dan *Blanco regels* in het instellingenvenster. Een blanco
+regel is een statische, lege regel (leeg vakje, standaardtekst "[blanco]") zonder bron en
+zonder hoeveelheid. Je kunt er meerdere toevoegen; elke regel blijft los bestaan en
+behouden bij bijwerken, opslaan en heropenen. De tekst en status zijn per regel aan te passen.
+
 Je kunt ook per elementsoort kiezen wat in de legenda komt: geometrie/lijnen, vlakken,
 arceringen, vlakvullingen en symbolen zijn afzonderlijk aan of uit te zetten. Standaard
 staat alles aan. Je vindt dit in `NLCSLEGENDAOPTIES` onder *Elementsoorten* en in het
