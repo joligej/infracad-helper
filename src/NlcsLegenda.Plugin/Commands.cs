@@ -537,7 +537,7 @@ public partial class Commands
 
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                // De paper space van de huidige layout (robuust als je in MSPACE staat).
+                // De paper space van de huidige layout (werkt ook als je in MSPACE staat).
                 var lm = LayoutManager.Current;
                 var layout = (Layout)tr.GetObject(lm.GetLayoutId(lm.CurrentLayout), OpenMode.ForRead);
                 var ps = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite);
@@ -2248,8 +2248,8 @@ public partial class Commands
 
     // Twee-run A/B/C-persistentie: ABCSETUP bouwt drie legenda's met uiteenlopende instellingen
     // en slaat ze op; na QSAVE/_.QUIT/heropenen controleert ABCVERIFY dat elk met zijn eigen
-    // instellingen én getekende geometrie terugkomt en dat A bewerken B/C ongemoeid laat. Zo is
-    // de persistentie over een echte schijf-rondgang bewezen, niet alleen een store-herlaad.
+    // instellingen én getekende geometrie terugkomt en dat A bewerken B/C ongemoeid laat. Zo
+    // controleren we het bewaren over een echte schijf-rondgang, niet alleen een store-herlaad.
     [CommandMethod("NLCSLEGENDAABCSETUP", CommandFlags.Modal)]
     public void NlcsLegendaAbcSetup()
     {
@@ -3480,9 +3480,9 @@ public partial class Commands
         }
     }
 
-    // Consumer-audit op de echte host: elke zichtbare schakelaar moet de getekende geometrie
+    // Controle op de echte host: elke zichtbare schakelaar moet de getekende geometrie
     // veranderen. Bouwt telkens een verse legenda en vergelijkt het aantal entiteiten met de
-    // schakelaar aan en uit, zodat bewezen is dat de renderer de instelling echt verbruikt.
+    // schakelaar aan en uit, zodat zichtbaar is dat de renderer de instelling echt gebruikt.
     [CommandMethod("NLCSLEGENDACONSUMERTEST", CommandFlags.Modal)]
     public void NlcsLegendaConsumerTest()
     {
@@ -3786,7 +3786,7 @@ public partial class Commands
             }
 
             // Variant 6: verplaatste legenda. Na een handmatige verschuiving moet de viewport de
-            // nieuwe positie volgen (extents worden live gemeten), niet terugspringen (sectie 30).
+            // nieuwe positie volgen (extents worden live gemeten), niet terugspringen.
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var reg = LegendStore.Load(db, tr);
