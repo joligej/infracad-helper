@@ -537,7 +537,7 @@ public partial class Commands
 
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                // De paper space van de huidige layout (robuust als je in MSPACE staat).
+                // De paper space van de huidige layout (werkt ook als je in MSPACE staat).
                 var lm = LayoutManager.Current;
                 var layout = (Layout)tr.GetObject(lm.GetLayoutId(lm.CurrentLayout), OpenMode.ForRead);
                 var ps = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite);
@@ -2248,8 +2248,8 @@ public partial class Commands
 
     // Twee-run A/B/C-persistentie: ABCSETUP bouwt drie legenda's met uiteenlopende instellingen
     // en slaat ze op; na QSAVE/_.QUIT/heropenen controleert ABCVERIFY dat elk met zijn eigen
-    // instellingen én getekende geometrie terugkomt en dat A bewerken B/C ongemoeid laat. Zo is
-    // de persistentie over een echte schijf-rondgang bewezen, niet alleen een store-herlaad.
+    // instellingen én getekende geometrie terugkomt en dat A bewerken B/C ongemoeid laat. Zo
+    // controleren we het bewaren over een echte schijf-rondgang, niet alleen een store-herlaad.
     [CommandMethod("NLCSLEGENDAABCSETUP", CommandFlags.Modal)]
     public void NlcsLegendaAbcSetup()
     {
@@ -2471,9 +2471,10 @@ public partial class Commands
         }
     }
 
-    // Blanco legendaregels op een echte host: controleert dat ze als echte rijen worden gebouwd
-    // (leeg vakje, tekst "[blanco]"), dat extra blanco's de legenda hoger maken, dat ze geen
-    // renderissue geven en dat tekst-uit de regel laat staan maar de tekst verbergt.
+    // Blanco legendaregels op een echte host: inspecteert de gebouwde geometrie (een blanco row
+    // heeft een leeg vakje: geen lijnsample, arcering, vulling of symbool, hooguit het normale
+    // kader) en de echte renderissues uit BuildBlock. Controleert daarnaast dat extra blanco's de
+    // legenda hoger maken en dat tekst-uit de regel laat staan maar de tekst verbergt.
     [CommandMethod("NLCSLEGENDABLANCOTEST", CommandFlags.Modal)]
     public void NlcsLegendaBlancoTest()
     {
@@ -2497,17 +2498,49 @@ public partial class Commands
                 tr.Commit();
             }
 
-            (int rows, int issues, double height, int blanks, bool textSeen) Build(int blankCount, bool includeText)
+            // Bouwt een legenda met uitsluitend blanco regels en inspecteert de echte geometrie.
+            (int issues, int hatches, int symbols, int samples, int frames) InspectBlankOnly(int blankCount, bool swatchFrame)
+            {
+                var s = LoadGlobalDefaults();
+                s.DrawSwatchFrame = swatchFrame;
+                // Alleen de blanco-rijen inspecteren: schaalbalk/kader/titel/opmerkingen uit, zodat
+                // hun geometrie (zoals schaalbalk-arceringen) niet als swatchinhoud wordt geteld.
+                s.IncludeScaleBar = false; s.DrawBorder = false; s.IncludeTitle = false;
+                s.IncludeFooter = false; s.IncludeRemarks = false;
+                for (int i = 0; i < blankCount; i++) s.BlankEntries.Add(new BlankEntry());
+                using var tr = db.TransactionManager.StartTransaction();
+                var entries = LegendGrouping.Build(System.Array.Empty<NlcsLayerName>(), s);
+                var analysis = new AnalysisResult { Entries = entries };
+                var btrId = LegendBuilder.BuildBlock(db, tr, analysis, s, out _, out var issues);
+                int hatches = 0, symbols = 0, samples = 0, frames = 0;
+                var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
+                foreach (ObjectId id in btr)
+                {
+                    if (tr.GetObject(id, OpenMode.ForRead) is not Entity e) continue;
+                    if (e is Hatch) hatches++;
+                    else if (e is BlockReference) symbols++;
+                    else if (e is Curve)
+                    {
+                        if (string.Equals(e.Layer, s.FrameLayer, StringComparison.OrdinalIgnoreCase)) frames++;
+                        else samples++; // een lijn op een niet-kaderlaag zou een sample zijn (mag niet)
+                    }
+                }
+                tr.Commit();
+                PurgeTempBlock(db, btrId);
+                return (issues.Count, hatches, symbols, samples, frames);
+            }
+
+            // Bouwt een echte beheerde legenda (met NLCS-content + blanco's) voor rij-/hoogtecheck.
+            (int rows, double height, int blanks, bool textSeen) BuildManaged(int blankCount, bool includeText)
             {
                 var s = LoadGlobalDefaults();
                 s.IncludeText = includeText;
-                for (int i = 0; i < blankCount; i++)
-                    s.BlankEntries.Add(new BlankEntry());
+                for (int i = 0; i < blankCount; i++) s.BlankEntries.Add(new BlankEntry());
                 using var tr = db.TransactionManager.StartTransaction();
                 var reg = LegendStore.Load(db, tr);
                 var def = IsoDef(reg, s);
                 reg.Add(def);
-                var res = BuildManagedLegend(db, tr, reg, def, out int rows, out _);
+                BuildManagedLegend(db, tr, reg, def, out int rows, out _);
                 LegendStore.Save(db, tr, reg);
                 LegendManagement.TryGetGroupExtents(db, tr, def.GroupName, out var ext);
                 double h = ext.MaxPoint.Y - ext.MinPoint.Y;
@@ -2516,23 +2549,30 @@ public partial class Commands
                 bool txt = analysis.Entries.Any(e => e.IsBlank && e.Description == "[blanco]");
                 tr.Commit();
                 PurgePending(db);
-                return (rows, 0, h, blanks, txt);
+                return (rows, h, blanks, txt);
             }
 
-            var b0 = Build(0, includeText: true);
-            var b1 = Build(1, includeText: true);
-            var b5 = Build(5, includeText: true);
-            var bText = Build(3, includeText: false);
+            var withFrame = InspectBlankOnly(5, swatchFrame: true);
+            var noFrame = InspectBlankOnly(5, swatchFrame: false);
+            var b0 = BuildManaged(0, includeText: true);
+            var b1 = BuildManaged(1, includeText: true);
+            var b5 = BuildManaged(5, includeText: true);
+            var bText = BuildManaged(3, includeText: false);
 
+            // Leeg vakje: geen arcering, symbool of lijnsample; wel meer kaders als het kader aan staat.
+            bool swatchOk = withFrame.issues == 0 && noFrame.issues == 0
+                && withFrame.hatches == 0 && withFrame.symbols == 0 && withFrame.samples == 0
+                && noFrame.samples == 0 && withFrame.frames > noFrame.frames;
             bool rowsOk = b1.rows == b0.rows + 1 && b5.rows == b0.rows + 5;
             bool growOk = b5.height > b1.height && b1.height > b0.height;
             bool blankOk = b1.blanks == 1 && b5.blanks == 5 && b1.textSeen;
-            bool textOffOk = bText.blanks == 3; // regels blijven bestaan ook met tekst uit
+            bool textOffOk = bText.blanks == 3;
+            ed.WriteMessage($"\nBLANCO: leeg vakje issues={withFrame.issues} arcering={withFrame.hatches} symbool={withFrame.symbols} sample={withFrame.samples} kaders kader-aan={withFrame.frames}>kader-uit={noFrame.frames} -> {(swatchOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nBLANCO: rijen 0={b0.rows} 1={b1.rows} 5={b5.rows} (verw +1/+5) -> {(rowsOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nBLANCO: hoogte groeit {b0.height:0.0}<{b1.height:0.0}<{b5.height:0.0} -> {(growOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nBLANCO: entries IsBlank 1={b1.blanks} 5={b5.blanks} tekst=\"[blanco]\" -> {(blankOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nBLANCO: tekst-uit behoudt {bText.blanks} blanco-rijen -> {(textOffOk ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nBLANCO: totaal -> {(rowsOk && growOk && blankOk && textOffOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nBLANCO: totaal -> {(swatchOk && rowsOk && growOk && blankOk && textOffOk ? "OK" : "FAIL")}");
         }
         catch (Exception ex)
         {
@@ -2540,9 +2580,12 @@ public partial class Commands
         }
     }
 
-    // Systeemvariabele-isolatie: legt een set relevante sysvars plus de actieve laag/layout vast,
-    // draait de belangrijkste commando's (analyse, legenda, export, viewport-meting) en controleert
-    // dat elke waarde daarna exact gelijk is. Bewijst dat de plugin geen host-state laat lekken.
+    // Host-state-isolatie: legt relevante systeemvariabelen (getypeerde waarden, incl. de actieve
+    // laag CLAYER en layout CTAB/TILEMODE) vast, draait de analyse, bouwt en werkt een legenda bij,
+    // exporteert, en draait de analyse met een eigen laag en met blanco regels. Controleert daarna
+    // dat elke waarde exact gelijk is. Bewijst dat de plugin geen systeemvariabelen laat lekken.
+    // (De enige tijdelijke WorkingDatabase-wissels zitten in de xref-testcommando's en zijn daar
+    // met try/finally hersteld; WorkingDatabase is in de Core Console geen stabiele referentie.)
     [CommandMethod("NLCSLEGENDASYSVARTEST", CommandFlags.Modal)]
     public void NlcsLegendaSysvarTest()
     {
@@ -2554,28 +2597,31 @@ public partial class Commands
         string[] names = { "FILEDIA", "SECURELOAD", "CMDECHO", "CLAYER", "CTAB", "TILEMODE", "OSMODE", "PICKSTYLE", "ATTREQ", "ATTDIA", "EXPERT" };
         try
         {
-            var before = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var before = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
             foreach (var n in names)
             {
-                try { before[n] = AcApp.GetSystemVariable(n)?.ToString() ?? "<null>"; } catch { }
+                try { before[n] = AcApp.GetSystemVariable(n); } catch { }
             }
 
-            // Representatieve operaties die state zouden kunnen wijzigen.
+            // Analyse.
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db));
                 tr.Commit();
             }
+            // Legenda bouwen en meteen bijwerken.
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var reg = LegendStore.Load(db, tr);
                 var def = IsoDef(reg, LoadGlobalDefaults());
                 reg.Add(def);
                 BuildManagedLegend(db, tr, reg, def, out _, out _);
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
                 LegendStore.Save(db, tr, reg);
                 tr.Commit();
             }
             PurgePending(db);
+            // Export.
             string tmp = Path.Combine(Path.GetTempPath(), "nlcs_sysvar_" + Guid.NewGuid().ToString("N") + ".csv");
             try
             {
@@ -2585,13 +2631,22 @@ public partial class Commands
                 tr.Commit();
             }
             finally { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { } }
+            // Analyse met een eigen laag en met blanco regels.
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var s = LoadGlobalDefaults();
+                s.CustomLayerRules.Add(new CustomLayerRule { Layer = "Sysvar kabel", Element = "Sysvar", Type = NlcsDrawType.Geometrie, Description = "Sysvar" });
+                s.BlankEntries.Add(new BlankEntry());
+                DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db));
+                tr.Commit();
+            }
 
             int afwijkingen = 0;
             foreach (var n in names)
             {
-                string na;
-                try { na = AcApp.GetSystemVariable(n)?.ToString() ?? "<null>"; } catch { continue; }
-                if (before.TryGetValue(n, out var nb) && !string.Equals(nb, na, StringComparison.Ordinal))
+                object? na;
+                try { na = AcApp.GetSystemVariable(n); } catch { continue; }
+                if (before.TryGetValue(n, out var nb) && !Equals(nb, na))
                 {
                     ed.WriteMessage($"\nSYSVAR: {n} {nb} -> {na} (GEWIJZIGD)");
                     afwijkingen++;
@@ -3425,9 +3480,9 @@ public partial class Commands
         }
     }
 
-    // Consumer-audit op de echte host: elke zichtbare schakelaar moet de getekende geometrie
+    // Controle op de echte host: elke zichtbare schakelaar moet de getekende geometrie
     // veranderen. Bouwt telkens een verse legenda en vergelijkt het aantal entiteiten met de
-    // schakelaar aan en uit, zodat bewezen is dat de renderer de instelling echt verbruikt.
+    // schakelaar aan en uit, zodat zichtbaar is dat de renderer de instelling echt gebruikt.
     [CommandMethod("NLCSLEGENDACONSUMERTEST", CommandFlags.Modal)]
     public void NlcsLegendaConsumerTest()
     {
@@ -3731,7 +3786,7 @@ public partial class Commands
             }
 
             // Variant 6: verplaatste legenda. Na een handmatige verschuiving moet de viewport de
-            // nieuwe positie volgen (extents worden live gemeten), niet terugspringen (sectie 30).
+            // nieuwe positie volgen (extents worden live gemeten), niet terugspringen.
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var reg = LegendStore.Load(db, tr);
@@ -3797,10 +3852,10 @@ public partial class Commands
         }
     }
 
-    // Meet de maatvoering van een bestaande referentielegenda (swatch, rijafstand, teksthoogtes) en
-    // schrijft een machineleesbaar contract. Model is in meters (INSUNITS=6); op schaal 1:S is
-    // 1 modelmeter = 1000/S mm papier. De schaal komt uit NLCS_MEET_SCALE (default 200), het
-    // doelbestand uit NLCS_CONTRACT_OUT. VLA/ActiveX werkt niet in accoreconsole, daarom .NET-API.
+    // Meet de maatvoering van een bestaande legenda (swatch, rijafstand, teksthoogtes) en schrijft
+    // het resultaat als JSON weg. Model is in meters (INSUNITS=6); op schaal 1:S is 1 modelmeter =
+    // 1000/S mm papier. De schaal komt uit NLCS_MEET_SCALE (default 200), het doelbestand uit
+    // NLCS_METING_OUT. VLA/ActiveX werkt niet in accoreconsole, daarom de .NET-API.
     [CommandMethod("NLCSLEGENDATEMPLATEMETEN", CommandFlags.Modal)]
     public void NlcsLegendaTemplateMeten()
     {
@@ -3930,10 +3985,10 @@ public partial class Commands
             json.Append($"  \"teksthoogtesMm\": [{string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}],\n");
             json.Append($"  \"symbool\": {{ \"insertSchaal\": {symScale:0.###}, \"paperBreedteMm\": {symPaperW:0.0}, \"paperHoogteMm\": {symPaperH:0.0}, \"aantal\": {symCount} }}\n");
             json.Append("}\n");
-            string outPath = Environment.GetEnvironmentVariable("NLCS_CONTRACT_OUT")
-                ?? Path.Combine(Path.GetTempPath(), "nlcs-template-contract.json");
+            string outPath = Environment.GetEnvironmentVariable("NLCS_METING_OUT")
+                ?? Path.Combine(Path.GetTempPath(), "nlcs-template-meting.json");
             File.WriteAllText(outPath, json.ToString());
-            ed.WriteMessage($"\nMETEN: contract geschreven naar {outPath}");
+            ed.WriteMessage($"\nMETEN: meting geschreven naar {outPath}");
         }
         catch (Exception ex)
         {

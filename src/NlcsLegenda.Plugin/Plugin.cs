@@ -10,12 +10,10 @@ public sealed class Plugin : IExtensionApplication
 {
     public void Initialize()
     {
-        var doc = AcApp.DocumentManager.MdiActiveDocument;
-        doc?.Editor.WriteMessage(
-            "\nNLCS Legenda geladen. Gebruik het commando NLCSLEGENDA.\n");
+        var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
+        ed?.WriteMessage("\nNLCS Legenda geladen. Gebruik het commando NLCSLEGENDA.\n");
 
-        // Headless (accoreconsole) is er geen ribbon; de Idle-route en ribbon-API's zijn dan
-        // onnodig en vergroten alleen het risico.
+        // In headless AutoCAD (accoreconsole) is er geen ribbon.
         if (HostEnvironment.IsCoreConsole)
             return;
 
@@ -23,9 +21,11 @@ public sealed class Plugin : IExtensionApplication
         {
             RibbonBuilder.Initialize();
         }
-        catch
+        catch (System.Exception ex)
         {
-            // Zonder ribbon werkt de plugin gewoon via de commando's.
+            // Een ribbonfout mag de plugin niet blokkeren: de commando's blijven werken. Niet stil
+            // inslikken, maar op de opdrachtregel melden zodat de oorzaak traceerbaar is.
+            ed?.WriteMessage($"\nNLCS Legenda: de werkbalk kon niet worden opgebouwd ({ex.Message}). De commando's werken wel.\n");
         }
     }
 

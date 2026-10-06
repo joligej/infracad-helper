@@ -1,7 +1,7 @@
 # NLCS-laagnaamconventie (InfraCAD)
 
 Deze plugin herkent NLCS-lagen die door InfraCAD zijn aangemaakt aan hun
-laagnaamopbouw. De conventie die uit de voorbeeldtekeningen is afgeleid:
+laagnaamopbouw:
 
 ```
 F - DD - HH - ELEMENT[_SUB...] - TYPE [-SCHAAL]
@@ -31,7 +31,7 @@ F - DD - HH - ELEMENT[_SUB...] - TYPE [-SCHAAL]
 Een laag geldt als NLCS-laag wanneer, na het strippen van een eventueel
 xref-voorvoegsel (`xref|...`), de naam met `-` gesplitst ten minste 5 delen
 heeft en geldt: `len(F)==1 && len(DD)==2 && len(HH)==2`. Dit onderscheidt
-NLCS-lagen betrouwbaar van bijv. `SIT-BS-INMETING-2D` of `SIT-NW-ONTWERP`.
+NLCS-lagen betrouwbaar van gewone laagnamen als `INMETING-2D` of `KADER`.
 
 ## Legenda-groepering
 

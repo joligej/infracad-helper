@@ -185,8 +185,11 @@ public static class LegendLayoutEngine
                 y -= headerBand;
             }
 
-            bool hoofdChanged = !string.Equals(curHoofd, entry.Hoofdgroep, StringComparison.OrdinalIgnoreCase);
-            bool needSubHeader = s.IncludeHoofdgroepHeaders && (hoofdChanged || columnBroke);
+            // Blanco regels zijn hoofdgroep-neutraal: ze krijgen nooit een hoofdgroep-subkop en
+            // claimen ook geen hoofdgroep, zodat een volgende echte regel zijn eigen kop wel krijgt.
+            bool hoofdChanged = !entry.IsBlank
+                && !string.Equals(curHoofd, entry.Hoofdgroep, StringComparison.OrdinalIgnoreCase);
+            bool needSubHeader = s.IncludeHoofdgroepHeaders && !entry.IsBlank && (hoofdChanged || columnBroke);
             if (hoofdChanged)
                 curHoofd = entry.Hoofdgroep;
             if (needSubHeader && curHoofd is not null)

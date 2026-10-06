@@ -3,9 +3,8 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Pint de template-defaults op de gemeten/formele referentiewaarden. De teksthoogtes zijn
-// gemeten op de referentielegenda SIT-NW-LEGENDA.dwg (schaal 1:200): omschrijving 0,5 m =
-// 2,5 mm, kopregel 1,0 m = 5 mm. Zo kan output niet stilletjes van de referentie afdrijven.
+// Pint de template-defaults op de NLCS-ISO-waarden: op 1:200 is de omschrijving 0,5 m = 2,5 mm
+// en de kopregel 1,0 m = 5 mm. Zo kan de opmaak niet stilletjes afdrijven.
 public class TemplateDefaultsTests
 {
     [Fact]
@@ -56,9 +55,8 @@ public class TemplateDefaultsTests
         Assert.Equal(1.0, s.ToModel(s.HeaderTextHeightMm), 3);
     }
 
-    // Gemeten tekststijlen in SIT-NW-LEGENDA.dwg (INSUNITS=6 = meters, font NLCS-ISO.ttf, wf 1,0):
-    // NLCS-ISO-M200-T25 fixedH 0,500; -M200-T50 fixedH 1,000; -M1000-T25 fixedH 2,500;
-    // -M1000-T50 fixedH 5,000. De T25/T50-codes zijn dus 2,5 en 5 mm.
+    // NLCS-ISO tekststijlen (font NLCS-ISO.ttf, breedtefactor 1,0): de T25/T50-codes geven op
+    // 1:200 teksthoogtes van 2,5 en 5 mm.
     [Theory]
     [InlineData(200, 0.5, 1.0)]
     [InlineData(1000, 2.5, 5.0)]

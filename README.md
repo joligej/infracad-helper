@@ -79,7 +79,7 @@ leest de echte geometrie van die laag. Je kiest ook de bron: alleen de hoofdteke
 (lokaal), elke meegenomen bron, of één specifieke xref. Zit dezelfde laagnaam zowel in de
 host als in een xref, dan houdt de bron ze uit elkaar. Het verschil met NLCS zit alleen in
 de herkenning: een NLCS-laag wordt automatisch uit de laagnaam geclassificeerd, een eigen
-laag expliciet via jouw regel; daarna doorlopen beide exact dezelfde legendapipeline
+laag expliciet via jouw regel; daarna doorlopen beide exact dezelfde verwerking
 (groeperen, hoeveelheden, zichtbaarheid, filters, rendering). Anders dan een handmatige
 regel (die vast is) verschijnt een eigen laag alleen als er objecten op staan, en de
 hoeveelheden komen uit de tekening. Je koppelt alleen de lagen die je zelf aanwijst;

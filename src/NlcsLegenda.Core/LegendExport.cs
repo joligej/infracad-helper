@@ -48,9 +48,9 @@ public static class LegendExport
         return new[]
         {
             Csv(e.Status.DisplayName()),
-            Csv(e.Discipline),
-            Csv(e.Hoofdgroep),
-            Csv(e.Element),
+            Csv(ExportDiscipline(e)),
+            Csv(ExportHoofdgroep(e)),
+            Csv(ExportElement(e)),
             Csv(e.Description),
             Csv(SourceLabel(e.DescriptionSource)),
             Csv(types),
@@ -62,6 +62,12 @@ public static class LegendExport
         };
     }
 
+    // Blanco regels hebben geen bron, dus geen zinvolle discipline/hoofdgroep/element: in de
+    // export tonen we die neutraal (leeg) in plaats van de interne code (XX/HM/BLANCO_...).
+    private static string ExportDiscipline(LegendEntry e) => e.IsBlank ? string.Empty : e.Discipline;
+    private static string ExportHoofdgroep(LegendEntry e) => e.IsBlank ? string.Empty : e.Hoofdgroep;
+    private static string ExportElement(LegendEntry e) => e.IsBlank ? string.Empty : e.Element;
+
     public static string ToJson(IEnumerable<LegendEntry> entries, int decimals = 0,
         string unitArea = "m\u00B2", string unitLength = "m", string unitCount = "st")
     {
@@ -71,9 +77,9 @@ public static class LegendExport
         var rows = entries.Select(e => new
         {
             status = e.Status.DisplayName(),
-            discipline = e.Discipline,
-            hoofdgroep = e.Hoofdgroep,
-            element = e.Element,
+            discipline = ExportDiscipline(e),
+            hoofdgroep = ExportHoofdgroep(e),
+            element = ExportElement(e),
             omschrijving = e.Description,
             herkomst = SourceLabel(e.DescriptionSource),
             types = e.LayersByType.Keys.Select(k => k.ToString()).ToArray(),
@@ -98,9 +104,9 @@ public static class LegendExport
         {
             tekening = d.Drawing,
             status = e.Status.DisplayName(),
-            discipline = e.Discipline,
-            hoofdgroep = e.Hoofdgroep,
-            element = e.Element,
+            discipline = ExportDiscipline(e),
+            hoofdgroep = ExportHoofdgroep(e),
+            element = ExportElement(e),
             omschrijving = e.Description,
             herkomst = SourceLabel(e.DescriptionSource),
             types = e.LayersByType.Keys.Select(k => k.ToString()).ToArray(),

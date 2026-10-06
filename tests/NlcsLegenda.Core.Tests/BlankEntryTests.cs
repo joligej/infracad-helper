@@ -113,4 +113,39 @@ public class BlankEntryTests
         Assert.Contains("blanco", csv);
         Assert.Contains("[blanco]", csv);
     }
+
+    [Fact]
+    public void Export_BlankHasNeutralDisciplineHoofdgroepElement()
+    {
+        var entry = new BlankEntry().ToLegendEntry();
+        var csv = LegendExport.ToCsv(new[] { entry });
+        var row = csv.Split('\n').First(l => l.Contains("[blanco]"));
+        // Status;Discipline;Hoofdgroep;Element;Omschrijving;Herkomst;...
+        var cols = row.Split(';');
+        Assert.Equal(string.Empty, cols[1]); // Discipline
+        Assert.Equal(string.Empty, cols[2]); // Hoofdgroep
+        Assert.Equal(string.Empty, cols[3]); // Element
+        Assert.DoesNotContain("BLANCO_", csv);
+    }
+
+    [Fact]
+    public void Blank_DoesNotProduceHoofdgroepSubHeader_WhenHeadersEnabled()
+    {
+        var settings = new LegendSettings { IncludeHoofdgroepHeaders = true };
+        settings.BlankEntries.Add(new BlankEntry());
+        settings.BlankEntries.Add(new BlankEntry());
+        var entries = LegendGrouping.Build(System.Array.Empty<NlcsLayerName>(), settings);
+        var layout = LegendLayoutEngine.Compute(entries, settings);
+        Assert.DoesNotContain(layout.Items, i => i.Kind == LegendItemKind.SubHeader);
+    }
+
+    [Fact]
+    public void Blank_DoesNotChangeTotals()
+    {
+        var entry = new BlankEntry().ToLegendEntry();
+        Assert.Equal(0, entry.Metric.Count);
+        Assert.Equal(0.0, entry.Metric.Length);
+        Assert.Equal(0.0, entry.Metric.Area);
+        Assert.Equal(QuantityKind.None, entry.QuantityType);
+    }
 }

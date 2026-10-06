@@ -18,8 +18,4 @@
     <ProjectReference Include="..\..\src\NlcsLegenda.Core\NlcsLegenda.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="reference\template-contract.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
 </Project>

@@ -16,7 +16,7 @@ controle onmogelijk maken.
 | `NLCSLEGENDAKLICATTRTEST` | Diagnose van het KLIC-attribuut OMSCHRIJVING per symboollaag. |
 | `NLCSLEGENDALAAGNAAMTEST` | Parset en hernoemt NLCS-laagnamen component voor component. |
 | `NLCSLEGENDAPERFTEST` | Meet de analysetijd op een grote KLIC-tekening. |
-| `NLCSLEGENDATEMPLATEMETEN` | Meet de legendageometrie tegen de referentietemplate. |
+| `NLCSLEGENDATEMPLATEMETEN` | Meet de maatvoering (swatch, rijafstand, teksthoogtes) van een bestaande legenda. |
 | `NLCSLEGENDAUNDOSETUP` / `NLCSLEGENDAUNDORENAME` | Zetten een laaghernoem-/undo-regressie klaar en voeren die uit. |
 | `NLCSLEGENDAABCSETUP` / `NLCSLEGENDAABCVERIFY` | Bouwen drie legenda's met verschillende bronnen (twee selecties + hele tekening) en config; na QSAVE/heropenen controleren ze bronnen, instellingen, global-isolatie, inhoudelijke vingerafdrukken, export- en viewport-isolatie en update-isolatie. |
 | `NLCSLEGENDAABCXREFSETUP` / `NLCSLEGENDAABCXREFVERIFY` | Koppelen twee synthetische xrefs en controleren na heropenen dat A alleen xref A meeneemt, B alleen xref B en C allebei. |
