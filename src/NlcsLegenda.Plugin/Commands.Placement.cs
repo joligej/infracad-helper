@@ -77,4 +77,33 @@ public partial class Commands
             // Tijdelijk blok kon niet worden verwijderd; niet kritiek.
         }
     }
+
+    // Verwijdert ongebruikte legenda-blokdefinities (NLCS_LEGENDA_*). Bij een update wordt de oude
+    // blokreferentie gewist; de bijbehorende blokdefinitie (met de oude tekst) blijft anders als
+    // verweesde definitie achter. Alleen definities zonder referenties worden gewist.
+    private static void PurgeOrphanLegendBlocks(Database db)
+    {
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+            var orphans = new List<ObjectId>();
+            foreach (ObjectId id in bt)
+            {
+                if (tr.GetObject(id, OpenMode.ForRead) is not BlockTableRecord btr || btr.IsErased)
+                    continue;
+                if (btr.Name.StartsWith("NLCS_LEGENDA_", StringComparison.OrdinalIgnoreCase)
+                    && btr.GetBlockReferenceIds(true, false).Count == 0)
+                    orphans.Add(id);
+            }
+            foreach (var id in orphans)
+                if (tr.GetObject(id, OpenMode.ForWrite) is BlockTableRecord btr && !btr.IsErased)
+                    btr.Erase();
+            tr.Commit();
+        }
+        catch
+        {
+            // Opruimen van verweesde definities is niet kritiek.
+        }
+    }
 }

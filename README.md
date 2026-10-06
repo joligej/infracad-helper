@@ -30,9 +30,12 @@ legenda, dupliceer je een legenda, wijzig je de bronselectie of zet je de opmaak
 legenda als globale standaard voor nieuwe legenda's.
 
 Is het ontwerp veranderd, dan tekent `NLCSLEGENDAUPDATE` de legenda opnieuw op precies
-dezelfde plek. Is er één legenda, dan gaat dat direct; bij meerdere klik je de gewenste
-legenda aan (of kies je uit een lijst). Een selectielegenda wordt daarbij opnieuw van
-diezelfde selectie opgebouwd, niet van de hele tekening. `NLCSLEGENDAVIEWPORT` maakt in
+dezelfde plek. Omdat een beheerde legenda bij bijwerken volledig opnieuw wordt opgebouwd,
+verdwijnen rechtstreekse wijzigingen die je met de hand in de legenda hebt gemaakt; pas de
+tekst daarom aan via de instellingen of `NLCSLEGENDATEKST`. Is er één legenda, dan gaat dat
+direct; bij meerdere klik je de gewenste legenda aan (of kies je uit een lijst). Een
+selectielegenda wordt daarbij opnieuw van diezelfde selectie opgebouwd, niet van de hele
+tekening. `NLCSLEGENDAVIEWPORT` maakt in
 de paper space een viewport rond de gekozen legenda op de ingestelde schaal.
 
 De globale instellingen zijn het startpunt voor een **nieuwe** legenda. Zet je later de
@@ -55,7 +58,9 @@ je een object aanwijzen en meldt of en waarom het wel of niet in de gekozen lege
 (status, discipline, hoofdgroep, elementsoort, xref, zichtbaarheid of uitgevinkt).
 
 De teksten volgen de NLCS-template: tekststijl `NLCS-ISO` met vaste hoogtes (2,5 mm voor
-regels, 5 mm voor koppen, 7 mm voor de titel) op de tekstlagen `-T25` en `-T50`.
+regels, 5 mm voor koppen, 7 mm voor de titel) op de tekstlagen `-T25` en `-T50`. Alle tekst
+in de legenda bestaat uit gewone MText-objecten, zodat je die in AutoCAD net als andere tekst
+kunt selecteren en bewerken.
 
 Onder de legenda komen standaard een meeschalende schaalbalk en een opmerkingenblok.
 Allebei kun je uitzetten of aanpassen.

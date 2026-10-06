@@ -521,58 +521,50 @@ public static class LegendBuilder
         return pl;
     }
 
+    // Alle door de plugin getekende legendatekst is MText. DBText-baseline en MText-attachment
+    // hebben andere semantiek; daarom ankeren we op het verticale midden van de regel
+    // (baseline + hoogte/2) met een Middle*-attachment, zodat de tekst op dezelfde plek staat.
+    private static MText AddMText(
+        BlockTableRecord btr, Transaction tr, string text, Point3d anchor,
+        AttachmentPoint attach, double height, string layer, ObjectId styleId)
+    {
+        var mt = new MText();
+        mt.SetDatabaseDefaults();
+        mt.Layer = layer;
+        if (!styleId.IsNull)
+            mt.TextStyleId = styleId;
+        mt.TextHeight = height;
+        mt.Attachment = attach;
+        mt.Width = 0.0; // geen vaste breedte: één regel, geen afbreken
+        mt.Location = anchor;
+        mt.Contents = MTextFormat.Escape(text);
+        btr.AppendEntity(mt);
+        tr.AddNewlyCreatedDBObject(mt, true);
+        return mt;
+    }
+
     private static void AddText(
         BlockTableRecord btr, Transaction tr, string text, Point3d pos,
         double height, string layer, ObjectId styleId)
     {
-        var t = new DBText();
-        t.SetDatabaseDefaults();
-        t.TextString = text;
-        t.Height = height;
-        t.Position = pos;
-        t.Layer = layer;
-        if (!styleId.IsNull)
-            t.TextStyleId = styleId;
-        btr.AppendEntity(t);
-        tr.AddNewlyCreatedDBObject(t, true);
+        AddMText(btr, tr, text, new Point3d(pos.X, pos.Y + height / 2.0, pos.Z),
+            AttachmentPoint.MiddleLeft, height, layer, styleId);
     }
 
     private static void AddTextRight(
         BlockTableRecord btr, Transaction tr, string text, Point3d alignPoint,
         double height, string layer, ObjectId styleId)
     {
-        var t = new DBText();
-        t.SetDatabaseDefaults();
-        t.TextString = text;
-        t.Height = height;
-        t.Layer = layer;
-        if (!styleId.IsNull)
-            t.TextStyleId = styleId;
-        t.HorizontalMode = TextHorizontalMode.TextRight;
-        t.VerticalMode = TextVerticalMode.TextBase;
-        t.Position = alignPoint;
-        t.AlignmentPoint = alignPoint;
-        btr.AppendEntity(t);
-        tr.AddNewlyCreatedDBObject(t, true);
+        AddMText(btr, tr, text, new Point3d(alignPoint.X, alignPoint.Y + height / 2.0, alignPoint.Z),
+            AttachmentPoint.MiddleRight, height, layer, styleId);
     }
 
     private static void AddTextCentered(
         BlockTableRecord btr, Transaction tr, string text, Point3d alignPoint,
         double height, string layer, ObjectId styleId)
     {
-        var t = new DBText();
-        t.SetDatabaseDefaults();
-        t.TextString = text;
-        t.Height = height;
-        t.Layer = layer;
-        if (!styleId.IsNull)
-            t.TextStyleId = styleId;
-        t.HorizontalMode = TextHorizontalMode.TextCenter;
-        t.VerticalMode = TextVerticalMode.TextBase;
-        t.Position = alignPoint;
-        t.AlignmentPoint = alignPoint;
-        btr.AppendEntity(t);
-        tr.AddNewlyCreatedDBObject(t, true);
+        AddMText(btr, tr, text, new Point3d(alignPoint.X, alignPoint.Y + height / 2.0, alignPoint.Z),
+            AttachmentPoint.MiddleCenter, height, layer, styleId);
     }
 
     private static void AddSolidFill(
