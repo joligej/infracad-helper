@@ -2920,6 +2920,250 @@ public partial class Commands
         }
     }
 
+    // Eigen arcering en symbool end-to-end: maakt een echte Hatch op een eigen laag en een echt
+    // blok op een eigen laag, koppelt ze als Arcering/Symbool en controleert dat de gebouwde
+    // legenda daadwerkelijk een Hatch-entiteit en een symboolinvoeging bevat (geen nep/fallback).
+    [CommandMethod("NLCSLEGENDAEIGENHATCHTEST", CommandFlags.Modal)]
+    public void NlcsLegendaEigenHatchTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                ObjectId L(string n) { if (lt.Has(n)) return lt[n]; var r = new LayerTableRecord { Name = n }; var id = lt.Add(r); tr.AddNewlyCreatedDBObject(r, true); return id; }
+                var arc = L("Eigen arcering");
+                var kast = L("Eigen kast");
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+
+                // Echte arcering op een gesloten rechthoek.
+                var bnd = new Polyline();
+                bnd.AddVertexAt(0, new Point2d(0, 0), 0, 0, 0);
+                bnd.AddVertexAt(1, new Point2d(5, 0), 0, 0, 0);
+                bnd.AddVertexAt(2, new Point2d(5, 5), 0, 0, 0);
+                bnd.AddVertexAt(3, new Point2d(0, 5), 0, 0, 0);
+                bnd.Closed = true; bnd.LayerId = arc;
+                var bndId = ms.AppendEntity(bnd); tr.AddNewlyCreatedDBObject(bnd, true);
+                var hatch = new Hatch { LayerId = arc };
+                var hId = ms.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
+                hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31");
+                hatch.Associative = false;
+                hatch.AppendLoop(HatchLoopTypes.Default, new ObjectIdCollection { bndId });
+                hatch.EvaluateHatch(true);
+
+                // Echt blok KAST en een invoeging op de eigen laag.
+                var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
+                ObjectId kb;
+                if (bt.Has("KAST")) kb = bt["KAST"];
+                else
+                {
+                    var bd = new BlockTableRecord { Name = "KAST" };
+                    kb = bt.Add(bd); tr.AddNewlyCreatedDBObject(bd, true);
+                    var sq = new Polyline();
+                    sq.AddVertexAt(0, new Point2d(-0.5, -0.5), 0, 0, 0);
+                    sq.AddVertexAt(1, new Point2d(0.5, -0.5), 0, 0, 0);
+                    sq.AddVertexAt(2, new Point2d(0.5, 0.5), 0, 0, 0);
+                    sq.AddVertexAt(3, new Point2d(-0.5, 0.5), 0, 0, 0);
+                    sq.Closed = true;
+                    bd.AppendEntity(sq); tr.AddNewlyCreatedDBObject(sq, true);
+                }
+                var brf = new BlockReference(new Point3d(10, 0, 0), kb) { LayerId = kast };
+                ms.AppendEntity(brf); tr.AddNewlyCreatedDBObject(brf, true);
+                tr.Commit();
+            }
+
+            var settings = LoadGlobalDefaults();
+            settings.InsertSymbolBlocks = true;
+            settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen arcering", Element = "Eigen arcering", Type = NlcsDrawType.Arcering, Description = "Eigen arcering" });
+            settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen kast", Element = "Eigen kast", Type = NlcsDrawType.Symbool, Description = "Eigen kast", BlockName = "KAST" });
+
+            int hatchCount = 0, blockCount = 0; string sampleName = "";
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, settings);
+                reg.Add(def);
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
+                LegendStore.Save(db, tr, reg);
+                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db));
+                var arcEntry = analysis.Entries.FirstOrDefault(e => e.Element == "Eigen arcering");
+                sampleName = analysis.HatchSamples.TryGetValue(arcEntry?.HatchLayer ?? "", out var hs) ? hs.PatternName : "";
+                var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+                var g = (Group)tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead);
+                void CountIn(ObjectId btrId)
+                {
+                    if (tr.GetObject(btrId, OpenMode.ForRead) is not BlockTableRecord rec) return;
+                    foreach (ObjectId eid in rec)
+                    {
+                        var e = tr.GetObject(eid, OpenMode.ForRead);
+                        if (e is Hatch) hatchCount++;
+                        else if (e is BlockReference nbr && !nbr.BlockTableRecord.IsNull) { blockCount++; CountIn(nbr.BlockTableRecord); }
+                    }
+                }
+                foreach (var id in g.GetAllEntityIds())
+                {
+                    var e = tr.GetObject(id, OpenMode.ForRead);
+                    if (e is Hatch) hatchCount++;
+                    else if (e is BlockReference br && !br.BlockTableRecord.IsNull) { blockCount++; CountIn(br.BlockTableRecord); }
+                }
+                tr.Commit();
+            }
+            PurgePending(db);
+            bool ok = hatchCount >= 1 && blockCount >= 1 && sampleName == "ANSI31";
+            ed.WriteMessage($"\nEIGENHATCH: gerenderde hatches={hatchCount} (verw >=1) symbolen={blockCount} (verw >=1) patroon={sampleName} (verw ANSI31) -> {(ok ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nEIGENHATCH error: {ex.Message}");
+        }
+    }
+
+    // Eigen bronlagen in de batchpijplijn: twee tijdelijke DWG's (A met een eigen laag + bekende
+    // lengte, B zonder), draait de echte batch en controleert dat alleen A een eigen regel geeft
+    // en dat de bron-DWG's niet wijzigen (hash voor/na gelijk).
+    [CommandMethod("NLCSLEGENDAEIGENBATCHTEST", CommandFlags.Modal)]
+    public void NlcsLegendaEigenBatchTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        string dir = Path.Combine(Path.GetTempPath(), "nlcs_eigenbatch_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            string a = Path.Combine(dir, "a_met.dwg");
+            string b = Path.Combine(dir, "b_zonder.dwg");
+            CreateXrefLineDwg(a, "Eigen batchkabel", 8.0);
+            CreateXrefLineDwg(b, "Iets anders", 3.0);
+            string ha1 = Sha256(a), hb1 = Sha256(b);
+
+            var settings = LoadGlobalDefaults();
+            settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen batchkabel", Element = "Batchkabel", Type = NlcsDrawType.Geometrie, Description = "Batchkabel", QuantityMode = CustomQuantityMode.Lengte });
+
+            var results = BatchExport.AnalyzeFolder(dir, settings, LoadCatalog(doc.Database));
+            var ra = results.FirstOrDefault(r => r.Drawing == "a_met.dwg");
+            var rb = results.FirstOrDefault(r => r.Drawing == "b_zonder.dwg");
+            var aEntry = ra?.Entries.FirstOrDefault(e => e.Element == "Batchkabel");
+            bool aOk = aEntry is not null && Math.Abs(aEntry.Metric.Length - 8) < 0.1;
+            bool bOk = rb is not null && !rb.Entries.Any(e => e.Element == "Batchkabel");
+            bool hashOk = Sha256(a) == ha1 && Sha256(b) == hb1;
+            ed.WriteMessage($"\nEIGENBATCH: A batchkabel={aEntry?.Metric.Length:0.0}m (verw 8) B geen eigen regel={bOk} bron-hashes ongewijzigd={hashOk} -> {(aOk && bOk && hashOk ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nEIGENBATCH error: {ex.Message}");
+        }
+        finally
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    private static string Sha256(string path)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        using var fs = File.OpenRead(path);
+        return Convert.ToHexString(sha.ComputeHash(fs));
+    }
+
+    // Stabiliteit van een eigen-bronlegenda onder herhaald bijwerken: bouwt een legenda met een
+    // eigen laag en werkt 10 en daarna 50 keer bij. Rijtal en hoeveelheid moeten stabiel blijven
+    // en de modelspace mag niet dichtslibben (geen self-feeding, geen oplopend aantal blokken).
+    [CommandMethod("NLCSLEGENDAEIGENUPDATETEST", CommandFlags.Modal)]
+    public void NlcsLegendaEigenUpdateTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null)
+            return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                ObjectId id = lt.Has("Eigen upd") ? lt["Eigen upd"] : AddLayer(lt, tr, "Eigen upd");
+                ObjectId nid = lt.Has("N-WE-VH-UPDTEST-G") ? lt["N-WE-VH-UPDTEST-G"] : AddLayer(lt, tr, "N-WE-VH-UPDTEST-G");
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                var line = new Line(new Point3d(0, 0, 0), new Point3d(9, 0, 0)) { LayerId = id };
+                ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
+                var nline = new Line(new Point3d(0, 20, 0), new Point3d(7, 20, 0)) { LayerId = nid };
+                ms.AppendEntity(nline); tr.AddNewlyCreatedDBObject(nline, true);
+                tr.Commit();
+            }
+            var settings = LoadGlobalDefaults();
+            settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen upd", Element = "Updkabel", Type = NlcsDrawType.Geometrie, Description = "Updkabel", QuantityMode = CustomQuantityMode.Lengte });
+
+            string groupName;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, settings);
+                reg.Add(def);
+                BuildManagedLegend(db, tr, reg, def, out _, out _);
+                LegendStore.Save(db, tr, reg);
+                groupName = def.GroupName;
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            (int rows, double len, int refs, double nlen) Snapshot()
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                var reg = LegendStore.Load(db, tr);
+                var def = reg.Legends.First(l => l.GroupName == groupName);
+                var managed = LegendManagement.CollectManagedIds(db, tr, reg);
+                var analysis = DrawingAnalyzer.Analyze(db, tr, def.Settings, catalog: LoadCatalog(db),
+                    excludedIds: managed);
+                var e = analysis.Entries.FirstOrDefault(x => x.Element == "Updkabel");
+                var ne = analysis.Entries.FirstOrDefault(x => x.Element == "UPDTEST");
+                // Verweesde (niet-beheerde) legenda-blokken tellen = zelfvoedingslek. Hoort 1 te blijven.
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+                int unmanagedRefs = 0;
+                foreach (ObjectId id in ms)
+                    if (tr.GetObject(id, OpenMode.ForRead) is BlockReference && !managed.Contains(id))
+                        unmanagedRefs++;
+                tr.Commit();
+                return (analysis.Entries.Count, e?.Metric.Length ?? -1, unmanagedRefs, ne?.Metric.Length ?? -1);
+            }
+
+            void UpdateN(int n)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    using var tr = db.TransactionManager.StartTransaction();
+                    var reg = LegendStore.Load(db, tr);
+                    var def = reg.Legends.First(l => l.GroupName == groupName);
+                    BuildManagedLegend(db, tr, reg, def, out _, out _);
+                    LegendStore.Save(db, tr, reg);
+                    tr.Commit();
+                    PurgePending(db);
+                }
+            }
+
+            var s0 = Snapshot();
+            UpdateN(10);
+            var s10 = Snapshot();
+            UpdateN(50);
+            var s50 = Snapshot();
+            bool ok = s0.rows == s10.rows && s10.rows == s50.rows
+                && Math.Abs(s0.len - 9) < 0.1 && Math.Abs(s50.len - 9) < 0.1
+                && Math.Abs(s50.nlen - 7) < 0.1
+                && s0.refs == s50.refs;
+            ed.WriteMessage($"\nEIGENUPD: rijen {s0.rows}/{s10.rows}/{s50.rows} eigen-lengte {s0.len:0.0}/{s10.len:0.0}/{s50.len:0.0} (verw 9) nlcs-lengte {s0.nlen:0.0}/{s10.nlen:0.0}/{s50.nlen:0.0} (verw 7) verweesde-blokken {s0.refs}/{s10.refs}/{s50.refs} (verw 0) -> {(ok ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex)
+        {
+            ed.WriteMessage($"\nEIGENUPD error: {ex.Message}");
+        }
+    }
+
     // Zichtbaarheid moet voor eigen bronlagen exact zo werken als voor NLCS-lagen: een bevroren
     // laag telt niet mee tenzij "onzichtbare lagen meenemen" aan staat. Maakt een eigen en een
     // NLCS-laag, bevriest beide, en controleert dat ze in beide standen gelijk reageren.

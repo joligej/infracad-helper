@@ -67,8 +67,11 @@ internal static class LegendManagement
     }
 
     // Wist de geometrie van een groep en geeft de huidige linksbovenhoek terug, zodat een
-    // update op dezelfde plek komt. Geeft false als er geen bruikbare geometrie was.
-    public static bool TryEraseGroup(Database db, Transaction tr, string groupName, out Point3d topLeft)
+    // update op dezelfde plek komt. Geeft false als er geen bruikbare geometrie was. Bij
+    // keepGroup blijft de groep zelf bestaan (voor een update die er meteen nieuwe geometrie in
+    // hangt); zo blijft de legenda betrouwbaar als beheerde groep herkend en raakt een oude
+    // blokreferentie niet verweesd buiten de groep (anders telt een volgende update die mee).
+    public static bool TryEraseGroup(Database db, Transaction tr, string groupName, out Point3d topLeft, bool keepGroup = false)
     {
         topLeft = Point3d.Origin;
         var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
@@ -92,7 +95,16 @@ internal static class LegendManagement
             }
             ent.Erase();
         }
-        group.Erase();
+        if (keepGroup)
+        {
+            // De groep zelf behouden; geëraste leden vallen vanzelf uit GetAllEntityIds, dus de
+            // groep bevat na de rebuild alleen de nieuwe geometrie. Niet erasen voorkomt dat de
+            // oude blokreferentie als verweesde (niet-beheerde) bron blijft staan.
+        }
+        else
+        {
+            group.Erase();
+        }
         if (any)
             topLeft = new Point3d(minX, maxY, 0);
         return any;
