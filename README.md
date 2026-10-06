@@ -20,6 +20,8 @@ legenda van alleen die selectie. Alles komt in de model space op de eigen NLCS-l
 kleur en lijntype kloppen meteen. Wie liever klikt dan typt vindt
 in het lint een tab **NLCS Legenda** met dezelfde functies.
 
+### Meerdere legenda's
+
 Je kunt meerdere legenda's naast elkaar in één tekening hebben, bijvoorbeeld één voor de
 hele tekening en aparte legenda's voor deelgebieden. Elke legenda onthoudt zijn eigen
 bron (hele tekening of selectie) en zijn eigen instellingen. `NLCSLEGENDABEHEER` toont de
@@ -29,6 +31,8 @@ in dezelfde bewerking opnieuw opgebouwd), neem je de instellingen over van een a
 legenda, dupliceer je een legenda, wijzig je de bronselectie of zet je de opmaak van die
 legenda als globale standaard voor nieuwe legenda's.
 
+### Bijwerken en viewport
+
 Is het ontwerp veranderd, dan tekent `NLCSLEGENDAUPDATE` de legenda opnieuw op precies
 dezelfde plek. Omdat een beheerde legenda bij bijwerken volledig opnieuw wordt opgebouwd,
 verdwijnen rechtstreekse wijzigingen die je met de hand in de legenda hebt gemaakt; pas de
@@ -37,6 +41,8 @@ direct; bij meerdere klik je de gewenste legenda aan (of kies je uit een lijst).
 selectielegenda wordt daarbij opnieuw van diezelfde selectie opgebouwd, niet van de hele
 tekening. `NLCSLEGENDAVIEWPORT` maakt in
 de paper space een viewport rond de gekozen legenda op de ingestelde schaal.
+
+### Instellingen
 
 De globale instellingen zijn het startpunt voor een **nieuwe** legenda. Zet je later de
 globale standaard anders, dan verandert een bestaande legenda niet mee: die houdt de
@@ -77,18 +83,18 @@ kiest het type (lijn, vlak, arcering, vlakvulling of symbool), de laag en de
 omschrijving. In `NLCSLEGENDABEHEER` staat dit bij elkaar in één venster. Het uitvinken
 en de eigen regels horen bij de globale standaard of bij één legenda.
 
+### Eigen lagen
+
 Heb je eigen (niet-NLCS) lagen die als echte bron moeten meetellen, dan koppel je die in
-het instellingenvenster onder *Eigen lagen*. Zo'n koppeling werkt als een NLCS-laag: je
-kiest de laag, het type en de hoeveelheid (lengte, aantal of oppervlak), en de legenda
-leest de echte geometrie van die laag. Je kiest ook de bron: alleen de hoofdtekening
-(lokaal), elke meegenomen bron, of één specifieke xref. Zit dezelfde laagnaam zowel in de
-host als in een xref, dan houdt de bron ze uit elkaar. Het verschil met NLCS zit alleen in
-de herkenning: een NLCS-laag wordt automatisch uit de laagnaam geclassificeerd, een eigen
-laag expliciet via jouw regel; daarna doorlopen beide exact dezelfde verwerking
-(groeperen, hoeveelheden, zichtbaarheid, filters, rendering). Anders dan een handmatige
-regel (die vast is) verschijnt een eigen laag alleen als er objecten op staan, en de
-hoeveelheden komen uit de tekening. Je koppelt alleen de lagen die je zelf aanwijst;
-hulp- en annotatielagen blijven buiten beeld.
+het instellingenvenster onder *Eigen lagen*. Je kiest de laag, het type en de hoeveelheid
+(lengte, aantal of oppervlak), en de legenda leest de echte geometrie van die laag. Je kiest
+ook de bron: alleen de hoofdtekening, elke meegenomen bron, of één specifieke xref. Zit
+dezelfde laagnaam in de host én in een xref, dan houdt de bron ze uit elkaar. Eigen lagen
+werken daarna hetzelfde als NLCS-lagen, ook voor hoeveelheden en xrefs. Anders dan een
+handmatige regel verschijnt een eigen laag alleen als er echt objecten op staan. Je koppelt
+alleen de lagen die je zelf aanwijst; hulp- en annotatielagen blijven buiten beeld.
+
+### Blanco regels
 
 Wil je bewust lege ruimte in de legenda reserveren, bijvoorbeeld om er later met de hand
 iets bij te tekenen, gebruik dan *Blanco regels* in het instellingenvenster. Een blanco
@@ -100,6 +106,8 @@ Je kunt ook per elementsoort kiezen wat in de legenda komt: geometrie/lijnen, vl
 arceringen, vlakvullingen en symbolen zijn afzonderlijk aan of uit te zetten. Standaard
 staat alles aan. Je vindt dit in `NLCSLEGENDAOPTIES` onder *Elementsoorten* en in het
 keuzemenu vóór het plaatsen. `NLCSLEGENDAINFO` meldt welke soorten uitstaan.
+
+### KLIC-tekeningen
 
 Voor KLIC-tekeningen (kabels en leidingen) kun je regels samenvoegen op een eigenschap.
 Onder *Groepering* in de instellingen zet je los aan of je samenvoegt op soort, spanning/druk,
@@ -113,6 +121,8 @@ Onder *Groepering* staat ook *Gelijke statussen samenvoegen*. Die voegt dezelfde
 verschillende statussen samen, maar alleen als lijn, vlak, arcering en symbool er precies
 hetzelfde uitzien. Standaard staat dit uit, omdat de status in NLCS meestal juist de kleur
 bepaalt.
+
+### Statussen, xrefs en profielen
 
 Naast de vaste statussen (Nieuw, Bestaand, Vervallen, Tijdelijk, Revisie) maak je met
 `NLCSLEGENDASTATUS` eigen statussen aan. Daar wijs je regels aan toe: automatische
@@ -150,16 +160,14 @@ een opzet met collega's kunt delen.
 | `NLCSLEGENDAXREFS` | Per gekoppelde xref kiezen of die in de legenda wordt meegenomen. |
 | `NLCSLEGENDAPRESET` | Instellingen van de globale standaard of een gekozen legenda als profiel opslaan, laden, en im-/exporteren. |
 | `NLCSLEGENDACONFIG` | De globale configuratiebestanden aanmaken en de paden tonen. |
-| `NLCSLEGENDATEST` | Plaatsen zonder vragen; bedoeld voor scripts en tests. |
 
 ## Headless gebruik (Core Console)
 
 De meeste commando's zijn bedoeld voor AutoCAD/Civil 3D met venster. In de AutoCAD Core
-Console (`accoreconsole.exe`, zonder venster) werken alleen de commando's die geen muis of
-dialoog nodig hebben: `NLCSLEGENDAINFO`, `NLCSLEGENDATEST`, `NLCSLEGENDAEXPORT`,
-`NLCSLEGENDAUPDATE` en `NLCSLEGENDABATCHTEST`. Een venster-commando (zoals `NLCSLEGENDA`,
-`NLCSLEGENDABEHEER` of `NLCSLEGENDAVIEWPORT`) weigert in de Core Console netjes en wijzigt
-niets.
+Console (`accoreconsole.exe`, zonder venster) werken de commando's die geen muis of dialoog
+nodig hebben: `NLCSLEGENDAINFO`, `NLCSLEGENDAEXPORT` en `NLCSLEGENDAUPDATE`. Een
+venster-commando (zoals `NLCSLEGENDA`, `NLCSLEGENDABEHEER` of `NLCSLEGENDAVIEWPORT`) weigert
+in de Core Console netjes en wijzigt niets.
 
 `NLCSLEGENDAUPDATE` en `NLCSLEGENDAEXPORT` kiezen headless automatisch de legenda als er maar
 één is. Zijn er meerdere, kies er dan één via de omgevingsvariabele `NLCSLEGENDA_TARGET`
