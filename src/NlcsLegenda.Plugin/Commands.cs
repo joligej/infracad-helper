@@ -2033,8 +2033,9 @@ public partial class Commands
             }
             PurgePending(db);
 
-            // B's geometrie mag niet veranderen doordat A is bewerkt (geometrie-isolatie).
-            bool geomOk = bGeomBefore.Length > 0 && bGeomBefore == bGeomAfter;
+            // B's geometrie mag niet veranderen doordat A is bewerkt (geometrie-isolatie). Heeft B
+            // geen regels (lege legenda), dan is er geen geometrie; gelijk-leeg = ongewijzigd.
+            bool geomOk = bGeomBefore == bGeomAfter;
             ed.WriteMessage($"\nISO: B-geometrie {(geomOk ? "ongewijzigd" : "GEWIJZIGD")} ({bGeomAfter})");
 
             bool ok = (firstKey.Length == 0 || aRows2 == aRows - 1) && bAfter == bRows && geomOk;

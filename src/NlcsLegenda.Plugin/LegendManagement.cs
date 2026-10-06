@@ -86,11 +86,10 @@ internal static class LegendManagement
         {
             if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent || ent.IsErased)
                 continue;
-            var ext = ent.Bounds;
-            if (ext.HasValue)
+            if (TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out var ext))
             {
-                minX = Math.Min(minX, ext.Value.MinPoint.X);
-                maxY = Math.Max(maxY, ext.Value.MaxPoint.Y);
+                minX = Math.Min(minX, ext.MinPoint.X);
+                maxY = Math.Max(maxY, ext.MaxPoint.Y);
                 any = true;
             }
             ent.Erase();
@@ -119,13 +118,51 @@ internal static class LegendManagement
         bool any = false;
         foreach (var id in g.GetAllEntityIds())
         {
-            if (tr.GetObject(id, OpenMode.ForRead) is Entity ent && !ent.IsErased && ent.Bounds.HasValue)
+            if (tr.GetObject(id, OpenMode.ForRead) is Entity ent && !ent.IsErased
+                && TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out var e))
             {
-                extents.AddExtents(ent.Bounds.Value);
+                extents.AddExtents(e);
                 any = true;
             }
         }
         return any;
+    }
+
+    // Robuuste extents van een entiteit. Eerst de native bounds; is die er niet (MText levert in
+    // de Core Console zonder graphics soms geen extents), dan voor een blokreferentie de inhoud
+    // meten en meetransformeren. Zo blijven extents deterministisch, ook headless.
+    public static bool TryGetEntityExtents(Transaction tr, Entity ent, out Extents3d extents)
+        => TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out extents);
+
+    private static bool TryEntityExtents(Transaction tr, Entity ent, Matrix3d xform, int depth, out Extents3d extents)
+    {
+        extents = new Extents3d();
+        if (depth > 8) return false;
+        if (ent is BlockReference br && !br.BlockTableRecord.IsNull
+            && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord btr)
+        {
+            var m = xform * br.BlockTransform;
+            bool any = false;
+            foreach (ObjectId cid in btr)
+            {
+                if (tr.GetObject(cid, OpenMode.ForRead) is Entity child && !child.IsErased
+                    && TryEntityExtents(tr, child, m, depth + 1, out var ce))
+                {
+                    extents.AddExtents(ce);
+                    any = true;
+                }
+            }
+            return any;
+        }
+
+        Extents3d? b = null;
+        try { b = ent.Bounds; } catch { b = null; }
+        if (!b.HasValue) return false;
+        var val = b.Value;
+        if (!xform.IsEqualTo(Matrix3d.Identity))
+            val.TransformBy(xform);
+        extents = val;
+        return true;
     }
 
     // Resolvet opgeslagen Handles naar bestaande ObjectIds; ontbrekende handles worden

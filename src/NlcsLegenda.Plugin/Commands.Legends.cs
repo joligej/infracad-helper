@@ -65,10 +65,9 @@ public partial class Commands
 
         if (hadGeometry)
         {
-            var ext = br.Bounds;
-            if (ext.HasValue)
+            if (LegendManagement.TryGetEntityExtents(tr, br, out var ext))
             {
-                var shift = new Vector3d(topLeft.X - ext.Value.MinPoint.X, topLeft.Y - ext.Value.MaxPoint.Y, 0);
+                var shift = new Vector3d(topLeft.X - ext.MinPoint.X, topLeft.Y - ext.MaxPoint.Y, 0);
                 if (!shift.IsZeroLength())
                     br.Position += shift;
             }
@@ -90,6 +89,7 @@ public partial class Commands
         foreach (var id in _pendingPurge)
             PurgeTempBlock(db, id);
         _pendingPurge.Clear();
+        PurgeOrphanLegendBlocks(db);
     }
 
     [CommandMethod("NLCSLEGENDABEHEER", CommandFlags.Modal)]
