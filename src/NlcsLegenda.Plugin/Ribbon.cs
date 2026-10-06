@@ -120,13 +120,13 @@ internal static class RibbonBuilder
         maken.Items.Add(Button("Genereren", "NLCSLEGENDA",
             "Analyseer de tekening en plaats de legenda met de muis."));
         maken.Items.Add(Button("Overzicht", "NLCSLEGENDAINFO",
-            "Toon wat er in de legenda zou komen, zonder te tekenen."));
+            "Toon wat er in de legenda zou komen, zonder te tekenen.", large: false));
         maken.Items.Add(Button("Exporteren", "NLCSLEGENDAEXPORT",
-            "Schrijf de regels weg als CSV en JSON."));
+            "Schrijf de regels weg als CSV en JSON.", large: false));
         maken.Items.Add(Button("Batch", "NLCSLEGENDABATCH",
-            "Alle DWG's in een map samen in één uittrekstaat."));
+            "Alle DWG's in een map samen in één uittrekstaat.", large: false));
         maken.Items.Add(Button("Viewport", "NLCSLEGENDAVIEWPORT",
-            "Maak in de huidige layout een viewport rond de legenda."));
+            "Maak in de huidige layout een viewport rond de legenda.", large: false));
 
         var beheer = new RibbonPanelSource { Title = "Beheren" };
         tab.Panels.Add(new RibbonPanel { Source = beheer });
@@ -135,36 +135,38 @@ internal static class RibbonBuilder
         beheer.Items.Add(Button("Legenda's", "NLCSLEGENDABEHEER",
             "Legenda's bekijken, bijwerken, hernoemen, zoeken en verwijderen."));
         beheer.Items.Add(Button("Element controleren", "NLCSLEGENDAELEMENT",
-            "Klik een object aan om te zien of en waarom het in de legenda komt."));
+            "Klik een object aan om te zien of en waarom het in de legenda komt.", large: false));
         beheer.Items.Add(Button("Instellingen", "NLCSLEGENDAOPTIES",
-            "Standaardinstellingen voor nieuwe legenda's aanpassen."));
+            "Standaardinstellingen voor nieuwe legenda's aanpassen.", large: false));
         beheer.Items.Add(Button("Samenstellen", "NLCSLEGENDASAMENSTELLEN",
-            "Regels uitvinken en eigen regels toevoegen."));
+            "Regels uitvinken en eigen regels toevoegen.", large: false));
         beheer.Items.Add(Button("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN",
-            "De tekst per element bewerken in een tabel."));
+            "De tekst per element bewerken in een tabel.", large: false));
         beheer.Items.Add(Button("Elementtekst", "NLCSLEGENDATEKST",
-            "Klik een element aan en pas alleen die tekst aan."));
+            "Klik een element aan en pas alleen die tekst aan.", large: false));
         beheer.Items.Add(Button("Statussen", "NLCSLEGENDASTATUS",
-            "Eigen statussen maken en er regels aan toewijzen."));
+            "Eigen statussen maken en er regels aan toewijzen.", large: false));
         beheer.Items.Add(Button("Laagnaam", "NLCSLEGENDALAAGNAAM",
-            "Een NLCS-laagnaam component voor component bewerken en de laag hernoemen."));
+            "Een NLCS-laagnaam component voor component bewerken en de laag hernoemen.", large: false));
         beheer.Items.Add(Button("Xrefs", "NLCSLEGENDAXREFS",
-            "Per gekoppelde xref instellen of die wordt meegenomen."));
+            "Per gekoppelde xref instellen of die wordt meegenomen.", large: false));
         beheer.Items.Add(Button("Profielen", "NLCSLEGENDAPRESET",
-            "Legenda-instellingen als profiel opslaan en later opnieuw gebruiken."));
+            "Legenda-instellingen als profiel opslaan en later opnieuw gebruiken.", large: false));
         beheer.Items.Add(Button("Bestanden", "NLCSLEGENDACONFIG",
-            "De configuratiebestanden aanmaken en de paden tonen."));
+            "De configuratiebestanden aanmaken en de paden tonen.", large: false));
     }
 
-    private static RibbonButton Button(string text, string command, string tooltip)
+    private static RibbonButton Button(string text, string command, string tooltip, bool large = true)
     {
         return new RibbonButton
         {
             Text = text,
             ShowText = true,
             ShowImage = true,
-            Size = RibbonItemSize.Large,
-            Orientation = System.Windows.Controls.Orientation.Vertical,
+            Size = large ? RibbonItemSize.Large : RibbonItemSize.Standard,
+            Orientation = large
+                ? System.Windows.Controls.Orientation.Vertical
+                : System.Windows.Controls.Orientation.Horizontal,
             IsToolTipEnabled = true,
             LargeImage = RibbonIcons.Get(command, 32),
             Image = RibbonIcons.Get(command, 16),
