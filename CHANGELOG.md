@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.28.2 - 2026-10-07
+
+- Tekst die uit een bronsymbool wordt overgenomen, behoudt nu ook de breedtefactor, schuinte
+  en oriëntatie bij de omzetting naar MText, zodat zo'n symbool er in de legenda hetzelfde
+  uitziet als in de tekening.
+
 ## 1.28.1 - 2026-10-06
 
 - Tekst in bronsymbolen wordt bij het overnemen ook MText, zodat een gegenereerde legenda
