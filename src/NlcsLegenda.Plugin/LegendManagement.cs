@@ -128,9 +128,9 @@ internal static class LegendManagement
         return any;
     }
 
-    // Robuuste extents van een entiteit. Eerst de native bounds; is die er niet (MText levert in
+    // Extents van een entiteit bepalen. Eerst de native bounds; is die er niet (MText levert in
     // de Core Console zonder graphics soms geen extents), dan voor een blokreferentie de inhoud
-    // meten en meetransformeren. Zo blijven extents deterministisch, ook headless.
+    // meten en meetransformeren. Zo blijven extents ook headless gelijk.
     public static bool TryGetEntityExtents(Transaction tr, Entity ent, out Extents3d extents)
         => TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out extents);
 

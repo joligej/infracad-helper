@@ -115,45 +115,63 @@ internal static class RibbonBuilder
         var tab = new RibbonTab { Title = "NLCS Legenda", Id = TabId };
         ribbon.Tabs.Add(tab);
 
-        var maken = new RibbonPanelSource { Title = "Legenda" };
-        tab.Panels.Add(new RibbonPanel { Source = maken });
-        maken.Items.Add(Button("Genereren", "NLCSLEGENDA",
-            "Analyseer de tekening en plaats de legenda met de muis."));
-        maken.Items.Add(Button("Overzicht", "NLCSLEGENDAINFO",
-            "Toon wat er in de legenda zou komen, zonder te tekenen.", large: false));
-        maken.Items.Add(Button("Exporteren", "NLCSLEGENDAEXPORT",
-            "Schrijf de regels weg als CSV en JSON.", large: false));
-        maken.Items.Add(Button("Batch", "NLCSLEGENDABATCH",
-            "Alle DWG's in een map samen in één uittrekstaat.", large: false));
-        maken.Items.Add(Button("Viewport", "NLCSLEGENDAVIEWPORT",
-            "Maak in de huidige layout een viewport rond de legenda.", large: false));
+        // Hoofdworkflow: groot en vooraan.
+        var legenda = Panel(tab, "Legenda");
+        legenda.Items.Add(Button("Genereren", "NLCSLEGENDA",
+            "Maak een legenda van de tekening of selectie."));
+        legenda.Items.Add(Button("Bijwerken", "NLCSLEGENDAUPDATE",
+            "Teken een bestaande legenda opnieuw."));
+        legenda.Items.Add(Button("Legenda's", "NLCSLEGENDABEHEER",
+            "Legenda's bekijken, bijwerken, hernoemen en verwijderen."));
 
-        var beheer = new RibbonPanelSource { Title = "Beheren" };
-        tab.Panels.Add(new RibbonPanel { Source = beheer });
-        beheer.Items.Add(Button("Bijwerken", "NLCSLEGENDAUPDATE",
-            "Een legenda opnieuw tekenen; bij meerdere kies je welke."));
-        beheer.Items.Add(Button("Legenda's", "NLCSLEGENDABEHEER",
-            "Legenda's bekijken, bijwerken, hernoemen, zoeken en verwijderen."));
-        beheer.Items.Add(Button("Element controleren", "NLCSLEGENDAELEMENT",
-            "Klik een object aan om te zien of en waarom het in de legenda komt.", large: false));
-        beheer.Items.Add(Button("Instellingen", "NLCSLEGENDAOPTIES",
-            "Standaardinstellingen voor nieuwe legenda's aanpassen.", large: false));
-        beheer.Items.Add(Button("Samenstellen", "NLCSLEGENDASAMENSTELLEN",
+        // Controleren en uitvoeren.
+        var uitvoer = Panel(tab, "Uitvoer");
+        uitvoer.Items.Add(Button("Overzicht", "NLCSLEGENDAINFO",
+            "Laat zien wat erin komt, zonder te tekenen.", large: false));
+        uitvoer.Items.Add(Button("Controleren", "NLCSLEGENDAELEMENT",
+            "Klik een object aan en zie of het in de legenda komt.", large: false));
+        uitvoer.Items.Add(Button("Exporteren", "NLCSLEGENDAEXPORT",
+            "Schrijf de regels weg als CSV en JSON.", large: false));
+        uitvoer.Items.Add(Button("Batch", "NLCSLEGENDABATCH",
+            "Alle tekeningen in een map in één uittrekstaat.", large: false));
+        uitvoer.Items.Add(Button("Viewport", "NLCSLEGENDAVIEWPORT",
+            "Maak een viewport rond de legenda.", large: false));
+
+        // Inhoud van de legenda aanpassen.
+        var inhoud = Panel(tab, "Inhoud");
+        inhoud.Items.Add(Button("Instellingen", "NLCSLEGENDAOPTIES",
+            "Schaal, opmaak en inhoud instellen.", large: false));
+        inhoud.Items.Add(Button("Samenstellen", "NLCSLEGENDASAMENSTELLEN",
             "Regels uitvinken en eigen regels toevoegen.", large: false));
-        beheer.Items.Add(Button("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN",
-            "De tekst per element bewerken in een tabel.", large: false));
-        beheer.Items.Add(Button("Elementtekst", "NLCSLEGENDATEKST",
-            "Klik een element aan en pas alleen die tekst aan.", large: false));
-        beheer.Items.Add(Button("Statussen", "NLCSLEGENDASTATUS",
-            "Eigen statussen maken en er regels aan toewijzen.", large: false));
-        beheer.Items.Add(Button("Laagnaam", "NLCSLEGENDALAAGNAAM",
-            "Een NLCS-laagnaam component voor component bewerken en de laag hernoemen.", large: false));
-        beheer.Items.Add(Button("Xrefs", "NLCSLEGENDAXREFS",
-            "Per gekoppelde xref instellen of die wordt meegenomen.", large: false));
-        beheer.Items.Add(Button("Profielen", "NLCSLEGENDAPRESET",
-            "Legenda-instellingen als profiel opslaan en later opnieuw gebruiken.", large: false));
-        beheer.Items.Add(Button("Bestanden", "NLCSLEGENDACONFIG",
-            "De configuratiebestanden aanmaken en de paden tonen.", large: false));
+        inhoud.Items.Add(Button("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN",
+            "De tekst per element bewerken.", large: false));
+        inhoud.Items.Add(Button("Elementtekst", "NLCSLEGENDATEKST",
+            "Eén aangeklikte regel aanpassen.", large: false));
+
+        // Bronnen en profielen.
+        var bronnen = Panel(tab, "Bronnen");
+        bronnen.Items.Add(Button("Statussen", "NLCSLEGENDASTATUS",
+            "Eigen statussen maken en regels toewijzen.", large: false));
+        bronnen.Items.Add(Button("Xrefs", "NLCSLEGENDAXREFS",
+            "Kiezen welke xrefs meetellen.", large: false));
+        bronnen.Items.Add(Button("Profielen", "NLCSLEGENDAPRESET",
+            "Instellingen bewaren en opnieuw gebruiken.", large: false));
+        bronnen.Items.Add(Button("Laagnaam", "NLCSLEGENDALAAGNAAM",
+            "Een NLCS-laagnaam bewerken en de laag hernoemen.", large: false));
+        bronnen.Items.Add(Button("Bestanden", "NLCSLEGENDACONFIG",
+            "De instellingenbestanden en hun paden tonen.", large: false));
+
+        // Help apart, aan de rechterkant.
+        var help = Panel(tab, "Help");
+        help.Items.Add(Button("Help", "NLCSLEGENDAHELP",
+            "Korte uitleg over de belangrijkste functies."));
+    }
+
+    private static RibbonPanelSource Panel(RibbonTab tab, string title)
+    {
+        var source = new RibbonPanelSource { Title = title };
+        tab.Panels.Add(new RibbonPanel { Source = source });
+        return source;
     }
 
     private static RibbonButton Button(string text, string command, string tooltip, bool large = true)

@@ -134,7 +134,7 @@ public partial class Commands
                 pko.Keywords.Add("Overnemen");
                 pko.Keywords.Add("Standaardmaken");
                 pko.Keywords.Add("Dupliceren");
-                pko.Keywords.Add("Bron");
+                pko.Keywords.Add("BRon");
                 pko.Keywords.Add("Zoom");
                 pko.Keywords.Add("Naam");
                 pko.Keywords.Add("Verwijderen");
@@ -153,7 +153,7 @@ public partial class Commands
                     case "Overnemen": ManagerCopySettings(ed, db, registry); break;
                     case "Standaardmaken": ManagerMakeGlobalDefault(ed, db, registry); break;
                     case "Dupliceren": ManagerDuplicate(ed, db, registry); break;
-                    case "Bron": ManagerEditSource(ed, db, registry); break;
+                    case "BRon": ManagerEditSource(ed, db, registry); break;
                     case "Zoom": ManagerZoom(ed, db, registry); break;
                     case "Naam": ManagerRename(ed, db, registry); break;
                     case "Verwijderen": ManagerDelete(ed, db, registry); break;
@@ -360,13 +360,13 @@ public partial class Commands
             return;
         }
 
-        var pko = new PromptKeywordOptions("\nBron [Vervangen/Toevoegen/Verwijderen/Annuleren]")
+        var pko = new PromptKeywordOptions("\nBron")
         {
             AllowNone = true
         };
         pko.Keywords.Add("Vervangen");
         pko.Keywords.Add("Toevoegen");
-        pko.Keywords.Add("Verwijderen");
+        pko.Keywords.Add("VErwijderen");
         pko.Keywords.Add("Annuleren");
         pko.Keywords.Default = "Vervangen";
         var mode = ed.GetKeywords(pko);
@@ -396,7 +396,7 @@ public partial class Commands
                 var newHandles = mode.StringResult switch
                 {
                     "Toevoegen" => target.SourceHandles.Concat(pickedHandles),
-                    "Verwijderen" => target.SourceHandles.Except(pickedHandles, StringComparer.OrdinalIgnoreCase),
+                    "VErwijderen" => target.SourceHandles.Except(pickedHandles, StringComparer.OrdinalIgnoreCase),
                     _ => pickedHandles
                 };
                 var deduped = newHandles.Distinct(StringComparer.OrdinalIgnoreCase).ToList();

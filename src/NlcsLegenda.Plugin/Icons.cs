@@ -179,10 +179,31 @@ internal static class RibbonIcons
                 }
                 break;
             case "NLCSLEGENDAELEMENT":
-                // Vraagteken: boog, korte staart en een punt.
-                g.DrawArc(pen, 11 * s, 8 * s, 10 * s, 9 * s, 175, 235);
+                // Vergrootglas: een object inspecteren.
+                g.DrawEllipse(pen, 9 * s, 8 * s, 10 * s, 10 * s);
+                g.DrawLine(pen, 17 * s, 16 * s, 23 * s, 22 * s);
+                break;
+
+            case "NLCSLEGENDAHELP":
+                // Vraagteken, gecentreerd.
+                g.DrawArc(pen, 11 * s, 7 * s, 10 * s, 9 * s, 160, 250);
                 g.DrawLine(pen, 16 * s, 15 * s, 16 * s, 18 * s);
-                g.FillEllipse(fill, 16 * s - 1.4f * s, 21.5f * s - 1.4f * s, 2.8f * s, 2.8f * s);
+                g.FillEllipse(fill, 16 * s - 1.5f * s, 22 * s - 1.5f * s, 3f * s, 3f * s);
+                break;
+
+            case "NLCSLEGENDALAAGNAAM":
+                // Naamlabel: een laagnaam bewerken.
+                using (var path = new GraphicsPath())
+                {
+                    path.AddLines(new[]
+                    {
+                        new PointF(8 * s, 16 * s), new PointF(13 * s, 10 * s), new PointF(24 * s, 10 * s),
+                        new PointF(24 * s, 22 * s), new PointF(13 * s, 22 * s)
+                    });
+                    path.CloseFigure();
+                    g.DrawPath(pen, path);
+                }
+                g.FillEllipse(fill, 13 * s - 1.2f * s, 16 * s - 1.2f * s, 2.4f * s, 2.4f * s);
                 break;
         }
     }
