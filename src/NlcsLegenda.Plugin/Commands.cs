@@ -2674,7 +2674,7 @@ public partial class Commands
         var db = doc.Database;
         try
         {
-            ObjectId line5 = ObjectId.Null;
+            ObjectId line5;
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
@@ -2712,7 +2712,7 @@ public partial class Commands
                 }
                 for (int i = 0; i < 3; i++)
                 {
-                    var brf = new BlockReference(new Point3d(i * 2, 20, 0), putBlock) { LayerId = putten };
+                    var brf = new BlockReference(new Point3d(i * 2.0, 20, 0), putBlock) { LayerId = putten };
                     ms.AppendEntity(brf); tr.AddNewlyCreatedDBObject(brf, true);
                 }
 
@@ -3026,10 +3026,11 @@ public partial class Commands
                 bnd.Closed = true; bnd.LayerId = arc;
                 var bndId = ms.AppendEntity(bnd); tr.AddNewlyCreatedDBObject(bnd, true);
                 var hatch = new Hatch { LayerId = arc };
-                var hId = ms.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
+                ms.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
                 hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31");
                 hatch.Associative = false;
-                hatch.AppendLoop(HatchLoopTypes.Default, new ObjectIdCollection { bndId });
+                using (var loop = new ObjectIdCollection { bndId })
+                    hatch.AppendLoop(HatchLoopTypes.Default, loop);
                 hatch.EvaluateHatch(true);
 
                 // Echt blok KAST en een invoeging op de eigen laag.

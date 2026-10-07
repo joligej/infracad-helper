@@ -63,14 +63,11 @@ public partial class Commands
         ms.AppendEntity(br);
         tr.AddNewlyCreatedDBObject(br, true);
 
-        if (hadGeometry)
+        if (hadGeometry && LegendManagement.TryGetEntityExtents(tr, br, out var ext))
         {
-            if (LegendManagement.TryGetEntityExtents(tr, br, out var ext))
-            {
-                var shift = new Vector3d(topLeft.X - ext.MinPoint.X, topLeft.Y - ext.MaxPoint.Y, 0);
-                if (!shift.IsZeroLength())
-                    br.Position += shift;
-            }
+            var shift = new Vector3d(topLeft.X - ext.MinPoint.X, topLeft.Y - ext.MaxPoint.Y, 0);
+            if (!shift.IsZeroLength())
+                br.Position += shift;
         }
 
         FinalizePlacement(tr, db, br, def.Settings, def.GroupName);
@@ -511,12 +508,10 @@ public partial class Commands
             using var tr = db.TransactionManager.StartTransaction();
             bool managed = LegendManagement.CollectManagedIds(db, tr, registry).Contains(per.ObjectId);
             string layer = tr.GetObject(per.ObjectId, OpenMode.ForRead) is Entity ent ? ent.Layer : "?";
-            string? reason;
             string localName = string.Empty;
-            if (managed)
-                reason = "hoort bij een beheerde legenda; telt niet mee als bron";
-            else
-                reason = DiagnoseObject(db, tr, layer, settings, target, per.ObjectId, out localName);
+            string? reason = managed
+                ? "hoort bij een beheerde legenda; telt niet mee als bron"
+                : DiagnoseObject(db, tr, layer, settings, target, per.ObjectId, out localName);
             tr.Commit();
 
             // Compacte, technische weergave.

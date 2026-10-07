@@ -309,12 +309,9 @@ public static class LegendBuilder
 
         // Symbool (S): echt blok passend in het vakje. Staat de optie uit of kan een blok niet
         // worden geplaatst, dan tekenen we niets; geen generieke nep-markering.
-        if (entry.SymbolLayer is { } symLayer)
-        {
-            if (s.InsertSymbolBlocks && entry.SymbolBlockName is { } blk)
-                TryInsertSymbol(btr, tr, db, blk, symLayer,
-                    x + swatchW / 2, midY, swatchW, swatchH, s.ModelUnitsPerPaperMm);
-        }
+        if (entry.SymbolLayer is { } symLayer && s.InsertSymbolBlocks && entry.SymbolBlockName is { } blk)
+            TryInsertSymbol(btr, tr, db, blk, symLayer,
+                x + swatchW / 2, midY, swatchW, swatchH, s.ModelUnitsPerPaperMm);
 
         // Kader per swatch: alleen een zichtbaar vakje op de kaderlaag als de gebruiker dat wil.
         if (s.DrawSwatchFrame)
@@ -626,7 +623,8 @@ public static class LegendBuilder
         hatch.Associative = false;
         try
         {
-            hatch.AppendLoop(HatchLoopTypes.Default, new ObjectIdCollection { boundaryId });
+            using (var loop = new ObjectIdCollection { boundaryId })
+                hatch.AppendLoop(HatchLoopTypes.Default, loop);
             hatch.EvaluateHatch(true);
         }
         catch

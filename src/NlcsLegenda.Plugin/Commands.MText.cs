@@ -647,7 +647,7 @@ public partial class Commands
                 ms.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true);
                 handles.Add(ln.Handle.Value.ToString("X"));
             }
-            var (id, group, _) = SeedOldDbTextLegend(db, tr, MTextFixtureSettings(), LegendScope.Selection, handles);
+            var (_, group, _) = SeedOldDbTextLegend(db, tr, MTextFixtureSettings(), LegendScope.Selection, handles);
             var (dbt, _) = CountTextInGroup(db, tr, group);
             tr.Commit();
             ed.WriteMessage($"\nHEROPEN: setup klaar, oude DBText={dbt} handles={handles.Count}. QSAVE, heropenen, dan NLCSLEGENDAOLDREOPENVERIFY.");
