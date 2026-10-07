@@ -47,7 +47,7 @@ internal static class LegendManagement
 
     public static void AddToGroup(Database db, Transaction tr, string groupName, IEnumerable<ObjectId> ids)
     {
-        var idc = new ObjectIdCollection();
+        using var idc = new ObjectIdCollection();
         foreach (var id in ids) idc.Add(id);
         if (idc.Count == 0) return;
 

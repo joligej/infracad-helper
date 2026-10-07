@@ -177,7 +177,7 @@ public class SettingsSerializationTests
         c.Elementen["VH|TEST"] = new DescriptionEntry { Algemeen = "Alg", Specifiek = "Regel een\nRegel twee" };
         var back = DescriptionCatalog.FromJson(c.ToJson());
 
-        Assert.True(back.Elementen.ContainsKey("VH|TEST"));
-        Assert.Equal("Regel een\nRegel twee", back.Elementen["VH|TEST"].Specifiek);
+        Assert.True(back.Elementen.TryGetValue("VH|TEST", out var entry));
+        Assert.Equal("Regel een\nRegel twee", entry.Specifiek);
     }
 }

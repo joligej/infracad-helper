@@ -47,8 +47,8 @@ public class DescriptionCatalogTests
             catalog.Save(path);
 
             var loaded = DescriptionCatalog.Load(path);
-            Assert.True(loaded.Elementen.ContainsKey("VH|OPENVERHARDING_TEGEL"));
-            Assert.Equal("Tegel 30x30", loaded.Elementen["VH|OPENVERHARDING_TEGEL"].Specifiek);
+            Assert.True(loaded.Elementen.TryGetValue("VH|OPENVERHARDING_TEGEL", out var entry));
+            Assert.Equal("Tegel 30x30", entry.Specifiek);
         }
         finally
         {

@@ -63,14 +63,11 @@ public partial class Commands
         ms.AppendEntity(br);
         tr.AddNewlyCreatedDBObject(br, true);
 
-        if (hadGeometry)
+        if (hadGeometry && LegendManagement.TryGetEntityExtents(tr, br, out var ext))
         {
-            if (LegendManagement.TryGetEntityExtents(tr, br, out var ext))
-            {
-                var shift = new Vector3d(topLeft.X - ext.MinPoint.X, topLeft.Y - ext.MaxPoint.Y, 0);
-                if (!shift.IsZeroLength())
-                    br.Position += shift;
-            }
+            var shift = new Vector3d(topLeft.X - ext.MinPoint.X, topLeft.Y - ext.MaxPoint.Y, 0);
+            if (!shift.IsZeroLength())
+                br.Position += shift;
         }
 
         FinalizePlacement(tr, db, br, def.Settings, def.GroupName);
@@ -134,7 +131,7 @@ public partial class Commands
                 pko.Keywords.Add("Overnemen");
                 pko.Keywords.Add("Standaardmaken");
                 pko.Keywords.Add("Dupliceren");
-                pko.Keywords.Add("BRon");
+                pko.Keywords.Add("Herkomst");
                 pko.Keywords.Add("Zoom");
                 pko.Keywords.Add("Naam");
                 pko.Keywords.Add("Verwijderen");
@@ -153,7 +150,7 @@ public partial class Commands
                     case "Overnemen": ManagerCopySettings(ed, db, registry); break;
                     case "Standaardmaken": ManagerMakeGlobalDefault(ed, db, registry); break;
                     case "Dupliceren": ManagerDuplicate(ed, db, registry); break;
-                    case "BRon": ManagerEditSource(ed, db, registry); break;
+                    case "Herkomst": ManagerEditSource(ed, db, registry); break;
                     case "Zoom": ManagerZoom(ed, db, registry); break;
                     case "Naam": ManagerRename(ed, db, registry); break;
                     case "Verwijderen": ManagerDelete(ed, db, registry); break;
@@ -366,7 +363,7 @@ public partial class Commands
         };
         pko.Keywords.Add("Vervangen");
         pko.Keywords.Add("Toevoegen");
-        pko.Keywords.Add("VErwijderen");
+        pko.Keywords.Add("Weghalen");
         pko.Keywords.Add("Annuleren");
         pko.Keywords.Default = "Vervangen";
         var mode = ed.GetKeywords(pko);
@@ -396,7 +393,7 @@ public partial class Commands
                 var newHandles = mode.StringResult switch
                 {
                     "Toevoegen" => target.SourceHandles.Concat(pickedHandles),
-                    "VErwijderen" => target.SourceHandles.Except(pickedHandles, StringComparer.OrdinalIgnoreCase),
+                    "Weghalen" => target.SourceHandles.Except(pickedHandles, StringComparer.OrdinalIgnoreCase),
                     _ => pickedHandles
                 };
                 var deduped = newHandles.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -511,12 +508,10 @@ public partial class Commands
             using var tr = db.TransactionManager.StartTransaction();
             bool managed = LegendManagement.CollectManagedIds(db, tr, registry).Contains(per.ObjectId);
             string layer = tr.GetObject(per.ObjectId, OpenMode.ForRead) is Entity ent ? ent.Layer : "?";
-            string? reason;
             string localName = string.Empty;
-            if (managed)
-                reason = "hoort bij een beheerde legenda; telt niet mee als bron";
-            else
-                reason = DiagnoseObject(db, tr, layer, settings, target, per.ObjectId, out localName);
+            string? reason = managed
+                ? "hoort bij een beheerde legenda, telt niet mee als bron"
+                : DiagnoseObject(db, tr, layer, settings, target, per.ObjectId, out localName);
             tr.Commit();
 
             // Compacte, technische weergave.
