@@ -126,12 +126,12 @@ internal sealed class LayerEditDialog : Form
             if (exists)
             {
                 MergeIntoExisting = true;
-                lines.Add($"Let op: laag \"{name}\" bestaat al ({count} entiteit(en){(string.IsNullOrEmpty(info) ? "" : "; " + info)}).");
+                lines.Add($"Let op: laag \"{name}\" bestaat al ({count} entiteit(en){(string.IsNullOrEmpty(info) ? "" : ", " + info)}).");
                 lines.Add("Hernoemen voegt samen: de entiteiten gaan naar die laag en de bronlaag wordt verwijderd. De eigenschappen van de bestaande laag blijven behouden.");
             }
         }
         if (_sourceLocked)
-            lines.Add("Let op: de huidige laag is vergrendeld; hernoemen kan wel.");
+            lines.Add("Let op: de huidige laag is vergrendeld. Hernoemen kan wel.");
         lines.Add($"Raakt {_affected} entiteit(en) op de huidige laag.");
 
         _status2.ForeColor = errors.Count > 0 ? Color.Firebrick : Color.DimGray;

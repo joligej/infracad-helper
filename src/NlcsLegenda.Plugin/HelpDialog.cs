@@ -29,7 +29,7 @@ internal sealed class HelpDialog : Form
         ("Instellingen",
             "Open Instellingen voor schaal, inhoud, opmaak, teksten en hoeveelheden.\n\n" +
             "Dit is de standaard voor nieuwe legenda's. Een bestaande legenda pas je aan via\n" +
-            "Legenda's; die houdt zijn eigen instellingen."),
+            "Legenda's. Die houdt zijn eigen instellingen."),
         ("Eigen lagen",
             "Heb je eigen lagen die geen NLCS zijn maar wel mee moeten tellen? Koppel ze onder\n" +
             "Eigen lagen in de instellingen.\n\n" +

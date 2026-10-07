@@ -130,35 +130,38 @@ internal static class RibbonBuilder
             "Laat zien wat erin komt, zonder te tekenen.", large: false));
         uitvoer.Items.Add(Button("Controleren", "NLCSLEGENDAELEMENT",
             "Klik een object aan en zie of het in de legenda komt.", large: false));
+        uitvoer.Items.Add(Button("Viewport", "NLCSLEGENDAVIEWPORT",
+            "Maak een viewport rond de legenda.", large: false));
         uitvoer.Items.Add(Button("Exporteren", "NLCSLEGENDAEXPORT",
             "Schrijf de regels weg als CSV en JSON.", large: false));
         uitvoer.Items.Add(Button("Batch", "NLCSLEGENDABATCH",
             "Alle tekeningen in een map in één uittrekstaat.", large: false));
-        uitvoer.Items.Add(Button("Viewport", "NLCSLEGENDAVIEWPORT",
-            "Maak een viewport rond de legenda.", large: false));
 
-        // Inhoud van de legenda aanpassen.
+        // Wat er in de legenda staat.
         var inhoud = Panel(tab, "Inhoud");
-        inhoud.Items.Add(Button("Instellingen", "NLCSLEGENDAOPTIES",
-            "Schaal, opmaak en inhoud instellen.", large: false));
         inhoud.Items.Add(Button("Samenstellen", "NLCSLEGENDASAMENSTELLEN",
             "Regels uitvinken en eigen regels toevoegen.", large: false));
         inhoud.Items.Add(Button("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN",
             "De tekst per element bewerken.", large: false));
         inhoud.Items.Add(Button("Elementtekst", "NLCSLEGENDATEKST",
             "Eén aangeklikte regel aanpassen.", large: false));
-
-        // Bronnen en profielen.
-        var bronnen = Panel(tab, "Bronnen");
-        bronnen.Items.Add(Button("Statussen", "NLCSLEGENDASTATUS",
+        inhoud.Items.Add(Button("Statussen", "NLCSLEGENDASTATUS",
             "Eigen statussen maken en regels toewijzen.", large: false));
+
+        // De tekening als bron.
+        var bronnen = Panel(tab, "Bronnen");
         bronnen.Items.Add(Button("Xrefs", "NLCSLEGENDAXREFS",
             "Kiezen welke xrefs meetellen.", large: false));
-        bronnen.Items.Add(Button("Profielen", "NLCSLEGENDAPRESET",
-            "Instellingen bewaren en opnieuw gebruiken.", large: false));
         bronnen.Items.Add(Button("Laagnaam", "NLCSLEGENDALAAGNAAM",
             "Een NLCS-laagnaam bewerken en de laag hernoemen.", large: false));
-        bronnen.Items.Add(Button("Bestanden", "NLCSLEGENDACONFIG",
+
+        // Instellingen en profielen.
+        var instellingen = Panel(tab, "Instellingen");
+        instellingen.Items.Add(Button("Instellingen", "NLCSLEGENDAOPTIES",
+            "Schaal, opmaak en inhoud instellen.", large: false));
+        instellingen.Items.Add(Button("Profielen", "NLCSLEGENDAPRESET",
+            "Instellingen bewaren en opnieuw gebruiken.", large: false));
+        instellingen.Items.Add(Button("Bestanden", "NLCSLEGENDACONFIG",
             "De instellingenbestanden en hun paden tonen.", large: false));
 
         // Help apart, aan de rechterkant.

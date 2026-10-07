@@ -510,7 +510,7 @@ public partial class Commands
             string layer = tr.GetObject(per.ObjectId, OpenMode.ForRead) is Entity ent ? ent.Layer : "?";
             string localName = string.Empty;
             string? reason = managed
-                ? "hoort bij een beheerde legenda; telt niet mee als bron"
+                ? "hoort bij een beheerde legenda, telt niet mee als bron"
                 : DiagnoseObject(db, tr, layer, settings, target, per.ObjectId, out localName);
             tr.Commit();
 
