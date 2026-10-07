@@ -18,7 +18,8 @@ hangt de legenda aan je cursor en zet je hem naast de tekening neer. Standaard m
 een legenda van de hele tekening; kies je in het optiemenu `Selecteren`, dan komt er een
 legenda van alleen die selectie. Alles komt in de model space op de eigen NLCS-lagen, dus
 kleur en lijntype kloppen meteen. Wie liever klikt dan typt vindt
-in het lint een tab **NLCS Legenda** met dezelfde functies.
+in het lint een tab **NLCS Legenda** met dezelfde functies. Via **Help** in het lint staat
+de basisuitleg ook in AutoCAD zelf.
 
 ### Meerdere legenda's
 

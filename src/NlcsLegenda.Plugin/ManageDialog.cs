@@ -84,7 +84,7 @@ internal sealed class LegendManageDialog : Form
             catch { /* bij een extreem klein venster de standaardverdeling houden */ }
         };
 
-        var topGroup = new GroupBox { Text = "NLCS-regels (vink uit wat je niet in de legenda wilt; groep in één klik)", Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var topGroup = new GroupBox { Text = "NLCS-regels (vink uit wat je niet wilt)", Dock = DockStyle.Fill, Padding = new Padding(8) };
         _tree = new TriStateTree { Dock = DockStyle.Fill };
         _filter = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Filter\u2026" };
         _filter.TextChanged += (_, _) => _tree.SetModel(_tree.Model, _filter.Text);

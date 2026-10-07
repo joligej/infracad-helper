@@ -801,7 +801,7 @@ internal sealed class RemarksEditDialog : Form
         layout.Controls.Add(_title, 0, 1);
         layout.Controls.Add(new Label
         {
-            Text = "Tekst (Enter = nieuwe regel; gebruik \u2022 voor opsommingen)",
+            Text = "Tekst (Enter = nieuwe regel, \u2022 voor opsommingen)",
             AutoSize = true,
             Margin = new Padding(0, 8, 0, 2)
         }, 0, 2);
@@ -1078,8 +1078,8 @@ internal sealed class BlankEntryDialog : Form
         {
             Dock = DockStyle.Top,
             Height = 40,
-            Text = "Een blanco regel reserveert een lege regel in de legenda (leeg vakje, standaard "
-                 + "tekst \u201c[blanco]\u201d). Handig om later met de hand iets toe te voegen.",
+            Text = "Een blanco regel is een lege regel die je zelf later invult. "
+                 + "Standaardtekst: \u201c[blanco]\u201d.",
             Padding = new Padding(4, 2, 4, 2)
         };
 
