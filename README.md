@@ -65,7 +65,7 @@ je een object aanwijzen en meldt of en waarom het wel of niet in de gekozen lege
 (status, discipline, hoofdgroep, elementsoort, xref, zichtbaarheid of uitgevinkt).
 
 De teksten volgen de NLCS-template: tekststijl `NLCS-ISO` met vaste hoogtes (2,5 mm voor
-regels, 5 mm voor koppen, 7 mm voor de titel) op de tekstlagen `-T25` en `-T50`. Alle tekst
+regels en statuskoppen, 5 mm voor de titel) op de tekstlagen `-T25` en `-T50`. Alle tekst
 in de legenda bestaat uit gewone MText-objecten, zodat je die in AutoCAD net als andere tekst
 kunt selecteren en bewerken.
 

@@ -36,16 +36,16 @@ public sealed class LegendSettings
     public string GeneralSeparator { get; set; } = " - ";
 
     [Category("Teksten"), DisplayName("Label Nieuw")]
-    public string LabelNieuw { get; set; } = "Nieuw";
+    public string LabelNieuw { get; set; } = "Nieuwe situatie";
 
     [Category("Teksten"), DisplayName("Label Bestaand")]
-    public string LabelBestaand { get; set; } = "Bestaand";
+    public string LabelBestaand { get; set; } = "Bestaande situatie";
 
     [Category("Teksten"), DisplayName("Label Vervallen")]
-    public string LabelVervallen { get; set; } = "Vervallen";
+    public string LabelVervallen { get; set; } = "Vervallen situatie";
 
     [Category("Teksten"), DisplayName("Label Tijdelijk")]
-    public string LabelTijdelijk { get; set; } = "Tijdelijk";
+    public string LabelTijdelijk { get; set; } = "Tijdelijke situatie";
 
     [Category("Teksten"), DisplayName("Label Revisie")]
     public string LabelRevisie { get; set; } = "Revisie";

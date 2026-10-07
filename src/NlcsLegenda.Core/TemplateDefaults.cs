@@ -2,7 +2,7 @@ namespace NlcsLegenda.Core;
 
 // Eén centrale bron voor de maatvoering van de legenda (papier-mm). De tekststijl en teksthoogtes
 // volgen de NLCS-tekststijl NLCS-ISO. De titel staat op de T50-laag (5 mm), de statuskoppen en
-// omschrijvingen op de T25-laag (2,5 mm), net als in het TAUW-legendamateriaal. LegendSettings en
+// omschrijvingen op de T25-laag (2,5 mm), zoals in het legenda-referentiemateriaal. LegendSettings en
 // "terugzetten naar template" verwijzen hiernaar, zodat er geen parallelle magische getallen
 // ontstaan. LegendaOpmaakTests pinnen de belangrijkste waarden.
 public static class TemplateDefaults
