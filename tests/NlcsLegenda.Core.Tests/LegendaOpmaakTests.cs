@@ -3,16 +3,18 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Pint de legenda-opmaakwaarden exact vast zodat ze niet per ongeluk veranderen. De waarden
-// volgen de NLCS-tekststijl (NLCS-ISO) en de gangbare legenda-maatvoering op 1:200.
+// Pint de legenda-opmaakwaarden exact vast zodat ze niet per ongeluk veranderen. De waarden zijn
+// gemeten aan het legenda-referentiemateriaal: titel op de T50-laag (5 mm), statuskoppen en
+// omschrijvingen op de T25-laag (2,5 mm), swatch 24 x 5 mm, rijafstand 6,3 mm en een tussenruimte
+// van 5,7 mm tussen swatch en tekst.
 public class LegendaOpmaakTests
 {
     [Fact]
     public void Teksthoogtes_volgen_NLCS_ISO()
     {
         Assert.Equal(2.5, TemplateDefaults.TextHeightMm);
-        Assert.Equal(5.0, TemplateDefaults.HeaderTextHeightMm);
-        Assert.Equal(7.0, TemplateDefaults.TitleTextHeightMm);
+        Assert.Equal(2.5, TemplateDefaults.HeaderTextHeightMm);
+        Assert.Equal(5.0, TemplateDefaults.TitleTextHeightMm);
     }
 
     [Fact]
@@ -27,7 +29,7 @@ public class LegendaOpmaakTests
     [Fact]
     public void Kolom_en_marge_maten_zijn_vast()
     {
-        Assert.Equal(8.0, TemplateDefaults.TextGapMm);
+        Assert.Equal(5.7, TemplateDefaults.TextGapMm);
         Assert.Equal(6.0, TemplateDefaults.HeaderSpacingMm);
         Assert.Equal(67.0, TemplateDefaults.ColumnWidthMm);
         Assert.Equal(10.0, TemplateDefaults.ColumnGapMm);

@@ -68,8 +68,8 @@ public class TemplateConformanceTests
         var s = new LegendSettings();
         Assert.False(s.ExplodeOnPlace);
         Assert.Equal(2.5, s.TextHeightMm);
-        Assert.Equal(5.0, s.HeaderTextHeightMm);
-        Assert.Equal(7.0, s.TitleTextHeightMm);
+        Assert.Equal(2.5, s.HeaderTextHeightMm);
+        Assert.Equal(5.0, s.TitleTextHeightMm);
         Assert.Equal("X-XX-AL-LEGENDA-T25", s.TextLayer);
         Assert.Equal("X-XX-AL-LEGENDA-T50", s.HeaderTextLayer);
     }
@@ -91,7 +91,7 @@ public class TemplateConformanceTests
         s.ResetFormattingToTemplate();
 
         // Opmaak terug naar template.
-        Assert.Equal(7.0, s.TitleTextHeightMm);
+        Assert.Equal(5.0, s.TitleTextHeightMm);
         Assert.Equal(24.0, s.SwatchWidthMm);
         Assert.False(s.ExplodeOnPlace);
         // Inhoud/identiteit blijft.

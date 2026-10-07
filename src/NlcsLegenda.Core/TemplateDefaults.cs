@@ -1,9 +1,10 @@
 namespace NlcsLegenda.Core;
 
 // Eén centrale bron voor de maatvoering van de legenda (papier-mm). De tekststijl en teksthoogtes
-// volgen de NLCS-tekststijl NLCS-ISO: op schaal 1:200 geven T25 en T50 teksthoogtes van 2,5 en
-// 5 mm. LegendSettings en "terugzetten naar template" verwijzen hiernaar, zodat er geen parallelle
-// magische getallen ontstaan. LegendaOpmaakTests pinnen de belangrijkste waarden.
+// volgen de NLCS-tekststijl NLCS-ISO. De titel staat op de T50-laag (5 mm), de statuskoppen en
+// omschrijvingen op de T25-laag (2,5 mm), net als in het TAUW-legendamateriaal. LegendSettings en
+// "terugzetten naar template" verwijzen hiernaar, zodat er geen parallelle magische getallen
+// ontstaan. LegendaOpmaakTests pinnen de belangrijkste waarden.
 public static class TemplateDefaults
 {
     // Breedte van het sample-vak; de sample-lijn en (indien getekend) het swatchkader delen deze
@@ -13,12 +14,14 @@ public static class TemplateDefaults
     public const double RowPitchMm = 6.3;
     public const double LineSpacingFactor = 1.35;
     public const double RemarksWidthMm = 90.0;
-    public const double TextGapMm = 8.0;
 
-    // Teksthoogtes conform NLCS-ISO (T25 = 2,5 mm, T50 = 5 mm op 1:200).
+    // Ruimte tussen het sample-vak en de omschrijving.
+    public const double TextGapMm = 5.7;
+
+    // Teksthoogtes conform NLCS-ISO. Omschrijving en statuskop T25 = 2,5 mm, de titel T50 = 5 mm.
     public const double TextHeightMm = 2.5;
-    public const double HeaderTextHeightMm = 5.0;
-    public const double TitleTextHeightMm = 7.0;
+    public const double HeaderTextHeightMm = 2.5;
+    public const double TitleTextHeightMm = 5.0;
 
     public const double HeaderSpacingMm = 6.0;
     public const double ColumnWidthMm = 67.0;

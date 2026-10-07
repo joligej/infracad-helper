@@ -9,8 +9,7 @@ namespace NlcsLegenda.Plugin;
 public static class LegendBuilder
 {
     // Verhoudingen voor de opmaak (t.o.v. de bijbehorende teksthoogte of swatch-maat).
-    private const double SubHeaderHeightRatio = 0.85;   // subkop t.o.v. kophoogte
-    private const double TitleUnderlineOffset = 1.35;    // onderstreping onder de titel
+    private const double SubHeaderHeightRatio = 1.0;    // hoofdgroepkop even hoog als de statuskop
     private const double SubHeaderIndentRatio = 0.15;    // inspringing subkop in de swatch
     private const double RemarksTitleRatio = 1.15;       // kop opmerkingen t.o.v. teksthoogte
 
@@ -50,22 +49,17 @@ public static class LegendBuilder
             {
                 case LegendItemKind.Title:
                     AddText(btr, tr, item.Text, new Point3d(item.X, item.YTop - titleH, 0),
-                        titleH, s.HeaderTextLayer, styleId);
-                    var underline = new Line(
-                        new Point3d(layout.MinX, item.YTop - titleH * TitleUnderlineOffset, 0),
-                        new Point3d(layout.MaxX, item.YTop - titleH * TitleUnderlineOffset, 0)) { Layer = s.FrameLayer };
-                    btr.AppendEntity(underline);
-                    tr.AddNewlyCreatedDBObject(underline, true);
+                        titleH, s.HeaderTextLayer, styleId, underline: true);
                     break;
 
                 case LegendItemKind.Header:
                     AddText(btr, tr, item.Text, new Point3d(item.X, item.YTop - headerH, 0),
-                        headerH, s.HeaderTextLayer, styleId);
+                        headerH, s.TextLayer, styleId, underline: true);
                     break;
 
                 case LegendItemKind.SubHeader:
                     AddText(btr, tr, item.Text, new Point3d(item.X + swatchW * SubHeaderIndentRatio, item.YTop - subHeaderH, 0),
-                        subHeaderH, s.TextLayer, styleId);
+                        subHeaderH, s.TextLayer, styleId, underline: true);
                     break;
 
                 case LegendItemKind.Entry:
@@ -570,7 +564,7 @@ public static class LegendBuilder
     // (baseline + hoogte/2) met een Middle*-attachment, zodat de tekst op dezelfde plek staat.
     private static MText AddMText(
         BlockTableRecord btr, Transaction tr, string text, Point3d anchor,
-        AttachmentPoint attach, double height, string layer, ObjectId styleId)
+        AttachmentPoint attach, double height, string layer, ObjectId styleId, bool underline = false)
     {
         var mt = new MText();
         mt.SetDatabaseDefaults();
@@ -581,7 +575,7 @@ public static class LegendBuilder
         mt.Attachment = attach;
         mt.Width = 0.0; // geen vaste breedte: één regel, geen afbreken
         mt.Location = anchor;
-        mt.Contents = MTextFormat.Escape(text);
+        mt.Contents = underline ? "\\L" + MTextFormat.Escape(text) + "\\l" : MTextFormat.Escape(text);
         btr.AppendEntity(mt);
         tr.AddNewlyCreatedDBObject(mt, true);
         return mt;
@@ -589,10 +583,10 @@ public static class LegendBuilder
 
     private static void AddText(
         BlockTableRecord btr, Transaction tr, string text, Point3d pos,
-        double height, string layer, ObjectId styleId)
+        double height, string layer, ObjectId styleId, bool underline = false)
     {
         AddMText(btr, tr, text, new Point3d(pos.X, pos.Y + height / 2.0, pos.Z),
-            AttachmentPoint.MiddleLeft, height, layer, styleId);
+            AttachmentPoint.MiddleLeft, height, layer, styleId, underline);
     }
 
     private static void AddTextRight(
