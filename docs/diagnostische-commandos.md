@@ -30,6 +30,8 @@ controle onmogelijk maken.
 | `NLCSLEGENDAMTEXTTEST` | Controleert dat een complete legenda (alle tekstcategorieën) geen DBText maar alleen MText bevat, zowel behouden als geëxplodeerd, zonder verweesde tekstblokken. |
 | `NLCSLEGENDASYMBOOLTEKSTTEST` | Controleert dat tekst binnen een bronsymbool bij het overnemen MText wordt, zodat de legenda ook dan geen DBText bevat. |
 | `NLCSLEGENDAOPMAAKMEETTEST` | Meet de teksthoogtes en swatchbreedte van een gebouwde legenda en vergelijkt ze met de instellingen. |
+| `NLCSLEGENDAVOLOPMAAKTEST` | Brede opmaakcontrole: meet per tekstsoort hoogte/uitlijning/laag, de swatch-afmetingen, lijnsamples, arceringen, symbolen en de tekstruimte tegen de instellingen. |
+| `NLCSLEGENDASYMBOOLTEKST2TEST` | Controleert dat de symbooltekst-conversie uitlijning, breedtefactor, oblique, rotatie, normaal en Unicode behoudt. |
 | `NLCSLEGENDAOLDUPDATETEST` | Bootst een oude legenda met DBText na en controleert dat bijwerken dezelfde legenda MText-only teruggeeft met behoud van id, bron, instellingen en positie. |
 | `NLCSLEGENDAOLDUPDATEBROADTEST` | Hetzelfde maar voor WholeDrawing, Selection (met bronhandles), een eigen bronlaag, blanco regels en xref-instellingen naast elkaar. |
 | `NLCSLEGENDAOLDREOPENSETUP` / `NLCSLEGENDAOLDREOPENVERIFY` | Oude DBText-Selection-legenda; na QSAVE/heropenen bijwerken en controleren dat tekst MText-only wordt met behoud van bronhandles en plaats. |
