@@ -71,4 +71,17 @@ public class LegendaLayoutGeometrieTests
         Assert.NotEmpty(second);
         Assert.All(second, i => Assert.Equal(colWidth + colGap, i.X, 6));
     }
+
+    [Fact]
+    public void Titel_tot_eerste_regel_is_de_titelband()
+    {
+        var s = PlainSettings();
+        var entries = LegendGrouping.Build(Parse("N-WE-VH-AAA-G", "N-WE-VH-BBB-G"), s, _ => null);
+        var layout = LegendLayoutEngine.Compute(entries, s);
+
+        var title = layout.Items.Single(i => i.Kind == LegendItemKind.Title);
+        var first = layout.Items.Where(i => i.Kind == LegendItemKind.Entry).OrderByDescending(i => i.YTop).First();
+        double titleBand = s.ToModel(s.TitleTextHeightMm) + s.ToModel(s.HeaderSpacingMm);
+        Assert.Equal(title.YTop - titleBand, first.YTop, 6);
+    }
 }

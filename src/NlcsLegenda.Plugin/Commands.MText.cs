@@ -149,6 +149,163 @@ public partial class Commands
         }
     }
 
+    // Brede objectmatige opmaakcontrole van een gebouwde legenda op een echte tekening. Meet per
+    // tekstsoort de hoogte/attachment/laag, de swatch-afmetingen, lijnsamples, arceringen en
+    // symbolen, de tekstruimte en kolomorigins, en vergelijkt alles met de instellingen. Zo is de
+    // volledige opmaak gecontroleerd, niet alleen een paar getallen.
+    [CommandMethod("NLCSLEGENDAVOLOPMAAKTEST", CommandFlags.Modal)]
+    public void NlcsLegendaVolOpmaakTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            var mt = new List<(double H, AttachmentPoint A, string L, double X, double Y, double W)>();
+            var frames = new List<(double W, double H, double X)>();
+            var samples = new List<double>();
+            int hatches = 0, symbolEnts = 0;
+
+            LegendSettings s = LoadGlobalDefaults();
+            s.DrawSwatchFrame = true; s.IncludeQuantities = true; s.IncludeRemarks = true;
+            s.IncludeScaleBar = true; s.IncludeGroupHeaders = true; s.IncludeHoofdgroepHeaders = true;
+            if (string.IsNullOrWhiteSpace(s.RemarksText)) s.RemarksText = "Opmerking een.\nOpmerking twee.";
+
+            double bodyH = s.ToModel(s.TextHeightMm), headH = s.ToModel(s.HeaderTextHeightMm);
+            double titleH = s.ToModel(s.TitleTextHeightMm), swW = s.ToModel(s.SwatchWidthMm), swH = s.ToModel(s.SwatchHeightMm);
+            double textGap = s.ToModel(s.TextGapMm);
+
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, s); reg.Add(def);
+                BuildManagedLegend(db, tr, reg, def, out int rows, out _);
+                LegendStore.Save(db, tr, reg);
+                if (rows == 0) { ed.WriteMessage("\nVOLOPMAAK: host zonder NLCS-content; draai op een NLCS-tekening."); tr.Commit(); return; }
+                var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+                var g = (Group)tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead);
+                void Walk(ObjectId id, int depth)
+                {
+                    if (depth > 8 || tr.GetObject(id, OpenMode.ForRead) is not Entity e) return;
+                    bool frame = string.Equals(e.Layer, s.FrameLayer, StringComparison.OrdinalIgnoreCase);
+                    switch (e)
+                    {
+                        case MText m:
+                            mt.Add((m.TextHeight, m.Attachment, m.Layer, m.Location.X, m.Location.Y, m.Width));
+                            break;
+                        case Hatch: hatches++; break;
+                        case Polyline p:
+                            double w = p.Bounds is { } b ? b.MaxPoint.X - b.MinPoint.X : 0;
+                            double h = p.Bounds is { } b2 ? b2.MaxPoint.Y - b2.MinPoint.Y : 0;
+                            double px = p.Bounds is { } b3 ? b3.MinPoint.X : 0;
+                            if (frame && p.Closed) frames.Add((w, h, px));
+                            else if (!frame) { samples.Add(w); if (e.Layer.EndsWith("-S", StringComparison.OrdinalIgnoreCase)) symbolEnts++; }
+                            break;
+                        case BlockReference br when !br.BlockTableRecord.IsNull && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord r:
+                            foreach (ObjectId cid in r) Walk(cid, depth + 1);
+                            break;
+                        default:
+                            if (e.Layer.EndsWith("-S", StringComparison.OrdinalIgnoreCase)) symbolEnts++;
+                            break;
+                    }
+                }
+                foreach (ObjectId id in g.GetAllEntityIds()) Walk(id, 0);
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            bool Near(double a, double b, double tol = 1e-4) => Math.Abs(a - b) < tol;
+            bool titleOk = mt.Any(x => Near(x.H, titleH) && x.A == AttachmentPoint.MiddleLeft && string.Equals(x.L, s.HeaderTextLayer, StringComparison.OrdinalIgnoreCase));
+            bool headOk = mt.Any(x => Near(x.H, headH) && string.Equals(x.L, s.HeaderTextLayer, StringComparison.OrdinalIgnoreCase));
+            bool bodyOk = mt.Any(x => Near(x.H, bodyH) && x.A == AttachmentPoint.MiddleLeft && x.W > 0 && string.Equals(x.L, s.TextLayer, StringComparison.OrdinalIgnoreCase));
+            bool qtyOk = mt.Any(x => x.A == AttachmentPoint.MiddleRight && string.Equals(x.L, s.TextLayer, StringComparison.OrdinalIgnoreCase));
+            bool scaleOk = mt.Any(x => x.A == AttachmentPoint.MiddleCenter);
+            bool swatchOk = frames.Any(f => Near(f.W, swW, 0.02) && Near(f.H, swH, 0.02));
+            bool sampleOk = samples.Any(w => Near(w, swW, 0.05));
+            bool borderOk = frames.Any(f => f.W > swW * 2 && f.H > swH * 2);
+            double swatchLeft = frames.Where(f => Near(f.W, swW, 0.02) && Near(f.H, swH, 0.02)).Select(f => f.X).DefaultIfEmpty(double.NaN).Min();
+            double bodyMinX = mt.Where(x => Near(x.H, bodyH) && x.A == AttachmentPoint.MiddleLeft && x.W > 0).Select(x => x.X).DefaultIfEmpty(double.NaN).Min();
+            bool gapOk = !double.IsNaN(bodyMinX) && !double.IsNaN(swatchLeft) && Near(bodyMinX - (swatchLeft + swW), textGap, 0.05);
+
+            ed.WriteMessage($"\nVOLOPMAAK tekst: titel({titleOk}) kop({headOk}) body-wrap({bodyOk}) hoeveelheid-rechts({qtyOk}) schaallabel-midden({scaleOk}) -> {(titleOk && headOk && bodyOk && qtyOk && scaleOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nVOLOPMAAK swatch: kader {swW:0.##}x{swH:0.##}({swatchOk}) lijnsample({sampleOk}) buitenkader({borderOk}) -> {(swatchOk && sampleOk && borderOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nVOLOPMAAK layout: tekstruimte gemeten={bodyMinX - (swatchLeft + swW):0.###} verwacht={textGap:0.###} -> {(gapOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nVOLOPMAAK rendering: arceringen={hatches}(>0:{hatches > 0}) symbolen={symbolEnts}(>0:{symbolEnts > 0}) -> {(hatches > 0 && symbolEnts > 0 ? "OK" : "FAIL")}");
+            bool all = titleOk && headOk && bodyOk && qtyOk && scaleOk && swatchOk && sampleOk && borderOk && gapOk && hatches > 0 && symbolEnts > 0;
+            ed.WriteMessage($"\nVOLOPMAAK: totaal -> {(all ? "OK" : "FAIL")}");
+        }
+        catch (System.Exception ex) { ed.WriteMessage($"\nVOLOPMAAK error: {ex.Message}"); }
+    }
+
+    // Volledige equivalentie van de symbooltekst-conversie: maakt DBText-gevallen met uiteenlopende
+    // uitlijning, breedtefactor, oblique, rotatie, normaal en Unicode, zet elk los om met de echte
+    // conversie en controleert dat hoogte, rotatie, normaal, stijl, positie (visueel midden) en de
+    // breedtefactor/oblique-codes behouden blijven. Geen bron-DWG-mutatie; werkt op een testblok.
+    [CommandMethod("NLCSLEGENDASYMBOOLTEKST2TEST", CommandFlags.Modal)]
+    public void NlcsLegendaSymboolTekst2Test()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            using var tr = db.TransactionManager.StartTransaction();
+            var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
+            var btr = new BlockTableRecord { Name = "SYMFID_" + System.Guid.NewGuid().ToString("N"), Origin = Point3d.Origin };
+            bt.Add(btr); tr.AddNewlyCreatedDBObject(btr, true);
+
+            DBText Make(string txt, System.Action<DBText> cfg)
+            {
+                var t = new DBText { TextString = txt, Height = 0.5, Position = new Point3d(1, 1, 0) };
+                t.SetDatabaseDefaults();
+                cfg(t);
+                btr.AppendEntity(t); tr.AddNewlyCreatedDBObject(t, true);
+                return t;
+            }
+
+            var cases = new (string Name, DBText T, string Frag, bool WCode, bool QCode)[]
+            {
+                ("A-left",   Make("Aleft",  _ => { }), "Aleft", false, false),
+                ("B-center", Make("Bcenter", t => { t.HorizontalMode = TextHorizontalMode.TextCenter; t.AlignmentPoint = new Point3d(2, 1, 0); }), "Bcenter", false, false),
+                ("C-right",  Make("Cright", t => { t.HorizontalMode = TextHorizontalMode.TextRight; t.AlignmentPoint = new Point3d(3, 1, 0); }), "Cright", false, false),
+                ("D-width",  Make("Dwidth", t => t.WidthFactor = 2.0), "Dwidth", true, false),
+                ("E-obliek", Make("Eoblval", t => t.Oblique = 15.0 * System.Math.PI / 180.0), "Eoblval", false, true),
+                ("F-rot",    Make("Frot",   t => t.Rotation = 30.0 * System.Math.PI / 180.0), "Frot", false, false),
+                ("G-normaal",Make("Gnorm",  t => t.Normal = new Vector3d(0, 0, -1)), "Gnorm", false, false),
+                ("H-unicode",Make("\u00d8\u00b1\u00e9 m\u00b2", _ => { }), "m", false, false),
+            };
+
+            var expect = cases.Select(c => (c.Name, H: c.T.Height, R: c.T.Rotation, N: c.T.Normal, S: c.T.TextStyleId, c.Frag, c.WCode, c.QCode)).ToList();
+            bool Near(double a, double b) => System.Math.Abs(a - b) < 1e-6;
+            bool all = true;
+            for (int i = 0; i < cases.Length; i++)
+            {
+                var mt = LegendBuilder.SymbolTextToMText(btr, tr, cases[i].T);
+                var e = expect[i];
+                bool hOk = Near(mt.TextHeight, e.H);
+                bool rOk = Near(mt.Rotation, e.R);
+                bool nOk = mt.Normal.IsEqualTo(e.N);
+                bool sOk = mt.TextStyleId == e.S;
+                bool aOk = mt.Attachment == AttachmentPoint.MiddleCenter;
+                bool txtOk = mt.Contents.Contains(e.Frag);
+                bool wOk = e.WCode == mt.Contents.Contains("\\W");
+                bool qOk = e.QCode == mt.Contents.Contains("\\Q");
+                bool ok = hOk && rOk && nOk && sOk && aOk && txtOk && wOk && qOk;
+                all &= ok;
+                ed.WriteMessage($"\nSYMFID {e.Name}: h={hOk} rot={rOk} norm={nOk} stijl={sOk} midden={aOk} tekst={txtOk} breedte={wOk} oblique={qOk} -> {(ok ? "OK" : "FAIL")}");
+            }
+
+            int dbtLeft = 0;
+            foreach (ObjectId id in btr) if (tr.GetObject(id, OpenMode.ForRead) is DBText) dbtLeft++;
+            ed.WriteMessage($"\nSYMFID: DBText na conversie={dbtLeft} -> {(dbtLeft == 0 ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nSYMFID: totaal -> {(all && dbtLeft == 0 ? "OK" : "FAIL")}");
+            tr.Commit();
+        }
+        catch (System.Exception ex) { ed.WriteMessage($"\nSYMFID error: {ex.Message}"); }
+    }
+
     // Zero-DBText met een bronsymbool dat intern DBText bevat. Bouwt een symboolblok met DBText,
     // MText en een lijn, plaatst het op een NLCS-symboollaag en controleert dat de gebouwde legenda
     // geen DBText bevat en dat de symbooltekst als MText is overgenomen (behouden én geëxplodeerd).
@@ -161,6 +318,7 @@ public partial class Commands
         var db = doc.Database;
         const string dbTextMark = "SYMDBTEKST";
         const string mTextMark = "SYMMTEKST";
+        const string nestMark = "SYMNESTTEKST";
         try
         {
             using (var tr = db.TransactionManager.StartTransaction())
@@ -168,6 +326,13 @@ public partial class Commands
                 var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
                 if (!bt.Has("SYMTEKSTBLOK"))
                 {
+                    // Genest blok met eigen DBText (case I): moet ook worden omgezet.
+                    var nest = new BlockTableRecord { Name = "SYMTEKSTNEST", Origin = Point3d.Origin };
+                    bt.Add(nest); tr.AddNewlyCreatedDBObject(nest, true);
+                    var nt = new DBText { TextString = nestMark, Height = 0.3, Position = new Point3d(0.2, 0.2, 0) };
+                    nt.SetDatabaseDefaults();
+                    nest.AppendEntity(nt); tr.AddNewlyCreatedDBObject(nt, true);
+
                     var sbtr = new BlockTableRecord { Name = "SYMTEKSTBLOK", Origin = Point3d.Origin };
                     bt.Add(sbtr); tr.AddNewlyCreatedDBObject(sbtr, true);
                     var ln = new Line(new Point3d(0, 0, 0), new Point3d(1, 1, 0));
@@ -178,6 +343,8 @@ public partial class Commands
                     var inner = new MText { Contents = mTextMark, TextHeight = 0.3, Location = new Point3d(0.5, 0.5, 0) };
                     inner.SetDatabaseDefaults();
                     sbtr.AppendEntity(inner); tr.AddNewlyCreatedDBObject(inner, true);
+                    var nref = new BlockReference(new Point3d(0.3, 0.3, 0), nest.ObjectId);
+                    sbtr.AppendEntity(nref); tr.AddNewlyCreatedDBObject(nref, true);
                 }
                 var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
                 const string symLayer = "N-WE-RI-SYMTEKST-S";
@@ -188,7 +355,7 @@ public partial class Commands
                 tr.Commit();
             }
 
-            (int dbt, int mt, bool db2mt, bool keptMt) Build(bool explode)
+            (int dbt, int mt, bool db2mt, bool keptMt, bool nestOk) Build(bool explode)
             {
                 var s = LoadGlobalDefaults();
                 s.InsertSymbolBlocks = true;
@@ -203,14 +370,14 @@ public partial class Commands
                 var texts = CollectMTextContents(db, tr, def.GroupName);
                 tr.Commit();
                 PurgePending(db);
-                return (dbt, mt, texts.Any(x => x.Contains(dbTextMark)), texts.Any(x => x.Contains(mTextMark)));
+                return (dbt, mt, texts.Any(x => x.Contains(dbTextMark)), texts.Any(x => x.Contains(mTextMark)), texts.Any(x => x.Contains(nestMark)));
             }
 
             var r = Build(explode: false);
-            ed.WriteMessage($"\nSYMTEKST: behouden DBText={r.dbt} MText={r.mt} bron-DBText->MText={r.db2mt} bron-MText-behouden={r.keptMt} -> {(r.dbt == 0 && r.db2mt && r.keptMt ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nSYMTEKST: behouden DBText={r.dbt} MText={r.mt} bron-DBText->MText={r.db2mt} genest={r.nestOk} bron-MText-behouden={r.keptMt} -> {(r.dbt == 0 && r.db2mt && r.keptMt && r.nestOk ? "OK" : "FAIL")}");
             var e = Build(explode: true);
-            ed.WriteMessage($"\nSYMTEKST: geexplodeerd DBText={e.dbt} MText={e.mt} bron-DBText->MText={e.db2mt} -> {(e.dbt == 0 && e.db2mt ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nSYMTEKST: totaal -> {(r.dbt == 0 && r.db2mt && r.keptMt && e.dbt == 0 && e.db2mt ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nSYMTEKST: geexplodeerd DBText={e.dbt} MText={e.mt} bron-DBText->MText={e.db2mt} genest={e.nestOk} -> {(e.dbt == 0 && e.db2mt && e.nestOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nSYMTEKST: totaal -> {(r.dbt == 0 && r.db2mt && r.keptMt && r.nestOk && e.dbt == 0 && e.db2mt && e.nestOk ? "OK" : "FAIL")}");
         }
         catch (System.Exception ex)
         {

@@ -7,7 +7,7 @@
     hiermee overeenkomt.
   -->
   <PropertyGroup>
-    <VersionPrefix>1.28.1</VersionPrefix>
+    <VersionPrefix>1.28.2</VersionPrefix>
     <Authors>joligej</Authors>
     <Company>infracad-helper</Company>
     <Product>NLCS Legenda</Product>

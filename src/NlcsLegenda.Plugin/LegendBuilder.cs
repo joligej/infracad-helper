@@ -524,10 +524,11 @@ public static class LegendBuilder
         return pl;
     }
 
-    // Zet een DBText uit een bronsymbool om naar een gelijkwaardige MText op dezelfde plek. De
-    // tekst wordt op zijn visuele midden geankerd (MiddleCenter) met dezelfde hoogte, rotatie,
-    // stijl en kleur; de oude DBText wordt gewist. De aanroeper transformeert en herlaagt nog.
-    private static MText SymbolTextToMText(BlockTableRecord btr, Transaction tr, DBText dbt)
+    // Zet een DBText uit een bronsymbool om naar een gelijkwaardige MText. De tekst wordt op zijn
+    // visuele midden geankerd (MiddleCenter, uit de extents — die verrekenen breedtefactor, oblique
+    // en rotatie) met dezelfde hoogte, rotatie, normaal, stijl en kleur. Breedtefactor en oblique
+    // die van de tekststijl afwijken gaan mee als inline-codes zodat niets stil verloren gaat.
+    internal static MText SymbolTextToMText(BlockTableRecord btr, Transaction tr, DBText dbt)
     {
         Point3d anchor;
         try
@@ -543,6 +544,7 @@ public static class LegendBuilder
 
         var mt = new MText();
         mt.SetDatabaseDefaults();
+        mt.Normal = dbt.Normal;
         mt.Layer = dbt.Layer;
         mt.Color = dbt.Color;
         if (!dbt.TextStyleId.IsNull)
@@ -551,7 +553,15 @@ public static class LegendBuilder
         mt.Rotation = dbt.Rotation;
         mt.Attachment = AttachmentPoint.MiddleCenter;
         mt.Location = anchor;
-        mt.Contents = MTextFormat.Escape(dbt.TextString);
+
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        string prefix = string.Empty;
+        if (Math.Abs(dbt.WidthFactor - 1.0) > 1e-6)
+            prefix += $"\\W{dbt.WidthFactor.ToString("0.####", inv)};";
+        double obliqueDeg = dbt.Oblique * 180.0 / Math.PI;
+        if (Math.Abs(obliqueDeg) > 1e-6)
+            prefix += $"\\Q{obliqueDeg.ToString("0.###", inv)};";
+        mt.Contents = prefix + MTextFormat.Escape(dbt.TextString);
         btr.AppendEntity(mt);
         tr.AddNewlyCreatedDBObject(mt, true);
         dbt.Erase();
