@@ -163,7 +163,7 @@ public partial class Commands
         try
         {
             var mt = new List<(double H, AttachmentPoint A, string L, double X, double Y, double W, bool U)>();
-            var frames = new List<(double W, double H, double X)>();
+            var frames = new List<(double W, double H, double X, double CY)>();
             var samples = new List<double>();
             int hatches = 0, symbolEnts = 0;
 
@@ -200,7 +200,8 @@ public partial class Commands
                             double w = p.Bounds is { } b ? b.MaxPoint.X - b.MinPoint.X : 0;
                             double h = p.Bounds is { } b2 ? b2.MaxPoint.Y - b2.MinPoint.Y : 0;
                             double px = p.Bounds is { } b3 ? b3.MinPoint.X : 0;
-                            if (frame && p.Closed) frames.Add((w, h, px));
+                            double cy = p.Bounds is { } b4 ? (b4.MaxPoint.Y + b4.MinPoint.Y) / 2.0 : 0;
+                            if (frame && p.Closed) frames.Add((w, h, px, cy));
                             else if (!frame) { samples.Add(w); if (e.Layer.EndsWith("-S", StringComparison.OrdinalIgnoreCase)) symbolEnts++; }
                             break;
                         case BlockReference br when !br.BlockTableRecord.IsNull && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord r:
@@ -233,10 +234,84 @@ public partial class Commands
             ed.WriteMessage($"\nVOLOPMAAK swatch: kader {swW:0.##}x{swH:0.##}({swatchOk}) lijnsample({sampleOk}) buitenkader({borderOk}) -> {(swatchOk && sampleOk && borderOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nVOLOPMAAK layout: tekstruimte gemeten={bodyMinX - (swatchLeft + swW):0.###} verwacht={textGap:0.###} -> {(gapOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nVOLOPMAAK rendering: arceringen={hatches}(>0:{hatches > 0}) symbolen={symbolEnts}(>0:{symbolEnts > 0}) -> {(hatches > 0 && symbolEnts > 0 ? "OK" : "FAIL")}");
-            bool all = titleOk && headOk && bodyOk && qtyOk && scaleOk && swatchOk && sampleOk && borderOk && gapOk && hatches > 0 && symbolEnts > 0;
+
+            // MText verticale positie: Location.Y van een body-regel (MiddleLeft) is het verticale
+            // midden van de tekst en moet samenvallen met het verticale midden van de swatch op
+            // dezelfde rij. Rapporteer de kleinste afwijking in papier-mm.
+            var swatchCentersY = frames.Where(f => Near(f.W, swW, 0.02) && Near(f.H, swH, 0.02)).Select(f => f.CY).ToList();
+            var bodyCentersY = mt.Where(x => Near(x.H, bodyH) && x.A == AttachmentPoint.MiddleLeft && x.W > 0).Select(x => x.Y).ToList();
+            double vertDev = double.MaxValue;
+            foreach (var by in bodyCentersY)
+                foreach (var cy in swatchCentersY)
+                    vertDev = Math.Min(vertDev, Math.Abs(by - cy));
+            double vertDevMm = s.ModelUnitsPerPaperMm > 0 && vertDev != double.MaxValue ? vertDev / s.ModelUnitsPerPaperMm : double.NaN;
+            bool vertOk = !double.IsNaN(vertDevMm) && vertDevMm < 0.05;
+            ed.WriteMessage($"\nVOLOPMAAK verticaal: body-midden t.o.v. swatch-midden={vertDevMm:0.###} mm -> {(vertOk ? "OK" : "FAIL")}");
+
+            bool all = titleOk && headOk && bodyOk && qtyOk && scaleOk && swatchOk && sampleOk && borderOk && gapOk && vertOk && hatches > 0 && symbolEnts > 0;
             ed.WriteMessage($"\nVOLOPMAAK: totaal -> {(all ? "OK" : "FAIL")}");
         }
         catch (System.Exception ex) { ed.WriteMessage($"\nVOLOPMAAK error: {ex.Message}"); }
+    }
+
+    // Bewijst dat de teksthoogten volledig instelbaar zijn: bouwt een legenda met niet-standaard
+    // body/kop/titel-hoogten en controleert dat de echte MText-hoogten precies die ingestelde
+    // waarden volgen (via ToModel), niet de productdefaults. Zo is gegarandeerd dat niets in de
+    // renderer een hoogte hardcodeert.
+    [CommandMethod("NLCSLEGENDAHOOGTETEST", CommandFlags.Modal)]
+    public void NlcsLegendaHoogteTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var db = doc.Database;
+        try
+        {
+            LegendSettings s = LoadGlobalDefaults();
+            s.TextHeightMm = 3.0; s.HeaderTextHeightMm = 4.0; s.TitleTextHeightMm = 6.0;
+            s.IncludeGroupHeaders = true; s.IncludeHoofdgroepHeaders = true;
+            double bodyH = s.ToModel(3.0), headH = s.ToModel(4.0), titleH = s.ToModel(6.0);
+            double defBodyH = s.ToModel(TemplateDefaults.TextHeightMm), defTitleH = s.ToModel(TemplateDefaults.TitleTextHeightMm);
+
+            var heights = new List<double>();
+            int rows;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var reg = LegendStore.Load(db, tr);
+                var def = IsoDef(reg, s); reg.Add(def);
+                BuildManagedLegend(db, tr, reg, def, out rows, out _);
+                LegendStore.Save(db, tr, reg);
+                if (rows == 0) { ed.WriteMessage("\nHOOGTE: host zonder NLCS-content; draai op een NLCS-tekening."); tr.Commit(); return; }
+                var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+                var g = (Group)tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead);
+                void Walk(ObjectId id, int depth)
+                {
+                    if (depth > 8 || tr.GetObject(id, OpenMode.ForRead) is not Entity e) return;
+                    if (e is MText m)
+                    {
+                        // Alleen de structurele legenda-tekst telt mee; symbool-interne tekst houdt
+                        // bewust zijn eigen bronhoogte en staat op andere lagen.
+                        if (string.Equals(m.Layer, s.TextLayer, System.StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(m.Layer, s.HeaderTextLayer, System.StringComparison.OrdinalIgnoreCase))
+                            heights.Add(m.TextHeight);
+                    }
+                    else if (e is BlockReference br && !br.BlockTableRecord.IsNull
+                        && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord r)
+                        foreach (ObjectId cid in r) Walk(cid, depth + 1);
+                }
+                foreach (ObjectId id in g.GetAllEntityIds()) Walk(id, 0);
+                tr.Commit();
+            }
+            PurgePending(db);
+
+            bool Near(double a, double b) => Math.Abs(a - b) < 1e-4;
+            bool bodyOk = heights.Any(h => Near(h, bodyH));
+            bool headOk = heights.Any(h => Near(h, headH));
+            bool titleOk = heights.Any(h => Near(h, titleH));
+            bool noDefaults = !heights.Any(h => Near(h, defBodyH) || Near(h, defTitleH));
+            ed.WriteMessage($"\nHOOGTE: body={bodyH:0.###}({bodyOk}) kop={headH:0.###}({headOk}) titel={titleH:0.###}({titleOk}) geen-default({noDefaults}) -> {(bodyOk && headOk && titleOk && noDefaults ? "OK" : "FAIL")}");
+        }
+        catch (System.Exception ex) { ed.WriteMessage($"\nHOOGTE error: {ex.Message}"); }
     }
 
     // Volledige equivalentie van de symbooltekst-conversie: maakt DBText-gevallen met uiteenlopende
