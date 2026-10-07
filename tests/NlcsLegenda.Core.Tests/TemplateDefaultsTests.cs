@@ -67,4 +67,34 @@ public class TemplateDefaultsTests
         Assert.Equal(expT25, s.ToModel(TemplateDefaults.TextHeightMm), 3);
         Assert.Equal(expT50, s.ToModel(TemplateDefaults.TitleTextHeightMm), 3);
     }
+
+    // De voorbeeldconfiguratie in deploy/ mag niet van de productdefaults afdrijven: de opmaak
+    // die hij vastlegt moet gelijk zijn aan TemplateDefaults.
+    [Fact]
+    public void SampleConfig_MatchesTemplateDefaults()
+    {
+        var path = FindRepoFile(System.IO.Path.Combine("deploy", "settings.sample.json"));
+        var s = LegendSettings.FromJson(System.IO.File.ReadAllText(path));
+        Assert.Equal(TemplateDefaults.TextHeightMm, s.TextHeightMm);
+        Assert.Equal(TemplateDefaults.HeaderTextHeightMm, s.HeaderTextHeightMm);
+        Assert.Equal(TemplateDefaults.TitleTextHeightMm, s.TitleTextHeightMm);
+        Assert.Equal(TemplateDefaults.TextGapMm, s.TextGapMm);
+        Assert.Equal(TemplateDefaults.SwatchWidthMm, s.SwatchWidthMm);
+        Assert.Equal(TemplateDefaults.SwatchHeightMm, s.SwatchHeightMm);
+        Assert.Equal(TemplateDefaults.RowPitchMm, s.RowPitchMm);
+        Assert.Equal(TemplateDefaults.ColumnWidthMm, s.ColumnWidthMm);
+    }
+
+    private static string FindRepoFile(string relative)
+    {
+        var dir = System.AppContext.BaseDirectory;
+        for (int i = 0; i < 8 && dir is not null; i++)
+        {
+            var candidate = System.IO.Path.Combine(dir, relative);
+            if (System.IO.File.Exists(candidate))
+                return candidate;
+            dir = System.IO.Directory.GetParent(dir)?.FullName;
+        }
+        throw new System.IO.FileNotFoundException($"Kon {relative} niet vinden vanaf {System.AppContext.BaseDirectory}");
+    }
 }

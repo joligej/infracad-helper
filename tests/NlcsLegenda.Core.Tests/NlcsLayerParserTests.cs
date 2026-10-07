@@ -85,6 +85,29 @@ public class NlcsLayerParserTests
     }
 
     [Fact]
+    public void TryParse_LocalXrefNested_SameNlcsDifferentSource()
+    {
+        // Lokaal, xref en genest leveren dezelfde NLCS-ontleding; alleen de bronidentiteit verschilt.
+        NlcsLayerParser.TryParse("N-WE-VH-WEG-G", out var local);
+        NlcsLayerParser.TryParse("BestandA|N-WE-VH-WEG-G", out var xref);
+        NlcsLayerParser.TryParse("Buiten|Binnen|N-WE-VH-WEG-G", out var nested);
+        foreach (var p in new[] { local!, xref!, nested! })
+        {
+            Assert.Equal("N", p.StatusCode);
+            Assert.Equal("WE", p.Discipline);
+            Assert.Equal("VH", p.Hoofdgroep);
+            Assert.Equal("WEG", p.Element);
+            Assert.Equal("G", p.TypeSuffix);
+            Assert.Equal("N-WE-VH-WEG-G", p.LocalName);
+            Assert.Equal(NlcsDrawType.Geometrie, p.DrawType);
+        }
+        Assert.False(local!.IsXref);
+        Assert.Equal(string.Empty, local.XrefName);
+        Assert.Equal("BestandA", xref!.XrefName);
+        Assert.Equal("Buiten|Binnen", nested!.XrefName);
+    }
+
+    [Fact]
     public void GroupKey_IgnoresTypeAndScale()
     {
         NlcsLayerParser.TryParse("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A-200", out var hatch);

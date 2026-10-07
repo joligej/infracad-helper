@@ -20,7 +20,7 @@ public class SettingsCustomizationTests
         var settings = new LegendSettings { LabelNieuw = "Aan te leggen" };
 
         Assert.Equal("Aan te leggen", settings.StatusLabel(NlcsStatus.Nieuw));
-        Assert.Equal("Bestaand", settings.StatusLabel(NlcsStatus.Bestaand));
+        Assert.Equal("Bestaande situatie", settings.StatusLabel(NlcsStatus.Bestaand));
     }
 
     [Fact]

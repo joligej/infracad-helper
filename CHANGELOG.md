@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.29.3 - 2026-10-07
+
+- Een legenda die alleen uit een externe referentie (xref) wordt opgebouwd, krijgt nu volledig
+  gevulde sample-vakken in de juiste kleur. Eerder bleven die vakken soms leeg of wit, of kregen ze
+  een verkeerde kleur.
+- Het bijwerken van zo'n legenda na opslaan en opnieuw openen werkt betrouwbaar, ook bij geneste
+  externe referenties.
+- De standaard statusteksten ("Nieuwe situatie", "Bestaande situatie", en zo verder) en de
+  meegeleverde voorbeeldconfiguratie sluiten weer aan op de rest van de opmaak. De teksthoogtes voor
+  omschrijving, kop en titel blijven vrij instelbaar.
+
 ## 1.29.2 - 2026-10-07
 
 - De opmaak van de gegenereerde legenda sluit nu beter aan op het referentiemateriaal: de titel is
