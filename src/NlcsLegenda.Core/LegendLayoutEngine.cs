@@ -57,7 +57,7 @@ public static class LegendLayoutEngine
     {
         double titleH = s.ToModel(s.TitleTextHeightMm);
         double headerH = s.ToModel(s.HeaderTextHeightMm);
-        double subHeaderH = headerH * 0.85;
+        double subHeaderH = headerH; // hoofdgroepkop even hoog als de statuskop
         double swatchH = s.ToModel(s.SwatchHeightMm);
         double textH = s.ToModel(s.TextHeightMm);
         double lineHeight = textH * Math.Max(1.0, s.LineSpacingFactor);

@@ -162,7 +162,7 @@ public partial class Commands
         var db = doc.Database;
         try
         {
-            var mt = new List<(double H, AttachmentPoint A, string L, double X, double Y, double W)>();
+            var mt = new List<(double H, AttachmentPoint A, string L, double X, double Y, double W, bool U)>();
             var frames = new List<(double W, double H, double X)>();
             var samples = new List<double>();
             int hatches = 0, symbolEnts = 0;
@@ -192,7 +192,8 @@ public partial class Commands
                     switch (e)
                     {
                         case MText m:
-                            mt.Add((m.TextHeight, m.Attachment, m.Layer, m.Location.X, m.Location.Y, m.Width));
+                            mt.Add((m.TextHeight, m.Attachment, m.Layer, m.Location.X, m.Location.Y, m.Width,
+                                m.Contents != null && m.Contents.StartsWith("\\L", StringComparison.Ordinal)));
                             break;
                         case Hatch: hatches++; break;
                         case Polyline p:
@@ -216,8 +217,8 @@ public partial class Commands
             PurgePending(db);
 
             bool Near(double a, double b, double tol = 1e-4) => Math.Abs(a - b) < tol;
-            bool titleOk = mt.Any(x => Near(x.H, titleH) && x.A == AttachmentPoint.MiddleLeft && string.Equals(x.L, s.HeaderTextLayer, StringComparison.OrdinalIgnoreCase));
-            bool headOk = mt.Any(x => Near(x.H, headH) && string.Equals(x.L, s.HeaderTextLayer, StringComparison.OrdinalIgnoreCase));
+            bool titleOk = mt.Any(x => Near(x.H, titleH) && x.A == AttachmentPoint.MiddleLeft && x.U && string.Equals(x.L, s.HeaderTextLayer, StringComparison.OrdinalIgnoreCase));
+            bool headOk = mt.Any(x => Near(x.H, headH) && x.U && string.Equals(x.L, s.TextLayer, StringComparison.OrdinalIgnoreCase));
             bool bodyOk = mt.Any(x => Near(x.H, bodyH) && x.A == AttachmentPoint.MiddleLeft && x.W > 0 && string.Equals(x.L, s.TextLayer, StringComparison.OrdinalIgnoreCase));
             bool qtyOk = mt.Any(x => x.A == AttachmentPoint.MiddleRight && string.Equals(x.L, s.TextLayer, StringComparison.OrdinalIgnoreCase));
             bool scaleOk = mt.Any(x => x.A == AttachmentPoint.MiddleCenter);

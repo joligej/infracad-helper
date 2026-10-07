@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.29.2 - 2026-10-07
+
+- De opmaak van de gegenereerde legenda sluit nu beter aan op het referentiemateriaal: de titel is
+  5 mm, de statuskoppen zijn 2,5 mm en onderstreept, en de ruimte tussen het sample-vak en de tekst
+  is iets kleiner. Nieuwe legenda's en "terug naar template" gebruiken deze maten; bestaande
+  legenda's houden hun eigen instellingen tot je ze terugzet naar het template.
+
 ## 1.29.1 - 2026-10-07
 
 - De keuzes in de commandoregelmenu's zijn nu gewone woorden. Eerder stond er soms een hoofdletter
