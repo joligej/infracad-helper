@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.29.1 - 2026-10-07
+
+- De keuzes in de commandoregelmenu's zijn nu gewone woorden. Eerder stond er soms een hoofdletter
+  midden in een woord om een sneltoets vrij te maken, wat op een schrijffout leek.
+- Het lint is logischer ingedeeld: een apart paneel voor instellingen en een paneel Bronnen met
+  alleen de tekening-bronnen.
+- Kleine opschoning van zichtbare teksten en van de code achter de schermen, zonder dat er iets
+  aan het resultaat verandert.
+
 ## 1.29.0 - 2026-10-07
 
 - Nieuw helpvenster in het lint (en het commando NLCSLEGENDAHELP) met korte uitleg over de
