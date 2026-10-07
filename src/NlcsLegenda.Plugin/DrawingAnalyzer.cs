@@ -11,6 +11,12 @@ public sealed class AnalysisResult
     public IReadOnlyDictionary<string, HatchSample> HatchSamples { get; init; } =
         new Dictionary<string, HatchSample>();
 
+    // Effectieve laag-look (kleur/linetype/lineweight) per NLCS-laagnaam. Een xref-laag bestaat in
+    // de host als "xref|laag" en heeft daar de echte kleur; de swatch neemt die over zodat een
+    // legenda uit een xref-only kader niet in standaardwit verschijnt.
+    public IReadOnlyDictionary<string, LayerDisplayStyle> LayerStyles { get; init; } =
+        new Dictionary<string, LayerDisplayStyle>();
+
     public int UsedNlcsLayerCount { get; init; }
 
     public int UsedCustomLayerCount { get; init; }
@@ -20,6 +26,17 @@ public sealed class AnalysisResult
     public int AttrDescribedLayerCount { get; init; }
 
     public int ExcludedNlcsLayerCount { get; init; }
+}
+
+// Wat een laag zichtbaar maakt in de legenda: de effectieve kleur, het linetype en de lijndikte.
+// Losse data (geen ObjectId's), zodat het veilig tussen bron-database en host-database reist.
+public sealed class LayerDisplayStyle
+{
+    public required Autodesk.AutoCAD.Colors.Color Color { get; init; }
+
+    public string Linetype { get; init; } = "Continuous";
+
+    public LineWeight LineWeight { get; init; } = LineWeight.ByLineWeightDefault;
 }
 
 public static class DrawingAnalyzer
@@ -141,6 +158,7 @@ public static class DrawingAnalyzer
         {
             Entries = entries,
             HatchSamples = c.Hatches,
+            LayerStyles = ReadLayerStyles(db, tr, c.Parsed.Values),
             // c.Parsed bevat nu zowel NLCS- als eigen bronlagen; eigen lagen apart tellen zodat
             // de INFO-melding geen eigen lagen als "NLCS" presenteert.
             UsedNlcsLayerCount = c.Parsed.Count - c.CustomDesc.Count,
@@ -620,6 +638,42 @@ public static class DrawingAnalyzer
         }
         c.Visible[layerName] = visible;
         return visible;
+    }
+
+    // Effectieve laag-look per NLCS-laagnaam. Een xref-laag staat in de host als "xref|laag" en
+    // draagt daar de echte kleur; die lezen we zodat de swatch niet in standaardwit verschijnt.
+    // Een echte hostlaag wint van een gelijknamige xref-laag.
+    private static Dictionary<string, LayerDisplayStyle> ReadLayerStyles(
+        Database db, Transaction tr, IEnumerable<NlcsLayerName> layers)
+    {
+        var styles = new Dictionary<string, LayerDisplayStyle>(StringComparer.OrdinalIgnoreCase);
+        var local = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        foreach (var layer in layers)
+        {
+            var clean = LayerNaming.LocalName(layer.Raw);
+            if (local.Contains(clean) || !lt.Has(layer.Raw))
+                continue;
+            if (tr.GetObject(lt[layer.Raw], OpenMode.ForRead) is not LayerTableRecord ltr)
+                continue;
+            string linetype = "Continuous";
+            try
+            {
+                if (tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord lte)
+                    linetype = lte.Name;
+            }
+            catch { /* standaard */ }
+            if (!layer.IsXref || !styles.ContainsKey(clean))
+                styles[clean] = new LayerDisplayStyle
+                {
+                    Color = ltr.Color,
+                    Linetype = linetype,
+                    LineWeight = ltr.LineWeight
+                };
+            if (!layer.IsXref)
+                local.Add(clean);
+        }
+        return styles;
     }
 
     private static Dictionary<string, string> ReadRenderIds(

@@ -259,7 +259,12 @@ public static class LegendBuilder
         double midY = (top + bottom) / 2.0;
 
         foreach (var lyr in entry.LayersByType.Values)
-            EnsureLayer(tr, db, lyr, 7);
+        {
+            if (analysis.LayerStyles.TryGetValue(lyr, out var style))
+                EnsureStyledLayer(tr, db, lyr, style);
+            else
+                EnsureLayer(tr, db, lyr, 7);
+        }
 
         // Elke elementsoort rendert volgens zijn eigen semantiek en wordt van achter naar
         // voren gestapeld: eerst vlak/vulling/arcering als achtergrond, dan de G-lijn als
@@ -675,6 +680,25 @@ public static class LegendBuilder
         {
             hatch.Erase();
         }
+    }
+
+    // Zoals EnsureLayer, maar een nieuwe laag krijgt de effectieve look van de bron (kleur,
+    // linetype, lijndikte). Zo neemt een swatch uit een xref-only kader de echte kleur over in
+    // plaats van standaardwit. Een bestaande hostlaag houdt zijn eigen look. Alleen losse data
+    // (geen bron-ObjectId's): het linetype gaat op naam, onbekend valt terug op Continuous.
+    private static void EnsureStyledLayer(Transaction tr, Database db, string name, LayerDisplayStyle style)
+    {
+        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        if (lt.Has(name))
+            return;
+        lt.UpgradeOpen();
+        var ltr = new LayerTableRecord { Name = name, Color = style.Color, LineWeight = style.LineWeight };
+        var cleanLt = LayerNaming.LocalName(style.Linetype);
+        var ltt = (LinetypeTable)tr.GetObject(db.LinetypeTableId, OpenMode.ForRead);
+        if (!string.IsNullOrEmpty(cleanLt) && ltt.Has(cleanLt))
+            ltr.LinetypeObjectId = ltt[cleanLt];
+        lt.Add(ltr);
+        tr.AddNewlyCreatedDBObject(ltr, true);
     }
 
     private static void EnsureLayer(Transaction tr, Database db, string name, short colorIndex, bool plottable = true)
