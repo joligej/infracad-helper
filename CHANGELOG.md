@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.29.0 - 2026-10-07
+
+- Nieuw helpvenster in het lint (en het commando NLCSLEGENDAHELP) met korte uitleg over de
+  belangrijkste functies, zonder internet.
+- Het lint is opnieuw ingedeeld: de hoofdacties staan groot vooraan en de rest is verdeeld
+  over overzichtelijke panelen.
+- Teksten, knoplabels en tooltips zijn opgeschoond en de sneltoetsen in de commandoprompts
+  zijn nu allemaal uniek.
+
 ## 1.28.2 - 2026-10-07
 
 - Tekst die uit een bronsymbool wordt overgenomen, behoudt nu ook de breedtefactor, schuinte
