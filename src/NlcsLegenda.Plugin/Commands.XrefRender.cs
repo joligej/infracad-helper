@@ -257,4 +257,120 @@ public partial class Commands
         ed.WriteMessage($"\nXREFSAVE kleur na heropenen: G={gColor}(rood=1) A={aColor}(groen=3) -> {(colorOk ? "OK" : "FAIL")}");
         ed.WriteMessage($"\nXREFSAVE: totaal -> {(noDbErr && updOk && colorOk ? "OK" : "FAIL")}");
     }
+
+    // Eén logische NLCS-laag uit meerdere bronnen: gelijke weergave hoort samen te vallen (één
+    // regel, opgetelde hoeveelheid), verschillende weergave hoort te splitsen (aparte regels, eigen
+    // hoeveelheid). Sectie 11: A rood 5 m + B rood 7 m + C groen 3 m -> rood 12 m, groen 3 m, 2 regels.
+    private static void CreateXrefLineDwg(string path, string layerName, short colorIndex, double lengthM,
+        LineWeight lineWeight = LineWeight.ByLineWeightDefault)
+    {
+        var prev = HostApplicationServices.WorkingDatabase;
+        using var xdb = new Database(true, true);
+        HostApplicationServices.WorkingDatabase = xdb;
+        try
+        {
+            using (var tr = xdb.TransactionManager.StartTransaction())
+            {
+                var lt = (LayerTable)tr.GetObject(xdb.LayerTableId, OpenMode.ForWrite);
+                var r = new LayerTableRecord { Name = layerName, Color = AcColor.Color.FromColorIndex(AcColor.ColorMethod.ByAci, colorIndex), LineWeight = lineWeight };
+                var lid = lt.Add(r); tr.AddNewlyCreatedDBObject(r, true);
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(xdb), OpenMode.ForWrite);
+                var line = new Line(new Point3d(0, 0, 0), new Point3d(lengthM, 0, 0)) { LayerId = lid };
+                ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
+                tr.Commit();
+            }
+            xdb.SaveAs(path, DwgVersion.Current);
+        }
+        finally { HostApplicationServices.WorkingDatabase = prev; }
+    }
+
+    private static string EntryAci(AnalysisResult a, LegendEntry e) =>
+        e.GeometryLayer is { } g && a.LayerStyles.TryGetValue(g, out var s) ? s.Color.ColorIndex.ToString() : "?";
+
+    [CommandMethod("NLCSLEGENDAXREFSPLITTEST", CommandFlags.Modal)]
+    public void NlcsLegendaXrefSplitTest()
+    {
+        var doc = AcAp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var db = doc.Database; var ed = doc.Editor;
+        string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
+        const string layer = "N-WE-VH-WEG-G";
+        try
+        {
+            var a = Path.Combine(dir, "split_a.dwg");
+            var b = Path.Combine(dir, "split_b.dwg");
+            var cpath = Path.Combine(dir, "split_c.dwg");
+            CreateXrefLineDwg(a, layer, 1, 5.0);    // rood 5 m
+            CreateXrefLineDwg(b, layer, 1, 7.0);    // rood 7 m
+            CreateXrefLineDwg(cpath, layer, 3, 3.0); // groen 3 m
+            AttachAndInsert(db, a, "SPLITA");
+            AttachAndInsert(db, b, "SPLITB");
+            AttachAndInsert(db, cpath, "SPLITC");
+
+            var settings = LoadGlobalDefaults();
+            settings.IncludeXrefLayers = true;
+            settings.IncludeQuantities = true;
+            using var tr = db.TransactionManager.StartTransaction();
+            var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db));
+            var rows = analysis.Entries.Where(e => e.GeometryLayer is not null).ToList();
+            ed.WriteMessage($"\nSPLIT: regels={rows.Count}");
+            foreach (var e in rows)
+                ed.WriteMessage($"\nSPLIT: element='{e.Element}' lengte={e.Metric.Length:0.#} kleur={EntryAci(analysis, e)} laag={e.GeometryLayer}");
+            double red = rows.Where(e => EntryAci(analysis, e) == "1").Sum(e => e.Metric.Length);
+            double green = rows.Where(e => EntryAci(analysis, e) == "3").Sum(e => e.Metric.Length);
+            bool rowsOk = rows.Count == 2, redOk = System.Math.Abs(red - 12.0) < 0.01, greenOk = System.Math.Abs(green - 3.0) < 0.01;
+            ed.WriteMessage($"\nSPLIT: rood={red:0.#}(verw 12) groen={green:0.#}(verw 3) regels={rows.Count}(verw 2) -> {(rowsOk && redOk && greenOk ? "OK" : "FAIL")}");
+            tr.Commit();
+
+            // De gebouwde legenda moet twee swatchlagen met de juiste kleur opleveren.
+            int built = BuildPlaceXrefLegend(db, settings, out string err);
+            string c1 = ReadAci(db, "N-WE-VH-WEG-G"), c2 = ReadAci(db, "N-WE-VH-WEG-G #2");
+            bool noErr = err == "geen";
+            bool swatchOk = (c1 == "1" && c2 == "3") || (c1 == "3" && c2 == "1");
+            ed.WriteMessage($"\nSPLIT: gebouwd regels={built} fout={err} swatchkleuren={c1}/{c2} -> {(noErr && swatchOk ? "OK" : "FAIL")}");
+        }
+        catch (System.Exception ex) { ed.WriteMessage($"\nSPLIT fatale fout: {ex.GetType().Name}: {ex.Message}"); }
+    }
+
+    // Splitsen moet ook werken op een ander stijlverschil dan kleur (sectie 5). Twee bronnen met
+    // dezelfde logische laag en dezelfde kleur maar verschillende lijndikte horen apart te blijven;
+    // twee bronnen met een identieke lijndikte horen samen te vallen met opgetelde hoeveelheid.
+    [CommandMethod("NLCSLEGENDAXREFSTYLETEST", CommandFlags.Modal)]
+    public void NlcsLegendaXrefStyleTest()
+    {
+        var doc = AcAp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var db = doc.Database; var ed = doc.Editor;
+        string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
+        const string layer = "N-WE-VH-WEG-G";
+        try
+        {
+            var thin1 = Path.Combine(dir, "style_thin1.dwg");
+            var thin2 = Path.Combine(dir, "style_thin2.dwg");
+            var thick = Path.Combine(dir, "style_thick.dwg");
+            CreateXrefLineDwg(thin1, layer, 1, 4.0, LineWeight.LineWeight025); // dun, 4 m
+            CreateXrefLineDwg(thin2, layer, 1, 6.0, LineWeight.LineWeight025); // dun, 6 m (gelijk uiterlijk)
+            CreateXrefLineDwg(thick, layer, 1, 2.0, LineWeight.LineWeight100); // dik, 2 m
+            AttachAndInsert(db, thin1, "STYLETHIN1");
+            AttachAndInsert(db, thin2, "STYLETHIN2");
+            AttachAndInsert(db, thick, "STYLETHICK");
+
+            var settings = LoadGlobalDefaults();
+            settings.IncludeXrefLayers = true;
+            settings.IncludeQuantities = true;
+            using var tr = db.TransactionManager.StartTransaction();
+            var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db));
+            var rows = analysis.Entries.Where(e => e.GeometryLayer is not null).ToList();
+            ed.WriteMessage($"\nSTYLE: regels={rows.Count}");
+            foreach (var e in rows)
+                ed.WriteMessage($"\nSTYLE: lengte={e.Metric.Length:0.#} laag={e.GeometryLayer}");
+            // Dunne bronnen (4+6=10 m) vallen samen; dikke (2 m) blijft apart -> 2 regels.
+            bool rowsOk = rows.Count == 2;
+            bool thinOk = rows.Any(e => System.Math.Abs(e.Metric.Length - 10.0) < 0.01);
+            bool thickOk = rows.Any(e => System.Math.Abs(e.Metric.Length - 2.0) < 0.01);
+            ed.WriteMessage($"\nSTYLE: dun-samen(10m)={thinOk} dik-apart(2m)={thickOk} regels={rows.Count}(verw 2) -> {(rowsOk && thinOk && thickOk ? "OK" : "FAIL")}");
+            tr.Commit();
+        }
+        catch (System.Exception ex) { ed.WriteMessage($"\nSTYLE fatale fout: {ex.GetType().Name}: {ex.Message}"); }
+    }
 }

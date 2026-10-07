@@ -34,10 +34,13 @@ public static class LegendGrouping
             // Uitgeschakelde elementsoorten tellen ook niet mee voor hoeveelheden.
             if (!settings.IsDrawTypeIncluded(layer.DrawType)) continue;
 
-            if (!groups.TryGetValue(layer.GroupKey, out var list))
+            // Splitssleutel = logische identiteit + render-partitie: dezelfde NLCS-laag uit
+            // bronnen met zichtbaar andere weergave (RenderGroup gevuld) valt niet samen.
+            var splitKey = layer.GroupKey + "\u0001" + layer.RenderGroup;
+            if (!groups.TryGetValue(splitKey, out var list))
             {
                 list = new List<NlcsLayerName>();
-                groups[layer.GroupKey] = list;
+                groups[splitKey] = list;
             }
             list.Add(layer);
         }

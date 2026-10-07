@@ -61,6 +61,10 @@ public static class DrawingAnalyzer
         // hoeveelheid, zichtbaar verschillend = aparte regels per bron (geen first-wins).
         public readonly Dictionary<string, (CustomLayerRule Rule, string SourceId)> AnyBuckets =
             new(StringComparer.Ordinal);
+        // Standaard-NLCS-lagen per echte (bron-)laagnaam. Na de collectie worden ze op render-
+        // identiteit samengevoegd: dezelfde logische laag uit bronnen met gelijke weergave wordt
+        // één regel met opgetelde hoeveelheid, zichtbaar verschillende bronnen blijven apart.
+        public readonly HashSet<string> NlcsRawKeys = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<ObjectId> Excluded = new();
         public LayerTable? Layers;
     }
@@ -98,6 +102,11 @@ public static class DrawingAnalyzer
         // AnySource-regels die meerdere bronnen raken samenvoegen op render-identiteit vóór de
         // beschrijvings-/groepeerstap, zodat de swatch niet van de traversalevolgorde afhangt.
         CoalesceAnySource(db, tr, c);
+
+        // Dezelfde logische NLCS-laag uit meerdere bronnen: gelijke weergave valt samen (één regel,
+        // opgetelde hoeveelheid), zichtbaar verschillende weergave splitst (aparte regels met eigen
+        // hoeveelheid en swatchkleur). Geen first/last-wins.
+        CoalesceNlcsSources(db, tr, c);
 
         var descriptions = ReadLayerDescriptions(db, tr, c.Parsed.Values);
         // De echte OMSCHRIJVING uit de KLIC-symboolattributen krijgt voorrang op de laag-
@@ -260,18 +269,19 @@ public static class DrawingAnalyzer
             }
         }
 
-        AddMetric(ent, nlcs.LocalName, c, transform);
+        c.NlcsRawKeys.Add(layerName);
+        AddMetric(ent, layerName, c, transform);
 
         if (ent is Hatch hatch && !c.Hatches.ContainsKey(layerName))
             c.Hatches[layerName] = HatchSample.From(hatch);
 
         if (ent is BlockReference symbolRef && nlcs.DrawType == NlcsDrawType.Symbool)
         {
-            if (!c.SymbolBlocks.ContainsKey(nlcs.LocalName))
+            if (!c.SymbolBlocks.ContainsKey(layerName))
             {
                 var name = BlockName(symbolRef, tr);
                 if (!string.IsNullOrEmpty(name) && !name.StartsWith('*'))
-                    c.SymbolBlocks[nlcs.LocalName] = name;
+                    c.SymbolBlocks[layerName] = name;
             }
             // KLIC-symbolen dragen de echte omschrijving in het attribuut OMSCHRIJVING. Tel de
             // niet-lege waarden per laag; de meest voorkomende wint bij de omschrijving.
@@ -520,6 +530,101 @@ public static class DrawingAnalyzer
         }
     }
 
+    // Voegt standaard-NLCS-lagen samen of splitst ze op zichtbare weergave. Per logische identiteit
+    // worden de bronnen (hoofdtekening + elke xref) gepartitioneerd op hun gecombineerde render-
+    // identiteit (laagstijl + arcering/vulling + symbool, per elementsoort). Bronnen die er hetzelfde
+    // uitzien vormen één regel met opgetelde hoeveelheid; bronnen die zichtbaar verschillen blijven
+    // aparte regels, elk met een eigen swatchlaag en hoeveelheid. Zo bepaalt niet de volgorde van de
+    // traversal (first/last-wins) welke kleur of hoeveelheid een regel krijgt.
+    private sealed record NlcsSnap(NlcsLayerName Parsed, string Sig, LayerMetric Metric, HatchSample? Hatch, string? Symbol);
+
+    private static void CoalesceNlcsSources(Database db, Transaction tr, Collector c)
+    {
+        if (c.NlcsRawKeys.Count == 0)
+            return;
+
+        var snap = new List<NlcsSnap>();
+        foreach (var key in c.NlcsRawKeys)
+        {
+            if (!c.Parsed.TryGetValue(key, out var p))
+                continue;
+            string style = ReadStyleSignature(db, tr, p.Raw);
+            HatchSample? h = c.Hatches.TryGetValue(key, out var hv) ? hv : null;
+            string? sym = c.SymbolBlocks.TryGetValue(key, out var sv) ? sv : null;
+            string hatchSig = h is not null ? $"H:{h.PatternName}:{h.PatternScale:0.###}:{h.PatternAngle:0.###}:{h.IsSolid}" : string.Empty;
+            string symSig = sym is not null ? "S:" + sym : string.Empty;
+            c.Metrics.TryGetValue(key, out var metric);
+            snap.Add(new NlcsSnap(p, style + "|" + hatchSig + "|" + symSig, metric, h, sym));
+            c.Parsed.Remove(key);
+            c.Metrics.Remove(key);
+            c.Hatches.Remove(key);
+            c.SymbolBlocks.Remove(key);
+        }
+        c.NlcsRawKeys.Clear();
+
+        foreach (var logical in snap.GroupBy(s => s.Parsed.GroupKey))
+        {
+            // Per bron (hoofdtekening = "", anders de xref-naam) de gecombineerde render-identiteit
+            // over alle elementsoorten; zo tellen bijvoorbeeld een lijn + arcering uit dezelfde bron
+            // als één uiterlijk mee en splitsen we niet midden in een element.
+            var sources = logical
+                .GroupBy(s => s.Parsed.IsXref ? s.Parsed.XrefName : string.Empty, StringComparer.OrdinalIgnoreCase)
+                .Select(g => (Layers: g.ToList(),
+                    CombinedSig: string.Join(";", g.OrderBy(x => x.Parsed.DrawType).Select(x => (int)x.Parsed.DrawType + ":" + x.Sig))))
+                .ToList();
+
+            var bySig = sources
+                .GroupBy(s => s.CombinedSig)
+                .OrderByDescending(g => g.Any(s => s.Layers.Any(l => !l.Parsed.IsXref))) // hoofdtekening eerst
+                .ThenByDescending(g => g.Count())                                        // dan de meeste bronnen
+                .ThenBy(g => g.Key, StringComparer.Ordinal)                              // dan deterministisch
+                .ToList();
+            bool divergent = bySig.Count > 1;
+
+            int partition = 0;
+            foreach (var sigGroup in bySig)
+            {
+                string renderGroup = divergent ? partition.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
+                var allLayers = sigGroup.SelectMany(s => s.Layers).ToList();
+                foreach (var dt in allLayers.GroupBy(l => l.Parsed.DrawType))
+                {
+                    var rep = dt.First();
+                    string clean = rep.Parsed.LocalName;
+                    // Niet-divergent: de echte NLCS-laagnaam blijft de swatchlaag (bestaand gedrag).
+                    // Divergent: elke volgende partitie krijgt een eigen, geldige swatchlaagnaam
+                    // zodat de renderer de afwijkende kleur op een aparte laag kan tekenen.
+                    string swatchLayer = partition == 0 ? clean : $"{clean} #{partition + 1}";
+
+                    var metric = LayerMetric.Empty;
+                    foreach (var m in dt) metric += m.Metric;
+
+                    c.Parsed[swatchLayer] = new NlcsLayerName
+                    {
+                        Raw = rep.Parsed.Raw,
+                        LocalName = swatchLayer,
+                        IsXref = rep.Parsed.IsXref,
+                        XrefName = rep.Parsed.XrefName,
+                        StatusCode = rep.Parsed.StatusCode,
+                        Status = rep.Parsed.Status,
+                        Discipline = rep.Parsed.Discipline,
+                        Hoofdgroep = rep.Parsed.Hoofdgroep,
+                        Element = rep.Parsed.Element,
+                        TypeSuffix = rep.Parsed.TypeSuffix,
+                        DrawType = rep.Parsed.DrawType,
+                        Scale = rep.Parsed.Scale,
+                        RenderGroup = renderGroup
+                    };
+                    c.Metrics[swatchLayer] = metric;
+                    if (rep.Hatch is not null)
+                        c.Hatches[swatchLayer] = rep.Hatch;
+                    if (rep.Symbol is not null)
+                        c.SymbolBlocks[swatchLayer] = rep.Symbol;
+                }
+                partition++;
+            }
+        }
+    }
+
     private static string ReadStyleSignature(Database db, Transaction tr, string rawLayer)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
@@ -646,13 +751,14 @@ public static class DrawingAnalyzer
     private static Dictionary<string, LayerDisplayStyle> ReadLayerStyles(
         Database db, Transaction tr, IEnumerable<NlcsLayerName> layers)
     {
+        // Na het coalescen is elke LocalName een unieke swatchlaag en levert Raw de bron waaruit
+        // de effectieve stijl wordt gelezen. Geen host-wins meer: de render-partitie heeft de
+        // representatieve bron al gekozen.
         var styles = new Dictionary<string, LayerDisplayStyle>(StringComparer.OrdinalIgnoreCase);
-        var local = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         foreach (var layer in layers)
         {
-            var clean = LayerNaming.LocalName(layer.Raw);
-            if (local.Contains(clean) || !lt.Has(layer.Raw))
+            if (styles.ContainsKey(layer.LocalName) || !lt.Has(layer.Raw))
                 continue;
             if (tr.GetObject(lt[layer.Raw], OpenMode.ForRead) is not LayerTableRecord ltr)
                 continue;
@@ -663,15 +769,12 @@ public static class DrawingAnalyzer
                     linetype = lte.Name;
             }
             catch { /* standaard */ }
-            if (!layer.IsXref || !styles.ContainsKey(clean))
-                styles[clean] = new LayerDisplayStyle
-                {
-                    Color = ltr.Color,
-                    Linetype = linetype,
-                    LineWeight = ltr.LineWeight
-                };
-            if (!layer.IsXref)
-                local.Add(clean);
+            styles[layer.LocalName] = new LayerDisplayStyle
+            {
+                Color = ltr.Color,
+                Linetype = linetype,
+                LineWeight = ltr.LineWeight
+            };
         }
         return styles;
     }

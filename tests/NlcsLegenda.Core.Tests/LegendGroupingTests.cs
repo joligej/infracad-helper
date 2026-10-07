@@ -93,4 +93,47 @@ public class LegendGroupingTests
         Assert.Single(entries);
         Assert.Equal(NlcsStatus.Nieuw, entries[0].Status);
     }
+
+    [Fact]
+    public void SameLogicalLayer_DifferentRenderGroup_SplitsIntoSeparateRows()
+    {
+        // Zoals de analyse ze maakt bij bronnen met zichtbaar verschillende weergave: dezelfde
+        // logische NLCS-laag, maar twee render-partities. Build houdt ze als aparte regels.
+        var a = WithRender("N-WE-VH-WEG-G", "N-WE-VH-WEG-G", "0");
+        var b = WithRender("N-WE-VH-WEG-G", "N-WE-VH-WEG-G #2", "1");
+
+        var entries = LegendGrouping.Build(new[] { a, b }, new LegendSettings());
+
+        Assert.Equal(2, entries.Count);
+        Assert.All(entries, e => Assert.Equal("WEG", e.Element));
+    }
+
+    [Fact]
+    public void SameLogicalLayer_SameRenderGroup_StaysOneRow()
+    {
+        var a = WithRender("N-WE-VH-WEG-G", "N-WE-VH-WEG-G", string.Empty);
+
+        Assert.Single(LegendGrouping.Build(new[] { a }, new LegendSettings()));
+    }
+
+    private static NlcsLayerName WithRender(string parseName, string localName, string renderGroup)
+    {
+        Assert.True(NlcsLayerParser.TryParse(parseName, out var p));
+        return new NlcsLayerName
+        {
+            Raw = p!.Raw,
+            LocalName = localName,
+            IsXref = p.IsXref,
+            XrefName = p.XrefName,
+            StatusCode = p.StatusCode,
+            Status = p.Status,
+            Discipline = p.Discipline,
+            Hoofdgroep = p.Hoofdgroep,
+            Element = p.Element,
+            TypeSuffix = p.TypeSuffix,
+            DrawType = p.DrawType,
+            Scale = p.Scale,
+            RenderGroup = renderGroup
+        };
+    }
 }
