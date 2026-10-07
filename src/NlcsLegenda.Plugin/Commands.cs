@@ -904,7 +904,7 @@ public partial class Commands
         pko.Keywords.Add("Lijn");
         pko.Keywords.Add("Vlak");
         pko.Keywords.Add("Arcering");
-        pko.Keywords.Add("Vulling");
+        pko.Keywords.Add("VUlling");
         pko.Keywords.Add("Symbool");
         pko.Keywords.Default = "Lijn";
         pko.AllowNone = true;
@@ -915,7 +915,7 @@ public partial class Commands
         {
             "Vlak" => NlcsDrawType.Vlak,
             "Arcering" => NlcsDrawType.Arcering,
-            "Vulling" => NlcsDrawType.Vlakvulling,
+            "VUlling" => NlcsDrawType.Vlakvulling,
             "Symbool" => NlcsDrawType.Symbool,
             _ => NlcsDrawType.Geometrie
         };
@@ -1237,7 +1237,7 @@ public partial class Commands
             var pko = new PromptKeywordOptions("\nProfielen");
             pko.Keywords.Add("Laden");
             pko.Keywords.Add("Opslaan");
-            pko.Keywords.Add("Lijst");
+            pko.Keywords.Add("Tonen");
             pko.Keywords.Add("Verwijderen");
             pko.Keywords.Add("Importeren");
             pko.Keywords.Add("Exporteren");
@@ -1255,7 +1255,7 @@ public partial class Commands
             {
                 case "Opslaan": PresetSave(ed, db); break;
                 case "Laden": PresetLoad(ed, db); break;
-                case "Lijst": PresetList(ed); break;
+                case "Tonen": PresetList(ed); break;
                 case "Verwijderen": PresetDelete(ed); break;
                 case "Importeren": PresetImport(ed); break;
                 case "Exporteren": PresetExport(ed); break;
@@ -1452,13 +1452,13 @@ public partial class Commands
             pko.Keywords.Add("Toewijzen");
             pko.Keywords.Add("Losmaken");
             pko.Keywords.Add("Handmatig");
-            pko.Keywords.Add("Hernoemen");
-            pko.Keywords.Add("Terug");
-            pko.Keywords.Default = "Terug";
+            pko.Keywords.Add("HErnoemen");
+            pko.Keywords.Add("TErug");
+            pko.Keywords.Default = "TErug";
             pko.AllowNone = true;
 
             var res = ed.GetKeywords(pko);
-            if (res.Status != PromptStatus.OK || res.StringResult == "Terug")
+            if (res.Status != PromptStatus.OK || res.StringResult == "TErug")
                 break;
 
             switch (res.StringResult)
@@ -1472,7 +1472,7 @@ public partial class Commands
                 case "Handmatig":
                     changed |= AssignManualEntry(ed, settings, status);
                     break;
-                case "Hernoemen":
+                case "HErnoemen":
                     var name = AskStatusName(ed);
                     if (name is not null) { status.Name = name; changed = true; }
                     break;
@@ -4438,18 +4438,18 @@ public partial class Commands
             pko.Keywords.Add("Algemeen");
             pko.Keywords.Add("Groepskoppen");
             pko.Keywords.Add("Hoofdgroepen");
-            pko.Keywords.Add("Titel");
+            pko.Keywords.Add("TItel");
             pko.Keywords.Add("Kader");
             pko.Keywords.Add("Datum");
-            pko.Keywords.Add("Hoeveelheden");
-            pko.Keywords.Add("Kolommen");
+            pko.Keywords.Add("HOeveelheden");
+            pko.Keywords.Add("KOlommen");
             pko.Keywords.Add("Ordenen");
             pko.Keywords.Add("Filteren");
             pko.Keywords.Add("Elementsoorten");
-            pko.Keywords.Add("Selecteren");
+            pko.Keywords.Add("SElecteren");
             pko.Keywords.Add("Instellingen");
             pko.Keywords.Add("Beschrijvingen");
-            pko.Keywords.Add("Opslaan");
+            pko.Keywords.Add("OPslaan");
             pko.Keywords.Add("Plaatsen");
             pko.Keywords.Default = "Plaatsen";
             pko.AllowNone = true;
@@ -4476,17 +4476,22 @@ public partial class Commands
                 case "Groepskoppen": s.IncludeGroupHeaders = !s.IncludeGroupHeaders; Changed(ed, $"groepskoppen {OnOff(s.IncludeGroupHeaders)}"); break;
                 case "Hoofdgroepen": s.IncludeHoofdgroepHeaders = !s.IncludeHoofdgroepHeaders; Changed(ed, $"hoofdgroepkoppen {OnOff(s.IncludeHoofdgroepHeaders)}"); break;
                 case "Titel": s.IncludeTitle = !s.IncludeTitle; Changed(ed, $"titel {OnOff(s.IncludeTitle)}"); break;
+                case "TItel": s.IncludeTitle = !s.IncludeTitle; Changed(ed, $"titel {OnOff(s.IncludeTitle)}"); break;
                 case "Kader": s.DrawBorder = !s.DrawBorder; Changed(ed, $"kader {OnOff(s.DrawBorder)}"); break;
                 case "Datum": s.IncludeDate = !s.IncludeDate; Changed(ed, $"datum {OnOff(s.IncludeDate)}"); break;
                 case "Hoeveelheden": s.IncludeQuantities = !s.IncludeQuantities; Changed(ed, $"hoeveelheden {OnOff(s.IncludeQuantities)}"); break;
+                case "HOeveelheden": s.IncludeQuantities = !s.IncludeQuantities; Changed(ed, $"hoeveelheden {OnOff(s.IncludeQuantities)}"); break;
                 case "Kolommen": PromptColumns(ed, s); break;
+                case "KOlommen": PromptColumns(ed, s); break;
                 case "Ordenen": PromptSortMode(ed, s); break;
                 case "Filteren": PromptStatusFilter(ed, s); break;
                 case "Elementsoorten": PromptDrawTypeFilter(ed, s); break;
                 case "Selecteren": selection = PromptSelection(ed); break;
+                case "SElecteren": selection = PromptSelection(ed); break;
                 case "Instellingen": EditSettingsDialog(ed, s); break;
                 case "Beschrijvingen": EditDescriptionsDialog(ed); break;
                 case "Opslaan": SaveSettings(ed, s); break;
+                case "OPslaan": SaveSettings(ed, s); break;
                 case "Plaatsen": return true;
             }
         }
@@ -4562,7 +4567,7 @@ public partial class Commands
             pko.Keywords.Add("Geometrie");
             pko.Keywords.Add("Vlakken");
             pko.Keywords.Add("Arceringen");
-            pko.Keywords.Add("Vlakvullingen");
+            pko.Keywords.Add("VLakvullingen");
             pko.Keywords.Add("Symbolen");
             pko.Keywords.Add("Klaar");
             pko.Keywords.Default = "Klaar";
@@ -4577,7 +4582,7 @@ public partial class Commands
                 "Geometrie" => NlcsDrawType.Geometrie,
                 "Vlakken" => NlcsDrawType.Vlak,
                 "Arceringen" => NlcsDrawType.Arcering,
-                "Vlakvullingen" => NlcsDrawType.Vlakvulling,
+                "VLakvullingen" => NlcsDrawType.Vlakvulling,
                 _ => NlcsDrawType.Symbool
             };
             if (!s.IncludedDrawTypes.Add(type))
