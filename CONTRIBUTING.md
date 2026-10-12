@@ -5,7 +5,7 @@ Bijdragen zijn welkom. Een paar praktische zaken:
 ## Ontwikkelen
 
 Je hebt de .NET SDK nodig: versie 8 voor AutoCAD 2025 en 2026, versie 10 voor 2027.
-AutoCAD zelf hoeft niet geïnstalleerd te zijn; zonder AutoCAD pakt de build automatisch
+AutoCAD zelf hoeft niet geïnstalleerd te zijn; de build gebruikt standaard
 de `AutoCAD.NET`-referenties van NuGet.
 
 ```powershell

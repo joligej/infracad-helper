@@ -158,6 +158,21 @@ public class LegendGroupingTests
             forward.Select(entry => entry.RenderIdentity));
     }
 
+    [Fact]
+    public void DescriptionAndProvenance_StayWithTheirRenderPartition()
+    {
+        var red = WithRender("N-WE-VH-WEG-G", "N-WE-VH-WEG-G", "red");
+        var green = WithRender("OUTER|INNER|N-WE-VH-WEG-G", "N-WE-VH-WEG-G #2", "green");
+        var entries = LegendGrouping.Build(new[] { green, red }, new LegendSettings { IncludeXrefLayers = true },
+            layerDescription: key => key.EndsWith("#2") ? "Groene variant" : "Rode variant",
+            descriptionSourceOf: key => key.EndsWith("#2") ? DescriptionSource.EigenKoppeling : null);
+        Assert.Equal(2, entries.Count);
+        var variant = Assert.Single(entries, e => e.Description == "Groene variant");
+        Assert.Equal(DescriptionSource.EigenKoppeling, variant.DescriptionSource);
+        Assert.Equal("OUTER|INNER", Assert.Single(variant.SourceLayers).SourceIdentity);
+        Assert.Contains(entries, e => e.Description == "Rode variant");
+    }
+
     private static NlcsLayerName WithRender(string parseName, string renderLayerName, string renderIdentity)
     {
         Assert.True(NlcsLayerParser.TryParse(parseName, out var p));

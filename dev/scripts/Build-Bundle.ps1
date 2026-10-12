@@ -41,13 +41,19 @@ $series = switch ($AcadVersion) {
 }
 
 Write-Host "==> Plugin bouwen (Release, AutoCAD $AcadVersion, $tfm)..." -ForegroundColor Cyan
-dotnet build $pluginProj -c Release -p:AcadVersion=$AcadVersion | Out-Null
+dotnet build $pluginProj -c Release -p:AcadVersion=$AcadVersion
+if ($LASTEXITCODE -ne 0) { throw "Pluginbuild mislukt; er wordt geen bundel gemaakt van oude DLLs." }
 
 $binDir = Join-Path $repoRoot "src\NlcsLegenda.Plugin\bin\Release\$tfm"
 $outBundle = Join-Path $repoRoot "artifacts\NlcsLegenda.bundle"
 $outContents = Join-Path $outBundle "Contents"
 
-if (Test-Path $outBundle) { Remove-Item $outBundle -Recurse -Force }
+if (Test-Path -LiteralPath $outBundle) {
+    $resolvedBundle = (Resolve-Path -LiteralPath $outBundle).Path
+    $expectedBundle = [IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts\NlcsLegenda.bundle"))
+    if ($resolvedBundle -ne $expectedBundle) { throw "Onverwacht bundelpad; opruimen gestopt." }
+    Remove-Item -LiteralPath $resolvedBundle -Recurse -Force
+}
 New-Item -ItemType Directory -Force -Path $outContents | Out-Null
 
 # Manifest overnemen en de versie-eis passend maken voor de doelversie.

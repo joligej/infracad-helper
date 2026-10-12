@@ -53,11 +53,8 @@ public partial class Commands
         bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out var topLeft, keepGroup: true);
 
         var btrId = LegendBuilder.BuildBlock(db, tr, analysis, def.Settings, out rows, out var issues);
-        // Semantiek bij tekenfouten (bewuste keuze A): de legenda wordt bijgewerkt met wat wél
-        // kon renderen (partieel geldig), maar de aanroeper meldt de fouten als duidelijke
-        // waarschuwing. Nooit stil als volledig succes beschouwen.
         if (issues.Count > 0)
-            note = AppendNote(note, $"{issues.Count} regel(s) met tekenfouten ({issues[0].SourceLayer}: {issues[0].Reason})");
+            throw new InvalidOperationException($"Legenda niet gewijzigd: {issues[0].Reason}");
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
         var br = new BlockReference(hadGeometry ? topLeft : ComputeInsertPoint(db, def.Settings), btrId);
         ms.AppendEntity(br);

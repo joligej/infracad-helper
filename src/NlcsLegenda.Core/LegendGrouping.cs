@@ -287,7 +287,7 @@ public static class LegendGrouping
         {
             foreach (var layer in group.OrderBy(l => TypePriority(l.DrawType)))
             {
-                var desc = layerDescription(layer.LocalName);
+                var desc = layerDescription(layer.EffectiveRenderLayerName);
                 if (string.IsNullOrWhiteSpace(desc))
                     continue;
                 // KLIC-symbolen dragen soms lege attribuut-tags als omschrijving mee; die
@@ -296,7 +296,7 @@ public static class LegendGrouping
                     continue;
                 // Een eigen-laagkoppeling levert de tekst uit de regel (niet uit de tekening);
                 // dan is EigenKoppeling de juiste herkomst in plaats van laagbeschrijving.
-                source = descriptionSourceOf?.Invoke(layer.LocalName) ?? DescriptionSource.Laagbeschrijving;
+                source = descriptionSourceOf?.Invoke(layer.EffectiveRenderLayerName) ?? DescriptionSource.Laagbeschrijving;
                 return desc.Trim();
             }
         }

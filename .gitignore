@@ -38,3 +38,6 @@ Desktop.ini
 # Autodesk crash-/telemetrielogs (accoreconsole)
 ErrorReports/
 *.dmp
+
+# Tijdelijke AutoCAD- en testlogs blijven lokaal.
+*.log

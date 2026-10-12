@@ -14,7 +14,7 @@ public static class NlcsLayerParser
 
         // Xref-lagen: "xrefnaam|laagnaam" -> neem het deel na de laatste '|'.
         var isXref = raw.Contains('|');
-        var local = isXref ? raw[(raw.LastIndexOf('|') + 1)..] : raw;
+        var local = LayerNaming.LocalName(raw);
         var xrefName = isXref ? raw[..raw.LastIndexOf('|')] : string.Empty;
 
         var parts = local.Split('-');

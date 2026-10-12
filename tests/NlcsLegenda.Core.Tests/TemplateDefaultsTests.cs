@@ -83,6 +83,18 @@ public class TemplateDefaultsTests
         Assert.Equal(TemplateDefaults.SwatchHeightMm, s.SwatchHeightMm);
         Assert.Equal(TemplateDefaults.RowPitchMm, s.RowPitchMm);
         Assert.Equal(TemplateDefaults.ColumnWidthMm, s.ColumnWidthMm);
+
+        var defaults = new LegendSettings();
+        Assert.Equal("Nieuwe situatie", defaults.LabelNieuw);
+        Assert.Equal("Bestaande situatie", defaults.LabelBestaand);
+        Assert.Equal("Vervallen situatie", defaults.LabelVervallen);
+        Assert.Equal("Tijdelijke situatie", defaults.LabelTijdelijk);
+        Assert.Equal("Revisie", defaults.LabelRevisie);
+        Assert.Equal(defaults.LabelNieuw, s.LabelNieuw);
+        Assert.Equal(defaults.LabelBestaand, s.LabelBestaand);
+        Assert.Equal(defaults.LabelVervallen, s.LabelVervallen);
+        Assert.Equal(defaults.LabelTijdelijk, s.LabelTijdelijk);
+        Assert.Equal(defaults.LabelRevisie, s.LabelRevisie);
     }
 
     private static string FindRepoFile(string relative)

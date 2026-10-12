@@ -10,16 +10,22 @@ public partial class Commands
     {
         var ms = (BlockTableRecord)tr.GetObject(
             SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-        var pieces = new DBObjectCollection();
-        br.Explode(pieces);
+        using var pieces = new DBObjectCollection();
         var ids = new List<ObjectId>();
-        foreach (DBObject piece in pieces)
+        try
         {
-            if (piece is Entity entity)
-            {
-                ids.Add(ms.AppendEntity(entity));
-                tr.AddNewlyCreatedDBObject(entity, true);
-            }
+            br.Explode(pieces);
+            foreach (DBObject piece in pieces)
+                if (piece is Entity entity)
+                {
+                    ids.Add(ms.AppendEntity(entity));
+                    tr.AddNewlyCreatedDBObject(entity, true);
+                }
+        }
+        finally
+        {
+            foreach (DBObject piece in pieces)
+                if (piece.ObjectId.IsNull) piece.Dispose();
         }
         return ids;
     }
@@ -75,7 +81,7 @@ public partial class Commands
 
     private static void RequireHostObjectId(Database host, ObjectId id, string role)
     {
-        if (id.IsNull || id.Database != host)
+        if (id.IsNull || id.Database != host || id.OriginalDatabase != host)
             throw new InvalidOperationException($"Het {role}-ObjectId hoort niet bij de hostdatabase.");
     }
 
