@@ -254,7 +254,7 @@ public static class LegendBuilder
         double midY = top - item.RowHeight / 2.0;
         double bottom = midY - swatchH / 2.0;
 
-        var existingEntities = btr.Cast<ObjectId>().ToHashSet();
+        var rowEntities = new List<ObjectId>();
         var renderLayers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var lyr in entry.LayersByType.Values)
         {
@@ -278,7 +278,7 @@ public static class LegendBuilder
         if (entry.VlakLayer is { } vlakLayer)
         {
             var area = MakeRectangle(x, bottom, swatchW, swatchH, renderLayers[vlakLayer]);
-            btr.AppendEntity(area);
+            rowEntities.Add(btr.AppendEntity(area));
             tr.AddNewlyCreatedDBObject(area, true);
         }
 
@@ -288,14 +288,15 @@ public static class LegendBuilder
             var fillBoundary = MakeRectangle(x, bottom, swatchW, swatchH, renderLayers[fillLayer]);
             var fillId = btr.AppendEntity(fillBoundary);
             tr.AddNewlyCreatedDBObject(fillBoundary, true);
-            AddSolidFill(btr, tr, fillId, renderLayers[fillLayer]);
+            rowEntities.Add(fillId);
+            rowEntities.Add(AddSolidFill(btr, tr, fillId, renderLayers[fillLayer]));
         }
 
         // Arcering (A): het patroon uit de brontekening.
         if (entry.HatchLayer is { } hatchLayer)
         {
             analysis.HatchSamples.TryGetValue(hatchLayer, out var sample);
-            AddHatch(btr, tr, x, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample, s.HatchScaleFactor);
+            rowEntities.Add(AddHatch(btr, tr, x, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample, s.HatchScaleFactor));
         }
 
         // Geometrie (G/GD/GS): horizontale lijn; de effectieve bronstijl wordt hieronder vastgezet.
@@ -305,7 +306,7 @@ public static class LegendBuilder
             line.AddVertexAt(0, new Point2d(x, midY), 0, 0, 0);
             line.AddVertexAt(1, new Point2d(x + swatchW, midY), 0, 0, 0);
             line.Layer = renderLayers[geoLayer];
-            btr.AppendEntity(line);
+            rowEntities.Add(btr.AppendEntity(line));
             tr.AddNewlyCreatedDBObject(line, true);
         }
 
@@ -320,9 +321,9 @@ public static class LegendBuilder
                 throw new InvalidOperationException(failureReason);
         }
 
-        foreach (ObjectId id in btr)
+        foreach (ObjectId id in rowEntities)
         {
-            if (existingEntities.Contains(id) || tr.GetObject(id, OpenMode.ForWrite) is not Entity entity)
+            if (tr.GetObject(id, OpenMode.ForWrite) is not Entity entity)
                 continue;
             foreach (var rendered in renderLayers)
                 if (entity.Layer == rendered.Value && analysis.LayerStyles.TryGetValue(rendered.Key, out var style))
@@ -847,7 +848,7 @@ public static class LegendBuilder
             AttachmentPoint.MiddleCenter, height, layer, styleId);
     }
 
-    private static void AddSolidFill(
+    private static ObjectId AddSolidFill(
         BlockTableRecord btr, Transaction tr, ObjectId boundaryId, string layer)
     {
         var hatch = new Hatch();
@@ -862,6 +863,7 @@ public static class LegendBuilder
             using (var loop = new ObjectIdCollection { boundaryId })
                 hatch.AppendLoop(HatchLoopTypes.External, loop);
             hatch.EvaluateHatch(true);
+            return hatch.ObjectId;
         }
         catch
         {
@@ -873,7 +875,7 @@ public static class LegendBuilder
         }
     }
 
-    private static void AddHatch(
+    private static ObjectId AddHatch(
         BlockTableRecord btr, Transaction tr, double x, double yBottom, double w, double h,
         string layer, HatchSample? sample, double scaleFactor)
     {
@@ -912,6 +914,7 @@ public static class LegendBuilder
             var bulges = new DoubleCollection { 0.0, 0.0, 0.0, 0.0 };
             hatch.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline, pts, bulges);
             hatch.EvaluateHatch(true);
+            return hatch.ObjectId;
         }
         catch
         {

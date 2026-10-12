@@ -324,7 +324,7 @@ public partial class Commands
             CreateXrefRenderDwg(xpath);
             AttachAndInsert(db, xpath, "KADER");
 
-            var settings = LoadGlobalDefaults();
+            var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
             settings.HatchScaleFactor = 1.0;
             int entryCount = BuildPlaceXrefLegend(db, settings, out string err, out string groupName, out ObjectId blockRecordId);
@@ -391,7 +391,7 @@ public partial class Commands
         (int Rows, double Length) includedOff = default;
         (int Rows, double Length) hiddenFrozen = default;
         (int Rows, double Length) includedFrozen = default;
-        var settings = LoadGlobalDefaults();
+        var settings = new LegendSettings();
         settings.IncludeXrefLayers = true;
         settings.IncludeInvisibleLayers = false;
 
@@ -457,7 +457,7 @@ public partial class Commands
         (int Rows, double Length) unloadedIncludingInvisible = default;
         (int Rows, double Length) missing = default;
         (int Rows, double Length) restored = default;
-        var settings = LoadGlobalDefaults();
+        var settings = new LegendSettings();
         settings.IncludeXrefLayers = true;
         settings.IncludeInvisibleLayers = false;
 
@@ -539,7 +539,7 @@ public partial class Commands
                 tr.Commit();
             }
 
-            var settings = LoadGlobalDefaults();
+            var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
             int entryCount = BuildPlaceXrefLegend(db, settings, out string err, out _, out _);
             string gColor = ReadAci(db, XrefGLayer), aColor = ReadAci(db, XrefALayer);
@@ -576,7 +576,7 @@ public partial class Commands
         {
             CreateXrefRenderDwg(xpath);
             AttachAndInsert(db, xpath, "KADER");
-            var settings = LoadGlobalDefaults();
+            var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
             int entryCount = BuildPlaceXrefLegend(db, settings, out string err, out _, out _);
             ed.WriteMessage($"\nXREFSAVE setup: entries={entryCount} fout={err}. QSAVE, heropenen, dan NLCSLEGENDAXREFSAVEVERIFY.");
@@ -880,7 +880,7 @@ public partial class Commands
         {
             AddHostLine(hostDb, "N-WE-VH-WEG-G", hostColor, hostLength);
             AttachAndInsert(hostDb, xrefPath, xrefName);
-            var settings = LoadGlobalDefaults();
+            var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
             settings.IncludeQuantities = true;
             using var tr = hostDb.TransactionManager.StartTransaction();
@@ -943,7 +943,7 @@ public partial class Commands
                 && sameRow.SourceLayers.Count == 2;
             bool sameExportOk = sameOk
                 && ExportedLengths(sameRows).SequenceEqual(new[] { 12.0 })
-                && InfoRowCountMatches(same, LoadGlobalDefaults());
+                && InfoRowCountMatches(same, new LegendSettings());
 
             var different = AnalyzeHostAndXref(diffPath, 1, 5.0, "HOSTDIFF");
             var differentRows = different.Entries.Where(entry => entry.GeometryLayer is not null).ToList();
@@ -954,7 +954,7 @@ public partial class Commands
                 && System.Math.Abs(green - 7.0) < 0.01;
             bool differentExportOk = differentOk
                 && ExportedLengths(differentRows).SequenceEqual(new[] { 5.0, 7.0 })
-                && InfoRowCountMatches(different, LoadGlobalDefaults());
+                && InfoRowCountMatches(different, new LegendSettings());
             ed.WriteMessage($"\nHOSTXREF gelijk: regels={sameRows.Count} rood={sameRow?.Metric.Length:0.#} m kleur={(sameRow is null ? "geen" : EntryAci(same, sameRow))} -> {(sameOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nHOSTXREF verschillend: regels={differentRows.Count} rood={red:0.#} m groen={green:0.#} m -> {(differentOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nHOSTXREF export/info: gelijk={sameExportOk} verschillend={differentExportOk}");
@@ -986,7 +986,7 @@ public partial class Commands
             AttachAndInsert(db, b, "SPLITB");
             AttachAndInsert(db, cpath, "SPLITC");
 
-            var settings = LoadGlobalDefaults();
+            var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
             settings.IncludeQuantities = true;
             using var tr = db.TransactionManager.StartTransaction();
@@ -1036,7 +1036,7 @@ public partial class Commands
             AttachAndInsert(db, thin2, "STYLETHIN2");
             AttachAndInsert(db, thick, "STYLETHICK");
 
-            var settings = LoadGlobalDefaults();
+            var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
             settings.IncludeQuantities = true;
             using var tr = db.TransactionManager.StartTransaction();
@@ -1112,7 +1112,7 @@ public partial class Commands
             AttachAndInsert(db, pathE, "SYMBOLE");
             AttachAndInsert(db, pathF, "SYMBOLF");
 
-            var settings = LoadGlobalDefaults();
+            var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
             settings.IncludeQuantities = true;
             List<LegendEntry> rows;
@@ -1244,7 +1244,7 @@ public partial class Commands
                 AttachAndInsert(db, path, fixture.Name);
             }
 
-            var settings = LoadGlobalDefaults();
+            var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
             settings.IncludeQuantities = true;
             settings.HatchScaleFactor = 1.0;
@@ -1362,7 +1362,7 @@ public partial class Commands
             CreateConflictingSymbolDwg(symbolPath, symbolLayer);
             ObjectId hatchReference = AttachAndInsert(db, hatchPath, "HATCHCONFLICT");
             ObjectId symbolReference = AttachAndInsert(db, symbolPath, "SYMBOLCONFLICT");
-            var settings = LoadGlobalDefaults();
+            var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
 
             settings.ExplodeOnPlace = false;
@@ -1428,7 +1428,7 @@ public partial class Commands
                 CreateXrefLineDwg(replacementPath, layerName, 3, 5.0);
                 AcAp.SetSystemVariable("VISRETAIN", 0);
                 AttachAndInsert(db, sourcePath, "RELOADTEST");
-                var settings = LoadGlobalDefaults();
+                var settings = new LegendSettings();
                 settings.IncludeXrefLayers = true;
                 settings.IncludeText = true;
                 settings.IncludeQuantities = true;
@@ -1579,7 +1579,7 @@ public partial class Commands
         string hostPath = Path.Combine(dir, "placement_host.dwg");
         var previousWorkingDatabase = HostApplicationServices.WorkingDatabase;
 
-        var settings = LoadGlobalDefaults();
+        var settings = new LegendSettings();
         settings.IncludeXrefLayers = true;
         settings.IncludeQuantities = true;
         settings.IncludeText = true;

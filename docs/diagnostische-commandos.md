@@ -42,5 +42,23 @@ controle onmogelijk maken.
 | `NLCSLEGENDAXREFSETUP` / `NLCSLEGENDAXREFVERIFY` | Bouwen een xref-scenario en verifiëren de opname ervan. |
 | `NLCSLEGENDAXREFANALYSE` | Analyseert een tekening met echte xrefs en toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. |
 
+| `NLCSLEGENDAAUDITVERSION` | Toont versie, geladen DLL-pad en SHA-256 voor controle van de werkelijk geteste installatie. |
+| `NLCSLEGENDAAUDITFIXTURE` | Maakt drie lijnen en een symbool voor niet-lege opmaak-, hoogte- en isolatiecontroles. |
+| `NLCSLEGENDAENTITYSTYLETEST` | Controleert expliciete bronkleuren, vaste hoeveelheden en echte swatches na een gedeelde laagwijziging. |
+| `NLCSLEGENDADEPENDENCYTEST` | Test een xref-symbool met eigen lijntype, tekststijl, materiaal en dictionary, inclusief host-eigenaarschap en SaveAs. |
+| `NLCSLEGENDASTABILITYTEST` | Werkt bestaande testlegenda's vijftig keer bij en controleert hoeveelheden, instellingen, eigenaarschap, resourcegroei en QSAVE. |
+| `NLCSLEGENDAPROPERTYTEST` | Test ByLayer/ByBlock, truecolor, lijndikte, transparantie en lijntypeschaal; een mislukte update moet de vorige legenda behouden. |
+| `NLCSLEGENDASYMBOLEDGETEST` | Test lege, verborgen en lijnvormige symbolen, afwijkende Z-schaal en verschillende arceringscontouren. |
+| `NLCSLEGENDAPOLYOWNERSHIPTEST` | Controleert vaste lengtes en ongewijzigde bronvertices bij herhaalde analyse van 2D/3D-polylijnen. |
+| `NLCSLEGENDAPAPERSCALETEST` | Meet vaste papiermaten, teksthoogtes, onderstreping, centrering en kader bij schaal 1:100/200/500/1000. |
+| `NLCSLEGENDAXREFVISIBILITYTEST` / `NLCSLEGENDAXREFSTATESTEST` | Testen uitgeschakelde/bevroren lagen en unloaded, ontbrekende en herstelde xrefs. |
+| `NLCSLEGENDAXREFRENDERTEST` / `NLCSLEGENDAXREFNESTEDTEST` | Controleren echte kleuren, arceringen, symbolen en eigenaarschap bij gewone en geneste xrefs. |
+| `NLCSLEGENDAXREFHOSTTEST` / `NLCSLEGENDAXREFSPLITTEST` / `NLCSLEGENDAXREFSTYLETEST` | Controleren samenvoegen en splitsen van host/xref-regels op effectieve eigenschappen. |
+| `NLCSLEGENDAXREFSYMBOLTEST` / `NLCSLEGENDAXREFHATCHTEST` / `NLCSLEGENDAXREFSAMPLECONFLICTTEST` | Controleren gelijkwaardige en verschillende voorbeelden, echte uitvoer en vaste hoeveelheden. |
+| `NLCSLEGENDAXREFPLACEMENTTEST` / `NLCSLEGENDAXREFPLACEMENTVERIFY` | Testen het productiepad voor plaatsing, annulering en verificatie na heropenen; de fysieke jig-klik blijft een GUI-controle. |
+| `NLCSLEGENDAXREFRELOADSETUP` / `NLCSLEGENDAXREFRELOADVERIFY` | Controleren opnieuw laden van een gewijzigde bron over afzonderlijke CAD-sessies. |
+
+De releasecontrole `dev/scripts/Run-ReleaseAcceptance.ps1` voert deze commando's uit op afzonderlijke kopieën, controleert de geladen DLL-hash en stopt bij een fout, ontbrekend resultaat of mislukte QSAVE. Gebruik deze testcommando's uitsluitend in een testtekening: fixturecommando's voegen objecten en tijdelijke xrefs toe.
+
 De testcommando's zijn read-only of werken op tijdelijke testfixtures; ze wijzigen geen
 gebruikersinstellingen en zetten `SECURELOAD`/`FILEDIA` netjes terug.
