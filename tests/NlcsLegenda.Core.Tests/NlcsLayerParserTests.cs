@@ -54,6 +54,9 @@ public class NlcsLayerParserTests
         Assert.True(NlcsLayerParser.TryParse("SIT-NW-ONTWERP|N-WE-AM-AS_WEG-G", out var parsed));
         Assert.True(parsed!.IsXref);
         Assert.Equal("N-WE-AM-AS_WEG-G", parsed.LocalName);
+        Assert.Equal("N-WE-AM-AS_WEG-G", parsed.LogicalLayerName);
+        Assert.Equal("SIT-NW-ONTWERP|N-WE-AM-AS_WEG-G", parsed.SourceLayerName);
+        Assert.Equal("SIT-NW-ONTWERP", parsed.SourceIdentity);
         Assert.Equal("SIT-NW-ONTWERP", parsed.XrefName);
         Assert.Equal("AS_WEG", parsed.Element);
         Assert.Equal(NlcsStatus.Nieuw, parsed.Status);
@@ -67,7 +70,10 @@ public class NlcsLayerParserTests
         Assert.True(NlcsLayerParser.TryParse("BUITEN|BINNEN|N-WE-VH-GOOT-V", out var parsed));
         Assert.True(parsed!.IsXref);
         Assert.Equal("BUITEN|BINNEN", parsed.XrefName);
+        Assert.Equal("BUITEN|BINNEN", parsed.SourceIdentity);
+        Assert.Equal("BUITEN|BINNEN|N-WE-VH-GOOT-V", parsed.SourceLayerName);
         Assert.Equal("N-WE-VH-GOOT-V", parsed.LocalName);
+        Assert.Equal("N-WE-VH-GOOT-V", parsed.LogicalLayerName);
         Assert.Equal(NlcsDrawType.Vlakvulling, parsed.DrawType);
     }
 
