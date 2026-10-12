@@ -593,7 +593,7 @@ public static class LegendBuilder
     {
         var result = new List<ObjectId>();
         ok = false;
-        var probe = new BlockReference(Point3d.Origin, defId) { Layer = layer };
+        using var probe = new BlockReference(Point3d.Origin, defId) { Layer = layer };
         btr.AppendEntity(probe);
         created.Add(probe.ObjectId);
         tr.AddNewlyCreatedDBObject(probe, true);

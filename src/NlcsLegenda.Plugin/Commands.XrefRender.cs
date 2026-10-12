@@ -382,7 +382,7 @@ public partial class Commands
         var db = doc.Database;
         var ed = doc.Editor;
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
-        string sourcePath = Path.Combine(dir, "xref-visibility-" + Guid.NewGuid().ToString("N") + ".dwg");
+        string sourcePath = Path.Join(dir, "xref-visibility-" + Guid.NewGuid().ToString("N") + ".dwg");
         const string xrefName = "VISIBILITYTEST";
         string dependentLayer = string.Empty;
         string error = "geen";
@@ -446,7 +446,7 @@ public partial class Commands
         var db = doc.Database;
         var ed = doc.Editor;
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
-        string sourcePath = Path.Combine(dir, "xref-state-" + Guid.NewGuid().ToString("N") + ".dwg");
+        string sourcePath = Path.Join(dir, "xref-state-" + Guid.NewGuid().ToString("N") + ".dwg");
         string unavailablePath = sourcePath + ".unavailable";
         const string xrefName = "STATETEST";
         string error = "geen";
@@ -1287,8 +1287,8 @@ public partial class Commands
                         && Math.Abs(samples[2].PatternAngle - 0.25) < 1e-9;
                 }
 
-                groupsOk = rows.Count == 4 && shared?.Metric.Count == 2 && Math.Abs(shared.Metric.Area - 200) < 1e-8
-                    && separate.All(entry => entry?.Metric.Count == 1 && Math.Abs(entry.Metric.Area - 100) < 1e-8)
+                groupsOk = rows.Count == 4 && shared is not null && shared.Metric.Count == 2 && Math.Abs(shared.Metric.Area - 200) < 1e-8
+                    && separate.All(entry => entry is not null && entry.Metric.Count == 1 && Math.Abs(entry.Metric.Area - 100) < 1e-8)
                     && rows.Select(entry => entry.RenderIdentity).Distinct(StringComparer.Ordinal).Count() == 4
                     && SharedSampleMatches() && SeparateSamplesMatch();
                 exportOk = ExportedCounts(rows).SequenceEqual(new[] { 1, 1, 1, 2 });

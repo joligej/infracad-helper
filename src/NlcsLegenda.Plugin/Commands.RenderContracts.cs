@@ -34,7 +34,7 @@ public partial class Commands
                 double[] lengths = { 2, 2, 3, 4, 5, 6 };
                 for (int i = 0; i < lengths.Length; i++)
                 {
-                    var line = new Line(new Point3d(0, i, 0), new Point3d(lengths[i], i, 0)) { LayerId = layerId };
+                    using var line = new Line(new Point3d(0, i, 0), new Point3d(lengths[i], i, 0)) { LayerId = layerId };
                     if (i == 1) line.Color = Color.FromRgb(30, 80, 160);
                     if (i == 2) line.Transparency = new Transparency((byte)100);
                     if (i == 3) line.LineWeight = LineWeight.LineWeight100;
@@ -47,13 +47,13 @@ public partial class Commands
                 var blocks = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
                 var block = new BlockTableRecord { Name = "PROPERTY_BYBLOCK" };
                 var blockId = blocks.Add(block); tr.AddNewlyCreatedDBObject(block, true);
-                var child = new Line(Point3d.Origin, new Point3d(7, 0, 0))
+                using var child = new Line(Point3d.Origin, new Point3d(7, 0, 0))
                 { LayerId = inheritId, ColorIndex = 0, LinetypeId = db.ByBlockLinetype, LineWeight = LineWeight.ByBlock };
                 block.AppendEntity(child); tr.AddNewlyCreatedDBObject(child, true);
-                var parent = new BlockReference(new Point3d(0, 20, 0), blockId)
+                using var parent = new BlockReference(new Point3d(0, 20, 0), blockId)
                 { Color = Color.FromRgb(120, 80, 20), LinetypeId = dashId, LineWeight = LineWeight.LineWeight050 };
                 ms.AppendEntity(parent); tr.AddNewlyCreatedDBObject(parent, true);
-                var explicitLine = new Line(new Point3d(0, 22, 0), new Point3d(8, 22, 0))
+                using var explicitLine = new Line(new Point3d(0, 22, 0), new Point3d(8, 22, 0))
                 { LayerId = inheritId, Color = parent.Color, LinetypeId = dashId, LineWeight = LineWeight.LineWeight050 };
                 ms.AppendEntity(explicitLine); tr.AddNewlyCreatedDBObject(explicitLine, true);
                 tr.Commit();
@@ -124,12 +124,12 @@ public partial class Commands
                     var id = blocks.Add(block); tr.AddNewlyCreatedDBObject(block, true);
                     if (i == 1 || i == 2)
                     {
-                        var line = new Line(Point3d.Origin, new Point3d(10, 0, 0)) { Visible = i == 2 };
+                        using var line = new Line(Point3d.Origin, new Point3d(10, 0, 0)) { Visible = i == 2 };
                         block.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                     }
                     if (i >= 3)
                     {
-                        var hatch = new Hatch();
+                        using var hatch = new Hatch();
                         hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
                         block.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
                         // Gelijke bounding box en patroon, maar verschillende contouren.
@@ -137,7 +137,7 @@ public partial class Commands
                         hatch.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline, points, new DoubleCollection { 0, 0, 0 });
                         hatch.EvaluateHatch(true);
                     }
-                    var reference = new BlockReference(new Point3d(i * 20, 0, 0), id) { LayerId = layerId, ScaleFactors = new Scale3d(0.161, 0.161, 0.16) };
+                    using var reference = new BlockReference(new Point3d(i * 20d, 0, 0), id) { LayerId = layerId, ScaleFactors = new Scale3d(0.161, 0.161, 0.16) };
                     ms.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true);
                 }
                 tr.Commit();
@@ -180,25 +180,25 @@ public partial class Commands
             {
                 var layer = new LayerTableRecord { Name = spatial ? "N-WE-VH-POLY3-G" : "N-WE-VH-POLY2-G" };
                 var layerId = layers.Add(layer); tr.AddNewlyCreatedDBObject(layer, true);
-                Curve curve = spatial ? new Polyline3d() : new Polyline2d();
+                using Curve curve = spatial ? new Polyline3d() : new Polyline2d();
                 curve.LayerId = layerId;
                 definition.AppendEntity(curve); tr.AddNewlyCreatedDBObject(curve, true);
                 foreach (var point in new[] { Point3d.Origin, new Point3d(3,0,0), new Point3d(3,4,0) })
                 {
                     if (curve is Polyline2d p2)
                     {
-                        var vertex = new Vertex2d { Position = point };
+                        using var vertex = new Vertex2d { Position = point };
                         vertices.Add(p2.AppendVertex(vertex)); tr.AddNewlyCreatedDBObject(vertex, true);
                     }
                     else
                     {
-                        var vertex = new PolylineVertex3d(point);
+                        using var vertex = new PolylineVertex3d(point);
                         vertices.Add(((Polyline3d)curve).AppendVertex(vertex)); tr.AddNewlyCreatedDBObject(vertex, true);
                     }
                 }
             }
             var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-            var reference = new BlockReference(Point3d.Origin, defId) { ScaleFactors = new Scale3d(2) };
+            using var reference = new BlockReference(Point3d.Origin, defId) { ScaleFactors = new Scale3d(2) };
             ms.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true);
             string Snapshot() => string.Join(";", vertices.Select(id => tr.GetObject(id, OpenMode.ForRead) switch
             { Vertex2d v => v.Position.ToString(), PolylineVertex3d v => v.Position.ToString(), _ => "invalid" }));

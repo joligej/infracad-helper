@@ -39,7 +39,7 @@ public partial class Commands
         const string layerName = "N-WE-VH-ENTITYSTYLE-G";
         try
         {
-            string path = Path.Combine(Path.GetDirectoryName(db.Filename)!, "entity-style-source.dwg");
+            string path = Path.Join(Path.GetDirectoryName(db.Filename)!, "entity-style-source.dwg");
             using (var source = CreateXrefLineDatabase(path, layerName, 7, 7, out var lineId))
             {
                 using (var tr = source.TransactionManager.StartTransaction())
@@ -47,7 +47,7 @@ public partial class Commands
                     var line = (Line)tr.GetObject(lineId, OpenMode.ForWrite);
                     line.ColorIndex = 1;
                     var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(source), OpenMode.ForWrite);
-                    var green = new Line(new Point3d(0, 1, 0), new Point3d(3, 1, 0));
+                    using var green = new Line(new Point3d(0, 1, 0), new Point3d(3, 1, 0));
                     green.SetDatabaseDefaults(source);
                     green.LayerId = line.LayerId;
                     green.ColorIndex = 3;
@@ -65,7 +65,7 @@ public partial class Commands
                 var layerId = layers.Add(layer);
                 tr.AddNewlyCreatedDBObject(layer, true);
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var red = new Line(Point3d.Origin, new Point3d(5, 0, 0)) { LayerId = layerId, ColorIndex = 1 };
+                using var red = new Line(Point3d.Origin, new Point3d(5, 0, 0)) { LayerId = layerId, ColorIndex = 1 };
                 ms.AppendEntity(red);
                 tr.AddNewlyCreatedDBObject(red, true);
                 tr.Commit();
@@ -113,10 +113,10 @@ public partial class Commands
         var blocks = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
         var definition = new BlockTableRecord { Name = "AUDIT_SYMBOL" };
         var defId = blocks.Add(definition); tr.AddNewlyCreatedDBObject(definition, true);
-        var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 1);
+        using var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 1);
         definition.AppendEntity(circle); tr.AddNewlyCreatedDBObject(circle, true);
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-        var reference = new BlockReference(new Point3d(80, 0, 0), defId) { LayerId = layerId };
+        using var reference = new BlockReference(new Point3d(80, 0, 0), defId) { LayerId = layerId };
         ms.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true);
         tr.Commit();
         AcAp.DocumentManager.MdiActiveDocument.Editor.WriteMessage("\nAUDITFIXTURE 3 lijnen en 1 symbool -> OK");
@@ -133,7 +133,7 @@ public partial class Commands
         const string symbolLayer = "N-WE-VH-DEPENDENCY-S";
         try
         {
-            string path = Path.Combine(Path.GetDirectoryName(db.Filename)!, "dependency-source.dwg");
+            string path = Path.Join(Path.GetDirectoryName(db.Filename)!, "dependency-source.dwg");
             using (var source = CreateXrefLineDatabase(path, lineLayer, 1, 5, out _, symbolLayerName: symbolLayer, symbolBlockName: "DEPENDENCY_SYMBOL"))
             {
                 using (var tr = source.TransactionManager.StartTransaction())
@@ -149,7 +149,7 @@ public partial class Commands
                     var detailLayerId = sourceLayers.Add(detailLayer);
                     tr.AddNewlyCreatedDBObject(detailLayer, true);
                     var materials = (DBDictionary)tr.GetObject(source.MaterialDictionaryId, OpenMode.ForWrite);
-                    var material = new Material { Name = "AUDIT_MATERIAL" };
+                    using var material = new Material { Name = "AUDIT_MATERIAL" };
                     var materialId = materials.SetAt(material.Name, material);
                     tr.AddNewlyCreatedDBObject(material, true);
                     var styles = (TextStyleTable)tr.GetObject(source.TextStyleTableId, OpenMode.ForWrite);
@@ -167,7 +167,7 @@ public partial class Commands
                         if (entity is DBText text) text.TextStyleId = textStyleId;
                         entity.CreateExtensionDictionary();
                         var dictionary = (DBDictionary)tr.GetObject(entity.ExtensionDictionary, OpenMode.ForWrite);
-                        var record = new Xrecord();
+                        using var record = new Xrecord();
                         dictionary.SetAt("AUDIT", record);
                         tr.AddNewlyCreatedDBObject(record, true);
                         using var data = new ResultBuffer(new TypedValue((int)DxfCode.Text, "dependency fixture"));
@@ -208,7 +208,7 @@ public partial class Commands
             }
             try
             {
-                db.SaveAs(Path.Combine(Path.GetDirectoryName(db.Filename)!, "programmatic-save.dwg"), DwgVersion.Current);
+                db.SaveAs(Path.Join(Path.GetDirectoryName(db.Filename)!, "programmatic-save.dwg"), DwgVersion.Current);
                 ed.WriteMessage("\nDEPENDENCY SaveAs -> OK");
             }
             catch (System.Exception ex) { ed.WriteMessage($"\nDEPENDENCY SaveAs -> FAIL: {ex}"); }
