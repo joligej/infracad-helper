@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.29.4 - 2026-10-12
+
+- Dezelfde NLCS-laag uit host- en xref-bronnen wordt alleen samengevoegd wanneer de zichtbare
+  weergave gelijk is. Verschillende kleuren, lijntypen, lijngewichten, arceringen en
+  symboolrenderingen houden hun eigen regels, swatches en hoeveelheden.
+- Xref-symbolen worden bij plaatsing in de hosttekening opgebouwd; tekststijlen worden op basis
+  van hun naam in de hostdatabase opgelost.
+
 ## 1.29.3 - 2026-10-07
 
 - Een legenda die alleen uit een externe referentie (xref) wordt opgebouwd, krijgt nu volledig

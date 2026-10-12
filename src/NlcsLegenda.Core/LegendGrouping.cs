@@ -15,7 +15,8 @@ public static class LegendGrouping
         Func<string, string?>? symbolBlock = null,
         DescriptionCatalog? catalog = null,
         Func<string, string?>? renderIdentity = null,
-        Func<string, DescriptionSource?>? descriptionSourceOf = null)
+        Func<string, DescriptionSource?>? descriptionSourceOf = null,
+        Func<string, string?>? symbolRenderIdentity = null)
     {
         // Per-legenda omschrijvingen liggen bovenop de (globale) catalogus. Dit is de enige plek
         // waar ze worden toegepast, zodat elke aanroeper dezelfde effectieve teksten krijgt.
@@ -34,10 +35,11 @@ public static class LegendGrouping
             // Uitgeschakelde elementsoorten tellen ook niet mee voor hoeveelheden.
             if (!settings.IsDrawTypeIncluded(layer.DrawType)) continue;
 
-            if (!groups.TryGetValue(layer.GroupKey, out var list))
+            var splitKey = layer.GroupKey + "\u0001" + layer.RenderIdentity;
+            if (!groups.TryGetValue(splitKey, out var list))
             {
                 list = new List<NlcsLayerName>();
-                groups[layer.GroupKey] = list;
+                groups[splitKey] = list;
             }
             list.Add(layer);
         }
@@ -46,21 +48,26 @@ public static class LegendGrouping
         foreach (var group in groups.Values)
         {
             var byType = new Dictionary<NlcsDrawType, string>();
-            foreach (var layer in group.OrderBy(l => l.Scale ?? 0))
+            foreach (var layer in group
+                .OrderBy(l => l.Scale ?? 0)
+                .ThenBy(l => l.LocalName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(l => l.Raw, StringComparer.OrdinalIgnoreCase))
             {
                 if (!byType.ContainsKey(layer.DrawType))
-                    byType[layer.DrawType] = layer.LocalName;
+                    byType[layer.DrawType] = layer.EffectiveRenderLayerName;
             }
 
             var representative = group
                 .OrderBy(l => TypePriority(l.DrawType))
                 .ThenBy(l => l.Scale ?? 0)
+                .ThenBy(l => l.LocalName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(l => l.Raw, StringComparer.OrdinalIgnoreCase)
                 .First();
 
             var metric = LayerMetric.Empty;
             if (metrics is not null)
                 foreach (var layer in group)
-                    if (metrics.TryGetValue(layer.LocalName, out var m))
+                    if (metrics.TryGetValue(layer.EffectiveRenderLayerName, out var m))
                         metric += m;
 
             string? blockName = null;
@@ -80,7 +87,10 @@ public static class LegendGrouping
                 LayersByType = byType,
                 Metric = metric,
                 SymbolBlockName = blockName,
-                RenderIdentity = RenderId(byType, renderIdentity, blockName)
+                SourceLayers = group.SelectMany(layer => layer.SourceLayers.Count > 0
+                    ? layer.SourceLayers
+                    : new[] { layer.Source }).Distinct().ToArray(),
+                RenderIdentity = RenderId(byType, renderIdentity, blockName, symbolRenderIdentity)
             });
         }
 
@@ -110,15 +120,25 @@ public static class LegendGrouping
     // Visuele identiteit: per elementsoort de bronlaag-look (kleur/linetype/lineweight) plus
     // symbool. Lege identiteit als er geen laag-info beschikbaar is (dan nooit samenvoegen).
     private static string RenderId(
-        Dictionary<NlcsDrawType, string> byType, Func<string, string?>? renderIdentity, string? block)
+        Dictionary<NlcsDrawType, string> byType, Func<string, string?>? renderIdentity, string? block,
+        Func<string, string?>? symbolRenderIdentity)
     {
         if (renderIdentity is null)
             return string.Empty;
         var parts = new List<string>();
         foreach (var kv in byType.OrderBy(k => k.Key))
             parts.Add($"{kv.Key}={renderIdentity(kv.Value) ?? "?"}");
-        if (!string.IsNullOrEmpty(block))
-            parts.Add("S=" + block);
+        if (byType.TryGetValue(NlcsDrawType.Symbool, out var symbolLayer))
+        {
+            var identity = symbolRenderIdentity?.Invoke(symbolLayer);
+            if (!string.IsNullOrEmpty(identity))
+                parts.Add(identity);
+            else if (!string.IsNullOrEmpty(block))
+            {
+                var separator = block.LastIndexOf('|');
+                parts.Add("S=" + (separator < 0 ? block : block[(separator + 1)..]).Trim());
+            }
+        }
         return string.Join(";", parts);
     }
 
@@ -145,7 +165,8 @@ public static class LegendGrouping
             var statusPart = mergeStatus && e.RenderIdentity.Length > 0
                 ? "R:" + e.RenderIdentity
                 : e.StatusGroupId;
-            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{props.MergeKey(settings.MergedDimensions)}";
+            var renderPart = e.RenderIdentity.Length > 0 ? e.RenderIdentity : string.Empty;
+            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{props.MergeKey(settings.MergedDimensions)}|{renderPart}";
         }
 
         var merged = new List<LegendEntry>();
@@ -188,6 +209,7 @@ public static class LegendGrouping
             Description = rep.Description,
             DescriptionSource = rep.DescriptionSource,
             LayersByType = rep.LayersByType,
+            SourceLayers = group.SelectMany(e => e.SourceLayers).Distinct().ToArray(),
             Metric = metric,
             SymbolBlockName = rep.SymbolBlockName,
             RenderIdentity = rep.RenderIdentity,
@@ -205,13 +227,22 @@ public static class LegendGrouping
         return mode switch
         {
             LegendSortMode.Naam =>
-                ordered.ThenBy(e => e.Description, StringComparer.CurrentCultureIgnoreCase).ToList(),
+                ordered.ThenBy(e => e.Description, StringComparer.CurrentCultureIgnoreCase)
+                       .ThenBy(e => e.RenderIdentity, StringComparer.Ordinal)
+                       .ThenBy(e => e.Element, StringComparer.OrdinalIgnoreCase)
+                       .ThenBy(e => e.PrimaryLayer, StringComparer.OrdinalIgnoreCase).ToList(),
             LegendSortMode.Hoeveelheid =>
                 ordered.ThenByDescending(e => e.QuantitySortValue())
-                       .ThenBy(e => e.Description, StringComparer.CurrentCultureIgnoreCase).ToList(),
+                       .ThenBy(e => e.Description, StringComparer.CurrentCultureIgnoreCase)
+                       .ThenBy(e => e.RenderIdentity, StringComparer.Ordinal)
+                       .ThenBy(e => e.Element, StringComparer.OrdinalIgnoreCase)
+                       .ThenBy(e => e.PrimaryLayer, StringComparer.OrdinalIgnoreCase).ToList(),
             _ =>
                 ordered.ThenBy(e => e.Hoofdgroep, StringComparer.OrdinalIgnoreCase)
-                       .ThenBy(e => e.Description, StringComparer.CurrentCultureIgnoreCase).ToList()
+                       .ThenBy(e => e.Description, StringComparer.CurrentCultureIgnoreCase)
+                       .ThenBy(e => e.RenderIdentity, StringComparer.Ordinal)
+                       .ThenBy(e => e.Element, StringComparer.OrdinalIgnoreCase)
+                       .ThenBy(e => e.PrimaryLayer, StringComparer.OrdinalIgnoreCase).ToList()
         };
     }
 

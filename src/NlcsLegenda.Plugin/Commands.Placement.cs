@@ -44,6 +44,41 @@ public partial class Commands
         return ids;
     }
 
+    private static LegendDefinition PlaceLegendAtPoint(
+        Transaction tr, Database db, LegendRegistry registry, LegendSettings settings,
+        ObjectId[]? selection, ObjectId blockRecordId, BlockReference preview, Point3d point)
+    {
+        RequireHostObjectId(db, blockRecordId, "legend block");
+        RequireHostObjectId(db, preview.ObjectId, "preview reference");
+        RequireHostObjectId(db, preview.BlockTableRecord, "preview block reference");
+        if (preview.BlockTableRecord != blockRecordId)
+            throw new InvalidOperationException("De preview verwijst niet naar het legenda-blok uit de hostdatabase.");
+
+        preview.Position = point;
+        var def = new LegendDefinition
+        {
+            Name = registry.NextDefaultName(),
+            Scope = selection is { Length: > 0 } ? LegendScope.Selection : LegendScope.WholeDrawing,
+            SourceHandles = selection is { Length: > 0 } ? LegendManagement.ToHandles(selection) : new(),
+            GroupName = LegendRegistry.NewGroupName(),
+            Settings = settings.Clone(),
+            CreatedWithVersion = PluginVersion
+        };
+        var members = FinalizePlacement(tr, db, preview, settings, def.GroupName);
+        foreach (var member in members)
+            RequireHostObjectId(db, member, "placed legend entity");
+
+        registry.Add(def);
+        LegendStore.Save(db, tr, registry);
+        return def;
+    }
+
+    private static void RequireHostObjectId(Database host, ObjectId id, string role)
+    {
+        if (id.IsNull || id.Database != host)
+            throw new InvalidOperationException($"Het {role}-ObjectId hoort niet bij de hostdatabase.");
+    }
+
     private static Point3d ComputeInsertPoint(Database db, LegendSettings s)
     {
         try

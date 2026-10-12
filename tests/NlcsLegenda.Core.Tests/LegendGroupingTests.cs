@@ -93,4 +93,91 @@ public class LegendGroupingTests
         Assert.Single(entries);
         Assert.Equal(NlcsStatus.Nieuw, entries[0].Status);
     }
+
+    [Fact]
+    public void SameLogicalLayer_DifferentRenderIdentity_SplitsIntoSeparateRows()
+    {
+        // Zoals de analyse ze maakt bij bronnen met zichtbaar verschillende weergave: dezelfde
+        // logische NLCS-laag, maar twee render-partities. Build houdt ze als aparte regels.
+        var a = WithRender("N-WE-VH-WEG-G", "N-WE-VH-WEG-G", "ACI:1");
+        var b = WithRender("XREF|N-WE-VH-WEG-G", "N-WE-VH-WEG-G #2", "ACI:3");
+
+        var entries = LegendGrouping.Build(new[] { a, b }, new LegendSettings { IncludeXrefLayers = true },
+            metrics: new Dictionary<string, LayerMetric>
+            {
+                [a.EffectiveRenderLayerName] = LayerMetric.Empty.Add(1, 5, 0),
+                [b.EffectiveRenderLayerName] = LayerMetric.Empty.Add(1, 7, 0)
+            });
+
+        Assert.Equal(2, entries.Count);
+        Assert.All(entries, e => Assert.Equal("WEG", e.Element));
+        Assert.Equal(new[] { 5.0, 7.0 }, entries.Select(e => e.Metric.Length).OrderBy(value => value).ToArray());
+        Assert.Equal(2, entries.Sum(e => e.SourceLayers.Count));
+    }
+
+    [Fact]
+    public void SameLogicalLayer_SameRenderIdentity_StaysOneRow()
+    {
+        var a = WithRender("N-WE-VH-WEG-G", "N-WE-VH-WEG-G", "ACI:1");
+        var b = WithRender("XREF|N-WE-VH-WEG-G", "N-WE-VH-WEG-G #2", "ACI:1");
+
+        var entries = LegendGrouping.Build(new[] { a, b }, new LegendSettings { IncludeXrefLayers = true },
+            metrics: new Dictionary<string, LayerMetric>
+            {
+                [a.EffectiveRenderLayerName] = LayerMetric.Empty.Add(1, 5, 0),
+                [b.EffectiveRenderLayerName] = LayerMetric.Empty.Add(1, 7, 0)
+            });
+
+        var entry = Assert.Single(entries);
+        Assert.Equal(12, entry.Metric.Length);
+        Assert.Equal(2, entry.SourceLayers.Count);
+    }
+
+    [Fact]
+    public void SameDescription_DifferentRenderIdentities_SortDeterministically()
+    {
+        var red = WithRender("N-WE-VH-WEG-G", "N-WE-VH-WEG-G", "ACI:1");
+        var green = WithRender("XREF|N-WE-VH-WEG-G", "N-WE-VH-WEG-G #2", "ACI:3");
+        var styles = new Dictionary<string, string>
+        {
+            [red.EffectiveRenderLayerName] = "ACI:1",
+            [green.EffectiveRenderLayerName] = "ACI:3"
+        };
+        var settings = new LegendSettings { IncludeXrefLayers = true };
+
+        IReadOnlyList<LegendEntry> BuildInOrder(params NlcsLayerName[] layers) =>
+            LegendGrouping.Build(layers, settings,
+                renderIdentity: layer => styles.TryGetValue(layer, out var style) ? style : null);
+
+        var forward = BuildInOrder(green, red);
+        var reverse = BuildInOrder(red, green);
+
+        Assert.Equal(2, forward.Count);
+        Assert.Equal(forward.Select(entry => entry.RenderIdentity), reverse.Select(entry => entry.RenderIdentity));
+        Assert.Equal(new[] { "Geometrie=ACI:1", "Geometrie=ACI:3" },
+            forward.Select(entry => entry.RenderIdentity));
+    }
+
+    private static NlcsLayerName WithRender(string parseName, string renderLayerName, string renderIdentity)
+    {
+        Assert.True(NlcsLayerParser.TryParse(parseName, out var p));
+        return new NlcsLayerName
+        {
+            Raw = p!.Raw,
+            LocalName = p.LocalName,
+            IsXref = p.IsXref,
+            XrefName = p.XrefName,
+            StatusCode = p.StatusCode,
+            Status = p.Status,
+            Discipline = p.Discipline,
+            Hoofdgroep = p.Hoofdgroep,
+            Element = p.Element,
+            TypeSuffix = p.TypeSuffix,
+            DrawType = p.DrawType,
+            Scale = p.Scale,
+            RenderLayerName = renderLayerName,
+            RenderIdentity = renderIdentity,
+            SourceLayers = new[] { p.Source }
+        };
+    }
 }

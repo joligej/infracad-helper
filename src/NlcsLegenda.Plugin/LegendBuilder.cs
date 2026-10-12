@@ -258,12 +258,18 @@ public static class LegendBuilder
         double bottom = top - swatchH;
         double midY = (top + bottom) / 2.0;
 
+        var renderLayers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var lyr in entry.LayersByType.Values)
         {
+            if (renderLayers.ContainsKey(lyr))
+                continue;
             if (analysis.LayerStyles.TryGetValue(lyr, out var style))
-                EnsureStyledLayer(tr, db, lyr, style);
+                renderLayers[lyr] = EnsureStyledLayer(tr, db, lyr, style);
             else
+            {
                 EnsureLayer(tr, db, lyr, 7);
+                renderLayers[lyr] = lyr;
+            }
         }
 
         // Elke elementsoort rendert volgens zijn eigen semantiek en wordt van achter naar
@@ -274,7 +280,7 @@ public static class LegendBuilder
         // Vlak (GV): begrensd oppervlak, weergegeven als rechthoek op de bronlaag.
         if (entry.VlakLayer is { } vlakLayer)
         {
-            var area = MakeRectangle(x, bottom, swatchW, swatchH, vlakLayer);
+            var area = MakeRectangle(x, bottom, swatchW, swatchH, renderLayers[vlakLayer]);
             btr.AppendEntity(area);
             tr.AddNewlyCreatedDBObject(area, true);
         }
@@ -282,17 +288,17 @@ public static class LegendBuilder
         // Vlakvulling (V): egale (SOLID) vulling van het vakje.
         if (entry.FillLayer is { } fillLayer)
         {
-            var fillBoundary = MakeRectangle(x, bottom, swatchW, swatchH, fillLayer);
+            var fillBoundary = MakeRectangle(x, bottom, swatchW, swatchH, renderLayers[fillLayer]);
             var fillId = btr.AppendEntity(fillBoundary);
             tr.AddNewlyCreatedDBObject(fillBoundary, true);
-            AddSolidFill(btr, tr, fillId, fillLayer);
+            AddSolidFill(btr, tr, fillId, renderLayers[fillLayer]);
         }
 
         // Arcering (A): het patroon uit de brontekening.
         if (entry.HatchLayer is { } hatchLayer)
         {
             analysis.HatchSamples.TryGetValue(hatchLayer, out var sample);
-            AddHatch(btr, tr, x, bottom, swatchW, swatchH, hatchLayer, sample, s.HatchScaleFactor);
+            AddHatch(btr, tr, x, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample, s.HatchScaleFactor);
         }
 
         // Geometrie (G/GD/GS): altijd een horizontale lijn; linetype en kleur volgen ByLayer.
@@ -301,16 +307,21 @@ public static class LegendBuilder
             var line = new Polyline();
             line.AddVertexAt(0, new Point2d(x, midY), 0, 0, 0);
             line.AddVertexAt(1, new Point2d(x + swatchW, midY), 0, 0, 0);
-            line.Layer = geoLayer;
+            line.Layer = renderLayers[geoLayer];
             btr.AppendEntity(line);
             tr.AddNewlyCreatedDBObject(line, true);
         }
 
-        // Symbool (S): echt blok passend in het vakje. Staat de optie uit of kan een blok niet
-        // worden geplaatst, dan tekenen we niets; geen generieke nep-markering.
+        // Symbool (S): echt blok passend in het vakje. Een onbeschikbaar blok wordt als renderissue gemeld.
         if (entry.SymbolLayer is { } symLayer && s.InsertSymbolBlocks && entry.SymbolBlockName is { } blk)
-            TryInsertSymbol(btr, tr, db, blk, symLayer,
-                x + swatchW / 2, midY, swatchW, swatchH, s.ModelUnitsPerPaperMm);
+        {
+            var symbolTransform = analysis.SymbolSamples.TryGetValue(symLayer, out var sample)
+                ? sample.Transform
+                : SymbolTransform.Identity;
+            if (!TryInsertSymbol(btr, tr, db, blk, renderLayers[symLayer], symbolTransform,
+                    x + swatchW / 2, midY, swatchW, swatchH, s.ModelUnitsPerPaperMm, out var failureReason))
+                throw new InvalidOperationException(failureReason);
+        }
 
         // Kader per swatch: alleen een zichtbaar vakje op de kaderlaag als de gebruiker dat wil.
         if (s.DrawSwatchFrame)
@@ -356,22 +367,41 @@ public static class LegendBuilder
 
     private static bool TryInsertSymbol(
         BlockTableRecord btr, Transaction tr, Database db, string blockName, string layer,
-        double centerX, double centerY, double swatchW, double swatchH, double modelPerPaperMm)
+        SymbolTransform sourceTransform,
+        double centerX, double centerY, double swatchW, double swatchH, double modelPerPaperMm,
+        out string failureReason)
     {
+        failureReason = string.Empty;
+        var primitives = new List<ObjectId>();
         try
         {
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
             if (!bt.Has(blockName))
+            {
+                failureReason = $"Symboolblok '{blockName}' ontbreekt in de hostdatabase.";
                 return false;
+            }
             var defId = bt[blockName];
 
             // Explode-to-primitives voorkomt dat annotatieve blokschaal de swatch opblaast.
-            var primitives = ExplodeToPrimitives(btr, tr, defId, out var probeOk);
+            primitives = ExplodeToPrimitives(btr, tr, defId, out var probeOk);
             if (!probeOk || primitives.Count == 0)
             {
                 foreach (var id in primitives)
                     EraseSafe(tr, id);
+                failureReason = $"Symboolblok '{blockName}' bevat geen omzetbare geometrie.";
                 return false;
+            }
+
+            var transform = sourceTransform.ToMatrix();
+            for (int i = 0; i < primitives.Count; i++)
+            {
+                var entity = (Entity)tr.GetObject(primitives[i], OpenMode.ForWrite);
+                Entity place = entity is DBText dbText
+                    ? SymbolTextToMText(btr, tr, dbText)
+                    : entity;
+                place.TransformBy(transform);
+                primitives[i] = place.ObjectId;
             }
 
             double minX = double.MaxValue, minY = double.MaxValue;
@@ -392,6 +422,7 @@ public static class LegendBuilder
             {
                 foreach (var id in primitives)
                     EraseSafe(tr, id);
+                failureReason = $"Symboolblok '{blockName}' heeft geen bruikbare extents.";
                 return false;
             }
 
@@ -412,16 +443,16 @@ public static class LegendBuilder
             {
                 if (tr.GetObject(id, OpenMode.ForWrite) is not Entity e)
                     continue;
-                // Tekst uit het bronsymbool wordt MText, zodat de gegenereerde legenda nooit DBText
-                // bevat. De maatvoering hierboven is al op de oorspronkelijke tekst gemeten.
-                Entity place = e is DBText dbt ? SymbolTextToMText(btr, tr, dbt) : e;
-                place.TransformBy(m);
-                place.Layer = layer;
+                e.TransformBy(m);
+                e.Layer = layer;
             }
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            foreach (var id in primitives)
+                EraseSafe(tr, id);
+            failureReason = $"Symboolblok '{blockName}' kon niet worden weergegeven: {ex.Message}";
             return false;
         }
     }
@@ -543,8 +574,17 @@ public static class LegendBuilder
         mt.Normal = dbt.Normal;
         mt.Layer = dbt.Layer;
         mt.Color = dbt.Color;
+        // Een xref-tekststijl-ID hoort bij de bron-database; alleen de naam mag de grens over.
         if (!dbt.TextStyleId.IsNull)
-            mt.TextStyleId = dbt.TextStyleId;
+        {
+            var host = btr.Database;
+            var styleName = ReadTextStyleName(dbt.TextStyleId, host, tr);
+            var styleId = ResolveTextStyle(tr, host, styleName);
+            if (styleId.IsNull || styleId.Database != host)
+                throw new InvalidOperationException(
+                    $"De symbooltekststijl '{styleName}' kon niet naar de hostdatabase worden vertaald.");
+            mt.TextStyleId = styleId;
+        }
         mt.TextHeight = dbt.Height > 1e-9 ? dbt.Height : mt.TextHeight;
         mt.Rotation = dbt.Rotation;
         mt.Attachment = AttachmentPoint.MiddleCenter;
@@ -562,6 +602,25 @@ public static class LegendBuilder
         tr.AddNewlyCreatedDBObject(mt, true);
         dbt.Erase();
         return mt;
+    }
+
+    private static string ReadTextStyleName(ObjectId styleId, Database host, Transaction hostTransaction)
+    {
+        var source = styleId.Database
+            ?? throw new InvalidOperationException("De symbooltekststijl heeft geen database-eigenaar.");
+        if (source == host)
+        {
+            return hostTransaction.GetObject(styleId, OpenMode.ForRead) is TextStyleTableRecord hostStyle
+                ? hostStyle.Name
+                : throw new InvalidOperationException("De symbooltekststijl is geen tekststijlrecord.");
+        }
+
+        using var sourceTransaction = source.TransactionManager.StartTransaction();
+        var sourceStyle = sourceTransaction.GetObject(styleId, OpenMode.ForRead) as TextStyleTableRecord
+            ?? throw new InvalidOperationException("De bron-symbooltekststijl is geen tekststijlrecord.");
+        var name = sourceStyle.Name;
+        sourceTransaction.Commit();
+        return name;
     }
 
     // Alle door de plugin getekende legendatekst is MText. DBText-baseline en MText-attachment
@@ -614,21 +673,25 @@ public static class LegendBuilder
         BlockTableRecord btr, Transaction tr, ObjectId boundaryId, string layer)
     {
         var hatch = new Hatch();
-        hatch.SetDatabaseDefaults();
-        hatch.Layer = layer;
-        hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
-        btr.AppendEntity(hatch);
-        tr.AddNewlyCreatedDBObject(hatch, true);
-        hatch.Associative = false;
         try
         {
+            hatch.SetDatabaseDefaults();
+            hatch.Layer = layer;
+            hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
+            btr.AppendEntity(hatch);
+            tr.AddNewlyCreatedDBObject(hatch, true);
+            hatch.Associative = false;
             using (var loop = new ObjectIdCollection { boundaryId })
                 hatch.AppendLoop(HatchLoopTypes.Default, loop);
             hatch.EvaluateHatch(true);
         }
         catch
         {
-            hatch.Erase();
+            if (!hatch.ObjectId.IsNull)
+                EraseSafe(tr, hatch.ObjectId);
+            else
+                hatch.Dispose();
+            throw;
         }
     }
 
@@ -637,68 +700,120 @@ public static class LegendBuilder
         string layer, HatchSample? sample, double scaleFactor)
     {
         var hatch = new Hatch();
-        hatch.SetDatabaseDefaults();
-        hatch.Layer = layer;
-
-        var patternName = sample?.PatternName ?? "SOLID";
-        var patternType = sample?.PatternType ?? HatchPatternType.PreDefined;
         try
         {
+            hatch.SetDatabaseDefaults();
+            hatch.Layer = layer;
+            var patternName = sample?.PatternName ?? "SOLID";
+            var patternType = sample?.PatternType ?? HatchPatternType.PreDefined;
             hatch.SetHatchPattern(patternType, patternName);
-        }
-        catch
-        {
-            hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
-        }
+            if (sample is not null)
+            {
+                var patternScale = sample.IsSolid ? 1.0 : sample.PatternScale * scaleFactor;
+                if (!sample.IsSolid && (!double.IsFinite(patternScale) || patternScale <= 0))
+                    throw new InvalidOperationException($"Arcering '{patternName}' heeft een ongeldige render-schaal.");
+                if (!double.IsFinite(sample.PatternAngle))
+                    throw new InvalidOperationException($"Arcering '{patternName}' heeft een ongeldige render-hoek.");
+                hatch.PatternScale = patternScale;
+                hatch.PatternAngle = sample.IsSolid ? 0.0 : sample.PatternAngle;
+                if (sample.Color is not null)
+                    hatch.Color = sample.Color;
+                hatch.Transparency = sample.Transparency.ToAutoCadValue();
+            }
 
-        if (sample is not null)
-        {
-            try { hatch.PatternScale = Math.Max(sample.PatternScale * scaleFactor, 1e-6); } catch { /* houd standaard */ }
-            try { hatch.PatternAngle = sample.PatternAngle; } catch { /* houd standaard */ }
-            try { hatch.SetHatchPattern(hatch.PatternType, hatch.PatternName); } catch { /* negeren */ }
-        }
-
-        btr.AppendEntity(hatch);
-        tr.AddNewlyCreatedDBObject(hatch, true);
-
-        // Niet-associatieve hatch: lus direct uit punten, zodat explode/update betrouwbaar blijft.
-        hatch.Associative = false;
-        var pts = new Point2dCollection
-        {
-            new Point2d(x, yBottom),
-            new Point2d(x + w, yBottom),
-            new Point2d(x + w, yBottom + h),
-            new Point2d(x, yBottom + h)
-        };
-        var bulges = new DoubleCollection { 0.0, 0.0, 0.0, 0.0 };
-        try
-        {
+            btr.AppendEntity(hatch);
+            tr.AddNewlyCreatedDBObject(hatch, true);
+            hatch.Associative = false;
+            var pts = new Point2dCollection
+            {
+                new Point2d(x, yBottom),
+                new Point2d(x + w, yBottom),
+                new Point2d(x + w, yBottom + h),
+                new Point2d(x, yBottom + h)
+            };
+            var bulges = new DoubleCollection { 0.0, 0.0, 0.0, 0.0 };
             hatch.AppendLoop(HatchLoopTypes.Polyline, pts, bulges);
             hatch.EvaluateHatch(true);
         }
         catch
         {
-            hatch.Erase();
+            if (!hatch.ObjectId.IsNull)
+                EraseSafe(tr, hatch.ObjectId);
+            else
+                hatch.Dispose();
+            throw;
         }
     }
 
     // Zoals EnsureLayer, maar een nieuwe laag krijgt de effectieve look van de bron (kleur,
-    // linetype, lijndikte). Zo neemt een swatch uit een xref-only kader de echte kleur over in
+    // linetype, lijndikte, transparantie). Zo neemt een swatch uit een xref-only kader de echte kleur over in
     // plaats van standaardwit. Een bestaande hostlaag houdt zijn eigen look. Alleen losse data
     // (geen bron-ObjectId's): het linetype gaat op naam, onbekend valt terug op Continuous.
-    private static void EnsureStyledLayer(Transaction tr, Database db, string name, LayerDisplayStyle style)
+    private static string EnsureStyledLayer(Transaction tr, Database db, string name, LayerDisplayStyle style)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-        if (lt.Has(name))
-            return;
+        bool nameExists = lt.Has(name);
+        if (nameExists)
+        {
+            var existing = (LayerTableRecord)tr.GetObject(lt[name], OpenMode.ForRead);
+            if (LayerMatchesStyle(tr, existing, style))
+                return name;
+        }
+
+        string styledName = nameExists ? StyledLayerName(name, style) : name;
+        for (int collision = 0; lt.Has(styledName); collision++)
+        {
+            var existing = (LayerTableRecord)tr.GetObject(lt[styledName], OpenMode.ForRead);
+            if (LayerMatchesStyle(tr, existing, style))
+                return styledName;
+            styledName = StyledLayerName(name, style, collision + 1);
+        }
+
         lt.UpgradeOpen();
-        var ltr = new LayerTableRecord { Name = name, Color = style.Color, LineWeight = style.LineWeight };
+        var ltr = new LayerTableRecord
+        {
+            Name = styledName,
+            Color = style.Color,
+            LineWeight = style.LineWeight
+        };
         var cleanLt = LayerNaming.LocalName(style.Linetype);
         var ltt = (LinetypeTable)tr.GetObject(db.LinetypeTableId, OpenMode.ForRead);
         if (!string.IsNullOrEmpty(cleanLt) && ltt.Has(cleanLt))
             ltr.LinetypeObjectId = ltt[cleanLt];
         lt.Add(ltr);
         tr.AddNewlyCreatedDBObject(ltr, true);
+        ltr.Transparency = style.Transparency.ToAutoCadValue();
+        return styledName;
+    }
+
+    private static bool LayerMatchesStyle(Transaction tr, LayerTableRecord layer, LayerDisplayStyle style)
+    {
+        string linetype = "Continuous";
+        if (tr.GetObject(layer.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord ltr)
+            linetype = ltr.Name;
+        return layer.Color.ColorMethod == style.Color.ColorMethod
+            && layer.Color.ColorIndex == style.Color.ColorIndex
+            && layer.Color.ColorValue.ToArgb() == style.Color.ColorValue.ToArgb()
+            && StringComparer.OrdinalIgnoreCase.Equals(linetype, style.Linetype)
+            && layer.LineWeight == style.LineWeight
+            && TransparencyValue.From(layer.Transparency).Signature == style.Transparency.Signature;
+    }
+
+    private static string StyledLayerName(string name, LayerDisplayStyle style, int collision = 0)
+    {
+        string key = string.Join("|",
+            style.Color.ColorMethod,
+            style.Color.ColorIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            style.Color.ColorValue.ToArgb().ToString(System.Globalization.CultureInfo.InvariantCulture),
+            style.Linetype.Trim().ToUpperInvariant(),
+            style.LineWeight,
+            style.Transparency.Signature);
+        string hash = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key)))[..12];
+        string suffix = $" #R{hash}" + (collision == 0 ? string.Empty : $"_{collision + 1}");
+        int prefixLength = Math.Max(1, 255 - suffix.Length);
+        string prefix = name.Length <= prefixLength ? name : name[..prefixLength];
+        return prefix + suffix;
     }
 
     private static void EnsureLayer(Transaction tr, Database db, string name, short colorIndex, bool plottable = true)
@@ -734,17 +849,28 @@ public static class LegendBuilder
     private static ObjectId ResolveTextStyle(Transaction tr, Database db, string name)
     {
         var tst = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForRead);
-        if (!string.IsNullOrWhiteSpace(name) && tst.Has(name))
-            return tst[name];
+        ObjectId FindHostStyle(string candidate)
+        {
+            if (string.IsNullOrWhiteSpace(candidate) || !tst.Has(candidate))
+                return ObjectId.Null;
+            var id = tst[candidate];
+            return !id.IsNull && id.Database == db ? id : ObjectId.Null;
+        }
 
-        if (tst.Has("NLCS-ISO"))
-            return tst["NLCS-ISO"];
+        var requested = FindHostStyle(name);
+        if (!requested.IsNull)
+            return requested;
+
+        var nlcsIso = FindHostStyle("NLCS-ISO");
+        if (!nlcsIso.IsNull)
+            return nlcsIso;
 
         // Een variabele-hoogte NLCS-ISO-stijl (height 0) is bruikbaar; vaste-hoogte varianten
         // (NLCS-ISO-M500-T25 e.d.) negeren onze eigen teksthoogte en slaan we over.
         foreach (ObjectId id in tst)
         {
-            if (tr.GetObject(id, OpenMode.ForRead) is TextStyleTableRecord ts &&
+            if (!id.IsNull && id.Database == db
+                && tr.GetObject(id, OpenMode.ForRead) is TextStyleTableRecord ts &&
                 ts.Name.StartsWith("NLCS-ISO", StringComparison.OrdinalIgnoreCase) &&
                 ts.TextSize == 0.0)
                 return id;
@@ -752,11 +878,15 @@ public static class LegendBuilder
 
         foreach (ObjectId id in tst)
         {
-            if (tr.GetObject(id, OpenMode.ForRead) is TextStyleTableRecord ts &&
+            if (!id.IsNull && id.Database == db
+                && tr.GetObject(id, OpenMode.ForRead) is TextStyleTableRecord ts &&
                 ts.Name.Contains("NLCS", StringComparison.OrdinalIgnoreCase) &&
                 ts.TextSize == 0.0)
                 return id;
         }
-        return db.Textstyle;
+        var defaultStyle = db.Textstyle;
+        if (defaultStyle.IsNull || defaultStyle.Database != db)
+            throw new InvalidOperationException("Geen tekststijl uit de hostdatabase beschikbaar.");
+        return defaultStyle;
     }
 }

@@ -26,6 +26,8 @@ public sealed class LegendEntry
 
     public Dictionary<NlcsDrawType, string> LayersByType { get; init; } = new();
 
+    public IReadOnlyList<NlcsLayerSource> SourceLayers { get; init; } = System.Array.Empty<NlcsLayerSource>();
+
     // Alleen de echte G/GD/GS-laag. GV valt hier bewust niet onder: een vlak rendert als
     // rechthoek, een G-lijn altijd als lijn, ook als beide op dezelfde entry zitten.
     public string? GeometryLayer =>

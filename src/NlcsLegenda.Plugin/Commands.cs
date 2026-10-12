@@ -156,19 +156,8 @@ public partial class Commands
                 }
                 else
                 {
-                    br.Position = jig.Position;
-                    var def = new LegendDefinition
-                    {
-                        Name = registry.NextDefaultName(),
-                        Scope = selection is { Length: > 0 } ? LegendScope.Selection : LegendScope.WholeDrawing,
-                        SourceHandles = selection is { Length: > 0 } ? LegendManagement.ToHandles(selection) : new(),
-                        GroupName = LegendRegistry.NewGroupName(),
-                        Settings = settings.Clone(),
-                        CreatedWithVersion = PluginVersion
-                    };
-                    FinalizePlacement(tr, db, br, settings, def.GroupName);
-                    registry.Add(def);
-                    LegendStore.Save(db, tr, registry);
+                    var def = PlaceLegendAtPoint(
+                        tr, db, registry, settings, selection, btrId, br, jig.Position);
                     ed.WriteMessage($"\n\"{def.Name}\" geplaatst ({def.Scope.ToDisplay()}).");
                 }
                 tr.Commit();
@@ -4458,7 +4447,7 @@ public partial class Commands
             var res = ed.GetKeywords(pko);
             if (res.Status == PromptStatus.Cancel)
                 return false;
-            if (res.Status != PromptStatus.OK)
+            if (res.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(res.StringResult))
                 return true;
 
             switch (res.StringResult)
