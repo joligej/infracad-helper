@@ -38,7 +38,7 @@ public sealed class HatchSample
     public Color? Color { get; set; }
 
     public TransparencyValue Transparency { get; set; } =
-        new(TransparencyMethod.ByAlpha, 0);
+        new(TransparencyMethod.ByAlpha, 255);
 
     public static HatchSample From(Hatch hatch)
     {

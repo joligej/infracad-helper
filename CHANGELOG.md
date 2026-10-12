@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.29.5 - 2026-10-13
+
+- Legenda's behouden de effectieve bronkleur, lijndikte, transparantie en het lijntype,
+  ook wanneer objecten op dezelfde laag verschillende eigenschappen hebben.
+- Verschillende arceringen en symbolen op één bronlaag krijgen eigen regels en hoeveelheden.
+  Arceringsgrenzen worden niet dubbel geteld; geschaalde oppervlakken worden in het juiste vlak gemeten.
+- Xref-symbolen worden met hun database-afhankelijkheden naar de host gekopieerd.
+  Herhaald bijwerken voegt geen nieuwe kopieën van dezelfde stijlen en materialen toe.
+- Vlakke symbolen met een afwijkende Z-insertschaal behouden hun geometrie en arcering.
+- Een tekenfout draait de plaatsing of update terug en behoudt de bestaande legenda.
+- Meerregelige omschrijvingen staan op gelijke hoogte met hun voorbeeld; lege symboolblokken leveren geen lege regel op.
+- De voorbeeldconfiguratie gebruikt dezelfde standaard statusteksten als nieuwe legenda's.
+
 ## 1.29.4 - 2026-10-12
 
 - Dezelfde NLCS-laag uit host- en xref-bronnen wordt alleen samengevoegd wanneer de zichtbare

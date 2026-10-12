@@ -50,7 +50,7 @@ public partial class Commands
                 hatch.PatternScale = 1.5;
                 hatch.PatternAngle = Math.PI / 4.0;
                 hatch.Associative = false;
-                using (var loop = new ObjectIdCollection { plId }) hatch.AppendLoop(HatchLoopTypes.Default, loop);
+                using (var loop = new ObjectIdCollection { plId }) hatch.AppendLoop(HatchLoopTypes.External, loop);
                 hatch.EvaluateHatch(true);
 
                 var symbolLayer = LayerC(XrefSymbolLayer, 2);
@@ -145,7 +145,7 @@ public partial class Commands
             blockRecordId = btrId;
             tr.Commit();
         }
-        catch (System.Exception ex) { err = ex.GetType().Name + ": " + ex.Message; }
+        catch (System.Exception ex) { err = ex.ToString(); }
         return entryCount;
     }
 
@@ -165,6 +165,9 @@ public partial class Commands
             if (tr.GetObject(id, OpenMode.ForRead) is not Entity entity)
                 return;
             entities++;
+            RequireHostObjectId(db, entity.LinetypeId, "entity linetype");
+            if (tr.GetObject(entity.LinetypeId, OpenMode.ForRead) is not LinetypeTableRecord)
+                throw new InvalidOperationException("Een legenda-entiteit verwijst niet naar een host-linetype.");
             if (!entity.LayerId.IsNull)
             {
                 RequireHostObjectId(db, entity.LayerId, "entity layer");
@@ -271,6 +274,44 @@ public partial class Commands
         return result;
     }
 
+    private static (int Rows, double Length) AnalyzeXrefRows(Database db, LegendSettings settings)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: DescriptionCatalog.Default());
+        var rows = analysis.Entries.Where(entry => entry.GeometryLayer is not null).ToList();
+        var result = (rows.Count, rows.Sum(entry => entry.Metric.Length));
+        tr.Commit();
+        return result;
+    }
+
+    private static string FindXrefDependentLayer(Database db, string localLayerName)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        string suffix = "|" + localLayerName;
+        string? name = layers.Cast<ObjectId>()
+            .Select(id => tr.GetObject(id, OpenMode.ForRead) as LayerTableRecord)
+            .Where(layer => layer is { IsDependent: true }
+                && layer.Name.EndsWith(suffix, System.StringComparison.OrdinalIgnoreCase))
+            .Select(layer => layer!.Name)
+            .SingleOrDefault();
+        tr.Commit();
+        return name ?? throw new InvalidOperationException(
+            $"De xref-afhankelijke laag voor '{localLayerName}' ontbreekt.");
+    }
+
+    private static void SetXrefLayerFlags(Database db, string layerName, bool isOff, bool isFrozen)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        if (!layers.Has(layerName))
+            throw new InvalidOperationException($"Xref-laag '{layerName}' ontbreekt.");
+        var layer = (LayerTableRecord)tr.GetObject(layers[layerName], OpenMode.ForWrite);
+        layer.IsOff = isOff;
+        layer.IsFrozen = isFrozen;
+        tr.Commit();
+    }
+
     [CommandMethod("NLCSLEGENDAXREFRENDERTEST", CommandFlags.Modal)]
     public void NlcsLegendaXrefRenderTest()
     {
@@ -331,6 +372,141 @@ public partial class Commands
             ed.WriteMessage($"\nXREFRENDER: totaal -> {(parseOk && noDbErr && colorOk && ownershipOk && hatchLoops > 0 && symbolOk && hatchStyleOk ? "OK" : "FAIL")}");
         }
         catch (System.Exception ex) { ed.WriteMessage($"\nXREFRENDER fatale fout: {ex.GetType().Name}: {ex.Message}"); }
+    }
+
+    [CommandMethod("NLCSLEGENDAXREFVISIBILITYTEST", CommandFlags.Modal)]
+    public void NlcsLegendaXrefVisibilityTest()
+    {
+        var doc = AcAp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var db = doc.Database;
+        var ed = doc.Editor;
+        string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
+        string sourcePath = Path.Combine(dir, "xref-visibility-" + Guid.NewGuid().ToString("N") + ".dwg");
+        const string xrefName = "VISIBILITYTEST";
+        string dependentLayer = string.Empty;
+        string error = "geen";
+        (int Rows, double Length) baseline = default;
+        (int Rows, double Length) hiddenOff = default;
+        (int Rows, double Length) includedOff = default;
+        (int Rows, double Length) hiddenFrozen = default;
+        (int Rows, double Length) includedFrozen = default;
+        var settings = LoadGlobalDefaults();
+        settings.IncludeXrefLayers = true;
+        settings.IncludeInvisibleLayers = false;
+
+        try
+        {
+            CreateXrefLineDwg(sourcePath, XrefGLayer, 1, 5.0);
+            AttachAndInsert(db, sourcePath, xrefName);
+            dependentLayer = FindXrefDependentLayer(db, XrefGLayer);
+            baseline = AnalyzeXrefRows(db, settings);
+
+            SetXrefLayerFlags(db, dependentLayer, isOff: true, isFrozen: false);
+            hiddenOff = AnalyzeXrefRows(db, settings);
+            settings.IncludeInvisibleLayers = true;
+            includedOff = AnalyzeXrefRows(db, settings);
+
+            SetXrefLayerFlags(db, dependentLayer, isOff: false, isFrozen: true);
+            settings.IncludeInvisibleLayers = false;
+            hiddenFrozen = AnalyzeXrefRows(db, settings);
+            settings.IncludeInvisibleLayers = true;
+            includedFrozen = AnalyzeXrefRows(db, settings);
+        }
+        catch (System.Exception ex)
+        {
+            error = ex.GetType().Name + ": " + ex.Message;
+        }
+        finally
+        {
+            if (!string.IsNullOrEmpty(dependentLayer))
+            {
+                try { SetXrefLayerFlags(db, dependentLayer, isOff: false, isFrozen: false); }
+                catch (System.Exception ex) { error = "opruimen: " + ex.GetType().Name + ": " + ex.Message; }
+            }
+        }
+
+        bool baselineOk = baseline.Rows == 1 && System.Math.Abs(baseline.Length - 5.0) < 0.01;
+        bool offOk = hiddenOff.Rows == 0 && includedOff.Rows == 1
+            && System.Math.Abs(includedOff.Length - 5.0) < 0.01;
+        bool frozenOk = hiddenFrozen.Rows == 0 && includedFrozen.Rows == 1
+            && System.Math.Abs(includedFrozen.Length - 5.0) < 0.01;
+        bool allOk = error == "geen" && baselineOk && offOk && frozenOk;
+        ed.WriteMessage($"\nXREF visibility baseline: rows={baseline.Rows} lengte={baseline.Length:0.#} m -> {(baselineOk ? "OK" : "FAIL")}");
+        ed.WriteMessage($"\nXREF visibility off: standaard={hiddenOff.Rows} inclusief-onzichtbaar={includedOff.Rows}/{includedOff.Length:0.#} m -> {(offOk ? "OK" : "FAIL")}");
+        ed.WriteMessage($"\nXREF visibility frozen: standaard={hiddenFrozen.Rows} inclusief-onzichtbaar={includedFrozen.Rows}/{includedFrozen.Length:0.#} m -> {(frozenOk ? "OK" : "FAIL")}");
+        ed.WriteMessage($"\nXREF visibility totaal: {(allOk ? "OK" : "FAIL")}; fout={error}");
+    }
+
+    [CommandMethod("NLCSLEGENDAXREFSTATESTEST", CommandFlags.Modal)]
+    public void NlcsLegendaXrefStatesTest()
+    {
+        var doc = AcAp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var db = doc.Database;
+        var ed = doc.Editor;
+        string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
+        string sourcePath = Path.Combine(dir, "xref-state-" + Guid.NewGuid().ToString("N") + ".dwg");
+        string unavailablePath = sourcePath + ".unavailable";
+        const string xrefName = "STATETEST";
+        string error = "geen";
+        bool sourceMoved = false;
+        bool missingObserved = false;
+        (int Rows, double Length) baseline = default;
+        (int Rows, double Length) unloaded = default;
+        (int Rows, double Length) unloadedIncludingInvisible = default;
+        (int Rows, double Length) missing = default;
+        (int Rows, double Length) restored = default;
+        var settings = LoadGlobalDefaults();
+        settings.IncludeXrefLayers = true;
+        settings.IncludeInvisibleLayers = false;
+
+        try
+        {
+            CreateXrefLineDwg(sourcePath, XrefGLayer, 1, 5.0);
+            AttachAndInsert(db, sourcePath, xrefName);
+            baseline = AnalyzeXrefRows(db, settings);
+
+            ed.Command("_.-XREF", "_Unload", xrefName);
+            unloaded = AnalyzeXrefRows(db, settings);
+            settings.IncludeInvisibleLayers = true;
+            unloadedIncludingInvisible = AnalyzeXrefRows(db, settings);
+            settings.IncludeInvisibleLayers = false;
+
+            File.Move(sourcePath, unavailablePath);
+            sourceMoved = true;
+            missingObserved = !File.Exists(sourcePath) && File.Exists(unavailablePath);
+            ed.Command("_.-XREF", "_Reload", xrefName);
+            missing = AnalyzeXrefRows(db, settings);
+
+            File.Move(unavailablePath, sourcePath);
+            sourceMoved = false;
+            ed.Command("_.-XREF", "_Reload", xrefName);
+            restored = AnalyzeXrefRows(db, settings);
+        }
+        catch (System.Exception ex)
+        {
+            error = ex.GetType().Name + ": " + ex.Message;
+        }
+        finally
+        {
+            if (sourceMoved && File.Exists(unavailablePath) && !File.Exists(sourcePath))
+            {
+                try { File.Move(unavailablePath, sourcePath); }
+                catch (System.Exception ex) { error = "xref-bron opruimen: " + ex.GetType().Name + ": " + ex.Message; }
+            }
+        }
+
+        bool baselineOk = baseline.Rows == 1 && System.Math.Abs(baseline.Length - 5.0) < 0.01;
+        bool unloadedOk = unloaded.Rows == 0 && unloadedIncludingInvisible.Rows == 0;
+        bool missingOk = missingObserved && missing.Rows == 0;
+        bool restoredOk = restored.Rows == 1 && System.Math.Abs(restored.Length - 5.0) < 0.01;
+        bool allOk = error == "geen" && baselineOk && unloadedOk && missingOk && restoredOk;
+        ed.WriteMessage($"\nXREF status baseline: rows={baseline.Rows} lengte={baseline.Length:0.#} m -> {(baselineOk ? "OK" : "FAIL")}");
+        ed.WriteMessage($"\nXREF status unloaded: standaard={unloaded.Rows} inclusief-onzichtbaar={unloadedIncludingInvisible.Rows} -> {(unloadedOk ? "OK" : "FAIL")}");
+        ed.WriteMessage($"\nXREF status missing: bron-afwezig={missingObserved} rows={missing.Rows} -> {(missingOk ? "OK" : "FAIL")}");
+        ed.WriteMessage($"\nXREF status restored: rows={restored.Rows} lengte={restored.Length:0.#} m -> {(restoredOk ? "OK" : "FAIL")}");
+        ed.WriteMessage($"\nXREF status totaal: {(allOk ? "OK" : "FAIL")}; fout={error}");
     }
 
     // Geneste xref: een host die alleen een buiten-xref koppelt die zelf een binnen-xref met de
@@ -428,7 +604,7 @@ public partial class Commands
             }
             PurgePending(db);
         }
-        catch (System.Exception ex) { err = ex.GetType().Name + ": " + ex.Message; }
+        catch (System.Exception ex) { err = ex.ToString(); }
 
         string gColor = ReadAci(db, XrefGLayer), aColor = ReadAci(db, XrefALayer);
         bool noDbErr = err == "geen";
@@ -560,7 +736,7 @@ public partial class Commands
                 hatch.PatternScale = patternScale;
                 hatch.PatternAngle = patternAngle;
                 using var loop = new ObjectIdCollection { boundaryId };
-                hatch.AppendLoop(HatchLoopTypes.Default, loop);
+                hatch.AppendLoop(HatchLoopTypes.External, loop);
                 hatch.EvaluateHatch(true);
                 tr.Commit();
             }
@@ -667,23 +843,6 @@ public partial class Commands
         finally
         {
             HostApplicationServices.WorkingDatabase = previousWorkingDatabase;
-        }
-    }
-
-    private static bool RejectsAmbiguousSample(
-        Database db, ObjectId sourceReference, LegendSettings settings, string errorFragment)
-    {
-        try
-        {
-            using var tr = db.TransactionManager.StartTransaction();
-            DrawingAnalyzer.Analyze(
-                db, tr, settings, new[] { sourceReference }, catalog: LoadCatalog(db));
-            tr.Commit();
-            return false;
-        }
-        catch (InvalidOperationException ex)
-        {
-            return ex.Message.Contains(errorFragment, System.StringComparison.Ordinal);
         }
     }
 
@@ -1128,11 +1287,11 @@ public partial class Commands
                         && Math.Abs(samples[2].PatternAngle - 0.25) < 1e-9;
                 }
 
-                groupsOk = rows.Count == 4 && shared?.Metric.Count == 4
-                    && separate.All(entry => entry?.Metric.Count == 2)
+                groupsOk = rows.Count == 4 && shared?.Metric.Count == 2 && Math.Abs(shared.Metric.Area - 200) < 1e-8
+                    && separate.All(entry => entry?.Metric.Count == 1 && Math.Abs(entry.Metric.Area - 100) < 1e-8)
                     && rows.Select(entry => entry.RenderIdentity).Distinct(StringComparer.Ordinal).Count() == 4
                     && SharedSampleMatches() && SeparateSamplesMatch();
-                exportOk = ExportedCounts(rows).SequenceEqual(new[] { 2, 2, 2, 4 });
+                exportOk = ExportedCounts(rows).SequenceEqual(new[] { 1, 1, 1, 2 });
                 infoOk = InfoRowCountMatches(analysis, settings);
                 tr.Commit();
             }
@@ -1174,6 +1333,7 @@ public partial class Commands
             bool totalOk = groupsOk && exportOk && infoOk && built == 4 && error == "geen"
                 && ownershipOk && renderedPatternsOk && renderedColorsOk;
             ed.WriteMessage($"\nHATCH: zelfde patroon/hoek/schaal 1 regel, verschil in patroon/hoek/schaal 4 regels={groupsOk}");
+            ed.WriteMessage("\nHATCH oppervlakken: " + string.Join("/", rows.Select(e => e.Metric.Area)));
             ed.WriteMessage($"\nHATCH: aantallen/export/info behouden {string.Join("/", ExportedCounts(rows))}={exportOk}/{infoOk}");
             ed.WriteMessage($"\nHATCH: gebouwd={built} werkelijke ANSI-patterns/hoeken/schalen={renderedPatternsOk} groen={renderedColorsOk} host-owned/MText-only={ownershipOk}; fout={error}");
             ed.WriteMessage($"\nHATCH totaal: {(totalOk ? "OK" : "FAIL")}");
@@ -1205,13 +1365,41 @@ public partial class Commands
             var settings = LoadGlobalDefaults();
             settings.IncludeXrefLayers = true;
 
-            bool hatchRejected = RejectsAmbiguousSample(
-                db, hatchReference, settings, "meerdere hatch-renderingen");
-            bool symbolRejected = RejectsAmbiguousSample(
-                db, symbolReference, settings, "meerdere symboolrenderingen");
-            ed.WriteMessage($"\nSAMPLECONFLICT hatch first-wins geblokkeerd={hatchRejected}");
-            ed.WriteMessage($"\nSAMPLECONFLICT symbool first-wins geblokkeerd={symbolRejected}");
-            ed.WriteMessage($"\nSAMPLECONFLICT totaal: {(hatchRejected && symbolRejected ? "OK" : "FAIL")}");
+            settings.ExplodeOnPlace = false;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                // 5 x 5 m per patroon, xref schaal 2: precies 100 m2 per patroon.
+                ((BlockReference)tr.GetObject(hatchReference, OpenMode.ForWrite)).ScaleFactors = new Scale3d(2);
+                tr.Commit();
+            }
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var analysis = DrawingAnalyzer.Analyze(db, tr, settings);
+                var hatches = analysis.Entries.Where(e => e.HatchLayer is not null).ToList();
+                var symbols = analysis.Entries.Where(e => e.SymbolLayer is not null).ToList();
+                bool hatchOk = hatches.Count == 2 && hatches.All(e => Math.Abs(e.Metric.Area - 100) < 1e-8 && e.Metric.Count == 1)
+                    && hatches.Select(e => analysis.HatchSamples[e.HatchLayer!].PatternName).OrderBy(x => x)
+                        .SequenceEqual(new[] { "ANSI31", "SOLID" });
+                bool symbolOk = symbols.Count == 2 && symbols.All(e => e.Metric.Count == 1);
+                if (!hatchOk || !symbolOk) throw new InvalidOperationException("Patroon-/symboolvarianten of hoeveelheden onjuist: " + string.Join("; ", analysis.Entries.Select(e => e.PrimaryLayer + " count=" + e.Metric.Count + " area=" + e.Metric.Area)));
+                tr.Commit();
+            }
+            int built = BuildPlaceXrefLegend(db, settings, out var error, out var group, out var blockId);
+            if (built != 4 || error != "geen") throw new InvalidOperationException(error);
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                AssertLegendHostOwnership(db, tr, group, blockId);
+                var block = (BlockTableRecord)tr.GetObject(blockId, OpenMode.ForRead);
+                var entities = block.Cast<ObjectId>().Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>().ToList();
+                var circles = entities.OfType<Circle>().OrderBy(c => c.Radius).ToList();
+                if (circles.Count != 2 || Math.Abs(circles[1].Radius / circles[0].Radius - 2) > 1e-8)
+                    throw new InvalidOperationException("Symboolafmetingen verloren.");
+                var patterns = entities.OfType<Hatch>().Where(h => h.Layer.StartsWith(hatchLayer, StringComparison.Ordinal)).Select(h => h.PatternName).OrderBy(x => x);
+                if (!patterns.SequenceEqual(new[] { "ANSI31", "SOLID" })) throw new InvalidOperationException("Patroonswatches onjuist.");
+                tr.Commit();
+            }
+            ed.WriteMessage("\nSAMPLECONFLICT 2 patronen elk 100 m2; 2 symbolen elk 1; echte swatches -> OK");
+            ed.WriteMessage("\nSAMPLECONFLICT totaal: OK");
         }
         catch (System.Exception ex)
         {
@@ -1474,12 +1662,16 @@ public partial class Commands
                 var preview = new BlockReference(Point3d.Origin, blockId);
                 modelSpace.AppendEntity(preview);
                 tr.AddNewlyCreatedDBObject(preview, true);
-                var pointPrompt = ed.GetPoint("\nPlaats de xref-legenda (acceptance):");
-                if (pointPrompt.Status != PromptStatus.OK
-                    || pointPrompt.Value.DistanceTo(new Point3d(200, 0, 0)) > 1e-8)
-                    throw new InvalidOperationException("Het gescripte plaatsingspunt ontbreekt of is onjuist.");
+                var placementPoint = new Point3d(200, 0, 0);
+                if (!HostEnvironment.IsCoreConsole)
+                {
+                    var pointPrompt = ed.GetPoint("\nPlaats de xref-legenda (acceptance):");
+                    if (pointPrompt.Status != PromptStatus.OK)
+                        throw new InvalidOperationException("De plaatsing is geannuleerd.");
+                    placementPoint = pointPrompt.Value;
+                }
                 var definition = PlaceLegendAtPoint(
-                    tr, db, registry, settings, selection, blockId, preview, pointPrompt.Value);
+                    tr, db, registry, settings, selection, blockId, preview, placementPoint);
                 groupName = definition.GroupName;
                 ownership = AssertLegendHostOwnership(db, tr, groupName, blockId);
 
@@ -1510,12 +1702,30 @@ public partial class Commands
                     && System.Math.Abs(text.TextHeight - settings.ToModel(4.0)) < 1e-8);
                 bool hasTitle = mtexts.Any(text => text.Contents.Contains(settings.Title, System.StringComparison.Ordinal)
                     && System.Math.Abs(text.TextHeight - settings.ToModel(6.0)) < 1e-8);
-                customHeightsOk = hasBody && hasHeader && hasTitle;
+                var redSwatch = block.Cast<ObjectId>()
+                    .Select(id => tr.GetObject(id, OpenMode.ForRead))
+                    .OfType<Polyline>()
+                    .Single(polyline => polyline.NumberOfVertices == 2
+                        && polyline.Layer.Equals(redLayer, System.StringComparison.OrdinalIgnoreCase));
+                double swatchCenterY = (redSwatch.GetPoint2dAt(0).Y + redSwatch.GetPoint2dAt(1).Y) / 2.0;
+                var bodyText = mtexts
+                    .Where(text => text.Contents.Contains(red.Description, System.StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(text => System.Math.Abs(text.Location.Y - swatchCenterY))
+                    .First();
+                var bodyExtents = bodyText.GeometricExtents;
+                double mmPerModelUnit = 1.0 / settings.ToModel(1.0);
+                double anchorDeviationMm = System.Math.Abs(bodyText.Location.Y - swatchCenterY) * mmPerModelUnit;
+                double extentsDeviationMm = System.Math.Abs(
+                    (bodyExtents.MinPoint.Y + bodyExtents.MaxPoint.Y) / 2.0 - swatchCenterY) * mmPerModelUnit;
+                bool mtextPositionOk = anchorDeviationMm < 1e-6 && extentsDeviationMm <= 0.25;
+                customHeightsOk = hasBody && hasHeader && hasTitle && mtextPositionOk;
                 tr.Commit();
+                ed.WriteMessage($"\nPLACEMENT MText-verticaal: ankerafwijking={anchorDeviationMm:0.###} mm extentsafwijking={extentsDeviationMm:0.###} mm -> {(mtextPositionOk ? "OK" : "FAIL")}");
             }
             catch (System.Exception ex)
             {
                 error = ex.GetType().Name + ": " + ex.Message;
+                customHeightsOk = false;
             }
 
             try

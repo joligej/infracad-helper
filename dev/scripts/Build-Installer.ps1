@@ -48,17 +48,24 @@ if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
 # 1) Alle doel-frameworks bouwen: net8 tegen de 2025- én 2026-referenties en net10 voor 2027.
 #    Zo krijgt elke AutoCAD-versie in de MSI dezelfde binary als de losse zip-bundle.
 Write-Host "==> Plugin bouwen (net8, AutoCAD 2025)..." -ForegroundColor Cyan
-dotnet build $pluginProj -c Release -p:AcadVersion=2025 | Out-Null
+dotnet build $pluginProj -c Release -p:AcadVersion=2025
+if ($LASTEXITCODE -ne 0) { throw "Pluginbuild 2025 mislukt; MSI-bouw gestopt." }
 $net8Bin2025 = Join-Path $repoRoot "src\NlcsLegenda.Plugin\bin\Release\net8.0-windows"
 $stage = Join-Path $repoRoot "artifacts\bundle-combined"
-if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+if (Test-Path -LiteralPath $stage) {
+    $resolvedStage = (Resolve-Path -LiteralPath $stage).Path
+    $expectedStage = [IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts\bundle-combined"))
+    if ($resolvedStage -ne $expectedStage) { throw "Onverwacht stagingpad; opruimen gestopt." }
+    Remove-Item -LiteralPath $resolvedStage -Recurse -Force
+}
 $net82025Out = Join-Path $stage "Contents\net8-2025"
 New-Item -ItemType Directory -Force -Path $net82025Out | Out-Null
 Copy-Item (Join-Path $net8Bin2025 "NlcsLegenda.dll") $net82025Out
 Copy-Item (Join-Path $net8Bin2025 "NlcsLegenda.Core.dll") $net82025Out
 
 Write-Host "==> Plugin bouwen (net8, AutoCAD 2026)..." -ForegroundColor Cyan
-dotnet build $pluginProj -c Release -p:AcadVersion=2026 | Out-Null
+dotnet build $pluginProj -c Release -p:AcadVersion=2026
+if ($LASTEXITCODE -ne 0) { throw "Pluginbuild 2026 mislukt; MSI-bouw gestopt." }
 $net8Bin2026 = Join-Path $repoRoot "src\NlcsLegenda.Plugin\bin\Release\net8.0-windows"
 $net82026Out = Join-Path $stage "Contents\net8-2026"
 New-Item -ItemType Directory -Force -Path $net82026Out | Out-Null
@@ -66,7 +73,8 @@ Copy-Item (Join-Path $net8Bin2026 "NlcsLegenda.dll") $net82026Out
 Copy-Item (Join-Path $net8Bin2026 "NlcsLegenda.Core.dll") $net82026Out
 
 Write-Host "==> Plugin bouwen (net10, AutoCAD 2027)..." -ForegroundColor Cyan
-dotnet build $pluginProj -c Release -p:AcadVersion=2027 | Out-Null
+dotnet build $pluginProj -c Release -p:AcadVersion=2027
+if ($LASTEXITCODE -ne 0) { throw "Pluginbuild 2027 mislukt; MSI-bouw gestopt." }
 $net10Bin = Join-Path $repoRoot "src\NlcsLegenda.Plugin\bin\Release\net10.0-windows"
 $net10Out = Join-Path $stage "Contents\net10"
 New-Item -ItemType Directory -Force -Path $net10Out | Out-Null
@@ -111,7 +119,7 @@ $outDir = Join-Path $repoRoot "artifacts"
 $msi = Join-Path $outDir "NlcsLegenda-$Version.msi"
 Write-Host "==> MSI samenstellen met WiX..." -ForegroundColor Cyan
 wix build $wxs -arch x64 -d "Version=$Version" -d "BundleStage=$stage" -o $msi
-if (-not (Test-Path $msi)) { throw "MSI is niet gebouwd." }
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $msi)) { throw "MSI is niet gebouwd." }
 
 # 5) Optioneel ondertekenen.
 if ($PfxPath) {

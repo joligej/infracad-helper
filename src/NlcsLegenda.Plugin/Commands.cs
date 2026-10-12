@@ -123,7 +123,6 @@ public partial class Commands
             }
 
             ObjectId btrId;
-            bool cancelled = false;
 
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -151,8 +150,9 @@ public partial class Commands
                 var result = ed.Drag(jig);
                 if (result.Status != PromptStatus.OK)
                 {
-                    br.Erase();
-                    cancelled = true;
+                    tr.Abort();
+                    ed.WriteMessage("\nGeannuleerd.");
+                    return;
                 }
                 else
                 {
@@ -164,8 +164,6 @@ public partial class Commands
             }
 
             PurgeTempBlock(db, btrId);
-            if (cancelled)
-                ed.WriteMessage("\nGeannuleerd.");
         }
         catch (Exception ex)
         {
@@ -1919,7 +1917,7 @@ public partial class Commands
         }
         catch (Exception ex)
         {
-            ed.WriteMessage($"\nNLCSTEST error: {ex.Message}");
+            ed.WriteMessage($"\nNLCSTEST error: {ex}");
         }
     }
 
@@ -3488,7 +3486,7 @@ public partial class Commands
             {
                 using var tr = db.TransactionManager.StartTransaction();
                 var reg = LegendStore.Load(db, tr);
-                var s = LoadGlobalDefaults();
+                var s = MTextFixtureSettings();
                 tweak(s);
                 var def = IsoDef(reg, s);
                 reg.Add(def);
@@ -3515,8 +3513,9 @@ public partial class Commands
                             }
                         }
                 }
-                tr.Commit();
-                PurgePending(db);
+                // Proefbouw terugdraaien: geen ongeregistreerde legenda als bron achterlaten.
+                tr.Abort();
+                _pendingPurge.RemoveAll(id => id.IsNull || !id.IsValid || id.IsErased);
                 return n;
             }
 
@@ -3524,7 +3523,7 @@ public partial class Commands
             {
                 int a = Count(on);
                 int b = Count(off);
-                ed.WriteMessage($"\nCONSUMER: {label} aan={a} uit={b} -> {(a != b ? "OK" : "GEEN VERSCHIL")}");
+                ed.WriteMessage($"\nCONSUMER: {label} aan={a} uit={b} -> {(a != b ? "OK" : "FAIL")}");
             }
 
             Check("kader", s => s.DrawBorder = true, s => s.DrawBorder = false);

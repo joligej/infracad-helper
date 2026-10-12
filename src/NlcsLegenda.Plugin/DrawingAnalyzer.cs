@@ -39,22 +39,26 @@ public sealed class LayerDisplayStyle
 
     public string Linetype { get; init; } = "Continuous";
 
+    public string LinetypeIdentity { get; init; } = string.Empty;
+
+    public double LinetypeScale { get; init; } = 1.0;
+
     public LineWeight LineWeight { get; init; } = LineWeight.ByLineWeightDefault;
 
     public TransparencyValue Transparency { get; init; } =
-        new(Autodesk.AutoCAD.Colors.TransparencyMethod.ByAlpha, 0);
+        new(Autodesk.AutoCAD.Colors.TransparencyMethod.ByAlpha, 255);
 }
 
 public static class DrawingAnalyzer
 {
     private sealed class Collector
     {
+        public readonly Dictionary<string, LayerDisplayStyle> Styles = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, NlcsLayerName> Parsed = new(StringComparer.OrdinalIgnoreCase);
-        public readonly HashSet<string> NonNlcs = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, HatchSample> Hatches = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, LayerMetric> Metrics = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, SymbolSample> SymbolSamples = new(StringComparer.OrdinalIgnoreCase);
-        public readonly Dictionary<ObjectId, string> SymbolDefinitionIdentities = new();
+        public readonly Dictionary<(ObjectId, string), string> SymbolDefinitionIdentities = new();
         // Per laag de getelde OMSCHRIJVING-attribuutwaarden van KLIC-symbolen; de meest
         // voorkomende niet-lege waarde is de echte omschrijving uit de tekening.
         public readonly Dictionary<string, Dictionary<string, int>> AttrOms =
@@ -63,11 +67,6 @@ public static class DrawingAnalyzer
         public readonly Dictionary<string, bool> Visible = new(StringComparer.OrdinalIgnoreCase);
         // Omschrijving per eigen-laag-sleutel (komt uit de regel, niet uit de NLCS-catalogus).
         public readonly Dictionary<string, string> CustomDesc = new(StringComparer.OrdinalIgnoreCase);
-        // Per-bron buckets voor AnySource-regels: sleutel -> (regel, bron-id). Na de collectie
-        // worden ze op render-identiteit samengevoegd: gelijk uiterlijk = één regel met opgetelde
-        // hoeveelheid, zichtbaar verschillend = aparte regels per bron (geen first-wins).
-        public readonly Dictionary<string, (CustomLayerRule Rule, string SourceId)> AnyBuckets =
-            new(StringComparer.Ordinal);
         // Standaard-NLCS-lagen per echte (bron-)laagnaam. Na de collectie worden ze op render-
         // identiteit samengevoegd: dezelfde logische laag uit bronnen met gelijke weergave wordt
         // één regel met opgetelde hoeveelheid, zichtbaar verschillende bronnen blijven apart.
@@ -106,14 +105,10 @@ public static class DrawingAnalyzer
             CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false, sourceXref: string.Empty);
         }
 
-        // AnySource-regels die meerdere bronnen raken samenvoegen op render-identiteit vóór de
-        // beschrijvings-/groepeerstap, zodat de swatch niet van de traversalevolgorde afhangt.
-        CoalesceAnySource(db, tr, c);
-
         // Dezelfde logische NLCS-laag uit meerdere bronnen: gelijke weergave valt samen (één regel,
         // opgetelde hoeveelheid), zichtbaar verschillende weergave splitst (aparte regels met eigen
         // hoeveelheid en swatchkleur). Geen first/last-wins.
-        CoalesceNlcsSources(db, tr, c);
+        CoalesceNlcsSources(c);
 
         var parsedLayers = c.Parsed.Values
             .OrderBy(layer => layer.GroupKey, StringComparer.Ordinal)
@@ -143,7 +138,7 @@ public static class DrawingAnalyzer
             };
         }
 
-        var renderIds = ReadRenderIds(db, tr, parsedLayers);
+        var renderIds = c.Styles.ToDictionary(kv => kv.Key, kv => StyleSignature(kv.Value), StringComparer.OrdinalIgnoreCase);
 
         // Render-identiteit per laag = laag-look, gesamplede arcering en de brontransformatie van
         // het symbool. Alle samples bevatten alleen waarden; bron-ObjectIds blijven binnen analyse.
@@ -173,7 +168,7 @@ public static class DrawingAnalyzer
             Entries = entries,
             HatchSamples = c.Hatches,
             SymbolSamples = c.SymbolSamples,
-            LayerStyles = ReadLayerStyles(db, tr, parsedLayers),
+            LayerStyles = c.Styles,
             // c.Parsed bevat nu zowel NLCS- als eigen bronlagen; eigen lagen apart tellen zodat
             // de INFO-melding geen eigen lagen als "NLCS" presenteert.
             UsedNlcsLayerCount = c.Parsed.Count - c.CustomDesc.Count,
@@ -186,120 +181,204 @@ public static class DrawingAnalyzer
 
     private static void CollectFromBlock(
         ObjectId btrId, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref, string sourceXref)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref, string sourceXref, LayerDisplayStyle? inheritedStyle = null)
     {
-        if (depth > MaxDepth || !path.Add(btrId))
-            return;
+        if (depth > MaxDepth) throw new InvalidOperationException("Te diep geneste blokken; analyse afgebroken om onvolledige hoeveelheden te voorkomen.");
+        if (!path.Add(btrId)) return;
 
         var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
         foreach (ObjectId id in btr)
             if (tr.GetObject(id, OpenMode.ForRead) is Entity ent)
-                Process(ent, tr, c, settings, path, depth, transform, insideIncludedXref, sourceXref);
+                Process(ent, tr, c, settings, path, depth, transform, insideIncludedXref, sourceXref, inheritedStyle);
 
         path.Remove(btrId);
     }
 
     private static void Process(
         Entity ent, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref, string sourceXref)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref, string sourceXref, LayerDisplayStyle? inheritedStyle = null)
     {
         // Eigen legenda-geometrie telt nooit als bron.
         if (c.Excluded.Contains(ent.ObjectId))
             return;
 
-        Record(ent, tr, c, settings, transform, sourceXref);
+        if (!settings.IncludeInvisibleLayers && (!ent.Visible || !IsVisible(ent.Layer, tr, c)))
+            return;
+        var effectiveStyle = EntityStyle(ent, tr, inheritedStyle);
+        Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle);
 
         if (ent is BlockReference br && !br.BlockTableRecord.IsNull)
         {
             var def = tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) as BlockTableRecord;
             if (def is { IsLayout: false })
             {
-                var nested = br.BlockTransform * transform;
+                var nested = transform * br.BlockTransform;
                 if (def.IsFromExternalReference)
                 {
                     bool included = insideIncludedXref || settings.IsXrefIncluded(def.Name);
                     if (included)
                         CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref: true,
-                            sourceXref: string.IsNullOrEmpty(sourceXref) ? def.Name : sourceXref);
+                            sourceXref: string.IsNullOrEmpty(sourceXref) ? def.Name : sourceXref + "|" + LayerNaming.LocalName(def.Name), inheritedStyle: effectiveStyle);
                 }
                 else
                 {
-                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref, sourceXref);
+                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref, sourceXref, effectiveStyle);
                 }
             }
         }
     }
 
-    private static void Record(Entity ent, Transaction tr, Collector c, LegendSettings settings, Matrix3d transform, string sourceXref)
+    private static void Record(Entity ent, Transaction tr, Collector c, LegendSettings settings,
+        Matrix3d transform, string sourceXref, LayerDisplayStyle style)
     {
         var layerName = ent.Layer;
-
-        // Gemeenschappelijke geschiktheid, bron-onafhankelijk: een onzichtbare laag (uit of
-        // bevroren) telt nooit mee, of de laag nu NLCS is of een eigen koppeling heeft. Deze
-        // controle staat vóór de classificatie zodat zichtbaarheid voor beide gelijk werkt.
-        if (!settings.IncludeInvisibleLayers && !IsVisible(layerName, tr, c))
-            return;
-
-        // Expliciete eigen-laagkoppeling wint van NLCS-herkenning: precies één interpretatie.
-        if (settings.CustomLayerRules.Count > 0
-            && TryMatchCustomRule(ent, tr, settings, layerName, sourceXref, out var rule, out var canonical))
+        CustomLayerRule? rule = null;
+        NlcsLayerName? parsed;
+        if (TryMatchCustomRule(ent, tr, settings, layerName, sourceXref, out rule, out parsed))
         {
-            RecordCustom(ent, tr, c, settings, transform, rule!, canonical!);
-            return;
+            if (!settings.IsIncluded(parsed!)) return;
         }
-
-        if (c.NonNlcs.Contains(layerName))
-            return;
-
-        if (!c.Parsed.TryGetValue(layerName, out var nlcs))
+        else
         {
-            if (NlcsLayerParser.TryParse(layerName, out var parsed))
+            if (!NlcsLayerParser.TryParse(layerName, out parsed)) return;
+            parsed = CopyLayer(parsed, sourceXref);
+            if (!settings.IsIncluded(parsed))
             {
-                if (settings.IsIncluded(parsed))
-                {
-                    nlcs = parsed;
-                    c.Parsed[layerName] = parsed;
-                }
-                else
-                {
-                    // Gefilterde NLCS-lagen apart tellen voor een eerlijke INFO-melding.
-                    c.ExcludedNlcs.Add(parsed.LocalName);
-                    c.NonNlcs.Add(layerName);
-                    return;
-                }
-            }
-            else
-            {
-                c.NonNlcs.Add(layerName);
+                c.ExcludedNlcs.Add(parsed.LocalName);
                 return;
             }
         }
+        if (!settings.IsDrawTypeIncluded(parsed!.DrawType) || !EntityMatchesType(ent, parsed.DrawType)) return;
 
-        c.NlcsRawKeys.Add(layerName);
-        AddMetric(ent, layerName, c, transform);
-
-        if (ent is Hatch hatch)
-            RegisterHatchSample(c.Hatches, layerName, layerName, hatch);
-
-        if (ent is BlockReference symbolRef && nlcs.DrawType == NlcsDrawType.Symbool)
+        HatchSample? hatch = ent is Hatch h ? HatchSample.From(h) : null;
+        if (hatch is not null)
         {
-            RegisterSymbolSample(c.SymbolSamples, c.SymbolDefinitionIdentities, layerName, layerName,
-                symbolRef, tr, transform);
-            // KLIC-symbolen dragen de echte omschrijving in het attribuut OMSCHRIJVING. Tel de
-            // niet-lege waarden per laag; de meest voorkomende wint bij de omschrijving.
-            var oms = ReadAttribute(symbolRef, tr, "OMSCHRIJVING");
-            if (!string.IsNullOrWhiteSpace(oms))
+            hatch.Color = style.Color;
+            hatch.Transparency = style.Transparency;
+        }
+        SymbolSample? symbol = null;
+        if (ent is BlockReference br && parsed.DrawType == NlcsDrawType.Symbool)
+        {
+            if (!HasSymbolGeometry(br.BlockTableRecord, tr, settings.IncludeInvisibleLayers, new HashSet<ObjectId>())) return;
+            string blockName = ((BlockTableRecord)tr.GetObject(br.BlockTableRecord, OpenMode.ForRead)).Name;
+            if (string.IsNullOrWhiteSpace(blockName)) return;
+            var id = br.BlockTableRecord;
+            var cacheKey = (id, StyleSignature(style));
+            if (!c.SymbolDefinitionIdentities.TryGetValue(cacheKey, out var identity))
             {
-                if (!c.AttrOms.TryGetValue(nlcs.LocalName, out var counts))
-                {
-                    counts = new Dictionary<string, int>(StringComparer.Ordinal);
-                    c.AttrOms[nlcs.LocalName] = counts;
-                }
-                counts.TryGetValue(oms, out var n);
-                counts[oms] = n + 1;
+                identity = SymbolDefinitionIdentity(id, ent.Database, tr, style);
+                c.SymbolDefinitionIdentities[cacheKey] = identity;
+            }
+            symbol = new SymbolSample(blockName, identity, SymbolTransform.From(transform * br.BlockTransform));
+        }
+        string appearance = StyleSignature(style) + "|" + HatchSignature(hatch) + "|" + SymbolSignature(symbol);
+        string key = parsed.GroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
+        c.Parsed[key] = parsed;
+        c.NlcsRawKeys.Add(key);
+        c.Styles[key] = style;
+        if (rule is not null)
+        {
+            c.CustomDesc[key] = rule.Description;
+            AddMetricMasked(ent, key, c, transform, rule.QuantityMode);
+        }
+        else AddMetric(ent, key, c, transform);
+        if (hatch is not null) c.Hatches[key] = hatch;
+        if (symbol is not null) c.SymbolSamples[key] = symbol;
+        if (ent is BlockReference attributed && parsed.DrawType == NlcsDrawType.Symbool)
+        {
+            var description = ReadAttribute(attributed, tr, "OMSCHRIJVING");
+            if (!string.IsNullOrWhiteSpace(description))
+            {
+                if (!c.AttrOms.TryGetValue(key, out var counts)) c.AttrOms[key] = counts = new(StringComparer.Ordinal);
+                counts.TryGetValue(description, out int count);
+                counts[description] = count + 1;
             }
         }
     }
+
+    private static bool HasSymbolGeometry(ObjectId id, Transaction tr, bool includeInvisible, HashSet<ObjectId> path)
+    {
+        if (!path.Add(id)) return false;
+        try
+        {
+            foreach (ObjectId child in (BlockTableRecord)tr.GetObject(id, OpenMode.ForRead))
+                if (tr.GetObject(child, OpenMode.ForRead) is Entity entity)
+                {
+                    var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
+                    if (!includeInvisible && (!entity.Visible || layer.IsOff || layer.IsFrozen)) continue;
+                    if (entity is not BlockReference nested || HasSymbolGeometry(nested.BlockTableRecord, tr, includeInvisible, path)) return true;
+                }
+            return false;
+        }
+        finally { path.Remove(id); }
+    }
+
+    private static NlcsLayerName CopyLayer(NlcsLayerName p, string source) => new()
+    {
+        Raw = p.Raw, LocalName = p.LocalName, IsXref = source.Length > 0,
+        XrefName = source, StatusCode = p.StatusCode, Status = p.Status,
+        Discipline = p.Discipline, Hoofdgroep = p.Hoofdgroep, Element = p.Element,
+        TypeSuffix = p.TypeSuffix, DrawType = p.DrawType, Scale = p.Scale
+    };
+
+    private static LayerDisplayStyle EntityStyle(Entity ent, Transaction tr, LayerDisplayStyle? parent)
+    {
+        var layer = (LayerTableRecord)tr.GetObject(ent.LayerId, OpenMode.ForRead);
+        bool inheritLayer = LayerNaming.LocalName(layer.Name) == "0" && parent is not null;
+        var color = ent.Color.IsByLayer ? (inheritLayer ? parent!.Color : layer.Color)
+            : ent.Color.IsByBlock ? parent?.Color ?? layer.Color : ent.Color;
+        if (color.IsByLayer || color.IsByBlock)
+            color = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, 7);
+        var ltId = ent.LinetypeId;
+        string ltName = ent.Linetype;
+        if (LayerNaming.LocalName(ltName).Equals("ByLayer", StringComparison.OrdinalIgnoreCase))
+        {
+            ltId = layer.LinetypeObjectId;
+            ltName = inheritLayer ? parent!.Linetype : ((LinetypeTableRecord)tr.GetObject(ltId, OpenMode.ForRead)).Name;
+        }
+        bool inheritLine = LayerNaming.LocalName(ent.Linetype).Equals("ByBlock", StringComparison.OrdinalIgnoreCase)
+            || (inheritLayer && LayerNaming.LocalName(ent.Linetype).Equals("ByLayer", StringComparison.OrdinalIgnoreCase));
+        if (inheritLine && parent is not null) ltName = parent.Linetype;
+        string ltSignature = inheritLine && parent is not null ? parent.LinetypeIdentity : LinetypeSignature(ltId, tr);
+        var weight = ent.LineWeight == LineWeight.ByLayer ? (inheritLayer ? parent!.LineWeight : layer.LineWeight)
+            : ent.LineWeight == LineWeight.ByBlock ? parent?.LineWeight ?? layer.LineWeight : ent.LineWeight;
+        var transparency = ent.Transparency.IsByLayer ? (inheritLayer ? parent!.Transparency : TransparencyValue.From(layer.Transparency))
+            : ent.Transparency.IsByBlock ? parent?.Transparency ?? TransparencyValue.From(layer.Transparency)
+            : TransparencyValue.From(ent.Transparency);
+        return new LayerDisplayStyle { Color = color, Linetype = ltName, LinetypeIdentity = ltSignature,
+            LinetypeScale = ent.LinetypeScale, LineWeight = weight, Transparency = transparency };
+    }
+
+    internal static string LinetypeSignature(ObjectId id, Transaction tr)
+    {
+        var record = (LinetypeTableRecord)tr.GetObject(id, OpenMode.ForRead);
+        if (record.NumDashes == 0) return "Continuous";
+        var parts = new List<string> { NumberSignature(record.PatternLength), record.IsScaledToFit.ToString() };
+        for (int i = 0; i < record.NumDashes; i++)
+        {
+            var shapeStyle = record.ShapeStyleAt(i);
+            if (shapeStyle.IsNull)
+            {
+                parts.Add(NumberSignature(record.DashLengthAt(i)));
+                continue;
+            }
+            bool isShape = ((TextStyleTableRecord)tr.GetObject(shapeStyle, OpenMode.ForRead)).IsShapeFile;
+            var offset = record.ShapeOffsetAt(i);
+            parts.Add(string.Join(":", NumberSignature(record.DashLengthAt(i)), isShape ? "" : record.TextAt(i),
+                record.ShapeNumberAt(i), NumberSignature(record.ShapeScaleAt(i)), NumberSignature(record.ShapeRotationAt(i)),
+                NumberSignature(offset.X), NumberSignature(offset.Y), record.ShapeIsUcsOrientedAt(i), record.ShapeIsUprightAt(i),
+                TextStyleSignature(shapeStyle, record.Database, tr)));
+        }
+        return string.Join(";", parts);
+    }
+
+    private static string ColorSignature(Autodesk.AutoCAD.Colors.Color color) =>
+        color.ColorMethod == Autodesk.AutoCAD.Colors.ColorMethod.ByAci && color.ColorIndex == 7
+            ? "foreground" : color.ColorValue.ToArgb().ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string StyleSignature(LayerDisplayStyle style) => string.Join("|",
+        ColorSignature(style.Color), style.LinetypeIdentity, NumberSignature(style.LinetypeIdentity == "Continuous" ? 1 : style.LinetypeScale),
+        style.LineWeight, style.Transparency.Signature);
 
     // Leest de waarde van een attribuut (op tag) uit een blokreferentie; lege string als het
     // attribuut ontbreekt. Constante attributen zitten niet in AttributeCollection en worden
@@ -328,8 +407,8 @@ public static class DrawingAnalyzer
         switch (ent)
         {
             case Hatch h:
-                // Oppervlak schaalt met de determinant van het lineaire deel van de transform.
-                area = SafeArea(() => h.Area) * AreaScale(transform);
+                // Oppervlak meten in het bronvlak en daarna met de vlaktransformatie schalen.
+                area = ReadHatchArea(h) * AreaScale(transform, h.Normal);
                 break;
             case Curve curve:
                 if (identity)
@@ -347,6 +426,37 @@ public static class DrawingAnalyzer
         }
 
         c.Metrics[localLayer] = metric.Add(1, length, area);
+    }
+
+    private static double ReadHatchArea(Hatch hatch)
+    {
+        try { return Math.Abs(hatch.Area); }
+        catch (Autodesk.AutoCAD.Runtime.Exception ex) when (ex.ErrorStatus == Autodesk.AutoCAD.Runtime.ErrorStatus.NotApplicable
+            && hatch.NumberOfLoops == 1)
+        {
+            // Oudere tekeningen kunnen één gesloten contour als Default opslaan. Bepaal het
+            // oppervlak met dezelfde contour als buitenrand in een tijdelijk, los hatch-object.
+            var loop = hatch.GetLoopAt(0);
+            using var measure = new Hatch();
+            measure.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
+            if (loop.IsPolyline)
+            {
+                var points = new Point2dCollection();
+                var bulges = new DoubleCollection();
+                foreach (BulgeVertex vertex in loop.Polyline) { points.Add(vertex.Vertex); bulges.Add(vertex.Bulge); }
+                measure.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline, points, bulges);
+            }
+            else
+            {
+                var types = new IntegerCollection();
+                foreach (Curve2d curve in loop.Curves)
+                    types.Add(curve switch { LineSegment2d => 1, CircularArc2d => 2, EllipticalArc2d => 3, NurbCurve2d => 4,
+                        _ => throw new InvalidOperationException("Onbekende arceringsgrens; oppervlak niet betrouwbaar meetbaar.") });
+                measure.AppendLoop(HatchLoopTypes.External, loop.Curves, types);
+            }
+            measure.EvaluateHatch(true);
+            return Math.Abs(measure.Area);
+        }
     }
 
     // Zoekt de eerste eigen-laagregel die op dit object past (expliciete volgorde = deterministisch).
@@ -386,329 +496,67 @@ public static class DrawingAnalyzer
         _ => true
     };
 
-    private static void RecordCustom(
-        Entity ent, Transaction tr, Collector c, LegendSettings settings, Matrix3d transform,
-        CustomLayerRule rule, NlcsLayerName canonical)
+    private sealed record LayerSample(NlcsLayerName Parsed, string Signature, LayerMetric Metric,
+        HatchSample? Hatch, SymbolSample? Symbol, LayerDisplayStyle Style, string? Description,
+        Dictionary<string, int>? Attributes);
+
+    private static void CoalesceNlcsSources(Collector c)
     {
-        string key;
-        if (rule.Scope == CustomSourceScope.AnySource)
+        var samples = c.NlcsRawKeys.Select(key => new LayerSample(c.Parsed[key],
+            StyleSignature(c.Styles[key]) + "|" + HatchSignature(c.Hatches.GetValueOrDefault(key))
+                + "|" + SymbolSignature(c.SymbolSamples.GetValueOrDefault(key)),
+            c.Metrics.GetValueOrDefault(key), c.Hatches.GetValueOrDefault(key), c.SymbolSamples.GetValueOrDefault(key),
+            c.Styles[key], c.CustomDesc.GetValueOrDefault(key), c.AttrOms.GetValueOrDefault(key))).ToList();
+        c.Parsed.Clear(); c.Metrics.Clear(); c.Hatches.Clear(); c.SymbolSamples.Clear();
+        c.Styles.Clear(); c.CustomDesc.Clear(); c.AttrOms.Clear(); c.NlcsRawKeys.Clear();
+
+        foreach (var logical in samples.GroupBy(x => x.Parsed.GroupKey))
         {
-            // Per bron een aparte bucket; coalescing voegt later gelijk-renderende bronnen samen.
-            string sourceId = canonical.IsXref ? canonical.XrefName : string.Empty;
-            key = "\u0001" + sourceId + "\u0001" + canonical.LocalName;
-            if (!c.Parsed.ContainsKey(key))
+            var bundles = new List<(List<LayerSample> Layers, string Signature)>();
+            foreach (var source in logical.GroupBy(x => x.Parsed.SourceIdentity, StringComparer.OrdinalIgnoreCase))
             {
-                c.Parsed[key] = WithLocalName(canonical, key);
-                c.CustomDesc[key] = rule.Description ?? string.Empty;
-                c.AnyBuckets[key] = (rule, sourceId);
-            }
-        }
-        else
-        {
-            key = canonical.LocalName;
-            if (!c.Parsed.ContainsKey(key))
-            {
-                c.Parsed[key] = canonical;
-                c.CustomDesc[key] = rule.Description ?? string.Empty;
-            }
-        }
-
-        AddMetricMasked(ent, key, c, transform, rule.QuantityMode);
-
-        if (ent is Hatch hatch)
-            RegisterHatchSample(c.Hatches, key, canonical.Raw, hatch);
-
-        if (ent is BlockReference symbolRef && rule.Type == NlcsDrawType.Symbool)
-            RegisterSymbolSample(c.SymbolSamples, c.SymbolDefinitionIdentities, key, canonical.Raw,
-                symbolRef, tr, transform);
-    }
-
-    private static void RegisterHatchSample(
-        Dictionary<string, HatchSample> samples, string key, string sourceLayer, Hatch hatch)
-    {
-        var sample = HatchSample.From(hatch);
-        if (samples.TryGetValue(key, out var existing))
-        {
-            if (!StringComparer.Ordinal.Equals(HatchSignature(existing), HatchSignature(sample)))
-                throw new InvalidOperationException(
-                    $"Laag '{sourceLayer}' bevat meerdere hatch-renderingen; de legenda is niet eenduidig.");
-            return;
-        }
-        samples[key] = sample;
-    }
-
-    private static void RegisterSymbolSample(
-        Dictionary<string, SymbolSample> samples, Dictionary<ObjectId, string> definitionIdentities,
-        string key, string sourceLayer,
-        BlockReference symbol, Transaction tr, Matrix3d transform)
-    {
-        string? blockName = BlockName(symbol, tr);
-        if (string.IsNullOrWhiteSpace(blockName) || blockName.StartsWith('*'))
-            return;
-        ObjectId definitionId = SymbolDefinitionId(symbol);
-        if (!definitionIdentities.TryGetValue(definitionId, out var definitionIdentity))
-        {
-            definitionIdentity = SymbolDefinitionIdentity(definitionId, symbol.Database
-                ?? throw new InvalidOperationException("Een symboolreferentie heeft geen database-eigenaar."), tr);
-            definitionIdentities[definitionId] = definitionIdentity;
-        }
-        var sample = new SymbolSample(blockName, definitionIdentity, SymbolTransform.From(symbol.BlockTransform * transform));
-        if (!samples.TryGetValue(key, out var existing))
-        {
-            samples[key] = sample;
-            return;
-        }
-        if (!StringComparer.Ordinal.Equals(existing.RenderIdentity, sample.RenderIdentity))
-            throw new InvalidOperationException(
-                $"Laag '{sourceLayer}' bevat meerdere symboolrenderingen; de legenda is niet eenduidig.");
-        if (StringComparer.Ordinal.Compare(sample.BlockName, existing.BlockName) < 0)
-            samples[key] = sample;
-    }
-
-    private static NlcsLayerName WithLocalName(NlcsLayerName src, string localName) => new()
-    {
-        Raw = src.Raw,
-        LocalName = localName,
-        IsXref = src.IsXref,
-        XrefName = src.XrefName,
-        SourceLayers = src.SourceLayers.Count > 0 ? src.SourceLayers : new[] { src.Source },
-        StatusCode = src.StatusCode,
-        Status = src.Status,
-        Discipline = src.Discipline,
-        Hoofdgroep = src.Hoofdgroep,
-        Element = src.Element,
-        TypeSuffix = src.TypeSuffix,
-        DrawType = src.DrawType,
-        Scale = src.Scale
-    };
-
-    // Voegt de per-bron AnySource-buckets samen. Buckets met gelijke render-identiteit (laagstijl
-    // + arcering + symbool) worden één legendaregel met opgetelde hoeveelheid; verschillen de
-    // bronnen zichtbaar, dan blijven het aparte regels, elk met een bronaanduiding in het element.
-    private static void CoalesceAnySource(Database db, Transaction tr, Collector c)
-    {
-        if (c.AnyBuckets.Count == 0)
-            return;
-
-        var snap = new Dictionary<string, (CustomLayerRule Rule, NlcsLayerName Parsed, string Sig, LayerMetric Metric, HatchSample? Hatch, SymbolSample? Symbol)>(StringComparer.Ordinal);
-        foreach (var bk in c.AnyBuckets.Keys)
-        {
-            var p = c.Parsed[bk];
-            string style = ReadStyleSignature(db, tr, p.Raw);
-            HatchSample? h = c.Hatches.TryGetValue(bk, out var hv) ? hv : null;
-            SymbolSample? sym = c.SymbolSamples.TryGetValue(bk, out var sv) ? sv : null;
-            c.Metrics.TryGetValue(bk, out var metric);
-            snap[bk] = (c.AnyBuckets[bk].Rule, p, style + "|" + HatchSignature(h) + "|" + SymbolSignature(sym), metric, h, sym);
-        }
-
-        foreach (var bk in snap.Keys)
-        {
-            c.Parsed.Remove(bk);
-            c.Metrics.Remove(bk);
-            c.Hatches.Remove(bk);
-            c.SymbolSamples.Remove(bk);
-            c.CustomDesc.Remove(bk);
-        }
-        c.AnyBuckets.Clear();
-
-        foreach (var logical in snap
-            .OrderBy(kv => kv.Value.Parsed.GroupKey, StringComparer.Ordinal)
-            .ThenBy(kv => kv.Value.Parsed.SourceIdentity, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(kv => kv.Value.Parsed.Raw, StringComparer.OrdinalIgnoreCase)
-            .GroupBy(kv =>
-                $"{kv.Value.Parsed.StatusCode}|{kv.Value.Parsed.Discipline}|{kv.Value.Parsed.Hoofdgroep}|{kv.Value.Parsed.Element}")
-            .OrderBy(group => group.Key, StringComparer.Ordinal))
-        {
-            var rule = logical.OrderBy(kv => kv.Key, StringComparer.Ordinal).First().Value.Rule;
-            var bySig = logical.GroupBy(kv => kv.Value.Sig)
-                .OrderBy(group => group.Key, StringComparer.Ordinal)
-                .ToList();
-            bool divergent = bySig.Count > 1;
-
-            foreach (var sigGroup in bySig)
-            {
-                var members = sigGroup
-                    .OrderBy(m => m.Value.Parsed.SourceIdentity, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(m => m.Value.Parsed.Raw, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                var rep = members[0].Value;
-                var sourceIds = members
-                    .Select(m => m.Value.Parsed.IsXref ? m.Value.Parsed.XrefName : string.Empty)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(s => s, StringComparer.Ordinal)
-                    .ToList();
-                string sourceLabel = string.Join(", ",
-                    sourceIds.Select(s => s.Length == 0 ? "hoofdtekening" : s));
-
-                // Sleutel = de echte database-laagnaam van de representatieve bron. Die bestaat en
-                // is geldig, zodat de renderer de swatch op een bestaande laag met de juiste stijl
-                // tekent (een synthetische sleutel met scheidingstekens zou een ongeldige laagnaam
-                // opleveren). Bij divergentie verschilt de Raw per partitie, dus de sleutels botsen
-                // niet; het element krijgt een bronaanduiding zodat de regels apart blijven.
-                string finalKey = rep.Parsed.Raw;
-                string element = divergent
-                    ? rule.Element + " (" + sourceLabel + ")"
-                    : rule.Element;
-
-                var metric = LayerMetric.Empty;
-                foreach (var m in members)
-                    metric += m.Value.Metric;
-
-                c.Parsed[finalKey] = new NlcsLayerName
+                var layers = source.ToList();
+                var byType = layers.GroupBy(x => x.Parsed.DrawType).ToList();
+                if (byType.Any(type => type.Select(x => x.Signature).Distinct(StringComparer.Ordinal).Count() > 1))
                 {
-                    Raw = rep.Parsed.Raw,
-                    LocalName = finalKey,
-                    IsXref = rep.Parsed.IsXref,
-                    XrefName = rep.Parsed.XrefName,
-                    SourceLayers = members.SelectMany(m => m.Value.Parsed.SourceLayers.Count > 0
-                        ? m.Value.Parsed.SourceLayers
-                        : new[] { m.Value.Parsed.Source }).Distinct().ToArray(),
-                    StatusCode = rep.Parsed.StatusCode,
-                    Status = rep.Parsed.Status,
-                    Discipline = rep.Parsed.Discipline,
-                    Hoofdgroep = rep.Parsed.Hoofdgroep,
-                    Element = element,
-                    TypeSuffix = rep.Parsed.TypeSuffix,
-                    DrawType = rep.Parsed.DrawType,
-                    Scale = rep.Parsed.Scale
-                };
-                c.Metrics[finalKey] = metric;
-                c.CustomDesc[finalKey] = rule.Description ?? string.Empty;
-                if (rep.Hatch is not null)
-                    c.Hatches[finalKey] = rep.Hatch;
-                if (rep.Symbol is not null)
-                    c.SymbolSamples[finalKey] = rep.Symbol;
+                    foreach (var type in byType)
+                        foreach (var variant in type.GroupBy(x => x.Signature, StringComparer.Ordinal))
+                            bundles.Add((variant.ToList(), $"{(int)type.Key}:{variant.Key}"));
+                }
+                else
+                    bundles.Add((layers, string.Join(";", byType.OrderBy(x => x.Key)
+                        .Select(x => $"{(int)x.Key}:{x.First().Signature}"))));
             }
-        }
-    }
-
-    // Voegt standaard-NLCS-lagen samen of splitst ze op zichtbare weergave. Per logische identiteit
-    // worden de bronnen (hoofdtekening + elke xref) gepartitioneerd op hun gecombineerde render-
-    // identiteit (laagstijl + arcering/vulling + symbool, per elementsoort). Bronnen die er hetzelfde
-    // uitzien vormen één regel met opgetelde hoeveelheid; bronnen die zichtbaar verschillen blijven
-    // aparte regels, elk met een eigen swatchlaag en hoeveelheid. Zo bepaalt niet de volgorde van de
-    // traversal (first/last-wins) welke kleur of hoeveelheid een regel krijgt.
-    private sealed record NlcsSnap(NlcsLayerName Parsed, string Sig, LayerMetric Metric, HatchSample? Hatch, SymbolSample? Symbol);
-
-    private static void CoalesceNlcsSources(Database db, Transaction tr, Collector c)
-    {
-        if (c.NlcsRawKeys.Count == 0)
-            return;
-
-        var snap = new List<NlcsSnap>();
-        foreach (var key in c.NlcsRawKeys)
-        {
-            if (!c.Parsed.TryGetValue(key, out var p))
-                continue;
-            string style = ReadStyleSignature(db, tr, p.Raw);
-            if (style.Length == 0)
-                style = "missing:" + p.Raw;
-            HatchSample? h = c.Hatches.TryGetValue(key, out var hv) ? hv : null;
-            SymbolSample? sym = c.SymbolSamples.TryGetValue(key, out var sv) ? sv : null;
-            c.Metrics.TryGetValue(key, out var metric);
-            snap.Add(new NlcsSnap(p, style + "|" + HatchSignature(h) + "|" + SymbolSignature(sym), metric, h, sym));
-            c.Parsed.Remove(key);
-            c.Metrics.Remove(key);
-            c.Hatches.Remove(key);
-            c.SymbolSamples.Remove(key);
-        }
-        c.NlcsRawKeys.Clear();
-
-        foreach (var logical in snap.GroupBy(s => s.Parsed.GroupKey))
-        {
-            // Per bron (hoofdtekening = "", anders de xref-naam) de gecombineerde render-identiteit
-            // over alle elementsoorten; zo tellen bijvoorbeeld een lijn + arcering uit dezelfde bron
-            // als één uiterlijk mee en splitsen we niet midden in een element.
-            var sources = logical
-                .GroupBy(s => s.Parsed.IsXref ? s.Parsed.XrefName : string.Empty, StringComparer.OrdinalIgnoreCase)
-                .Select(g =>
-                {
-                    var layers = g.OrderBy(x => x.Parsed.DrawType)
-                        .ThenBy(x => x.Parsed.Scale ?? 0)
-                        .ThenBy(x => x.Parsed.Raw, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    var renderLayers = layers
-                        .GroupBy(x => x.Parsed.DrawType)
-                        .OrderBy(type => type.Key)
-                        .Select(type =>
-                        {
-                            var styles = type.Select(x => x.Sig)
-                                .Distinct(StringComparer.Ordinal)
-                                .OrderBy(signature => signature, StringComparer.Ordinal)
-                                .ToList();
-                            if (styles.Count != 1)
-                            {
-                                var conflictingLayers = string.Join(", ", type
-                                    .Select(x => x.Parsed.Raw)
-                                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
-                                string source = g.Key.Length == 0 ? "hoofdtekening" : g.Key;
-                                throw new InvalidOperationException(
-                                    $"Bron '{source}' bevat meerdere zichtbare stijlen voor dezelfde NLCS-laag en elementsoort: {conflictingLayers}.");
-                            }
-                            return $"{(int)type.Key}:{styles[0]}";
-                        });
-                    return (SourceId: g.Key, Layers: layers, CombinedSig: string.Join(";", renderLayers));
-                })
-                .OrderBy(source => source.SourceId.Length == 0 ? 0 : 1)
-                .ThenBy(source => source.SourceId, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            var bySig = sources
-                .GroupBy(s => s.CombinedSig)
-                .OrderByDescending(g => g.Any(s => s.Layers.Any(l => !l.Parsed.IsXref))) // hoofdtekening eerst
-                .ThenByDescending(g => g.Count())                                        // dan de meeste bronnen
-                .ThenBy(g => g.Key, StringComparer.Ordinal)                              // dan deterministisch
-                .ToList();
-
             int partition = 0;
-            foreach (var sigGroup in bySig)
+            foreach (var renderClass in bundles.GroupBy(x => x.Signature, StringComparer.Ordinal)
+                .OrderByDescending(g => g.Any(x => x.Layers.Any(l => !l.Parsed.IsXref)))
+                .ThenByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal))
             {
-                var allLayers = sigGroup.SelectMany(s => s.Layers)
-                    .OrderBy(layer => layer.Parsed.IsXref ? 1 : 0)
-                    .ThenBy(layer => layer.Parsed.XrefName, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(layer => layer.Parsed.Scale ?? 0)
-                    .ThenBy(layer => layer.Parsed.Raw, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                foreach (var dt in allLayers.GroupBy(l => l.Parsed.DrawType))
+                foreach (var type in renderClass.SelectMany(x => x.Layers).GroupBy(x => x.Parsed.DrawType))
                 {
-                    var rep = dt.OrderBy(l => l.Parsed.Scale ?? 0)
-                        .ThenBy(l => l.Parsed.Raw, StringComparer.OrdinalIgnoreCase)
-                        .First();
-                    string clean = rep.Parsed.LocalName;
-                    // Niet-divergent: de echte NLCS-laagnaam blijft de swatchlaag (bestaand gedrag).
-                    // Divergent: elke volgende partitie krijgt een eigen, geldige swatchlaagnaam
-                    // zodat de renderer de afwijkende kleur op een aparte laag kan tekenen.
-                    string swatchLayer = partition == 0 ? clean : $"{clean} #{partition + 1}";
-
-                    var metric = LayerMetric.Empty;
-                    foreach (var m in dt) metric += m.Metric;
-
-                    c.Parsed[swatchLayer] = new NlcsLayerName
+                    var members = type.OrderBy(x => x.Parsed.Scale ?? 0).ThenBy(x => x.Parsed.Raw, StringComparer.OrdinalIgnoreCase).ToList();
+                    var rep = members[0];
+                    string clean = LayerNaming.LocalName(rep.Parsed.LocalName);
+                    string key = partition == 0 ? clean : $"{clean} #{partition + 1}";
+                    c.Parsed[key] = new NlcsLayerName
                     {
-                        Raw = rep.Parsed.Raw,
-                        LocalName = clean,
-                        IsXref = rep.Parsed.IsXref,
-                        XrefName = rep.Parsed.XrefName,
-                        SourceLayers = dt.SelectMany(l => l.Parsed.SourceLayers.Count > 0
-                            ? l.Parsed.SourceLayers
-                            : new[] { l.Parsed.Source }).Distinct().ToArray(),
-                        StatusCode = rep.Parsed.StatusCode,
-                        Status = rep.Parsed.Status,
-                        Discipline = rep.Parsed.Discipline,
-                        Hoofdgroep = rep.Parsed.Hoofdgroep,
-                        Element = rep.Parsed.Element,
-                        TypeSuffix = rep.Parsed.TypeSuffix,
-                        DrawType = rep.Parsed.DrawType,
-                        Scale = rep.Parsed.Scale,
-                        RenderLayerName = swatchLayer,
-                        RenderIdentity = sigGroup.Key
+                        Raw = rep.Parsed.Raw, LocalName = clean, IsXref = rep.Parsed.IsXref, XrefName = rep.Parsed.XrefName,
+                        SourceLayers = members.Select(x => x.Parsed.Source).Distinct().ToArray(),
+                        StatusCode = rep.Parsed.StatusCode, Status = rep.Parsed.Status, Discipline = rep.Parsed.Discipline,
+                        Hoofdgroep = rep.Parsed.Hoofdgroep, Element = rep.Parsed.Element, TypeSuffix = rep.Parsed.TypeSuffix,
+                        DrawType = rep.Parsed.DrawType, Scale = rep.Parsed.Scale, RenderLayerName = key, RenderIdentity = renderClass.Key
                     };
-                    c.Metrics[swatchLayer] = metric;
-                    if (rep.Hatch is not null)
-                        c.Hatches[swatchLayer] = rep.Hatch;
-                    if (rep.Symbol is not null)
-                        c.SymbolSamples[swatchLayer] = rep.Symbol;
+                    c.Metrics[key] = members.Aggregate(LayerMetric.Empty, (total, x) => total + x.Metric);
+                    c.Styles[key] = rep.Style;
+                    if (rep.Hatch is not null) c.Hatches[key] = rep.Hatch;
+                    if (rep.Symbol is not null) c.SymbolSamples[key] = rep.Symbol;
+                    if (rep.Description is not null) c.CustomDesc[key] = rep.Description;
+                    var attributes = new Dictionary<string, int>(StringComparer.Ordinal);
+                    foreach (var member in members)
+                        if (member.Attributes is not null)
+                            foreach (var item in member.Attributes)
+                                attributes[item.Key] = attributes.GetValueOrDefault(item.Key) + item.Value;
+                    if (attributes.Count > 0) c.AttrOms[key] = attributes;
                 }
                 partition++;
             }
@@ -725,25 +573,22 @@ public static class DrawingAnalyzer
             NumberSignature(hatch.PatternScale),
             NumberSignature(hatch.PatternAngle),
             hatch.IsSolid,
-            hatch.Color?.ToString() ?? string.Empty,
+            hatch.Color is null ? string.Empty : ColorSignature(hatch.Color),
             hatch.Transparency.Signature);
     }
 
     private static string SymbolSignature(SymbolSample? sample) =>
         sample?.RenderIdentity ?? string.Empty;
 
-    private static ObjectId SymbolDefinitionId(BlockReference reference) =>
-        reference.IsDynamicBlock ? reference.DynamicBlockTableRecord : reference.BlockTableRecord;
-
-    private static string SymbolDefinitionIdentity(ObjectId definitionId, Database host, Transaction tr)
+    private static string SymbolDefinitionIdentity(ObjectId definitionId, Database host, Transaction tr, LayerDisplayStyle parent)
     {
-        string content = BlockContentSignature(definitionId, host, tr, new HashSet<ObjectId>(), 0);
+        string content = BlockContentSignature(definitionId, host, tr, new HashSet<ObjectId>(), 0, parent);
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(content)));
     }
 
     private static string BlockContentSignature(
-        ObjectId definitionId, Database host, Transaction tr, HashSet<ObjectId> path, int depth)
+        ObjectId definitionId, Database host, Transaction tr, HashSet<ObjectId> path, int depth, LayerDisplayStyle parent)
     {
         if (depth > MaxDepth || !path.Add(definitionId))
             return "cycle";
@@ -754,7 +599,7 @@ public static class DrawingAnalyzer
             var entities = new List<string>();
             foreach (ObjectId id in definition)
                 if (tr.GetObject(id, OpenMode.ForRead) is Entity entity)
-                    entities.Add(SymbolEntitySignature(entity, host, tr, path, depth));
+                    entities.Add(SymbolEntitySignature(entity, host, tr, path, depth, parent));
             entities.Sort(StringComparer.Ordinal);
             return string.Join("\n", entities);
         }
@@ -765,15 +610,14 @@ public static class DrawingAnalyzer
     }
 
     private static string SymbolEntitySignature(
-        Entity entity, Database host, Transaction tr, HashSet<ObjectId> path, int depth)
+        Entity entity, Database host, Transaction tr, HashSet<ObjectId> path, int depth, LayerDisplayStyle parent)
     {
+        var style = EntityStyle(entity, tr, parent);
+        var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
         var parts = new List<string>
         {
             entity.GetType().FullName ?? entity.GetType().Name,
-            $"{entity.Color.ColorMethod}:{entity.Color.ColorIndex}:{entity.Color.ColorValue.ToArgb()}",
-            entity.Linetype,
-            entity.LineWeight.ToString(),
-            TransparencyValue.From(entity.Transparency).Signature
+            StyleSignature(style), entity.Visible.ToString(), layer.IsOff.ToString(), layer.IsFrozen.ToString()
         };
 
         switch (entity)
@@ -782,14 +626,14 @@ public static class DrawingAnalyzer
                 parts.Add($"L:{PointSignature(line.StartPoint)}:{PointSignature(line.EndPoint)}");
                 break;
             case Circle circle:
-                parts.Add($"C:{PointSignature(circle.Center)}:{NumberSignature(circle.Radius)}");
+                parts.Add($"C:{PointSignature(circle.Center)}:{NumberSignature(circle.Radius)}:{circle.Normal}");
                 break;
             case Arc arc:
                 parts.Add($"A:{PointSignature(arc.Center)}:{NumberSignature(arc.Radius)}:"
-                    + $"{NumberSignature(arc.StartAngle)}:{NumberSignature(arc.EndAngle)}");
+                    + $"{NumberSignature(arc.StartAngle)}:{NumberSignature(arc.EndAngle)}:{arc.Normal}");
                 break;
             case Polyline polyline:
-                parts.Add($"P:{polyline.Closed}:{NumberSignature(polyline.Elevation)}");
+                parts.Add($"P:{polyline.Closed}:{NumberSignature(polyline.Elevation)}:{polyline.Normal}");
                 for (int i = 0; i < polyline.NumberOfVertices; i++)
                     parts.Add($"{PointSignature(polyline.GetPoint2dAt(i))}:"
                         + $"{NumberSignature(polyline.GetBulgeAt(i))}:"
@@ -799,22 +643,33 @@ public static class DrawingAnalyzer
             case DBText text:
                 parts.Add($"T:{PointSignature(text.Position)}:{PointSignature(text.AlignmentPoint)}:"
                     + $"{text.TextString}:{NumberSignature(text.Height)}:{NumberSignature(text.Rotation)}:"
-                    + $"{NumberSignature(text.WidthFactor)}:{NumberSignature(text.Oblique)}:"
+                    + $"{NumberSignature(text.WidthFactor)}:{NumberSignature(text.Oblique)}:{text.HorizontalMode}:{text.VerticalMode}:{text.IsMirroredInX}:{text.IsMirroredInY}:"
                     + TextStyleSignature(text.TextStyleId, host, tr));
                 break;
             case MText text:
                 parts.Add($"MT:{PointSignature(text.Location)}:{text.Contents}:{NumberSignature(text.TextHeight)}:"
-                    + $"{NumberSignature(text.Width)}:{NumberSignature(text.Rotation)}:"
+                    + $"{NumberSignature(text.Width)}:{NumberSignature(text.Rotation)}:{text.Attachment}:{text.Normal}:"
                     + TextStyleSignature(text.TextStyleId, host, tr));
                 break;
             case Hatch hatch:
                 parts.Add($"H:{hatch.PatternType}:{hatch.PatternName}:{NumberSignature(hatch.PatternScale)}:"
-                    + $"{NumberSignature(hatch.PatternAngle)}:{hatch.NumberOfLoops}");
+                    + $"{NumberSignature(hatch.PatternAngle)}:{hatch.NumberOfLoops}:{hatch.Normal}:{NumberSignature(hatch.Elevation)}");
+                for (int i = 0; i < hatch.NumberOfLoops; i++)
+                {
+                    var loop = hatch.GetLoopAt(i);
+                    parts.Add(loop.LoopType.ToString());
+                    if (loop.IsPolyline)
+                        foreach (BulgeVertex vertex in loop.Polyline)
+                            parts.Add($"{PointSignature(vertex.Vertex)}:{NumberSignature(vertex.Bulge)}");
+                    else
+                        foreach (Curve2d edge in loop.Curves)
+                            parts.Add(edge.GetType().Name + ":" + string.Join(";", edge.GetSamplePoints(65).Select(PointSignature)));
+                }
                 break;
             case BlockReference nested:
                 parts.Add($"B:{PointSignature(nested.Position)}:"
                     + $"{SymbolTransform.From(nested.BlockTransform).Signature}:"
-                    + BlockContentSignature(nested.BlockTableRecord, host, tr, path, depth + 1));
+                    + BlockContentSignature(nested.BlockTableRecord, host, tr, path, depth + 1, style));
                 break;
             default:
                 if (entity is Curve curve)
@@ -833,21 +688,22 @@ public static class DrawingAnalyzer
             return string.Empty;
         if (source == host)
             return hostTransaction.GetObject(styleId, OpenMode.ForRead) is TextStyleTableRecord style
-                ? LocalName(style.Name)
+                ? TextStyleContent(style)
                 : string.Empty;
         using var sourceTransaction = source.TransactionManager.StartTransaction();
         var sourceStyle = sourceTransaction.GetObject(styleId, OpenMode.ForRead) as TextStyleTableRecord
             ?? throw new InvalidOperationException("Een symbooldefinitie bevat een ongeldige tekststijl.");
-        string name = LocalName(sourceStyle.Name);
+        string name = TextStyleContent(sourceStyle);
         sourceTransaction.Commit();
         return name;
     }
 
-    private static string LocalName(string name)
-    {
-        int separator = name.LastIndexOf('|');
-        return (separator < 0 ? name : name[(separator + 1)..]).Trim();
-    }
+    private static string TextStyleContent(TextStyleTableRecord style) => string.Join(":",
+        style.FileName.ToUpperInvariant(), style.BigFontFileName.ToUpperInvariant(),
+        NumberSignature(style.TextSize), NumberSignature(style.XScale), NumberSignature(style.ObliquingAngle),
+        style.IsVertical, style.IsShapeFile, style.Font.TypeFace, style.Font.Bold, style.Font.Italic);
+
+    private static string LocalName(string name) => LayerNaming.LocalName(name).Trim();
 
     private static bool TryGetExtents(Entity entity, out Point3d min, out Point3d max)
     {
@@ -875,22 +731,6 @@ public static class DrawingAnalyzer
     private static string NumberSignature(double number) =>
         Math.Round(number, 9, MidpointRounding.AwayFromZero)
             .ToString("0.#########", System.Globalization.CultureInfo.InvariantCulture);
-
-    private static string ReadStyleSignature(Database db, Transaction tr, string rawLayer)
-    {
-        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-        if (!lt.Has(rawLayer) || tr.GetObject(lt[rawLayer], OpenMode.ForRead) is not LayerTableRecord ltr)
-            return string.Empty;
-        string linetype = "Continuous";
-        try
-        {
-            if (tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord lype)
-                linetype = lype.Name;
-        }
-        catch { /* standaard */ }
-        var transp = TransparencyValue.From(ltr.Transparency);
-        return $"{ltr.Color}|{linetype}|{ltr.LineWeight}|{transp.Signature}";
-    }
 
     // Zoals AddMetric, maar met een expliciete hoeveelheidsmodus. Auto gedraagt zich als NLCS;
     // de andere modi tellen alleen de gekozen component zodat de legenda de juiste eenheid toont.
@@ -928,26 +768,19 @@ public static class DrawingAnalyzer
             double area = copy.Closed ? SafeArea(() => copy.Area) : 0;
             return (length, area);
         }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception ex)
         {
-            // Kan de kopie niet worden gemaakt/gemeten, val terug op de ongetransformeerde
-            // meting met een uniforme schaalbenadering in plaats van een stil fout getal.
-            double s = UniformScale(transform);
-            double length = SafeLength(curve) * s;
-            double area = curve.Closed ? SafeArea(() => curve.Area) * s * s : 0;
-            return (length, area);
+            throw new InvalidOperationException($"Lengte/oppervlak van '{curve.Layer}' kan onder deze transformatie niet betrouwbaar worden bepaald.", ex);
         }
     }
 
-    // |det| van het 3x3 lineaire deel: de factor waarmee oppervlak schaalt.
-    private static double AreaScale(Matrix3d m)
+    // Oppervlak schaalt in het vlak van de arcering, onafhankelijk van de Z-schaal.
+    private static double AreaScale(Matrix3d transform, Vector3d normal)
     {
-        var cs = m.CoordinateSystem3d;
-        var det = cs.Xaxis.DotProduct(cs.Yaxis.CrossProduct(cs.Zaxis));
-        return Math.Abs(det) < 1e-12 ? 1.0 : Math.Abs(det);
+        var x = normal.GetPerpendicularVector().GetNormal();
+        var y = normal.CrossProduct(x).GetNormal();
+        return x.TransformBy(transform).CrossProduct(y.TransformBy(transform)).Length;
     }
-
-    private static double UniformScale(Matrix3d m) => Math.Cbrt(AreaScale(m));
 
     private static double SafeLength(Curve curve)
     {
@@ -996,41 +829,7 @@ public static class DrawingAnalyzer
         return visible;
     }
 
-    // Effectieve laag-look per render-partitie. Een xref-laag staat in de host als "xref|laag";
-    // de gekozen partitie levert de bronstijl, ook als een andere bron dezelfde NLCS-naam heeft.
-    private static Dictionary<string, LayerDisplayStyle> ReadLayerStyles(
-        Database db, Transaction tr, IEnumerable<NlcsLayerName> layers)
-    {
-        // Na het coalescen is elke RenderLayerName een unieke swatchlaag en levert Raw de bron waaruit
-        // de effectieve stijl wordt gelezen. Geen host-wins meer: de render-partitie heeft de
-        // representatieve bron al gekozen.
-        var styles = new Dictionary<string, LayerDisplayStyle>(StringComparer.OrdinalIgnoreCase);
-        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-        foreach (var layer in layers)
-        {
-            if (styles.ContainsKey(layer.EffectiveRenderLayerName) || !lt.Has(layer.Raw))
-                continue;
-            if (tr.GetObject(lt[layer.Raw], OpenMode.ForRead) is not LayerTableRecord ltr)
-                continue;
-            string linetype = "Continuous";
-            try
-            {
-                if (tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord lte)
-                    linetype = lte.Name;
-            }
-            catch { /* standaard */ }
-            styles[layer.EffectiveRenderLayerName] = new LayerDisplayStyle
-            {
-                Color = ltr.Color,
-                Linetype = linetype,
-                LineWeight = ltr.LineWeight,
-                Transparency = TransparencyValue.From(ltr.Transparency)
-            };
-        }
-        return styles;
-    }
-
-    private static Dictionary<string, string> ReadRenderIds(
+    private static Dictionary<string, string> ReadLayerDescriptions(
         Database db, Transaction tr, IEnumerable<NlcsLayerName> layers)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1039,34 +838,10 @@ public static class DrawingAnalyzer
         {
             if (result.ContainsKey(layer.EffectiveRenderLayerName) || !lt.Has(layer.Raw))
                 continue;
-            if (tr.GetObject(lt[layer.Raw], OpenMode.ForRead) is not LayerTableRecord ltr)
-                continue;
-            string lt4 = "Continuous";
-            try
-            {
-                if (tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord ltype)
-                    lt4 = ltype.Name;
-            }
-            catch { /* standaard */ }
-            var transp = TransparencyValue.From(ltr.Transparency);
-            result[layer.EffectiveRenderLayerName] = $"{ltr.Color}|{lt4}|{ltr.LineWeight}|{transp.Signature}";
-        }
-        return result;
-    }
-
-    private static Dictionary<string, string> ReadLayerDescriptions(
-        Database db, Transaction tr, IEnumerable<NlcsLayerName> layers)
-    {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-        foreach (var layer in layers)
-        {
-            if (result.ContainsKey(layer.LocalName) || !lt.Has(layer.Raw))
-                continue;
             if (tr.GetObject(lt[layer.Raw], OpenMode.ForRead) is LayerTableRecord ltr
                 && !string.IsNullOrWhiteSpace(ltr.Description))
             {
-                result[layer.LocalName] = ltr.Description.Trim();
+                result[layer.EffectiveRenderLayerName] = ltr.Description.Trim();
             }
         }
         return result;

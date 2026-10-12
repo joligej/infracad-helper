@@ -68,6 +68,8 @@ De teksten volgen de NLCS-template: tekststijl `NLCS-ISO` met vaste hoogtes (2,5
 regels en statuskoppen, 5 mm voor de titel) op de tekstlagen `-T25` en `-T50`. Alle tekst
 in de legenda bestaat uit gewone MText-objecten, zodat je die in AutoCAD net als andere tekst
 kunt selecteren en bewerken.
+De standaard statuskoppen zijn "Nieuwe situatie", "Bestaande situatie", "Vervallen situatie",
+"Tijdelijke situatie" en "Revisie"; je kunt ze in de instellingen aanpassen.
 
 Onder de legenda komen standaard een meeschalende schaalbalk en een opmerkingenblok.
 Allebei kun je uitzetten of aanpassen.
@@ -242,8 +244,9 @@ je voor één legenda wilt afwijken, stel je per legenda in via `NLCSLEGENDABEHE
 ## Bouwen en testen
 
 Je hebt de .NET SDK nodig (versie 8 voor AutoCAD 2025 en 2026, versie 10 voor 2027).
-AutoCAD hoeft er niet op te staan om te bouwen: is het niet geïnstalleerd, dan gebruikt
-de build de `AutoCAD.NET`-referenties van NuGet.
+AutoCAD hoeft er niet op te staan om te bouwen. Lokale builds en CI gebruiken standaard
+dezelfde `AutoCAD.NET`-referenties van NuGet. Met `-p:UseNuGetAcad=false` kun je expliciet
+tegen lokaal geïnstalleerde hostassemblies bouwen, mits hun .NET-versie bij het doelframework past.
 
 ```powershell
 dotnet build NlcsLegenda.slnx -c Release
@@ -255,6 +258,13 @@ van AutoCAD, en zijn dus met `dotnet test` te controleren. Wil je de hele plugin
 een echte tekening draaien, dan doet `dev/scripts/Run-HeadlessLegendTest.ps1` dat
 headless via de AutoCAD Core Console. `dev/scripts/Run-IntegrationTests.ps1` draait
 plaatsen, overzicht, export en bijwerken achter elkaar en controleert de resultaten.
+
+Voor een release draait `dev/scripts/Run-ReleaseAcceptance.ps1` afzonderlijke synthetische
+tekeningen voor stijlen, xrefs, symbolen, arceringen, eigen lagen, plaatsing en oudere
+legenda's. Het script controleert de geladen DLL-hash, echte QSAVE, heropenen, vijftig
+updates en ongewijzigde systeemvariabelen. Het stopt bij een fout of ontbrekend testresultaat.
+Gebruik `-AcadVersion 2027` voor de 2027-host en `-PluginPath <geïnstalleerde DLL>` voor
+acceptatie na installatie. Logs en resultaten blijven lokaal onder `artifacts/acceptance/`.
 
 ## Ondersteunde versies
 

@@ -35,13 +35,13 @@
 
   <!--
     Doelversie 2025 (standaard). Overrulebaar met: dotnet build -p:AcadVersion=2027
-    Zonder lokaal geinstalleerde AutoCAD (bijv. op een build-agent) worden de
-    officiele AutoCAD.NET NuGet-referentieassemblies gebruikt.
+    Standaard gebruiken lokale builds en CI dezelfde officiele AutoCAD.NET NuGet-referenties.
+    Alleen met UseNuGetAcad=false worden lokale hostassemblies gebruikt.
   -->
   <PropertyGroup>
     <AcadDir Condition="'$(AcadDir)' == ''">C:\Program Files\Autodesk\AutoCAD $(AcadVersion)</AcadDir>
-    <UseNuGetAcad Condition="'$(UseNuGetAcad)' == '' and !Exists('$(AcadDir)\acdbmgd.dll')">true</UseNuGetAcad>
-    <UseNuGetAcad Condition="'$(UseNuGetAcad)' == ''">false</UseNuGetAcad>
+    <!-- Vaste referenties blijven compatibel wanneer een lokale AutoCAD-update het runtimeframework verhoogt. -->
+    <UseNuGetAcad Condition="'$(UseNuGetAcad)' == ''">true</UseNuGetAcad>
     <AcadNetVersion Condition="'$(AcadNetVersion)' == '' and '$(AcadVersion)' == '2025'">25.0.1</AcadNetVersion>
     <AcadNetVersion Condition="'$(AcadNetVersion)' == '' and '$(AcadVersion)' == '2026'">25.1.0</AcadNetVersion>
     <AcadNetVersion Condition="'$(AcadNetVersion)' == '' and '$(AcadVersion)' == '2027'">26.0.0</AcadNetVersion>

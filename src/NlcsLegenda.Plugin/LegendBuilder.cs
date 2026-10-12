@@ -1,3 +1,4 @@
+using System.IO;
 using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
@@ -71,14 +72,8 @@ public static class LegendBuilder
                     }
                     catch (Exception ex)
                     {
-                        // Regel die niet te tekenen is: de rest gaat door, maar we melden het
-                        // zodat de update niet ten onrechte als volledig geslaagd geldt.
-                        var entry = item.Entry!;
-                        issueList.Add(new RenderIssue(
-                            entry.Description,
-                            entry.PrimaryLayer,
-                            string.Join("+", entry.LayersByType.Keys),
-                            ex.Message));
+                        throw new InvalidOperationException(
+                            $"Legenda niet gewijzigd: '{item.Entry!.Description}' ({item.Entry.PrimaryLayer}) kon niet worden getekend.", ex);
                     }
                     break;
             }
@@ -96,6 +91,7 @@ public static class LegendBuilder
             tr.AddNewlyCreatedDBObject(border, true);
         }
 
+        ValidateHostLinetypeReferences(db, tr, btrId);
         return btrId;
     }
 
@@ -255,9 +251,10 @@ public static class LegendBuilder
         var entry = item.Entry!;
         double x = item.X;
         double top = item.YTop;
-        double bottom = top - swatchH;
-        double midY = (top + bottom) / 2.0;
+        double midY = top - item.RowHeight / 2.0;
+        double bottom = midY - swatchH / 2.0;
 
+        var existingEntities = btr.Cast<ObjectId>().ToHashSet();
         var renderLayers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var lyr in entry.LayersByType.Values)
         {
@@ -301,7 +298,7 @@ public static class LegendBuilder
             AddHatch(btr, tr, x, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample, s.HatchScaleFactor);
         }
 
-        // Geometrie (G/GD/GS): altijd een horizontale lijn; linetype en kleur volgen ByLayer.
+        // Geometrie (G/GD/GS): horizontale lijn; de effectieve bronstijl wordt hieronder vastgezet.
         if (entry.GeometryLayer is { } geoLayer)
         {
             var line = new Polyline();
@@ -312,15 +309,33 @@ public static class LegendBuilder
             tr.AddNewlyCreatedDBObject(line, true);
         }
 
-        // Symbool (S): echt blok passend in het vakje. Een onbeschikbaar blok wordt als renderissue gemeld.
+        // Symbool (S): echt blok passend in het vakje; een fout breekt de transactie af.
         if (entry.SymbolLayer is { } symLayer && s.InsertSymbolBlocks && entry.SymbolBlockName is { } blk)
         {
             var symbolTransform = analysis.SymbolSamples.TryGetValue(symLayer, out var sample)
                 ? sample.Transform
                 : SymbolTransform.Identity;
             if (!TryInsertSymbol(btr, tr, db, blk, renderLayers[symLayer], symbolTransform,
-                    x + swatchW / 2, midY, swatchW, swatchH, s.ModelUnitsPerPaperMm, out var failureReason))
+                    x + swatchW / 2, midY, swatchW, swatchH, s.ModelUnitsPerPaperMm, s.IncludeInvisibleLayers, out var failureReason))
                 throw new InvalidOperationException(failureReason);
+        }
+
+        foreach (ObjectId id in btr)
+        {
+            if (existingEntities.Contains(id) || tr.GetObject(id, OpenMode.ForWrite) is not Entity entity)
+                continue;
+            foreach (var rendered in renderLayers)
+                if (entity.Layer == rendered.Value && analysis.LayerStyles.TryGetValue(rendered.Key, out var style))
+                {
+                    if (rendered.Key != entry.SymbolLayer)
+                    {
+                        entity.Color = style.Color;
+                        entity.LineWeight = style.LineWeight;
+                        entity.Transparency = style.Transparency.ToAutoCadValue();
+                        entity.LinetypeId = ResolveStyleLinetype(tr, db, style);
+                        entity.LinetypeScale = style.LinetypeScale;
+                    }
+                }
         }
 
         // Kader per swatch: alleen een zichtbaar vakje op de kaderlaag als de gebruiker dat wil.
@@ -348,7 +363,7 @@ public static class LegendBuilder
             mt.TextHeight = textH;
             mt.Width = textColWidth;
             mt.Attachment = AttachmentPoint.MiddleLeft;
-            mt.Location = new Point3d(x + swatchW + textGap, top - item.RowHeight / 2.0, 0);
+            mt.Location = new Point3d(x + swatchW + textGap, midY, 0);
             mt.Contents = MTextFormat.Escape(entry.Description);
             btr.AppendEntity(mt);
             tr.AddNewlyCreatedDBObject(mt, true);
@@ -368,11 +383,13 @@ public static class LegendBuilder
     private static bool TryInsertSymbol(
         BlockTableRecord btr, Transaction tr, Database db, string blockName, string layer,
         SymbolTransform sourceTransform,
-        double centerX, double centerY, double swatchW, double swatchH, double modelPerPaperMm,
+        double centerX, double centerY, double swatchW, double swatchH, double modelPerPaperMm, bool includeInvisible,
         out string failureReason)
     {
         failureReason = string.Empty;
         var primitives = new List<ObjectId>();
+        var created = new List<ObjectId>();
+        var importedBlocks = new List<ObjectId>();
         try
         {
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
@@ -381,13 +398,13 @@ public static class LegendBuilder
                 failureReason = $"Symboolblok '{blockName}' ontbreekt in de hostdatabase.";
                 return false;
             }
-            var defId = bt[blockName];
+            var defId = ImportSymbolDefinition(db, tr, bt[blockName], importedBlocks);
 
             // Explode-to-primitives voorkomt dat annotatieve blokschaal de swatch opblaast.
-            primitives = ExplodeToPrimitives(btr, tr, defId, out var probeOk);
+            primitives = ExplodeToPrimitives(btr, tr, db, layer, defId, created, includeInvisible, out var probeOk);
             if (!probeOk || primitives.Count == 0)
             {
-                foreach (var id in primitives)
+                foreach (var id in created.Concat(primitives).Distinct())
                     EraseSafe(tr, id);
                 failureReason = $"Symboolblok '{blockName}' bevat geen omzetbare geometrie.";
                 return false;
@@ -400,7 +417,9 @@ public static class LegendBuilder
                 Entity place = entity is DBText dbText
                     ? SymbolTextToMText(btr, tr, dbText)
                     : entity;
-                place.TransformBy(transform);
+                if (place.ObjectId != entity.ObjectId)
+                    created.Add(place.ObjectId);
+                TransformPlanarSymbol(place, transform);
                 primitives[i] = place.ObjectId;
             }
 
@@ -418,9 +437,9 @@ public static class LegendBuilder
 
             double extW = maxX - minX;
             double extH = maxY - minY;
-            if (extW <= 1e-9 || extH <= 1e-9)
+            if (extW <= 1e-9 && extH <= 1e-9)
             {
-                foreach (var id in primitives)
+                foreach (var id in created.Concat(primitives).Distinct())
                     EraseSafe(tr, id);
                 failureReason = $"Symboolblok '{blockName}' heeft geen bruikbare extents.";
                 return false;
@@ -431,7 +450,8 @@ public static class LegendBuilder
             // 1:200 insertschaal 0,2. Zo verschijnt het symbool op zijn eigen papierformaat; alleen
             // als het groter is dan het vakje schalen we het passend terug (geen vaste vulgraad).
             double fit = modelPerPaperMm;
-            double maxFit = Math.Min(swatchW / extW, swatchH / extH);
+            double maxFit = Math.Min(extW > 1e-9 ? swatchW / extW : double.PositiveInfinity,
+                extH > 1e-9 ? swatchH / extH : double.PositiveInfinity);
             if (fit > maxFit)
                 fit = maxFit;
 
@@ -450,65 +470,218 @@ public static class LegendBuilder
         }
         catch (Exception ex)
         {
-            foreach (var id in primitives)
+            foreach (var id in created.Concat(primitives).Distinct())
                 EraseSafe(tr, id);
             failureReason = $"Symboolblok '{blockName}' kon niet worden weergegeven: {ex.Message}";
             return false;
         }
+        finally
+        {
+            for (int pass = 0; pass < importedBlocks.Count; pass++)
+                foreach (var imported in importedBlocks)
+                    if (!imported.IsErased && tr.GetObject(imported, OpenMode.ForWrite) is BlockTableRecord block
+                        && block.GetBlockReferenceIds(true, false).Count == 0)
+                        block.Erase();
+        }
     }
 
-    // Annotatieve of geneste blokken eerst naar gewone geometrie, daarna pas schalen.
+    private static void TransformPlanarSymbol(Entity entity, Matrix3d transform)
+    {
+        try { entity.TransformBy(transform); }
+        catch (Autodesk.AutoCAD.Runtime.Exception ex) when (ex.ErrorStatus == Autodesk.AutoCAD.Runtime.ErrorStatus.CannotScaleNonUniformly && entity.IsPlanar)
+        {
+            // Een 2D-symbool kan een afwijkende Z-insertschaal hebben. Alleen als de
+            // transformatie IN zijn eigen vlak exact uniform is, is deze vervanging gelijkwaardig.
+            using var plane = entity.GetPlane();
+            var normal = plane.Normal.GetNormal();
+            var u = normal.GetPerpendicularVector().GetNormal();
+            var v = normal.CrossProduct(u).GetNormal();
+            var a = u.TransformBy(transform);
+            var b = v.TransformBy(transform);
+            double scale = a.Length;
+            if (scale < 1e-12 || Math.Abs(scale - b.Length) > scale * 1e-9
+                || Math.Abs(a.DotProduct(b)) > scale * scale * 1e-9) throw;
+            var n = a.CrossProduct(b).GetNormal() * scale;
+            entity.TransformBy(Matrix3d.AlignCoordinateSystem(plane.PointOnPlane, u, v, normal,
+                plane.PointOnPlane.TransformBy(transform), a, b, n));
+        }
+    }
+
+    private static ObjectId ImportSymbolDefinition(
+        Database host, Transaction tr, ObjectId definitionId, List<ObjectId> importedBlocks)
+    {
+        var original = definitionId.OriginalDatabase;
+        if (original == host)
+            return definitionId;
+
+        var definition = (BlockTableRecord)tr.GetObject(definitionId, OpenMode.ForRead);
+        string localName = LayerNaming.LocalName(definition.Name);
+        using var source = new Database(false, true);
+        source.ReadDwgFile(original.Filename, FileOpenMode.OpenForReadAndAllShare, true, string.Empty);
+        source.CloseInput(true);
+        using var sourceTr = source.TransactionManager.StartTransaction();
+        var table = (BlockTable)sourceTr.GetObject(source.BlockTableId, OpenMode.ForRead);
+        if (!table.Has(localName))
+            throw new InvalidOperationException($"Symbooldefinitie '{localName}' ontbreekt in de bron.");
+        var sourceId = table[localName];
+        // Stabiele namen per broninhoud voorkomen nieuwe textstyles/materialen bij elke update.
+        // Alleen deze tijdelijke side-database wordt hernoemd; het bronbestand blijft onaangeroerd.
+        using var stream = new FileStream(original.Filename, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        string prefix = "NLCS_SRC_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream))[..20] + "_";
+        var originalLayers = new Dictionary<ObjectId, string>();
+        foreach (var tableId in new[] { source.BlockTableId, source.LayerTableId, source.LinetypeTableId, source.TextStyleTableId })
+            foreach (ObjectId id in (SymbolTable)sourceTr.GetObject(tableId, OpenMode.ForRead))
+            {
+                var record = (SymbolTableRecord)sourceTr.GetObject(id, OpenMode.ForRead);
+                if (record is BlockTableRecord { IsLayout: true }) continue;
+                if (record is LayerTableRecord)
+                {
+                    originalLayers[id] = record.Name;
+                    if (record.Name == "0") continue;
+                }
+                if (record is LinetypeTableRecord && (record.Name.Equals("ByLayer", StringComparison.OrdinalIgnoreCase)
+                    || record.Name.Equals("ByBlock", StringComparison.OrdinalIgnoreCase) || record.Name.Equals("Continuous", StringComparison.OrdinalIgnoreCase))) continue;
+                record.UpgradeOpen();
+                // Handles zijn uniek binnen deze broninhoud, ook voor anonieme blokken.
+                record.Name = prefix + record.Handle;
+            }
+        var materials = (DBDictionary)sourceTr.GetObject(source.MaterialDictionaryId, OpenMode.ForWrite);
+        var materialEntries = new List<(string Key, ObjectId Value)>();
+        foreach (DBDictionaryEntry item in materials) materialEntries.Add((item.Key, item.Value));
+        foreach (var item in materialEntries)
+        {
+            if (item.Key.Equals("ByLayer", StringComparison.OrdinalIgnoreCase) || item.Key.Equals("ByBlock", StringComparison.OrdinalIgnoreCase)
+                || item.Key.Equals("Global", StringComparison.OrdinalIgnoreCase)) continue;
+            string name = prefix + item.Value.Handle;
+            materials.SetName(item.Key, name);
+            ((Material)sourceTr.GetObject(item.Value, OpenMode.ForWrite)).Name = name;
+        }
+        using var ids = new ObjectIdCollection { sourceId };
+        using var mapping = new IdMapping();
+        source.WblockCloneObjects(ids, host.BlockTableId, mapping, DuplicateRecordCloning.Ignore, false);
+        foreach (IdPair pair in mapping)
+            if (pair.IsCloned && pair.Value.ObjectClass.IsDerivedFrom(Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(BlockTableRecord))))
+                importedBlocks.Add(pair.Value);
+        // Xref-laagoverrides uit de host gelden ook voor onderdelen binnen het symbool.
+        var hostLayers = (LayerTable)tr.GetObject(host.LayerTableId, OpenMode.ForRead);
+        int separator = definition.Name.LastIndexOf('|');
+        string xrefPrefix = separator >= 0 ? definition.Name[..(separator + 1)] : string.Empty;
+        foreach (IdPair pair in mapping)
+            if (originalLayers.TryGetValue(pair.Key, out var layerName) && layerName != "0" && hostLayers.Has(xrefPrefix + layerName))
+            {
+                var from = (LayerTableRecord)tr.GetObject(hostLayers[xrefPrefix + layerName], OpenMode.ForRead);
+                var to = (LayerTableRecord)tr.GetObject(pair.Value, OpenMode.ForWrite);
+                to.Color = from.Color; to.LineWeight = from.LineWeight; to.Transparency = from.Transparency;
+                to.IsOff = from.IsOff; to.IsFrozen = from.IsFrozen;
+                var lt = (LinetypeTableRecord)tr.GetObject(from.LinetypeObjectId, OpenMode.ForRead);
+                to.LinetypeObjectId = ResolveStyleLinetype(tr, host, new LayerDisplayStyle
+                {
+                    Color = from.Color, Linetype = lt.Name,
+                    LinetypeIdentity = DrawingAnalyzer.LinetypeSignature(from.LinetypeObjectId, tr)
+                });
+            }
+        var mapped = mapping[sourceId];
+        if (!mapped.IsCloned || mapped.Value.IsNull || mapped.Value.Database != host)
+            throw new InvalidOperationException("Het symbool is niet naar de hostdatabase gekopieerd.");
+        sourceTr.Commit();
+        return mapped.Value;
+    }
+
     private static List<ObjectId> ExplodeToPrimitives(
-        BlockTableRecord btr, Transaction tr, ObjectId defId, out bool ok)
+        BlockTableRecord btr, Transaction tr, Database db, string layer, ObjectId defId,
+        List<ObjectId> created, bool includeInvisible, out bool ok)
     {
         var result = new List<ObjectId>();
         ok = false;
-        try
+        var probe = new BlockReference(Point3d.Origin, defId) { Layer = layer };
+        btr.AppendEntity(probe);
+        created.Add(probe.ObjectId);
+        tr.AddNewlyCreatedDBObject(probe, true);
+        var queue = new Queue<ObjectId>();
+        queue.Enqueue(probe.ObjectId);
+        int guard = 0;
+        while (queue.Count > 0)
         {
-            var probe = new BlockReference(Point3d.Origin, defId);
-            btr.AppendEntity(probe);
-            tr.AddNewlyCreatedDBObject(probe, true);
-
-            var queue = new Queue<ObjectId>();
-            queue.Enqueue(probe.ObjectId);
-            int guard = 0;
-            while (queue.Count > 0 && guard++ < 5000)
+            if (++guard > 5000) throw new InvalidOperationException("Het symbool bevat te veel geneste objecten.");
+            var id = queue.Dequeue();
+            var entity = (Entity)tr.GetObject(id, OpenMode.ForWrite);
+            if (entity is not BlockReference reference) { result.Add(id); continue; }
+            using var pieces = new DBObjectCollection();
+            try
             {
-                var id = queue.Dequeue();
-                if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent)
-                    continue;
-                if (ent is BlockReference bref)
+                reference.Explode(pieces);
+                foreach (DBObject obj in pieces)
                 {
-                    var pieces = new DBObjectCollection();
-                    try { bref.Explode(pieces); }
-                    catch { pieces.Dispose(); continue; }
-                    foreach (DBObject obj in pieces)
-                    {
-                        if (obj is Entity pe)
-                        {
-                            btr.AppendEntity(pe);
-                            tr.AddNewlyCreatedDBObject(pe, true);
-                            queue.Enqueue(pe.ObjectId);
-                        }
-                        else
-                        {
-                            obj.Dispose();
-                        }
-                    }
-                    bref.Erase();
-                }
-                else
-                {
-                    result.Add(id);
+                    if (obj is not Entity piece) continue;
+                    if (piece.LinetypeId.Database != db || piece.LayerId.Database != db)
+                        throw new InvalidOperationException("Een symboolafhankelijkheid hoort niet bij de hostdatabase.");
+                    if (!includeInvisible && !piece.Visible) continue;
+                    var pieceLayer = (LayerTableRecord)tr.GetObject(piece.LayerId, OpenMode.ForRead);
+                    if (!includeInvisible && (pieceLayer.IsOff || pieceLayer.IsFrozen)) continue;
+                    piece.Visible = true;
+                    FreezeSymbolStyle(piece, reference, tr);
+                    btr.AppendEntity(piece);
+                    created.Add(piece.ObjectId);
+                    tr.AddNewlyCreatedDBObject(piece, true);
+                    queue.Enqueue(piece.ObjectId);
                 }
             }
-            ok = true;
+            finally
+            {
+                foreach (DBObject obj in pieces)
+                    if (obj.ObjectId.IsNull) obj.Dispose();
+            }
+            reference.Erase();
         }
-        catch
-        {
-            ok = false;
-        }
+        ok = true;
         return result;
+    }
+
+    private static void FreezeSymbolStyle(Entity entity, Entity parent, Transaction tr)
+    {
+        if (entity.Layer == "0") entity.LayerId = parent.LayerId;
+        var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
+        var parentLayer = (LayerTableRecord)tr.GetObject(parent.LayerId, OpenMode.ForRead);
+        if (entity.Color.IsByLayer) entity.Color = layer.Color;
+        else if (entity.Color.IsByBlock) entity.Color = parent.Color.IsByLayer ? parentLayer.Color : parent.Color;
+        if (entity.LineWeight == LineWeight.ByLayer) entity.LineWeight = layer.LineWeight;
+        else if (entity.LineWeight == LineWeight.ByBlock)
+            entity.LineWeight = parent.LineWeight == LineWeight.ByLayer ? parentLayer.LineWeight : parent.LineWeight;
+        if (entity.Transparency.IsByLayer) entity.Transparency = layer.Transparency;
+        else if (entity.Transparency.IsByBlock)
+            entity.Transparency = parent.Transparency.IsByLayer ? parentLayer.Transparency : parent.Transparency;
+        if (entity.Linetype.Equals("ByLayer", StringComparison.OrdinalIgnoreCase)) entity.LinetypeId = layer.LinetypeObjectId;
+        else if (entity.Linetype.Equals("ByBlock", StringComparison.OrdinalIgnoreCase))
+            entity.LinetypeId = parent.Linetype.Equals("ByLayer", StringComparison.OrdinalIgnoreCase)
+                ? parentLayer.LinetypeObjectId : parent.LinetypeId;
+    }
+
+    private static void ValidateHostLinetypeReferences(Database db, Transaction tr, ObjectId blockRecordId)
+    {
+        var visited = new HashSet<ObjectId>();
+        void Check(ObjectId id)
+        {
+            if (!id.IsNull && (id.Database != db || id.OriginalDatabase != db))
+                throw new InvalidOperationException("Een legenda-afhankelijkheid hoort niet bij de hostdatabase.");
+        }
+        void Visit(ObjectId id)
+        {
+            Check(id);
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity entity) return;
+            Check(entity.LayerId); Check(entity.LinetypeId); Check(entity.MaterialId); Check(entity.ExtensionDictionary);
+            if (entity is MText text) Check(text.TextStyleId);
+            if (entity is DBText) throw new InvalidOperationException("Een legenda bevat nog DBText.");
+            foreach (ObjectId reactor in entity.GetPersistentReactorIds()) Check(reactor);
+            if (entity is Hatch hatch)
+                for (int i = 0; i < hatch.NumberOfLoops; i++)
+                    foreach (ObjectId boundary in hatch.GetAssociatedObjectIdsAt(i)) Check(boundary);
+            if (entity is BlockReference reference && visited.Add(reference.BlockTableRecord))
+            {
+                Check(reference.BlockTableRecord);
+                foreach (ObjectId child in (BlockTableRecord)tr.GetObject(reference.BlockTableRecord, OpenMode.ForRead)) Visit(child);
+            }
+        }
+        foreach (ObjectId id in (BlockTableRecord)tr.GetObject(blockRecordId, OpenMode.ForRead)) Visit(id);
     }
 
     private static bool TryEntityExtents(Entity ent, out Point3d min, out Point3d max)
@@ -574,6 +747,11 @@ public static class LegendBuilder
         mt.Normal = dbt.Normal;
         mt.Layer = dbt.Layer;
         mt.Color = dbt.Color;
+        mt.LineWeight = dbt.LineWeight;
+        mt.LinetypeId = dbt.LinetypeId;
+        mt.LinetypeScale = dbt.LinetypeScale;
+        mt.Transparency = dbt.Transparency;
+        mt.MaterialId = dbt.MaterialId;
         // Een xref-tekststijl-ID hoort bij de bron-database; alleen de naam mag de grens over.
         if (!dbt.TextStyleId.IsNull)
         {
@@ -682,7 +860,7 @@ public static class LegendBuilder
             tr.AddNewlyCreatedDBObject(hatch, true);
             hatch.Associative = false;
             using (var loop = new ObjectIdCollection { boundaryId })
-                hatch.AppendLoop(HatchLoopTypes.Default, loop);
+                hatch.AppendLoop(HatchLoopTypes.External, loop);
             hatch.EvaluateHatch(true);
         }
         catch
@@ -732,7 +910,7 @@ public static class LegendBuilder
                 new Point2d(x, yBottom + h)
             };
             var bulges = new DoubleCollection { 0.0, 0.0, 0.0, 0.0 };
-            hatch.AppendLoop(HatchLoopTypes.Polyline, pts, bulges);
+            hatch.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline, pts, bulges);
             hatch.EvaluateHatch(true);
         }
         catch
@@ -745,10 +923,8 @@ public static class LegendBuilder
         }
     }
 
-    // Zoals EnsureLayer, maar een nieuwe laag krijgt de effectieve look van de bron (kleur,
-    // linetype, lijndikte, transparantie). Zo neemt een swatch uit een xref-only kader de echte kleur over in
-    // plaats van standaardwit. Een bestaande hostlaag houdt zijn eigen look. Alleen losse data
-    // (geen bron-ObjectId's): het linetype gaat op naam, onbekend valt terug op Continuous.
+    // Een bestaande bronlaag blijft ongewijzigd. Bij afwijkend uiterlijk maken we een
+    // eigen laag; de uiteindelijke swatches dragen ook expliciete entiteiteigenschappen.
     private static string EnsureStyledLayer(Transaction tr, Database db, string name, LayerDisplayStyle style)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
@@ -776,25 +952,48 @@ public static class LegendBuilder
             Color = style.Color,
             LineWeight = style.LineWeight
         };
-        var cleanLt = LayerNaming.LocalName(style.Linetype);
-        var ltt = (LinetypeTable)tr.GetObject(db.LinetypeTableId, OpenMode.ForRead);
-        if (!string.IsNullOrEmpty(cleanLt) && ltt.Has(cleanLt))
-            ltr.LinetypeObjectId = ltt[cleanLt];
+        ltr.LinetypeObjectId = ResolveStyleLinetype(tr, db, style);
         lt.Add(ltr);
         tr.AddNewlyCreatedDBObject(ltr, true);
         ltr.Transparency = style.Transparency.ToAutoCadValue();
         return styledName;
     }
 
+    private static ObjectId ResolveStyleLinetype(Transaction tr, Database db, LayerDisplayStyle style)
+    {
+        var table = (LinetypeTable)tr.GetObject(db.LinetypeTableId, OpenMode.ForRead);
+        if (style.LinetypeIdentity == "Continuous" || style.Linetype.Equals("Continuous", StringComparison.OrdinalIgnoreCase)) return table["Continuous"];
+        if (!table.Has(style.Linetype))
+            throw new InvalidOperationException($"Linetype '{style.Linetype}' ontbreekt.");
+        var id = table[style.Linetype];
+        if (id.OriginalDatabase == db) return id;
+        string importedName = "NLCS_LT_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(style.LinetypeIdentity)))[..20];
+        if (table.Has(importedName)) return table[importedName];
+        using var source = new Database(false, true);
+        source.ReadDwgFile(id.OriginalDatabase.Filename, FileOpenMode.OpenForReadAndAllShare, true, string.Empty);
+        source.CloseInput(true);
+        using var sourceTr = source.TransactionManager.StartTransaction();
+        var sourceTable = (LinetypeTable)sourceTr.GetObject(source.LinetypeTableId, OpenMode.ForRead);
+        var sourceId = sourceTable[LayerNaming.LocalName(style.Linetype)];
+        using var ids = new ObjectIdCollection { sourceId };
+        using var mapping = new IdMapping();
+        source.WblockCloneObjects(ids, db.LinetypeTableId, mapping, DuplicateRecordCloning.MangleName, false);
+        var imported = mapping[sourceId].Value;
+        ((LinetypeTableRecord)tr.GetObject(imported, OpenMode.ForWrite)).Name = importedName;
+        sourceTr.Commit();
+        return imported;
+    }
+
     private static bool LayerMatchesStyle(Transaction tr, LayerTableRecord layer, LayerDisplayStyle style)
     {
-        string linetype = "Continuous";
-        if (tr.GetObject(layer.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord ltr)
-            linetype = ltr.Name;
-        return layer.Color.ColorMethod == style.Color.ColorMethod
+        string linetype = DrawingAnalyzer.LinetypeSignature(layer.LinetypeObjectId, tr);
+        string expected = style.LinetypeIdentity.Length > 0 ? style.LinetypeIdentity
+            : DrawingAnalyzer.LinetypeSignature(((LinetypeTable)tr.GetObject(layer.Database.LinetypeTableId, OpenMode.ForRead))[style.Linetype], tr);
+        return !layer.IsOff && !layer.IsFrozen && layer.Color.ColorMethod == style.Color.ColorMethod
             && layer.Color.ColorIndex == style.Color.ColorIndex
             && layer.Color.ColorValue.ToArgb() == style.Color.ColorValue.ToArgb()
-            && StringComparer.OrdinalIgnoreCase.Equals(linetype, style.Linetype)
+            && StringComparer.Ordinal.Equals(linetype, expected)
             && layer.LineWeight == style.LineWeight
             && TransparencyValue.From(layer.Transparency).Signature == style.Transparency.Signature;
     }
@@ -805,7 +1004,7 @@ public static class LegendBuilder
             style.Color.ColorMethod,
             style.Color.ColorIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
             style.Color.ColorValue.ToArgb().ToString(System.Globalization.CultureInfo.InvariantCulture),
-            style.Linetype.Trim().ToUpperInvariant(),
+            style.LinetypeIdentity,
             style.LineWeight,
             style.Transparency.Signature);
         string hash = Convert.ToHexString(
