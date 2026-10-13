@@ -117,11 +117,11 @@ public class InputBoundaryTests
     [Fact]
     public void CorruptProfileLoad_DoesNotReturnDefaults()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "nlcs_load_" + Guid.NewGuid().ToString("N"));
+        var directory = Path.Join(Path.GetTempPath(), "nlcs_load_" + Guid.NewGuid().ToString("N"));
         try
         {
             Directory.CreateDirectory(directory);
-            File.WriteAllText(Path.Combine(directory, "Ontwerp.json"), "{ kapot");
+            File.WriteAllText(Path.Join(directory, "Ontwerp.json"), "{ kapot");
             Assert.Throws<InvalidDataException>(() => LegendPresets.Load(directory, "Ontwerp"));
         }
         finally { Directory.Delete(directory, recursive: true); }
@@ -130,11 +130,11 @@ public class InputBoundaryTests
     [Fact]
     public void CorruptProfileImport_PreservesExistingProfile()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "nlcs_import_" + Guid.NewGuid().ToString("N"));
+        var directory = Path.Join(Path.GetTempPath(), "nlcs_import_" + Guid.NewGuid().ToString("N"));
         try
         {
             LegendPresets.Save(directory, "Ontwerp", new LegendSettings { Scale = 500 });
-            var input = Path.Combine(directory, "input.json");
+            var input = Path.Join(directory, "input.json");
             File.WriteAllText(input, """{"manualEntries":[null]}""");
             Assert.False(LegendPresets.TryImport(directory, input, "Ontwerp", out _));
             Assert.Equal(500, LegendPresets.Load(directory, "Ontwerp")!.Scale);

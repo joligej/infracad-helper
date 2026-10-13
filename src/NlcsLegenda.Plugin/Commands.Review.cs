@@ -465,7 +465,7 @@ public partial class Commands
         var doc = AcAp.DocumentManager.MdiActiveDocument;
         try
         {
-            var directory = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "metadata");
+            var directory = System.IO.Path.Join(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "metadata");
             System.IO.Directory.CreateDirectory(directory);
             var invalid = new[] { "", "{ kapot", "{\"legends\":[null]}", "{\"schemaVersion\":999,\"legends\":[]}" };
             for (int i = 0; i <= invalid.Length; i++)
@@ -479,10 +479,10 @@ public partial class Commands
                     if (i < invalid.Length)
                     {
                         var nod = (DBDictionary)tr.GetObject(db.NamedObjectsDictionaryId, OpenMode.ForWrite);
-                        var root = new DBDictionary();
+                        using var root = new DBDictionary();
                         nod.SetAt("NLCSLEGENDA_REGISTRY", root);
                         tr.AddNewlyCreatedDBObject(root, true);
-                        var record = new Xrecord();
+                        using var record = new Xrecord();
                         root.SetAt("REGISTRY", record);
                         tr.AddNewlyCreatedDBObject(record, true);
                         using var data = new ResultBuffer(new TypedValue((int)DxfCode.Text, invalid[i]));
@@ -497,7 +497,7 @@ public partial class Commands
                     }
                     tr.Commit();
                 }
-                db.SaveAs(System.IO.Path.Combine(directory, i + ".dwg"), DwgVersion.Current);
+                db.SaveAs(System.IO.Path.Join(directory, i + ".dwg"), DwgVersion.Current);
             }
             var hashes = System.IO.Directory.GetFiles(directory, "*.dwg").ToDictionary(p => p,
                 p => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.IO.File.ReadAllBytes(p))));
@@ -512,6 +512,4 @@ public partial class Commands
         }
         catch (System.Exception ex) { doc.Editor.WriteMessage($"\nMETADATA FAIL: {ex}"); }
     }
-
-
 }
