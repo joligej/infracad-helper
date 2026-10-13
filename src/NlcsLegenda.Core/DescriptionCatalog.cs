@@ -78,7 +78,7 @@ public sealed class DescriptionCatalog
         if (Elementen.TryGetValue($"{layer.Hoofdgroep}|{element}", out var exact))
             return Compose(exact.Algemeen, exact.Specifiek, layer.Hoofdgroep, includeGeneral, separator);
 
-        foreach (var kv in Elementen)
+        foreach (var kv in Elementen.OrderByDescending(kv => kv.Key.Length))
         {
             var sep = kv.Key.IndexOf('|');
             if (sep < 0) continue;
@@ -112,8 +112,7 @@ public sealed class DescriptionCatalog
         try
         {
             if (File.Exists(path))
-                return JsonSerializer.Deserialize<DescriptionCatalog>(File.ReadAllText(path), Options)
-                       ?? new DescriptionCatalog();
+                return FromJson(File.ReadAllText(path));
         }
         catch
         {
@@ -127,22 +126,21 @@ public sealed class DescriptionCatalog
 
     public string ToJson() => JsonSerializer.Serialize(this, Options);
 
-    public static DescriptionCatalog FromJson(string? json)
+    public static DescriptionCatalog FromJson(string? json) =>
+        TryParse(json, out var catalog) ? catalog : new DescriptionCatalog();
+
+    internal void Normalize()
     {
-        if (string.IsNullOrWhiteSpace(json))
-            return new DescriptionCatalog();
-        try
+        var entries = new Dictionary<string, DescriptionEntry>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in Elementen ?? new())
         {
-            return JsonSerializer.Deserialize<DescriptionCatalog>(json, Options) ?? new DescriptionCatalog();
+            if (kv.Value is null || kv.Value.Specifiek is null)
+                throw new JsonException("Een omschrijving bevat geen geldige tekst.");
+            entries[kv.Key] = kv.Value;
         }
-        catch
-        {
-            return new DescriptionCatalog();
-        }
+        Elementen = entries;
     }
 
-    // Strikt lezen voor kritieke migratiestaat: false bij ongeldige JSON, zodat oude data niet
-    // stil door een lege catalogus wordt vervangen en vervolgens gewist.
     public static bool TryParse(string? json, out DescriptionCatalog catalog)
     {
         catalog = new DescriptionCatalog();
@@ -153,8 +151,7 @@ public sealed class DescriptionCatalog
             var parsed = JsonSerializer.Deserialize<DescriptionCatalog>(json, Options);
             if (parsed is null)
                 return false;
-            parsed.Elementen = new Dictionary<string, DescriptionEntry>(
-                parsed.Elementen ?? new(), StringComparer.OrdinalIgnoreCase);
+            parsed.Normalize();
             catalog = parsed;
             return true;
         }

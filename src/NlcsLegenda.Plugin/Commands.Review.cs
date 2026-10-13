@@ -30,6 +30,7 @@ public partial class Commands
                 doc.Editor.WriteMessage($"\nREVIEW {name} -> FAIL: {ex}");
             }
         }
+        Check("geldige en ongeldige laagnamen", ReviewLayerNames);
         Check("eigen laag met lijn en symbool", ReviewMixedCustomLayer);
         Check("eigen laag met twee blokfilters", ReviewCustomBlockFilters);
         Check("verschillende 3D-polylijnen", ReviewSymbolPolylineShapes);
@@ -49,6 +50,22 @@ public partial class Commands
         Check("lijncontour met arcering", ReviewAreaOutline);
         Check("omschrijving van samengevoegde lagen", ReviewMergedDescription);
         doc.Editor.WriteMessage($"\nREVIEW totaal: {(failures == 0 ? "OK" : "FAIL")} ({failures} fouten)");
+    }
+
+    private static void ReviewLayerNames(Database db, Transaction tr)
+    {
+        foreach (var name in new[] { "N03-WE-VH-SUBSTATUS-G", "N-RI-RIO-INSPECTIE-G", "N-WE-VH-ONGELDIG-G-99999999999999999999" })
+        {
+            var layer = ReviewLayer(db, tr, name);
+            using var line = new Line(Point3d.Origin, new Point3d(7, 0, 0)) { LayerId = layer };
+            ReviewAppend(ReviewModel(db, tr), tr, line);
+        }
+        var entries = DrawingAnalyzer.Analyze(db, tr, new LegendSettings()).Entries;
+        foreach (var element in new[] { "SUBSTATUS", "INSPECTIE" })
+            if (Math.Abs(entries.Single(e => e.Element == element).Metric.Length - 7) > 1e-8)
+                throw new InvalidOperationException("Een geldige laagnaam wordt niet volledig geanalyseerd.");
+        if (entries.Any(e => e.Element == "ONGELDIG"))
+            throw new InvalidOperationException("Een ongeldige schaal wordt als bron gebruikt.");
     }
 
     private static ObjectId ReviewLayer(Database db, Transaction tr, string name, short color = 7)
@@ -441,5 +458,60 @@ public partial class Commands
         var result = DrawingAnalyzer.Analyze(db, tr, new LegendSettings(), Array.Empty<ObjectId>());
         if (result.Entries.Count != 0) throw new InvalidOperationException("Een lege selectie wordt de hele tekening.");
     }
+
+    [CommandMethod("NLCSLEGENDAMETADATATEST", CommandFlags.Modal)]
+    public void NlcsLegendaMetadataTest()
+    {
+        var doc = AcAp.DocumentManager.MdiActiveDocument;
+        try
+        {
+            var directory = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "metadata");
+            System.IO.Directory.CreateDirectory(directory);
+            var invalid = new[] { "", "{ kapot", "{\"legends\":[null]}", "{\"schemaVersion\":999,\"legends\":[]}" };
+            for (int i = 0; i <= invalid.Length; i++)
+            {
+                using var db = new Database(true, true);
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    var layer = ReviewLayer(db, tr, "N-WE-VH-INVOER-G");
+                    using var line = new Line(Point3d.Origin, new Point3d(7, 0, 0)) { LayerId = layer };
+                    ReviewAppend(ReviewModel(db, tr), tr, line);
+                    if (i < invalid.Length)
+                    {
+                        var nod = (DBDictionary)tr.GetObject(db.NamedObjectsDictionaryId, OpenMode.ForWrite);
+                        var root = new DBDictionary();
+                        nod.SetAt("NLCSLEGENDA_REGISTRY", root);
+                        tr.AddNewlyCreatedDBObject(root, true);
+                        var record = new Xrecord();
+                        root.SetAt("REGISTRY", record);
+                        tr.AddNewlyCreatedDBObject(record, true);
+                        using var data = new ResultBuffer(new TypedValue((int)DxfCode.Text, invalid[i]));
+                        record.Data = data;
+                        bool refused = false;
+                        try { LegendStore.Save(db, tr, new LegendRegistry()); }
+                        catch (NotSupportedException) { refused = true; }
+                        using var retained = record.Data;
+                        var raw = retained is null ? string.Empty : string.Concat(retained.AsArray().Select(v => v.Value as string));
+                        if (!refused || raw != invalid[i])
+                            throw new InvalidOperationException("Onleesbare registratie is overschreven.");
+                    }
+                    tr.Commit();
+                }
+                db.SaveAs(System.IO.Path.Combine(directory, i + ".dwg"), DwgVersion.Current);
+            }
+            var hashes = System.IO.Directory.GetFiles(directory, "*.dwg").ToDictionary(p => p,
+                p => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.IO.File.ReadAllBytes(p))));
+            var results = BatchExport.AnalyzeFolder(directory, new LegendSettings(), DescriptionCatalog.Default());
+            var good = results.Single(r => r.Drawing == invalid.Length + ".dwg");
+            bool unchanged = hashes.All(p => p.Value == Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(System.IO.File.ReadAllBytes(p.Key))));
+            if (results.Count != 5 || results.Count(r => r.Error is not null) != 4 || good.Error is not null
+                || good.Entries.Count != 1 || Math.Abs(good.Entries[0].Metric.Length - 7) > 1e-8 || !unchanged)
+                throw new InvalidOperationException("Batch accepteert onleesbare gegevens of wijzigt een bronbestand.");
+            doc.Editor.WriteMessage("\nMETADATA vier onleesbare tekeningen afgewezen; geldige tekening 7m; bronbestanden ongewijzigd -> OK");
+        }
+        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nMETADATA FAIL: {ex}"); }
+    }
+
 
 }

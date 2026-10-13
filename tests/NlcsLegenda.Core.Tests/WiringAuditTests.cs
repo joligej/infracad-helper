@@ -52,6 +52,7 @@ public class WiringAuditTests
         foreach (var p in props)
         {
             if (p.Name == nameof(LegendSettings.Scale)) { expected[p.Name] = 250.0; continue; }
+            if (p.Name == nameof(LegendSettings.SchemaVersion)) { expected[p.Name] = LegendSettings.CurrentSchemaVersion; continue; }
             var val = Mutate(p.PropertyType, p.GetValue(s));
             p.SetValue(s, val);
             expected[p.Name] = val;

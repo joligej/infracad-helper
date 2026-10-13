@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.29.7 - 2026-10-13
+
+- Een ongeldige schaal in een laagnaam breekt de analyse niet meer af. Lagen met een
+  substatus of een langere discipline- of hoofdgroepcode worden ook herkend.
+- Omschrijvingen blijven na inlezen ongevoelig voor hoofdletters. Bij een variant krijgt
+  de meest specifieke omschrijving voorrang.
+- Onleesbare profielen worden geweigerd voordat ze een bestaand profiel kunnen vervangen.
+  Beschadigde legendaopslag blijft behouden en wordt duidelijk als fout gemeld,
+  ook tijdens batch-export.
+- De uitleg over laagnamen, standaardmaten en eigen instellingen is bijgewerkt.
+
 ## 1.29.6 - 2026-10-13
 
 - Gemengde eigen lagen en afzonderlijke blokfilters behouden alle legendaonderdelen.

@@ -56,7 +56,7 @@ public class LegendDomainTests
     public void Registry_NormalizesNullCollections()
     {
         // JSON zonder legends-array en zonder sourceHandles.
-        const string json = """{ "schemaVersion": 1 }""";
+        const string json = """{ "schemaVersion": 2 }""";
         Assert.True(LegendRegistry.TryParse(json, out var reg, out _));
         Assert.NotNull(reg.Legends);
         Assert.Empty(reg.Legends);

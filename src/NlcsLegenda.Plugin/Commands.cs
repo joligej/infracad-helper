@@ -652,7 +652,7 @@ public partial class Commands
             var maakStatus = created.Count > 0 ? $" ({string.Join(" + ", created)} aangemaakt)" : "";
 
             ed.WriteMessage(
-                $"\nGlobale bestanden{maakStatus} (voor alle tekeningen):" +
+                $"\nGlobale bestanden{maakStatus} (voor nieuwe legenda's):" +
                 $"\n  {ConfigPath}" +
                 $"\n  {DescriptionsPath}");
         }
@@ -2657,7 +2657,7 @@ public partial class Commands
         }
     }
 
-    // First-class eigen bronlagen op een echte host: maakt geometrie op niet-NLCS-lagen en
+    // Eigen bronlagen op een echte host: maakt geometrie op niet-NLCS-lagen en
     // controleert dat gekoppelde eigen lagen gelijkwaardig meetellen (lengte, aantal, oppervlak),
     // zowel op de hele tekening als op een selectie, en dat een echte legenda wordt gebouwd.
     [CommandMethod("NLCSLEGENDACUSTOMTEST", CommandFlags.Modal)]

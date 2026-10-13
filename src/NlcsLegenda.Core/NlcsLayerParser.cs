@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 namespace NlcsLegenda.Core;
 
@@ -25,14 +26,16 @@ public static class NlcsLayerParser
         var discipline = parts[1];
         var hoofdgroep = parts[2];
 
-        if (!IsField(status, 1) || !IsField(discipline, 2) || !IsField(hoofdgroep, 2))
+        if (!IsStatus(status) || !IsField(discipline) || !IsField(hoofdgroep))
             return false;
 
         var lastIndex = parts.Length - 1;
         int? scale = null;
         if (IsPositiveInteger(parts[lastIndex]))
         {
-            scale = int.Parse(parts[lastIndex]);
+            if (!int.TryParse(parts[lastIndex], NumberStyles.None, CultureInfo.InvariantCulture, out var value) || value <= 0)
+                return false;
+            scale = value;
             lastIndex--;
         }
 
@@ -55,7 +58,7 @@ public static class NlcsLayerParser
             IsXref = isXref,
             XrefName = xrefName,
             StatusCode = status.ToUpperInvariant(),
-            Status = NlcsStatusExtensions.FromCode(status),
+            Status = NlcsStatusExtensions.FromCode(status[..1]),
             Discipline = discipline.ToUpperInvariant(),
             Hoofdgroep = hoofdgroep.ToUpperInvariant(),
             Element = element,
@@ -66,8 +69,14 @@ public static class NlcsLayerParser
         return true;
     }
 
-    private static bool IsField(string value, int length) =>
-        value.Length == length && value.All(char.IsLetterOrDigit);
+    private static bool IsField(string value) =>
+        value.Length > 0 && value.All(char.IsLetterOrDigit);
+
+    private static bool IsStatus(string value) =>
+        value.Length == 1 && char.IsLetterOrDigit(value[0])
+        || value.Length == 3 && NlcsLayerComponents.StatusCodes.Contains(value[..1].ToUpperInvariant())
+            && value[1..].All(char.IsAsciiDigit)
+            && int.TryParse(value[1..], out var subStatus) && subStatus is >= 1 and <= 99;
 
     private static bool IsPositiveInteger(string value) =>
         value.Length > 0 && value.All(char.IsDigit);

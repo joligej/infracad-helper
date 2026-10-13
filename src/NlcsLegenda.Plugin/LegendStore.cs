@@ -19,9 +19,7 @@ internal static class LegendStore
             return new LegendRegistry();
         if (LegendRegistry.TryParse(json, out var reg, out _))
             return reg;
-        // Ongeldige of niet-ondersteunde registry: geef de (mogelijk niet-ondersteunde)
-        // versie terug zodat de aanroeper strikt kan afhandelen; nooit stil defaults schrijven.
-        return reg;
+        throw new NotSupportedException("Legenda-gegevens zijn onleesbaar of hebben een niet-ondersteunde versie.");
     }
 
     // Leest de registry strikt: false bij ongeldige of niet-ondersteunde metadata.
@@ -41,13 +39,11 @@ internal static class LegendStore
 
     public static void Save(Database db, Transaction tr, LegendRegistry registry)
     {
-        // Nooit onleesbare of nieuwere (niet-ondersteunde) legenda-gegevens overschrijven.
-        // De eerste opslag (nog geen root) en een normale mutatie (bestaande geldige registry)
-        // gaan door; alleen corrupt/future wordt geweigerd zodat er niets verloren gaat.
+        // Onleesbare gegevens en onbekende schemaversies mogen niet worden overschreven.
         var existing = ReadRaw(db, tr);
         if (existing is not null && !LegendRegistry.TryParse(existing, out _, out var err))
             throw new NotSupportedException(
-                "Bestaande legenda-gegevens zijn onleesbaar of nieuwer dan deze plugin; er wordt niets " +
+                "Bestaande legenda-gegevens zijn onleesbaar of hebben een niet-ondersteunde versie; er wordt niets " +
                 $"overschreven. {err}");
 
         var nod = (DBDictionary)tr.GetObject(db.NamedObjectsDictionaryId, OpenMode.ForWrite);
@@ -63,7 +59,7 @@ internal static class LegendStore
             tr.AddNewlyCreatedDBObject(root, true);
         }
 
-        var data = new ResultBuffer(Chunk(registry.ToJson()));
+        using var data = new ResultBuffer(Chunk(registry.ToJson()));
         if (root.Contains(RegistryKey))
         {
             ((Xrecord)tr.GetObject(root.GetAt(RegistryKey), OpenMode.ForWrite)).Data = data;
@@ -84,13 +80,16 @@ internal static class LegendStore
             return null;
         var root = (DBDictionary)tr.GetObject(nod.GetAt(RegistryRoot), OpenMode.ForRead);
         if (!root.Contains(RegistryKey))
-            return null;
+            return string.Empty;
         var xrec = (Xrecord)tr.GetObject(root.GetAt(RegistryKey), OpenMode.ForRead);
         var sb = new System.Text.StringBuilder();
-        foreach (TypedValue tv in xrec.Data)
+        using var data = xrec.Data;
+        if (data is null)
+            return string.Empty;
+        foreach (TypedValue tv in data)
             if (tv.TypeCode == (int)DxfCode.Text && tv.Value is string s)
                 sb.Append(s);
-        return sb.Length > 0 ? sb.ToString() : null;
+        return sb.ToString();
     }
 
     private static TypedValue[] Chunk(string json)

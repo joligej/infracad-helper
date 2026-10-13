@@ -9,9 +9,9 @@ F - DD - HH - ELEMENT[_SUB...] - TYPE [-SCHAAL]
 
 | Veld | Betekenis | Voorbeeldwaarden |
 |------|-----------|------------------|
-| `F` | **Fase / status** (1 teken) | `N` nieuw, `B` bestaand, `V` vervallen, `T` tijdelijk, `R` revisie, `X` algemeen |
-| `DD` | **Discipline** (2 tekens) | `WE` weg, `CO` constructie, `BH` beheer, `XX` algemeen |
-| `HH` | **Hoofdgroep** (2 tekens) | `VH` verharding, `RI` riolering, `GW` grondwerk, `IE` inrichting, `VW` verkeer/markering, `GR` groen, `KW` kunstwerk, `AL` algemeen |
+| `F` | **Fase / status** (1 teken, eventueel met subnummer 01–99) | `N` nieuw, `N03` nieuw met substatus 03, `B` bestaand, `V` vervallen, `T` tijdelijk, `R` revisie, `X` algemeen |
+| `DD` | **Discipline** | `WE` weg, `CO` constructie, `BH` beheer, `XX` algemeen |
+| `HH` | **Hoofdgroep** | `VH` verharding, `RI` riolering, `GW` grondwerk, `IE` inrichting, `VW` verkeer/markering, `GR` groen, `KW` kunstwerk, `AL` algemeen |
 | `ELEMENT` | **Elementomschrijving**, subdelen gescheiden met `_` | `OPENVERHARDING_BETONSTRAATSTEEN`, `KANTOPSLUITING_TROTTOIRBAND_180X200_250` |
 | `TYPE` | **Tekentype** (suffix) | `G` geometrie/lijn, `A` arcering/hatch, `V` vlakvulling (hatch), `S` symbool, `T50`/`T25` tekst, `GV` gevuld vlak (contour), `GD` geometrie detail, `O` overig |
 | `SCHAAL` | Optionele schaalvariant | `-200` (1:200), `-250`, `-500` |
@@ -28,15 +28,17 @@ F - DD - HH - ELEMENT[_SUB...] - TYPE [-SCHAAL]
 
 ## Herkenningsregel
 
-Een laag geldt als NLCS-laag wanneer, na het strippen van een eventueel
-xref-voorvoegsel (`xref|...`), de naam met `-` gesplitst ten minste 5 delen
-heeft en geldt: `len(F)==1 && len(DD)==2 && len(HH)==2`. Dit onderscheidt
-NLCS-lagen betrouwbaar van gewone laagnamen als `INMETING-2D` of `KADER`.
+De analyse leest de naam na het laatste xref-voorvoegsel (`xref|...`). Status,
+discipline, hoofdgroep, element en type moeten aanwezig zijn. Een status kan een
+subnummer hebben, zoals `N03`. Discipline en hoofdgroep bevatten letters en cijfers.
+Een optionele schaal moet een positief geheel getal zijn. De laagnaameditor
+controleert daarnaast de formele status- en elementcodes en hun combinaties.
 
 ## Legenda-groepering
 
 - Eén legenda-regel per **uniek** `(F, DD, HH, ELEMENT)`; het `TYPE`-suffix en de
-  schaal worden samengevoegd. Zo horen `...-G` (lijn) en `...-A` (arcering) van
+  schaal worden samengevoegd als de zichtbare weergave gelijk is. Verschillende
+  kleuren, arceringen of symbolen krijgen afzonderlijke regels. Zo horen `...-G` (lijn) en `...-A` (arcering) van
   hetzelfde element bij één swatch.
 - Sortering op status: **Nieuw -> Bestaand -> Vervallen -> Tijdelijk -> Revisie**,
   daarbinnen op hoofdgroep en element.
@@ -52,7 +54,6 @@ wordt gedefinieerd in **papier-millimeters** en omgerekend naar modeleenheden:
 model_eenheid = papier_mm * schaal / 1000
 ```
 
-Afgeleid uit een NLCS-voorbeeldlegenda op schaal 1:200:
-teksthoogte ~ 0,5 m (~ 2,5 mm papier), swatch ~ 4,0 x 0,8 m
-(~ 20 x 4 mm papier). Deze waarden zijn de standaardinstellingen en zijn
-volledig configureerbaar.
+De standaardmaten zijn 2,5 mm voor regeltekst en koppen, 5 mm voor de titel,
+24 × 5 mm voor het voorbeeldvak en 6,3 mm tussen opeenvolgende rijen.
+De afstand tussen het voorbeeldvak en de tekst is 5,7 mm. Deze maten zijn instelbaar.

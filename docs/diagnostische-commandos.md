@@ -57,6 +57,8 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDASNAPSHOTTEST` / `NLCSLEGENDASNAPSHOTVERIFY` | Wijzigt een synthetisch xref-bestand, controleert dat de oude legenda bij een versieverschil behouden blijft en werkt hem na heropenen bij. |
 | `NLCSLEGENDAEXPORTREVIEWTEST` | Voert INFO en export uit voor een bestaande selectielegenda, na een globale omschrijvingswijziging en na verwijdering van de selectie. |
 
+| `NLCSLEGENDAMETADATATEST` | Controleert dat onleesbare legendaopslag niet wordt overschreven en dat batch-export de fout meldt en verdergaat zonder bronbestanden te wijzigen. |
+
 De releasecontrole `dev/scripts/Run-ReleaseAcceptance.ps1` voert deze commando's uit op afzonderlijke kopieën, controleert de geladen DLL-hash en stopt bij een fout, ontbrekend resultaat of mislukte QSAVE. Gebruik deze testcommando's uitsluitend in een testtekening: fixturecommando's voegen objecten en tijdelijke xrefs toe.
 
 De runner controleert dat `SECURELOAD` en `FILEDIA` terugstaan op hun oorspronkelijke
