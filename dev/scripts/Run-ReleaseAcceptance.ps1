@@ -12,7 +12,7 @@ param(
     [string]$PluginPath,
     [string]$TemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen
 )
 $ErrorActionPreference='Stop'
@@ -31,6 +31,14 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ abclocal=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAABCSETUP",'ABC: setup klaar','NLCSLEGENDAABCVERIFY','ABC: na A bewerken B/C-vingerafdruk ongewijzigd')
+ abcxref=@('NLCSLEGENDAABCXREFSETUP','ABCX: setup klaar','NLCSLEGENDAABCXREFVERIFY','ABCX: xref-isolatie A=OK B=OK C=OK -> OK')
+ oldreopen=@('NLCSLEGENDAOLDREOPENSETUP','HEROPEN: setup klaar','NLCSLEGENDAOLDREOPENVERIFY','handles=2 pos=True orphan=0 -> OK')
+ eigenvis=@('NLCSLEGENDAEIGENZICHTBAARTEST','(verw true/true) -> OK')
+ eigenbatch=@('NLCSLEGENDAEIGENBATCHTEST','bron-hashes ongewijzigd=True -> OK')
+ exportreview=@('NLCSLEGENDAEXPORTREVIEWTEST','EXPORTREVIEW eigen omschrijvingen en lege bronselectie -> OK')
+ snapshot=@('NLCSLEGENDASNAPSHOTTEST','SNAPSHOT gewijzigde bron afgewezen; bestaande legenda behouden -> OK')
+ review=@('NLCSLEGENDAREVIEWTEST','REVIEW totaal: OK (0 fouten)')
  polyownership=@('NLCSLEGENDAPOLYOWNERSHIPTEST','POLYOWNERSHIP 2D/3D 14m en bronvertices ongewijzigd na drie analyses -> OK')
  symboledge=@('NLCSLEGENDASYMBOLEDGETEST','SYMBOLEDGE leeg/verborgen/lijn/verschillende arceringscontouren -> OK')
  paperscale=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAPAPERSCALETEST",'PAPERSCALE 1:1000 vakken24x5/tekst2.5/kop2.5/titel5/gap5.7/centrering/kader -> OK')
@@ -126,6 +134,14 @@ foreach($case in $Cases){
  $drawing=Join-Path $dir 'host.dwg'
  Copy-Item -LiteralPath $TemplatePath -Destination $drawing
  Run-Case $case $drawing $specs[$case][0] @($specs[$case][1])
+ if($case -in @('abclocal','abcxref','oldreopen')){
+  $expected=@($specs[$case][3])
+  if($case -eq 'abclocal'){$expected+='ABC: viewport A=OK B=OK C=OK'}
+  Run-Case "$case-verify" $drawing $specs[$case][2] $expected
+ }
+ if($case -eq 'snapshot'){
+  Run-Case 'snapshot-verify' $drawing "NLCSLEGENDASNAPSHOTVERIFY`nNLCSLEGENDASTABILITYTEST" @('SNAPSHOTVERIFY herladen bron; nieuwe symboolvorm -> OK','STABILITY updates=50','STABILITY orphan blocks=0 -> OK')
+ }
  if($case -eq 'reload'){
   Copy-Item -LiteralPath (Join-Path $dir 'reload_replacement.dwg') -Destination (Join-Path $dir 'reload_source.dwg') -Force
   Run-Case 'reload-verify' $drawing 'NLCSLEGENDAXREFRELOADVERIFY' @('XREFRELOAD totaal: OK')

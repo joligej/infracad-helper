@@ -317,7 +317,7 @@ public static class LegendBuilder
                 ? sample.Transform
                 : SymbolTransform.Identity;
             if (!TryInsertSymbol(btr, tr, db, blk, renderLayers[symLayer], symbolTransform,
-                    x + swatchW / 2, midY, swatchW, swatchH, s.ModelUnitsPerPaperMm, s.IncludeInvisibleLayers, out var failureReason))
+                    sample, x + swatchW / 2, midY, swatchW, swatchH, s.ModelUnitsPerPaperMm, s.IncludeInvisibleLayers, out var failureReason))
                 throw new InvalidOperationException(failureReason);
         }
 
@@ -383,7 +383,7 @@ public static class LegendBuilder
 
     private static bool TryInsertSymbol(
         BlockTableRecord btr, Transaction tr, Database db, string blockName, string layer,
-        SymbolTransform sourceTransform,
+        SymbolTransform sourceTransform, SymbolSample? sample,
         double centerX, double centerY, double swatchW, double swatchH, double modelPerPaperMm, bool includeInvisible,
         out string failureReason)
     {
@@ -402,7 +402,7 @@ public static class LegendBuilder
             var defId = ImportSymbolDefinition(db, tr, bt[blockName], importedBlocks);
 
             // Explode-to-primitives voorkomt dat annotatieve blokschaal de swatch opblaast.
-            primitives = ExplodeToPrimitives(btr, tr, db, layer, defId, created, includeInvisible, out var probeOk);
+            primitives = ExplodeToPrimitives(btr, tr, db, layer, defId, created, includeInvisible, sample, out var probeOk);
             if (!probeOk || primitives.Count == 0)
             {
                 foreach (var id in created.Concat(primitives).Distinct())
@@ -508,6 +508,24 @@ public static class LegendBuilder
         }
     }
 
+    private static Database OpenXrefSnapshot(Database loaded)
+    {
+        var snapshot = new Database(false, true);
+        try
+        {
+            snapshot.ReadDwgFile(loaded.Filename, FileOpenMode.OpenForReadAndAllShare, true, string.Empty);
+            snapshot.CloseInput(true);
+            if (snapshot.FingerprintGuid != loaded.FingerprintGuid || snapshot.VersionGuid != loaded.VersionGuid)
+                throw new InvalidOperationException($"Het bronbestand '{Path.GetFileName(loaded.Filename)}' is gewijzigd. Herlaad de xref en probeer opnieuw.");
+            return snapshot;
+        }
+        catch
+        {
+            snapshot.Dispose();
+            throw;
+        }
+    }
+
     private static ObjectId ImportSymbolDefinition(
         Database host, Transaction tr, ObjectId definitionId, List<ObjectId> importedBlocks)
     {
@@ -517,18 +535,16 @@ public static class LegendBuilder
 
         var definition = (BlockTableRecord)tr.GetObject(definitionId, OpenMode.ForRead);
         string localName = LayerNaming.LocalName(definition.Name);
-        using var source = new Database(false, true);
-        source.ReadDwgFile(original.Filename, FileOpenMode.OpenForReadAndAllShare, true, string.Empty);
-        source.CloseInput(true);
+        using var source = OpenXrefSnapshot(original);
         using var sourceTr = source.TransactionManager.StartTransaction();
         var table = (BlockTable)sourceTr.GetObject(source.BlockTableId, OpenMode.ForRead);
         if (!table.Has(localName))
             throw new InvalidOperationException($"Symbooldefinitie '{localName}' ontbreekt in de bron.");
         var sourceId = table[localName];
-        // Stabiele namen per broninhoud voorkomen nieuwe textstyles/materialen bij elke update.
-        // Alleen deze tijdelijke side-database wordt hernoemd; het bronbestand blijft onaangeroerd.
-        using var stream = new FileStream(original.Filename, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        string prefix = "NLCS_SRC_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream))[..20] + "_";
+        // Alleen de kopie wordt hernoemd. De geladen xref en het bronbestand blijven intact.
+        string sourceVersion = source.FingerprintGuid.ToString() + source.VersionGuid.ToString();
+        string prefix = "NLCS_SRC_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(sourceVersion)))[..20] + "_";
         var originalLayers = new Dictionary<ObjectId, string>();
         foreach (var tableId in new[] { source.BlockTableId, source.LayerTableId, source.LinetypeTableId, source.TextStyleTableId })
             foreach (ObjectId id in (SymbolTable)sourceTr.GetObject(tableId, OpenMode.ForRead))
@@ -590,7 +606,7 @@ public static class LegendBuilder
 
     private static List<ObjectId> ExplodeToPrimitives(
         BlockTableRecord btr, Transaction tr, Database db, string layer, ObjectId defId,
-        List<ObjectId> created, bool includeInvisible, out bool ok)
+        List<ObjectId> created, bool includeInvisible, SymbolSample? sample, out bool ok)
     {
         var result = new List<ObjectId>();
         ok = false;
@@ -598,13 +614,15 @@ public static class LegendBuilder
         btr.AppendEntity(probe);
         created.Add(probe.ObjectId);
         tr.AddNewlyCreatedDBObject(probe, true);
-        var queue = new Queue<ObjectId>();
-        queue.Enqueue(probe.ObjectId);
+        var insertionLayer = sample?.InsertionLayerStyle ?? DrawingAnalyzer.EntityLayerStyle(probe, tr);
+        if (sample?.InsertionStyle is { } insertionStyle) ApplyEntityStyle(probe, insertionStyle, tr, db);
+        var queue = new Queue<(ObjectId Id, LayerDisplayStyle Layer)>();
+        queue.Enqueue((probe.ObjectId, insertionLayer));
         int guard = 0;
         while (queue.Count > 0)
         {
             if (++guard > 5000) throw new InvalidOperationException("Het symbool bevat te veel geneste objecten.");
-            var id = queue.Dequeue();
+            var (id, inheritedLayer) = queue.Dequeue();
             var entity = (Entity)tr.GetObject(id, OpenMode.ForWrite);
             if (entity is not BlockReference reference) { result.Add(id); continue; }
             using var pieces = new DBObjectCollection();
@@ -620,11 +638,15 @@ public static class LegendBuilder
                     var pieceLayer = (LayerTableRecord)tr.GetObject(piece.LayerId, OpenMode.ForRead);
                     if (!includeInvisible && (pieceLayer.IsOff || pieceLayer.IsFrozen)) continue;
                     piece.Visible = true;
-                    FreezeSymbolStyle(piece, reference, tr);
+                    var pieceLayerStyle = DrawingAnalyzer.EntityLayerStyle(piece, tr, inheritedLayer);
+                    var parentStyle = DrawingAnalyzer.EntityStyle(reference, tr, null, inheritedLayer);
+                    var pieceStyle = DrawingAnalyzer.EntityStyle(piece, tr, parentStyle, pieceLayerStyle);
+                    if (piece.Layer == "0") piece.LayerId = reference.LayerId;
+                    ApplyEntityStyle(piece, pieceStyle, tr, db);
                     btr.AppendEntity(piece);
                     created.Add(piece.ObjectId);
                     tr.AddNewlyCreatedDBObject(piece, true);
-                    queue.Enqueue(piece.ObjectId);
+                    queue.Enqueue((piece.ObjectId, pieceLayerStyle));
                 }
             }
             finally
@@ -638,23 +660,13 @@ public static class LegendBuilder
         return result;
     }
 
-    private static void FreezeSymbolStyle(Entity entity, Entity parent, Transaction tr)
+    private static void ApplyEntityStyle(Entity entity, LayerDisplayStyle style, Transaction tr, Database db)
     {
-        if (entity.Layer == "0") entity.LayerId = parent.LayerId;
-        var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-        var parentLayer = (LayerTableRecord)tr.GetObject(parent.LayerId, OpenMode.ForRead);
-        if (entity.Color.IsByLayer) entity.Color = layer.Color;
-        else if (entity.Color.IsByBlock) entity.Color = parent.Color.IsByLayer ? parentLayer.Color : parent.Color;
-        if (entity.LineWeight == LineWeight.ByLayer) entity.LineWeight = layer.LineWeight;
-        else if (entity.LineWeight == LineWeight.ByBlock)
-            entity.LineWeight = parent.LineWeight == LineWeight.ByLayer ? parentLayer.LineWeight : parent.LineWeight;
-        if (entity.Transparency.IsByLayer) entity.Transparency = layer.Transparency;
-        else if (entity.Transparency.IsByBlock)
-            entity.Transparency = parent.Transparency.IsByLayer ? parentLayer.Transparency : parent.Transparency;
-        if (entity.Linetype.Equals("ByLayer", StringComparison.OrdinalIgnoreCase)) entity.LinetypeId = layer.LinetypeObjectId;
-        else if (entity.Linetype.Equals("ByBlock", StringComparison.OrdinalIgnoreCase))
-            entity.LinetypeId = parent.Linetype.Equals("ByLayer", StringComparison.OrdinalIgnoreCase)
-                ? parentLayer.LinetypeObjectId : parent.LinetypeId;
+        entity.Color = style.Color;
+        entity.LineWeight = style.LineWeight;
+        entity.Transparency = style.Transparency.ToAutoCadValue();
+        entity.LinetypeId = ResolveStyleLinetype(tr, db, style);
+        entity.LinetypeScale = style.LinetypeScale;
     }
 
     private static void ValidateHostLinetypeReferences(Database db, Transaction tr, ObjectId blockRecordId)
@@ -895,6 +907,11 @@ public static class LegendBuilder
                 if (!double.IsFinite(sample.PatternAngle))
                     throw new InvalidOperationException($"Arcering '{patternName}' heeft een ongeldige render-hoek.");
                 hatch.PatternScale = patternScale;
+                if (sample.PatternType == HatchPatternType.UserDefined)
+                {
+                    hatch.PatternSpace = sample.PatternSpace * scaleFactor;
+                    hatch.PatternDouble = sample.PatternDouble;
+                }
                 hatch.PatternAngle = sample.IsSolid ? 0.0 : sample.PatternAngle;
                 if (sample.Color is not null)
                     hatch.Color = sample.Color;
@@ -913,6 +930,7 @@ public static class LegendBuilder
             };
             var bulges = new DoubleCollection { 0.0, 0.0, 0.0, 0.0 };
             hatch.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline, pts, bulges);
+            hatch.SetHatchPattern(patternType, patternName);
             hatch.EvaluateHatch(true);
             return hatch.ObjectId;
         }
@@ -973,9 +991,7 @@ public static class LegendBuilder
         string importedName = "NLCS_LT_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(style.LinetypeIdentity)))[..20];
         if (table.Has(importedName)) return table[importedName];
-        using var source = new Database(false, true);
-        source.ReadDwgFile(id.OriginalDatabase.Filename, FileOpenMode.OpenForReadAndAllShare, true, string.Empty);
-        source.CloseInput(true);
+        using var source = OpenXrefSnapshot(id.OriginalDatabase);
         using var sourceTr = source.TransactionManager.StartTransaction();
         var sourceTable = (LinetypeTable)sourceTr.GetObject(source.LinetypeTableId, OpenMode.ForRead);
         var sourceId = sourceTable[LayerNaming.LocalName(style.Linetype)];

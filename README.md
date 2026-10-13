@@ -64,10 +64,10 @@ Weet je niet zeker waarom een element niet in de legenda staat? `NLCSLEGENDAELEM
 je een object aanwijzen en meldt of en waarom het wel of niet in de gekozen legenda komt
 (status, discipline, hoofdgroep, elementsoort, xref, zichtbaarheid of uitgevinkt).
 
-De teksten volgen de NLCS-template: tekststijl `NLCS-ISO` met vaste hoogtes (2,5 mm voor
+De teksten volgen de NLCS-template: tekststijl `NLCS-ISO` met standaardhoogtes (2,5 mm voor
 regels en statuskoppen, 5 mm voor de titel) op de tekstlagen `-T25` en `-T50`. Alle tekst
 in de legenda bestaat uit gewone MText-objecten, zodat je die in AutoCAD net als andere tekst
-kunt selecteren en bewerken.
+kunt selecteren en bewerken. De teksthoogtes zijn per legenda instelbaar.
 De standaard statuskoppen zijn "Nieuwe situatie", "Bestaande situatie", "Vervallen situatie",
 "Tijdelijke situatie" en "Revisie"; je kunt ze in de instellingen aanpassen.
 
@@ -133,11 +133,17 @@ NLCS-lagen door ze in de tekening aan te wijzen, handmatige regels via een lijst
 regel verschijnt dan onder de eigen kopregel, ook als de gewone status ervan uitstaat.
 
 Werk je met externe referenties, dan bepaalt `NLCSLEGENDAXREFS` per gekoppelde xref of
-die meetelt. Dit geldt als globale standaard; per legenda pas je het aan via
-`NLCSLEGENDABEHEER`.
+die meetelt. Kies daarbij een bestaande legenda of de globale standaard voor nieuwe
+legenda's. Is het xref-bestand op schijf gewijzigd sinds het laden, herlaad dan eerst de
+xref voordat je de legenda bijwerkt. Zo blijven hoeveelheden en voorbeelden op dezelfde
+bronversie gebaseerd; bij een versieverschil blijft de bestaande legenda behouden.
+
+Een arceringspatroon dat in het bronvlak ongelijk is geschaald, past niet in één
+patroonhoek en schaal. De plugin meldt dit en breekt het maken of bijwerken af.
+Een afwijkende schaal loodrecht op het vlak is wel toegestaan.
 
 Heb je een legenda-opzet die je vaker gebruikt, dan bewaar je die met `NLCSLEGENDAPRESET`
-als profiel. In een volgende tekening laad je het profiel weer als globale standaard. Zo
+als profiel. Je laadt het profiel in een bestaande legenda of als globale standaard. Zo
 hoef je schaal, teksten en opmaak niet telkens opnieuw in te stellen. Een profiel kun je
 ook exporteren naar een `.json`-bestand en op een andere computer weer importeren, zodat je
 een opzet met collega's kunt delen.
@@ -225,10 +231,10 @@ optie `Algemeen` (of `includeGeneralDescription`) zet je het algemene deel ervoo
 
 ## Configuratie
 
-`NLCSLEGENDAOPTIES` bewerkt de **globale standaard** die geldt voor nieuwe legenda's.
-De instellingen van een bestaande legenda pas je aan via `NLCSLEGENDABEHEER`; die horen
-bij die ene legenda en worden in de tekening bewaard. De opmaak van een legenda kun je in
-het beheervenster ook als nieuwe globale standaard instellen.
+`NLCSLEGENDAOPTIES` laat je een bestaande legenda of de globale standaard kiezen.
+Instellingen van een bestaande legenda worden in die tekening bewaard en gelden alleen
+voor die legenda. Via `NLCSLEGENDABEHEER` kun je ze ook bewerken of als nieuwe globale
+standaard opslaan.
 
 De globale standaard staat in `%APPDATA%\NlcsLegenda\settings.json`, los van de plugin
 zelf: de dll's staan in `ApplicationPlugins` (vaak alleen-lezen) en je instellingen bij je
@@ -236,10 +242,9 @@ profiel. `NLCSLEGENDACONFIG` maakt dat bestand aan en toont de paden. Een voorbe
 in [deploy/settings.sample.json](deploy/settings.sample.json); wat je weglaat krijgt de
 standaardwaarde.
 
-De omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`; die worden globaal bewaard in
+`NLCSLEGENDAOMSCHRIJVINGEN` laat dezelfde keuze tussen een legenda en de globale standaard toe. Globale omschrijvingen staan in
 `%APPDATA%\NlcsLegenda\omschrijvingen.json`. Een voorbeeld staat in
-[deploy/omschrijvingen.sample.json](deploy/omschrijvingen.sample.json). Omschrijvingen die
-je voor één legenda wilt afwijken, stel je per legenda in via `NLCSLEGENDABEHEER`.
+[deploy/omschrijvingen.sample.json](deploy/omschrijvingen.sample.json). De eigen omschrijvingen van een legenda worden in de tekening bewaard; je kunt ze ook via `NLCSLEGENDABEHEER` bewerken.
 
 ## Bouwen en testen
 
