@@ -7,8 +7,7 @@ namespace NlcsLegenda.Core;
 // onder een eigen NOD-root.
 public sealed class LegendRegistry
 {
-    // Verhoog bij een niet-terugwaarts-leesbare wijziging. Een hogere versie dan deze
-    // plugin kent, wordt niet overschreven maar als "niet ondersteund" gemeld.
+    // Alleen het huidige schema wordt gelezen. Andere versies blijven onaangeroerd.
     // v2: omschrijvingen staan als onafhankelijke snapshot per legenda.
     public const int CurrentSchemaVersion = 2;
 
@@ -17,7 +16,7 @@ public sealed class LegendRegistry
     public List<LegendDefinition> Legends { get; set; } = new();
 
     [JsonIgnore]
-    public bool IsSupported => SchemaVersion <= CurrentSchemaVersion;
+    public bool IsSupported => SchemaVersion == CurrentSchemaVersion;
 
     public LegendDefinition? FindById(string? id) =>
         string.IsNullOrEmpty(id) ? null : Legends.FirstOrDefault(l => l.Id == id);
@@ -56,14 +55,21 @@ public sealed class LegendRegistry
     public void Normalize()
     {
         Legends ??= new List<LegendDefinition>();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var groups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var l in Legends)
         {
+            if (l is null || string.IsNullOrWhiteSpace(l.Id) || !ids.Add(l.Id)
+                || (!string.IsNullOrEmpty(l.GroupName) && !groups.Add(l.GroupName)))
+                throw new JsonException("Legenda-gegevens bevatten een ontbrekende of dubbele identiteit.");
+            l.Name ??= string.Empty;
+            l.GroupName ??= string.Empty;
             l.SourceHandles ??= new List<string>();
             (l.Settings ??= new LegendSettings()).Normalize();
         }
     }
 
-    // Strikt lezen: geeft false bij ongeldige JSON of een niet-ondersteunde nieuwere
+    // Strikt lezen: geeft false bij ongeldige JSON of een niet-ondersteunde
     // schemaversie, zodat kritieke legenda-metadata nooit stil door defaults wordt vervangen.
     public static bool TryParse(string? json, out LegendRegistry registry, out string error)
     {
@@ -79,13 +85,13 @@ public sealed class LegendRegistry
                 error = "Lege of ongeldige registry.";
                 return false;
             }
-            parsed.Normalize();
             registry = parsed;
             if (!parsed.IsSupported)
             {
                 error = $"Registry-schemaversie {parsed.SchemaVersion} wordt niet ondersteund door deze plugin.";
                 return false;
             }
+            parsed.Normalize();
             return true;
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException or ArgumentException)

@@ -15,7 +15,7 @@ zitten en zet daar de bijbehorende legenda bij, in dezelfde stijl.
 
 Start `NLCSLEGENDA`. Je kunt eerst nog de schaal of een paar opties zetten; daarna
 hangt de legenda aan je cursor en zet je hem naast de tekening neer. Standaard maakt hij
-een legenda van de hele tekening; kies je in het optiemenu `Selecteren`, dan komt er een
+een legenda van de hele tekening; kies je in het optiemenu `Uitkiezen`, dan komt er een
 legenda van alleen die selectie. Alles komt in de model space op de eigen NLCS-lagen, dus
 kleur en lijntype kloppen meteen. Wie liever klikt dan typt vindt
 in het lint een tab **NLCS Legenda** met dezelfde functies. Via **Help** in het lint staat
@@ -218,10 +218,11 @@ nieuw, B voor bestaand, V voor vervallen, enzovoort); de rest beschrijft het ele
 en het tekentype: lijn, arcering of symbool. De volledige opbouw staat in
 [docs/NLCS-conventies.md](docs/NLCS-conventies.md).
 
-Voor de tekst naast een symbool kijkt de plugin op volgorde naar: de laagbeschrijving die
-InfraCAD invult, de omschrijvingen (de ingebouwde NLCS-catalogus plus je eigen per-legenda
-omschrijvingen uit `NLCSLEGENDAOMSCHRIJVINGEN`), en anders een opgeschoonde laagnaam. Er is
-geen koppeling met InfraCAD of een externe database; alles komt uit de tekening zelf.
+Een eigen omschrijving van de legenda krijgt voorrang. Daarna gebruikt de plugin de
+omschrijving uit de tekening: bij een KLIC-symbool eerst het ingevulde attribuut
+`OMSCHRIJVING`, anders de laagbeschrijving. Ontbreekt die, dan volgen de ingebouwde
+catalogus en ten slotte een leesbare laagnaam. Eigen laagkoppelingen gebruiken de tekst
+uit hun koppeling. Er is geen koppeling met InfraCAD of een externe database.
 `NLCSLEGENDAINFO` laat zien welke regels op de laagnaam terugvallen, zodat je gericht een
 eigen omschrijving kunt toevoegen.
 

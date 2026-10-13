@@ -120,8 +120,9 @@ public sealed class NlcsLayerComponents
         if (!IsValidElement(Element.Trim().ToUpperInvariant()))
             errors.Add($"ELEMENT '{Element}' is geen NLCS-element (bijv. G, GD, A, S, V, T25).");
 
-        if (Scale.Length > 0 && !int.TryParse(Scale.Trim(), out _))
-            errors.Add("SCHAAL moet een getal zijn.");
+        if (Scale.Length > 0 && (!int.TryParse(Scale.Trim(), System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var scale) || scale <= 0))
+            errors.Add("SCHAAL moet een positief geheel getal zijn.");
 
         // Combinatieregels (par. 5.1.1/5.1.3): X hoort bij XX+AL en omgekeerd.
         if (status == "X" && !(disc == "XX" && hoofd == "AL"))

@@ -19,7 +19,7 @@ public class ConsumerAuditTests
     // Instelling -> waar de waarde wordt verbruikt (consumer).
     private static readonly Dictionary<string, string> Consumers = new()
     {
-        [nameof(LegendSettings.SchemaVersion)] = "LegendSettings.FromJson migratie",
+        [nameof(LegendSettings.SchemaVersion)] = "LegendSettings.Normalize schemaversie",
         [nameof(LegendSettings.Scale)] = "LegendSettings.ToModel / LegendLayoutEngine",
         [nameof(LegendSettings.IncludeTitle)] = "LegendBuilder titel",
         [nameof(LegendSettings.Title)] = "LegendBuilder titeltekst",

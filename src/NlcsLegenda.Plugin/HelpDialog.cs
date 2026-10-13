@@ -28,8 +28,8 @@ internal sealed class HelpDialog : Form
             "verwijderen."),
         ("Instellingen",
             "Open Instellingen voor schaal, inhoud, opmaak, teksten en hoeveelheden.\n\n" +
-            "Dit is de standaard voor nieuwe legenda's. Een bestaande legenda pas je aan via\n" +
-            "Legenda's. Die houdt zijn eigen instellingen."),
+            "Kies een bestaande legenda of de globale standaard voor nieuwe legenda's.\n" +
+            "Elke bestaande legenda houdt zijn eigen instellingen."),
         ("Eigen lagen",
             "Heb je eigen lagen die geen NLCS zijn maar wel mee moeten tellen? Koppel ze onder\n" +
             "Eigen lagen in de instellingen.\n\n" +
@@ -40,8 +40,8 @@ internal sealed class HelpDialog : Form
             "opslaan en opnieuw openen."),
         ("Xrefs",
             "Werk je met externe referenties? Onder Xrefs kies je per xref of die meetelt.\n\n" +
-            "Zit dezelfde laagnaam in de tekening en in een xref, dan houdt de bron ze uit\n" +
-            "elkaar."),
+            "Lagen met dezelfde inhoud en weergave worden samengevoegd. Verschillende\n" +
+            "kleuren of voorbeelden krijgen aparte regels."),
         ("Hoeveelheden",
             "De legenda telt lengtes, aantallen en oppervlakten uit de tekening.\n\n" +
             "Zet hoeveelheden aan of uit in de instellingen. Overzicht laat de totalen zien\n" +

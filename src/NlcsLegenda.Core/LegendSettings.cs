@@ -601,6 +601,8 @@ public sealed class LegendSettings
     // handmatig bewerkte of oude JSON.
     public LegendSettings Normalize()
     {
+        if (SchemaVersion < 1 || SchemaVersion > CurrentSchemaVersion)
+            throw new NotSupportedException($"Profielversie {SchemaVersion} wordt niet ondersteund.");
         IncludedStatuses ??= new HashSet<NlcsStatus>();
         IncludedDrawTypes ??= new HashSet<NlcsDrawType>();
         ManualEntries ??= new List<ManualEntry>();
@@ -613,7 +615,12 @@ public sealed class LegendSettings
         ExcludedEntries = ToCi(ExcludedEntries);
         XrefInclusion = ToCi(XrefInclusion);
         DescriptionOverrides ??= new DescriptionCatalog();
-        DescriptionOverrides.Elementen = ToCi(DescriptionOverrides.Elementen);
+        DescriptionOverrides.Normalize();
+        if (ManualEntries.Any(e => e is null) || BlankEntries.Any(e => e is null)
+            || CustomStatuses.Any(e => e is null) || CustomLayerRules.Any(e => e is null))
+            throw new JsonException("Een profiel bevat een lege regel.");
+        foreach (var status in CustomStatuses)
+            status.Members ??= new List<string>();
         return this;
     }
 

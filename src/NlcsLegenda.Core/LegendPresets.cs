@@ -31,7 +31,11 @@ public static class LegendPresets
         if (string.IsNullOrWhiteSpace(name))
             return null;
         var path = PathFor(dir, name);
-        return File.Exists(path) ? LegendSettings.Load(path) : null;
+        if (!File.Exists(path))
+            return null;
+        if (!LegendSettings.TryParse(File.ReadAllText(path), out var settings))
+            throw new InvalidDataException($"Profiel '{name}' is onleesbaar of heeft een niet-ondersteunde versie.");
+        return settings;
     }
 
     public static bool Exists(string dir, string name) =>
