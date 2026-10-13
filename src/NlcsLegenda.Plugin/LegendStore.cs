@@ -47,14 +47,10 @@ internal static class LegendStore
                 $"overschreven. {err}");
 
         var nod = (DBDictionary)tr.GetObject(db.NamedObjectsDictionaryId, OpenMode.ForWrite);
-        DBDictionary root;
-        if (nod.Contains(RegistryRoot))
+        using var createdRoot = nod.Contains(RegistryRoot) ? null : new DBDictionary();
+        var root = createdRoot ?? (DBDictionary)tr.GetObject(nod.GetAt(RegistryRoot), OpenMode.ForWrite);
+        if (createdRoot is not null)
         {
-            root = (DBDictionary)tr.GetObject(nod.GetAt(RegistryRoot), OpenMode.ForWrite);
-        }
-        else
-        {
-            root = new DBDictionary();
             nod.SetAt(RegistryRoot, root);
             tr.AddNewlyCreatedDBObject(root, true);
         }
@@ -66,7 +62,7 @@ internal static class LegendStore
         }
         else
         {
-            var xrec = new Xrecord();
+            using var xrec = new Xrecord();
             root.SetAt(RegistryKey, xrec);
             tr.AddNewlyCreatedDBObject(xrec, true);
             xrec.Data = data;
