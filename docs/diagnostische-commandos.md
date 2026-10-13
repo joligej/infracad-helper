@@ -1,11 +1,8 @@
 # Diagnostische commando's
 
-Naast de commando's in de README registreert de plugin een aantal commando's die alleen
-bedoeld zijn voor headless tests en acceptatiecontroles (CI en de installatiecontrole op een
-echte AutoCAD-host). Ze staan bewust niet in de README en er is geen HELP-commando dat ze
-toont, dus een normale gebruiker komt ze niet tegen. Ze blijven wél in de release-dll omdat de
-acceptatietests ze tegen de geïnstalleerde bundle draaien; conditioneel compileren zou juist die
-controle onmogelijk maken.
+Deze commando's controleren de plugin in AutoCAD Core Console, ook vanuit de
+geïnstalleerde release. Gebruik ze uitsluitend op testtekeningen: sommige commando's
+maken objecten, legenda's en tijdelijke xrefs aan.
 
 | Commando | Doel |
 | --- | --- |
@@ -41,7 +38,6 @@ controle onmogelijk maken.
 | `NLCSLEGENDAVIEWPORTTEST` | Controleert viewport-plaatsing en -schaal rond de legenda. |
 | `NLCSLEGENDAXREFSETUP` / `NLCSLEGENDAXREFVERIFY` | Bouwen een xref-scenario en verifiëren de opname ervan. |
 | `NLCSLEGENDAXREFANALYSE` | Analyseert een tekening met echte xrefs en toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. |
-
 | `NLCSLEGENDAAUDITVERSION` | Toont versie, geladen DLL-pad en SHA-256 voor controle van de werkelijk geteste installatie. |
 | `NLCSLEGENDAAUDITFIXTURE` | Maakt drie lijnen en een symbool voor niet-lege opmaak-, hoogte- en isolatiecontroles. |
 | `NLCSLEGENDAENTITYSTYLETEST` | Controleert expliciete bronkleuren, vaste hoeveelheden en echte swatches na een gedeelde laagwijziging. |
@@ -57,8 +53,12 @@ controle onmogelijk maken.
 | `NLCSLEGENDAXREFSYMBOLTEST` / `NLCSLEGENDAXREFHATCHTEST` / `NLCSLEGENDAXREFSAMPLECONFLICTTEST` | Controleren gelijkwaardige en verschillende voorbeelden, echte uitvoer en vaste hoeveelheden. |
 | `NLCSLEGENDAXREFPLACEMENTTEST` / `NLCSLEGENDAXREFPLACEMENTVERIFY` | Testen het productiepad voor plaatsing, annulering en verificatie na heropenen; de fysieke jig-klik blijft een GUI-controle. |
 | `NLCSLEGENDAXREFRELOADSETUP` / `NLCSLEGENDAXREFRELOADVERIFY` | Controleren opnieuw laden van een gewijzigde bron over afzonderlijke CAD-sessies. |
+| `NLCSLEGENDAREVIEWTEST` | Controleert gemengde eigen lagen, blokfilters, symboolvormen en eigenschappen, arceringsinstellingen, hoeveelheden, omschrijvingen en een lege selectie. |
+| `NLCSLEGENDASNAPSHOTTEST` / `NLCSLEGENDASNAPSHOTVERIFY` | Wijzigt een synthetisch xref-bestand, controleert dat de oude legenda bij een versieverschil behouden blijft en werkt hem na heropenen bij. |
+| `NLCSLEGENDAEXPORTREVIEWTEST` | Voert INFO en export uit voor een bestaande selectielegenda, na een globale omschrijvingswijziging en na verwijdering van de selectie. |
 
 De releasecontrole `dev/scripts/Run-ReleaseAcceptance.ps1` voert deze commando's uit op afzonderlijke kopieën, controleert de geladen DLL-hash en stopt bij een fout, ontbrekend resultaat of mislukte QSAVE. Gebruik deze testcommando's uitsluitend in een testtekening: fixturecommando's voegen objecten en tijdelijke xrefs toe.
 
-De testcommando's zijn read-only of werken op tijdelijke testfixtures; ze wijzigen geen
-gebruikersinstellingen en zetten `SECURELOAD`/`FILEDIA` netjes terug.
+De runner controleert dat `SECURELOAD` en `FILEDIA` terugstaan op hun oorspronkelijke
+waarde. Isolatie- en exporttests die tijdelijk gebruikersinstellingen wijzigen, herstellen
+die in een `finally`-blok. Draai deze controles zonder gelijktijdig instellingen te bewerken.

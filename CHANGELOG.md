@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.29.6 - 2026-10-13
+
+- Gemengde eigen lagen en afzonderlijke blokfilters behouden alle legendaonderdelen.
+- Symbolen worden vergeleken op hun zichtbare vorm en eigenschappen. Laag 0, ByLayer en
+  ByBlock behouden hun eigen betekenis; verborgen onderdelen splitsen geen zichtbare regel.
+- Gebruikersarceringen behouden afstand en kruispatroon. Rotatie en schaal van een
+  bronblok werken ook door in het arceringsvoorbeeld.
+- Een gesloten lijncontour verdubbelt het oppervlak van een bijbehorende arcering niet meer.
+  Omschrijvingen op samengevoegde bronlagen blijven beschikbaar.
+- Bij een gewijzigd xref-bestand vraagt de plugin eerst om herladen. Een mislukte update
+  behoudt de bestaande legenda.
+- INFO en export gebruiken de bron en instellingen van de gekozen legenda. Een verdwenen
+  selectie valt niet terug op de hele tekening; latere globale omschrijvingen veranderen
+  bestaande legenda's niet.
+- De releasecontrole bevat extra regressietests en controleert isolatie en migratie na heropenen.
+
 ## 1.29.5 - 2026-10-13
 
 - Legenda's behouden de effectieve bronkleur, lijndikte, transparantie en het lijntype,

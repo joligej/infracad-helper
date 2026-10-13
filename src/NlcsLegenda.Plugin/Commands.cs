@@ -67,12 +67,7 @@ public partial class Commands
         return false;
     }
 
-    // De globale omschrijvingen (ingebouwde catalogus + globale gebruikersoverrides). Oude
-    // tekeningspecifieke omschrijvingen worden nog ingelezen zodat bestaande tekeningen hun
-    // teksten behouden, maar er wordt niets nieuws meer tekeningspecifiek weggeschreven.
-    // De gedeelde/globale omschrijvingen (ingebouwde catalogus + globale gebruikersdefaults).
-    // Legacy tekening-descriptions worden hier NIET meer gelezen; die komen via migratie in de
-    // per-legenda overrides terecht. Per-legenda overrides worden in de analyse toegevoegd.
+    // Nieuwe legenda's gebruiken de globale catalogus. Bestaande legenda's bewaren hun eigen omschrijvingen.
     private static DescriptionCatalog LoadCatalog(Database db) => LoadGlobalCatalog();
 
     private static DescriptionCatalog LoadGlobalCatalog()
@@ -189,12 +184,21 @@ public partial class Commands
             {
                 var sb = new StringBuilder();
                 sb.Append($"\nNLCS Legenda {PluginVersion} — {registry.Legends.Count} legenda('s) in deze tekening:");
-                foreach (var l in registry.Legends)
+                var managed = LegendManagement.CollectManagedIds(db, tr, registry);
+                foreach (var legend in registry.Legends)
                 {
-                    var scope = l.Scope == LegendScope.Selection
-                        ? $"selectie ({l.SourceHandles.Count} object(en))"
-                        : "hele tekening";
-                    sb.Append($"\n  - {l.Name} — {scope}");
+                    var selection = legend.Scope == LegendScope.Selection
+                        ? LegendManagement.ResolveHandles(db, legend.SourceHandles, out _)
+                            .Where(id => !managed.Contains(id)).ToArray() : null;
+                    sb.Append($"\n\n{legend.Name} — {legend.Scope.ToDisplay()}");
+                    if (selection is { Length: 0 })
+                    {
+                        sb.Append("\nDe bronselectie bevat geen bestaande objecten meer.");
+                        continue;
+                    }
+                    var result = DrawingAnalyzer.Analyze(db, tr, legend.Settings, selection,
+                        DescriptionCatalog.Default(), managed);
+                    sb.Append(BuildInfoReport(result, legend.Settings, legend.Name));
                 }
                 sb.Append("\nGebruik NLCSLEGENDABEHEER om ze te bekijken en bij te werken.");
                 ed.WriteMessage(sb.ToString());
@@ -261,7 +265,12 @@ public partial class Commands
                         ? LegendManagement.ResolveHandles(db, target.SourceHandles, out _)
                             .Where(id => !excluded.Contains(id)).ToArray()
                         : null;
-                    entries = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded).Entries;
+                    if (selection is { Length: 0 })
+                    {
+                        ed.WriteMessage("\nDe bronselectie bevat geen bestaande objecten meer. Er is niets geëxporteerd.");
+                        return;
+                    }
+                    entries = DrawingAnalyzer.Analyze(db, tr, settings, selection, DescriptionCatalog.Default(), excluded).Entries;
                     suffix = "Legenda-" + LegendPresets.SafeFileName(target.Name);
                 }
                 else

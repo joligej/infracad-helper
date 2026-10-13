@@ -124,7 +124,7 @@ public partial class Commands
                     var id = blocks.Add(block); tr.AddNewlyCreatedDBObject(block, true);
                     if (i == 1 || i == 2)
                     {
-                        using var line = new Line(Point3d.Origin, new Point3d(10, 0, 0)) { Visible = i == 2 };
+                        using var line = new Line(Point3d.Origin, new Point3d(i == 1 ? 12 : 10, 0, 0)) { Visible = i == 2 };
                         block.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                     }
                     if (i >= 3)

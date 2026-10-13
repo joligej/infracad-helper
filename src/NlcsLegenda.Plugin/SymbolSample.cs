@@ -4,6 +4,10 @@ namespace NlcsLegenda.Plugin;
 
 public sealed record SymbolSample(string BlockName, string DefinitionIdentity, SymbolTransform Transform)
 {
+    public LayerDisplayStyle? InsertionStyle { get; init; }
+
+    public LayerDisplayStyle? InsertionLayerStyle { get; init; }
+
     public string RenderIdentity =>
         $"S:{DefinitionIdentity}:{Transform.Signature}";
 }

@@ -255,11 +255,6 @@ public static class LegendGrouping
         return 100 + (idx < 0 ? int.MaxValue - 100 : idx);
     }
 
-    // Volgorde van omschrijvingsbronnen (één plek bepaalt de precedence):
-    //   1. laagbeschrijving uit de tekening;
-    //   2. effectieve catalogus = ingebouwde referentie + per-legenda DescriptionOverrides;
-    //   3. nette laagnaam.
-    // Het canonieke per-legenda model is DescriptionOverrides (zit in de catalogus verwerkt).
     private static string ResolveDescription(
         List<NlcsLayerName> group, NlcsLayerName representative, LegendSettings settings,
         Func<string, string?>? layerDescription, DescriptionCatalog catalog,
