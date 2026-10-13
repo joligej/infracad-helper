@@ -125,6 +125,11 @@ verschillende statussen samen, maar alleen als lijn, vlak, arcering en symbool e
 hetzelfde uitzien. Standaard staat dit uit, omdat de status in NLCS meestal juist de kleur
 bepaalt.
 
+De keuzelijst bij Samenstellen volgt de bron van de gekozen legenda. Uitgevinkte
+regels blijven uitgevinkt als hun bron tijdelijk ontbreekt. Instellingen en
+beschrijvingen die je vóór het plaatsen aanpast, gelden alleen voor die nieuwe legenda.
+Gebruik Instellingen met de keuze Globaal om de standaard voor nieuwe legenda's te wijzigen.
+
 ### Statussen, xrefs en profielen
 
 Naast de vaste statussen (Nieuw, Bestaand, Vervallen, Tijdelijk, Revisie) maak je met

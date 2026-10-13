@@ -41,7 +41,7 @@ internal static class LayerRename
         }
         plan.SourceLocked = ltr.IsLocked;
         plan.AffectedEntities = CountOnLayer(db, tr, source);
-        if (!plan.NoChange && lt.Has(target))
+        if (!plan.NoChange && lt.Has(target) && lt[target] != lt[source])
         {
             plan.TargetExists = true;
             var tgt = (LayerTableRecord)tr.GetObject(lt[target], OpenMode.ForRead);
@@ -95,56 +95,50 @@ internal static class LayerRename
             return false;
         }
 
-        // Bronlaag ontgrendelen zodat de entiteiten verplaatst mogen worden (lock blokkeert
-        // anders de wijziging). De bronlaag wordt daarna toch verwijderd.
         var srcLtr = (LayerTableRecord)tr.GetObject(lt[plan.Source], OpenMode.ForWrite);
-        if (srcLtr.IsLocked)
-            srcLtr.IsLocked = false;
-
-        ReassignEntities(db, tr, plan.Source, targetId);
-
-        // Bronlaag opruimen als die niet in gebruik is (niet de huidige laag en leeg).
-        if (db.Clayer != lt[plan.Source] && CountOnLayer(db, tr, plan.Source) == 0)
-            srcLtr.Erase();
-        return true;
-    }
-
-    internal static int CountOnLayer(Database db, Transaction tr, string layer)
-    {
-        int count = 0;
-        var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
-        foreach (ObjectId btrId in bt)
+        bool wasLocked = srcLtr.IsLocked;
+        try
         {
-            var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
-            if (btr.IsFromExternalReference || btr.IsFromOverlayReference)
-                continue;
-            foreach (ObjectId entId in btr)
-            {
-                if (tr.GetObject(entId, OpenMode.ForRead) is Entity e
-                    && string.Equals(e.Layer, layer, System.StringComparison.Ordinal))
-                    count++;
-            }
+            if (wasLocked) srcLtr.IsLocked = false;
+            ReassignEntities(db, tr, plan.Source, targetId);
+            if (db.Clayer != srcLtr.ObjectId && CountOnLayer(db, tr, plan.Source) == 0)
+                srcLtr.Erase();
+            return true;
         }
-        return count;
+        finally
+        {
+            // De huidige bronlaag blijft bestaan en moet haar oorspronkelijke slot behouden.
+            if (!srcLtr.IsErased) srcLtr.IsLocked = wasLocked;
+        }
     }
+
+    internal static int CountOnLayer(Database db, Transaction tr, string layer) =>
+        LayerEntities(db, tr, layer).Count();
 
     private static void ReassignEntities(Database db, Transaction tr, string source, ObjectId targetLayerId)
     {
-        var targetName = ((LayerTableRecord)tr.GetObject(targetLayerId, OpenMode.ForRead)).Name;
+        foreach (var id in LayerEntities(db, tr, source).ToArray())
+            ((Entity)tr.GetObject(id, OpenMode.ForWrite)).LayerId = targetLayerId;
+    }
+
+    private static IEnumerable<ObjectId> LayerEntities(Database db, Transaction tr, string layer)
+    {
         var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
         foreach (ObjectId btrId in bt)
         {
             var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
-            if (btr.IsFromExternalReference || btr.IsFromOverlayReference)
-                continue;
+            if (btr.IsFromExternalReference || btr.IsFromOverlayReference) continue;
             foreach (ObjectId entId in btr)
             {
-                if (tr.GetObject(entId, OpenMode.ForRead) is Entity e
-                    && string.Equals(e.Layer, source, System.StringComparison.Ordinal))
-                {
-                    e.UpgradeOpen();
-                    e.Layer = targetName;
-                }
+                if (tr.GetObject(entId, OpenMode.ForRead) is not Entity entity) continue;
+                if (string.Equals(entity.Layer, layer, StringComparison.OrdinalIgnoreCase))
+                    yield return entId;
+                // Attribuutreferenties zijn kinderen van de insert en staan niet in de bloktabel.
+                if (entity is BlockReference reference)
+                    foreach (ObjectId attributeId in reference.AttributeCollection)
+                        if (tr.GetObject(attributeId, OpenMode.ForRead) is Entity attribute
+                            && string.Equals(attribute.Layer, layer, StringComparison.OrdinalIgnoreCase))
+                            yield return attributeId;
             }
         }
     }

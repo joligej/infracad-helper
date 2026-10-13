@@ -45,12 +45,11 @@ public partial class Commands
 
     // De globale standaardinstellingen: het startpunt voor een NIEUWE legenda. Bestaande
     // legenda's houden hun eigen snapshot en veranderen niet mee.
-    private static LegendSettings LoadGlobalDefaults() => LegendSettings.Load(ConfigPath);
+    private static LegendSettings LoadGlobalDefaults() => GlobalLegendSettings.Load(ConfigDir);
 
     private static string SaveGlobalDefaults(LegendSettings settings)
     {
-        Directory.CreateDirectory(ConfigDir);
-        settings.Save(ConfigPath);
+        GlobalLegendSettings.Save(ConfigDir, settings);
         return "als globale standaard";
     }
 
@@ -75,8 +74,7 @@ public partial class Commands
     private static DescriptionCatalog LoadGlobalCatalog()
     {
         var catalog = DescriptionCatalog.Default();
-        if (File.Exists(DescriptionsPath))
-            catalog.MergeFrom(DescriptionCatalog.Load(DescriptionsPath));
+        catalog.MergeFrom(LoadGlobalDefaults().DescriptionOverrides);
         return catalog;
     }
 
@@ -84,12 +82,11 @@ public partial class Commands
     // Wordt bij het maken van een legenda als onafhankelijke snapshot in de legenda gezet, zodat
     // latere wijzigingen aan de globale standaard bestaande legenda's niet meer veranderen.
     private static DescriptionCatalog LoadGlobalDescriptionDefaults()
-        => File.Exists(DescriptionsPath) ? DescriptionCatalog.Load(DescriptionsPath) : new DescriptionCatalog();
+        => LoadGlobalDefaults().DescriptionOverrides;
 
     private static string SaveGlobalCatalog(DescriptionCatalog catalog)
     {
-        Directory.CreateDirectory(ConfigDir);
-        catalog.Save(DescriptionsPath);
+        GlobalLegendSettings.SaveDescriptions(ConfigDir, catalog);
         return "voor alle tekeningen";
     }
 
@@ -125,7 +122,7 @@ public partial class Commands
             {
                 var registry = LegendStore.Load(db, tr);
                 var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
-                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded);
+                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, DescriptionCatalog.Default(), excluded);
                 if (analysis.Entries.Count == 0)
                 {
                     ed.WriteMessage("\nGeen NLCS-lagen gevonden om een legenda van te maken.");
@@ -645,18 +642,11 @@ public partial class Commands
 
         try
         {
-            Directory.CreateDirectory(ConfigDir);
+            var settings = LoadGlobalDefaults();
             var created = new List<string>();
-            if (!File.Exists(ConfigPath))
-            {
-                new LegendSettings().Save(ConfigPath);
-                created.Add("instellingen");
-            }
-            if (!File.Exists(DescriptionsPath))
-            {
-                DescriptionCatalog.Default().Save(DescriptionsPath);
-                created.Add("omschrijvingen");
-            }
+            if (!File.Exists(ConfigPath)) created.Add("instellingen");
+            if (!File.Exists(DescriptionsPath)) created.Add("omschrijvingen");
+            if (created.Count > 0) GlobalLegendSettings.Save(ConfigDir, settings);
 
             var maakStatus = created.Count > 0 ? $" ({string.Join(" + ", created)} aangemaakt)" : "";
 
@@ -692,7 +682,7 @@ public partial class Commands
         {
             if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
             var settings = GetTargetSettings(db, target);
-            using var dialog = new SettingsDialog(settings, target.ContextLabel, BuildCompositionItems(db, settings), CollectXrefNames(db));
+            using var dialog = new SettingsDialog(settings, target.ContextLabel, BuildCompositionItems(db, settings, target.IsGlobal ? null : target.LegendId), CollectXrefNames(db));
             dialog.ApplyRequested += (_, _) => ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
@@ -985,29 +975,7 @@ public partial class Commands
             if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
             var settings = GetTargetSettings(db, target);
 
-            var probe = settings.Clone();
-            probe.ExcludedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            probe.ManualEntries = new List<ManualEntry>();
-            probe.IncludedStatuses = new HashSet<NlcsStatus>
-            {
-                NlcsStatus.Nieuw, NlcsStatus.Bestaand, NlcsStatus.Vervallen,
-                NlcsStatus.Tijdelijk, NlcsStatus.Revisie, NlcsStatus.Overig
-            };
-
-            List<EntryCheckItem> items;
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var analysis = DrawingAnalyzer.Analyze(db, tr, probe, catalog: LoadCatalog(db));
-                items = analysis.Entries
-                    .Select(e => new EntryCheckItem(LegendSettings.EntryKey(e),
-                        $"[{e.Status.DisplayName()}] {e.Description}", EntryGroupLabel(e)))
-                    .GroupBy(x => x.Key)
-                    .Select(g => g.First())
-                    .OrderBy(x => x.Group, StringComparer.CurrentCultureIgnoreCase)
-                    .ThenBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
-                    .ToList();
-                tr.Commit();
-            }
+            var items = BuildCompositionItems(db, settings, target.IsGlobal ? null : target.LegendId);
 
             using var dialog = new LegendManageDialog(items, settings);
             void Apply()
@@ -1039,40 +1007,6 @@ public partial class Commands
                 return soort;
         }
         return StandardTexts.HoofdgroepName(e.Hoofdgroep);
-    }
-
-    // Bouwt de lijst van tekening-entries voor de samenstellen-boom (alle statussen, zonder
-    // uitsluitingen/eigen regels). Geeft null terug als er niets te analyseren is, zodat het
-    // instellingenvenster de samenstellen-knop dan niet toont.
-    private List<EntryCheckItem>? BuildCompositionItems(Database db, LegendSettings settings)
-    {
-        try
-        {
-            var probe = settings.Clone();
-            probe.ExcludedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            probe.ManualEntries = new List<ManualEntry>();
-            probe.IncludedStatuses = new HashSet<NlcsStatus>
-            {
-                NlcsStatus.Nieuw, NlcsStatus.Bestaand, NlcsStatus.Vervallen,
-                NlcsStatus.Tijdelijk, NlcsStatus.Revisie, NlcsStatus.Overig
-            };
-            using var tr = db.TransactionManager.StartTransaction();
-            var analysis = DrawingAnalyzer.Analyze(db, tr, probe, catalog: LoadCatalog(db));
-            var items = analysis.Entries
-                .Select(e => new EntryCheckItem(LegendSettings.EntryKey(e),
-                    $"[{e.Status.DisplayName()}] {e.Description}", EntryGroupLabel(e)))
-                .GroupBy(x => x.Key)
-                .Select(g => g.First())
-                .OrderBy(x => x.Group, StringComparer.CurrentCultureIgnoreCase)
-                .ThenBy(x => x.Label, StringComparer.CurrentCultureIgnoreCase)
-                .ToList();
-            tr.Commit();
-            return items.Count > 0 ? items : null;
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     // Namen van gekoppelde xrefs (niet de geneste/afhankelijke), gesorteerd. Voor de per-xref
@@ -1739,10 +1673,9 @@ public partial class Commands
 
     private static string SaveSingleDescription(string key, DescriptionEntry entry)
     {
-        var global = File.Exists(DescriptionsPath) ? DescriptionCatalog.Load(DescriptionsPath) : new DescriptionCatalog();
+        var global = LoadGlobalDescriptionDefaults();
         global.Elementen[key] = entry;
-        Directory.CreateDirectory(ConfigDir);
-        global.Save(DescriptionsPath);
+        SaveGlobalCatalog(global);
         return "voor alle tekeningen";
     }
 
@@ -2043,8 +1976,8 @@ public partial class Commands
                     $"B.scale={b.Settings.Scale:0} B.excl={b.Settings.ExcludedEntries.Count}");
                 var gd = LoadGlobalDefaults();
                 var cDef = reg.FindById(idC)!;
-                bool cOk = cDef.Settings.Scale == gd.Scale && cDef.Settings.ExcludedEntries.Count == 0
-                    && cDef.Settings.DescriptionOverrides.Elementen.Count == 0;
+                // Een nieuwe legenda neemt de volledige globale standaard over, inclusief teksten.
+                bool cOk = cDef.Settings.ToJson() == gd.ToJson();
                 ed.WriteMessage($"\nISO: C.scale={cDef.Settings.Scale:0} (globaal {gd.Scale:0}) C.excl={cDef.Settings.ExcludedEntries.Count} -> {(cOk ? "OK" : "FAIL")}");
                 // Handregel + status: alleen A, niet B/C.
                 bool dimOk = a.Settings.ManualEntries.Count == 1 && a.Settings.CustomStatuses.Count == 1
@@ -2301,7 +2234,7 @@ public partial class Commands
         var db = doc.Database;
 
         // Globale config exact bewaren; de global-change hieronder zet 'm in finally terug.
-        byte[]? origConfig = File.Exists(ConfigPath) ? File.ReadAllBytes(ConfigPath) : null;
+        using var userSettings = new GlobalSettingsSnapshot();
         try
         {
             using var tr = db.TransactionManager.StartTransaction();
@@ -2371,18 +2304,7 @@ public partial class Commands
         {
             ed.WriteMessage($"\nABC setup error: {ex.Message}");
         }
-        finally
-        {
-            // Globale config exact terugzetten (data-veiligheid).
-            if (origConfig is null)
-            {
-                try { if (File.Exists(ConfigPath)) File.Delete(ConfigPath); } catch { /* geen config om te herstellen */ }
-            }
-            else
-            {
-                File.WriteAllBytes(ConfigPath, origConfig);
-            }
-        }
+
     }
 
     // Analyseert één legenda (met zijn eigen bron en instellingen) en levert de uittrekstaat-CSV.
@@ -3987,6 +3909,7 @@ public partial class Commands
 
             double Median(List<double> xs) { xs.Sort(); return xs.Count == 0 ? 0 : xs[xs.Count / 2]; }
             var tAnalyze = new List<double>();
+            var tGroup = new List<double>();
             var tTree = new List<double>();
             var tCsv = new List<double>();
             var tJson = new List<double>();
@@ -3995,9 +3918,9 @@ public partial class Commands
             {
                 using var tr = db.TransactionManager.StartTransaction();
                 var excluded = LegendManagement.CollectManagedIds(db, tr, LegendStore.Load(db, tr));
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded);
-                sw.Stop(); tAnalyze.Add(sw.Elapsed.TotalMilliseconds);
+                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db), excludedIds: excluded,
+                    reportTimings: (analyze, group) => { tAnalyze.Add(analyze); tGroup.Add(group); });
+                var sw = new System.Diagnostics.Stopwatch();
                 entries = analysis.Entries.Count;
 
                 var items = analysis.Entries.Select(e =>
@@ -4012,7 +3935,8 @@ public partial class Commands
             }
 
             ed.WriteMessage($"\nPERF: entities={entities} layers={layers} entries={entries} runs={runs}");
-            ed.WriteMessage($"\nPERF: analyse mediaan {Median(tAnalyze):0.0} ms (groepering inbegrepen)");
+            ed.WriteMessage($"\nPERF: analyse mediaan {Median(tAnalyze):0.0} ms");
+            ed.WriteMessage($"\nPERF: groepering mediaan {Median(tGroup):0.0} ms");
             ed.WriteMessage($"\nPERF: tree mediaan {Median(tTree):0.0} ms");
             ed.WriteMessage($"\nPERF: csv mediaan {Median(tCsv):0.0} ms");
             ed.WriteMessage($"\nPERF: json mediaan {Median(tJson):0.0} ms");
@@ -4152,7 +4076,7 @@ public partial class Commands
         var ed = doc.Editor;
         var db = doc.Database;
 
-        byte[]? backup = File.Exists(DescriptionsPath) ? File.ReadAllBytes(DescriptionsPath) : null;
+        using var userSettings = new GlobalSettingsSnapshot();
         try
         {
             string descKey = string.Empty;
@@ -4227,11 +4151,6 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nDESC error: {ex.Message}");
-        }
-        finally
-        {
-            if (backup is not null) File.WriteAllBytes(DescriptionsPath, backup);
-            else if (File.Exists(DescriptionsPath)) File.Delete(DescriptionsPath);
         }
     }
 
@@ -4411,7 +4330,6 @@ public partial class Commands
             pko.Keywords.Add("Uitkiezen");
             pko.Keywords.Add("Instellingen");
             pko.Keywords.Add("Beschrijvingen");
-            pko.Keywords.Add("Opslaan");
             pko.Keywords.Add("Plaatsen");
             pko.Keywords.Default = "Plaatsen";
             pko.AllowNone = true;
@@ -4447,8 +4365,7 @@ public partial class Commands
                 case "Elementsoorten": PromptDrawTypeFilter(ed, s); break;
                 case "Uitkiezen": selection = PromptSelection(ed); break;
                 case "Instellingen": EditSettingsDialog(ed, s); break;
-                case "Beschrijvingen": EditDescriptionsDialog(ed); break;
-                case "Opslaan": SaveSettings(ed, s); break;
+                case "Beschrijvingen": EditDescriptionsDialog(ed, s); break;
                 case "Plaatsen": return true;
             }
         }
@@ -4571,19 +4488,6 @@ public partial class Commands
         return res.Status == PromptStatus.OK ? res.Value.GetObjectIds() : null;
     }
 
-    private static void SaveSettings(Editor ed, LegendSettings s)
-    {
-        try
-        {
-            SaveGlobalDefaults(s);
-            ed.WriteMessage("\n  \u2192 opgeslagen als globale standaard voor nieuwe legenda's.");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nKon instellingen niet opslaan: {ex.Message}");
-        }
-    }
-
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static void EditSettingsDialog(Editor ed, LegendSettings s)
     {
@@ -4609,18 +4513,20 @@ public partial class Commands
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private static void EditDescriptionsDialog(Editor ed)
+    private static void EditDescriptionsDialog(Editor ed, LegendSettings settings)
     {
         try
         {
-            using var dialog = new DescriptionsDialog(LoadGlobalCatalog());
-            dialog.ApplyRequested += (_, _) =>
-                ed.WriteMessage($"\nOmschrijvingen opgeslagen ({SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()))}).");
-            if (AcWindows.ShowModalDialog(dialog) == WinForms.DialogResult.OK)
+            var catalog = DescriptionCatalog.Default();
+            catalog.MergeFrom(settings.DescriptionOverrides);
+            using var dialog = new DescriptionsDialog(catalog);
+            void Apply()
             {
-                var where = SaveGlobalCatalog(dialog.ToCatalog().Diff(DescriptionCatalog.Default()));
-                ed.WriteMessage($"\nOmschrijvingen opgeslagen ({where}).");
+                settings.DescriptionOverrides = dialog.ToCatalog().Diff(DescriptionCatalog.Default());
+                ed.WriteMessage("\nOmschrijvingen voor deze nieuwe legenda bijgewerkt.");
             }
+            dialog.ApplyRequested += (_, _) => Apply();
+            if (AcWindows.ShowModalDialog(dialog) == WinForms.DialogResult.OK) Apply();
         }
         catch (Exception ex)
         {

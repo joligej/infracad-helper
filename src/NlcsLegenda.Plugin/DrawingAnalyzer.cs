@@ -85,8 +85,10 @@ public static class DrawingAnalyzer
         Database db, Transaction tr, LegendSettings settings,
         IReadOnlyCollection<ObjectId>? selection = null,
         DescriptionCatalog? catalog = null,
-        IReadOnlyCollection<ObjectId>? excludedIds = null)
+        IReadOnlyCollection<ObjectId>? excludedIds = null,
+        Action<double, double>? reportTimings = null)
     {
+        var timer = reportTimings is null ? null : System.Diagnostics.Stopwatch.StartNew();
         var c = new Collector();
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (excludedIds is { Count: > 0 })
@@ -154,6 +156,8 @@ public static class DrawingAnalyzer
 
         // DescriptionOverrides worden in LegendGrouping.Build toegepast (één plek), dus hier
         // alleen de basiscatalogus doorgeven.
+        double analysisMilliseconds = timer?.Elapsed.TotalMilliseconds ?? 0;
+        timer?.Restart();
         var entries = LegendGrouping.Build(
             parsedLayers, settings,
             name => c.CustomDesc.TryGetValue(name, out var cd) ? cd
@@ -166,6 +170,11 @@ public static class DrawingAnalyzer
             name => c.CustomDesc.ContainsKey(name) ? DescriptionSource.EigenKoppeling : (DescriptionSource?)null,
             name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.RenderIdentity : null);
 
+        if (timer is not null)
+        {
+            timer.Stop();
+            reportTimings!(analysisMilliseconds, timer.Elapsed.TotalMilliseconds);
+        }
         return new AnalysisResult
         {
             Entries = entries,

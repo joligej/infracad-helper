@@ -2,6 +2,13 @@
 
 ## 1.29.9 - 2026-10-13
 
+- Samenstellen gebruikt de bronselectie en omschrijvingen van de gekozen legenda.
+  Geplaatste legenda's tellen niet mee; uitsluitingen van tijdelijk ontbrekende bronnen blijven bewaard.
+- Globale profielen nemen alle omschrijvingen mee. Opnieuw bewerken vervangt oude
+  tekstoverrides en een schrijffout laat de vorige bestanden intact.
+  Beschrijvingen vóór het plaatsen gelden alleen voor de nieuwe legenda.
+- Bij lagen samenvoegen verhuizen attribuutreferenties mee en blijft een behouden
+  bronlaag vergrendeld. Alleen hoofdletters wijzigen wordt als hernoemen behandeld.
 - Dialoogcommando's weigeren nu veilig in Core Console. De vensterbibliotheek kon
   bij onder meer Instellingen al vóór de hostcontrole laden en een native crash veroorzaken.
 - De systeemvariabeletest controleert vijftien waarden na afzonderlijke bewerkingen,

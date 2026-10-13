@@ -12,7 +12,7 @@ param(
     [string]$PluginPath,
     [string]$TemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('metadata','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen
 )
 $ErrorActionPreference='Stop'
@@ -32,6 +32,9 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ globalsettings=@('NLCSLEGENDAGLOBALSETTINGSTEST','GLOBALSETTINGS totaal: OK (0 fouten)')
+ layermerge=@('NLCSLEGENDALAYERMERGETEST','LAYERMERGE totaal: OK (0 fouten)')
+ composition=@('NLCSLEGENDACOMPOSITIONTEST','COMPOSITION totaal: OK (0 fouten)')
  metadata=@('NLCSLEGENDAMETADATATEST','METADATA 12 onleesbare tekeningen afgewezen; geldige tekening 7m; bronbestanden ongewijzigd -> OK')
  abclocal=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAABCSETUP",'ABC: setup klaar','NLCSLEGENDAABCVERIFY','ABC: na A bewerken B/C-vingerafdruk ongewijzigd')
  abcxref=@('NLCSLEGENDAABCXREFSETUP','ABCX: setup klaar','NLCSLEGENDAABCXREFVERIFY','ABCX: xref-isolatie A=OK B=OK C=OK -> OK')

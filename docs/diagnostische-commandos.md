@@ -38,6 +38,9 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDAVIEWPORTTEST` | Controleert viewport-plaatsing en -schaal rond de legenda. |
 | `NLCSLEGENDAXREFSETUP` / `NLCSLEGENDAXREFVERIFY` | Bouwen een xref-scenario en verifiëren de opname ervan. |
 | `NLCSLEGENDAXREFANALYSE` | Analyseert een tekening met echte xrefs en toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. |
+| `NLCSLEGENDACOMPOSITIONTEST` | Controleert de samenstellijst van een selectielegenda, uitsluiting van eigen geometrie en een verdwenen bronselectie. |
+| `NLCSLEGENDALAYERMERGETEST` | Controleert laagvergrendeling, attribuutreferenties en wijzigen van alleen hoofdletters bij hernoemen/samenvoegen. |
+| `NLCSLEGENDAGLOBALSETTINGSTEST` | Controleert volledige globale profielen, vervangen van tekstoverrides en afwijzen van onleesbare instellingen; herstelt beide gebruikersbestanden. |
 | `NLCSLEGENDAAUDITVERSION` | Toont versie, geladen DLL-pad en SHA-256 voor controle van de werkelijk geteste installatie. |
 | `NLCSLEGENDAAUDITFIXTURE` | Maakt drie lijnen en een symbool voor niet-lege opmaak-, hoogte- en isolatiecontroles. |
 | `NLCSLEGENDAENTITYSTYLETEST` | Controleert expliciete bronkleuren, vaste hoeveelheden en echte swatches na een gedeelde laagwijziging. |

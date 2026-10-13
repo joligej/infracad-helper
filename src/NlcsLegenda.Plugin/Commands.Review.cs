@@ -354,8 +354,7 @@ public partial class Commands
     {
         var doc = AcAp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
-        byte[]? saved = System.IO.File.Exists(DescriptionsPath) ? System.IO.File.ReadAllBytes(DescriptionsPath) : null;
-        DateTime? written = saved is null ? null : System.IO.File.GetLastWriteTimeUtc(DescriptionsPath);
+        using var userSettings = new GlobalSettingsSnapshot();
         try
         {
             ObjectId selected;
@@ -406,15 +405,7 @@ public partial class Commands
             doc.Editor.WriteMessage("\nEXPORTREVIEW eigen omschrijvingen en lege bronselectie -> OK");
         }
         catch (System.Exception ex) { doc.Editor.WriteMessage($"\nEXPORTREVIEW FAIL: {ex}"); }
-        finally
-        {
-            if (saved is null) System.IO.File.Delete(DescriptionsPath);
-            else
-            {
-                System.IO.File.WriteAllBytes(DescriptionsPath, saved);
-                System.IO.File.SetLastWriteTimeUtc(DescriptionsPath, written!.Value);
-            }
-        }
+
     }
 
 
