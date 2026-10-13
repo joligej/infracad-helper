@@ -54,6 +54,8 @@ public partial class Commands
         return "als globale standaard";
     }
 
+    // Dialoogcommando's blijven in aparte NoInlining-methoden: anders kan de JIT de
+    // vensterbibliotheek al laden voordat RequireInteractive een headless sessie weigert.
     // GUI-only commands roepen dit aan vóór de eerste interactieve/native prompt. In de Core
     // Console (headless) is er geen venster en crashen GetEntity/GetPoint/dialogen; dan weigeren
     // we veilig zonder iets te muteren.
@@ -310,11 +312,18 @@ public partial class Commands
     [CommandMethod("NLCSLEGENDABATCH", CommandFlags.Modal)]
     public void NlcsLegendaBatch()
     {
+        var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
+        if (ed is null || !RequireInteractive(ed, "NLCSLEGENDABATCH")) return;
+        NlcsLegendaBatchInteractive();
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private void NlcsLegendaBatchInteractive()
+    {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
             return;
         var ed = doc.Editor;
-        if (!RequireInteractive(ed, "NLCSLEGENDABATCH")) return;
 
         try
         {
@@ -665,12 +674,19 @@ public partial class Commands
     [CommandMethod("NLCSLEGENDAOPTIES", CommandFlags.Modal)]
     public void NlcsLegendaOpties()
     {
+        var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
+        if (ed is null || !RequireInteractive(ed, "NLCSLEGENDAOPTIES")) return;
+        NlcsLegendaOptiesInteractive();
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private void NlcsLegendaOptiesInteractive()
+    {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        if (!RequireInteractive(ed, "NLCSLEGENDAOPTIES")) return;
 
         try
         {
@@ -694,12 +710,19 @@ public partial class Commands
     [CommandMethod("NLCSLEGENDAOMSCHRIJVINGEN", CommandFlags.Modal)]
     public void NlcsLegendaOmschrijvingen()
     {
+        var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
+        if (ed is null || !RequireInteractive(ed, "NLCSLEGENDAOMSCHRIJVINGEN")) return;
+        NlcsLegendaOmschrijvingenInteractive();
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private void NlcsLegendaOmschrijvingenInteractive()
+    {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        if (!RequireInteractive(ed, "NLCSLEGENDAOMSCHRIJVINGEN")) return;
 
         try
         {
@@ -943,12 +966,19 @@ public partial class Commands
     [CommandMethod("NLCSLEGENDASAMENSTELLEN", CommandFlags.Modal)]
     public void NlcsLegendaSamenstellen()
     {
+        var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
+        if (ed is null || !RequireInteractive(ed, "NLCSLEGENDASAMENSTELLEN")) return;
+        NlcsLegendaSamenstellenInteractive();
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private void NlcsLegendaSamenstellenInteractive()
+    {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        if (!RequireInteractive(ed, "NLCSLEGENDASAMENSTELLEN")) return;
 
         try
         {
@@ -1602,12 +1632,19 @@ public partial class Commands
     [CommandMethod("NLCSLEGENDATEKST", CommandFlags.Modal)]
     public void NlcsLegendaTekst()
     {
+        var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
+        if (ed is null || !RequireInteractive(ed, "NLCSLEGENDATEKST")) return;
+        NlcsLegendaTekstInteractive();
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private void NlcsLegendaTekstInteractive()
+    {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        if (!RequireInteractive(ed, "NLCSLEGENDATEKST")) return;
 
         try
         {
@@ -1715,12 +1752,19 @@ public partial class Commands
     [CommandMethod("NLCSLEGENDALAAGNAAM", CommandFlags.Modal)]
     public void NlcsLegendaLaagnaam()
     {
+        var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
+        if (ed is null || !RequireInteractive(ed, "NLCSLEGENDALAAGNAAM")) return;
+        NlcsLegendaLaagnaamInteractive();
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private void NlcsLegendaLaagnaamInteractive()
+    {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        if (!RequireInteractive(ed, "NLCSLEGENDALAAGNAAM")) return;
 
         try
         {
@@ -2574,86 +2618,6 @@ public partial class Commands
         catch (Exception ex)
         {
             ed.WriteMessage($"\nBLANCO error: {ex.Message}");
-        }
-    }
-
-    // Host-state-isolatie: legt relevante systeemvariabelen (getypeerde waarden, incl. de actieve
-    // laag CLAYER en layout CTAB/TILEMODE) vast, draait de analyse, bouwt en werkt een legenda bij,
-    // exporteert, en draait de analyse met een eigen laag en met blanco regels. Controleert daarna
-    // dat elke waarde exact gelijk is. Bewijst dat de plugin geen systeemvariabelen laat lekken.
-    // (De enige tijdelijke WorkingDatabase-wissels zitten in de xref-testcommando's en zijn daar
-    // met try/finally hersteld; WorkingDatabase is in de Core Console geen stabiele referentie.)
-    [CommandMethod("NLCSLEGENDASYSVARTEST", CommandFlags.Modal)]
-    public void NlcsLegendaSysvarTest()
-    {
-        var doc = AcApp.DocumentManager.MdiActiveDocument;
-        if (doc is null)
-            return;
-        var ed = doc.Editor;
-        var db = doc.Database;
-        string[] names = { "FILEDIA", "SECURELOAD", "CMDECHO", "CLAYER", "CTAB", "TILEMODE", "OSMODE", "PICKSTYLE", "ATTREQ", "ATTDIA", "EXPERT" };
-        try
-        {
-            var before = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var n in names)
-            {
-                try { before[n] = AcApp.GetSystemVariable(n); } catch { }
-            }
-
-            // Analyse.
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db));
-                tr.Commit();
-            }
-            // Legenda bouwen en meteen bijwerken.
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var reg = LegendStore.Load(db, tr);
-                var def = IsoDef(reg, LoadGlobalDefaults());
-                reg.Add(def);
-                BuildManagedLegend(db, tr, reg, def, out _, out _);
-                BuildManagedLegend(db, tr, reg, def, out _, out _);
-                LegendStore.Save(db, tr, reg);
-                tr.Commit();
-            }
-            PurgePending(db);
-            // Export.
-            string tmp = Path.Combine(Path.GetTempPath(), "nlcs_sysvar_" + Guid.NewGuid().ToString("N") + ".csv");
-            try
-            {
-                using var tr = db.TransactionManager.StartTransaction();
-                var analysis = DrawingAnalyzer.Analyze(db, tr, LoadGlobalDefaults(), catalog: LoadCatalog(db));
-                File.WriteAllText(tmp, LegendExport.ToCsv(analysis.Entries));
-                tr.Commit();
-            }
-            finally { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { } }
-            // Analyse met een eigen laag en met blanco regels.
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var s = LoadGlobalDefaults();
-                s.CustomLayerRules.Add(new CustomLayerRule { Layer = "Sysvar kabel", Element = "Sysvar", Type = NlcsDrawType.Geometrie, Description = "Sysvar" });
-                s.BlankEntries.Add(new BlankEntry());
-                DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db));
-                tr.Commit();
-            }
-
-            int afwijkingen = 0;
-            foreach (var n in names)
-            {
-                object? na;
-                try { na = AcApp.GetSystemVariable(n); } catch { continue; }
-                if (before.TryGetValue(n, out var nb) && !Equals(nb, na))
-                {
-                    ed.WriteMessage($"\nSYSVAR: {n} {nb} -> {na} (GEWIJZIGD)");
-                    afwijkingen++;
-                }
-            }
-            ed.WriteMessage($"\nSYSVAR: {names.Length} variabele(n) gecontroleerd, {afwijkingen} gewijzigd -> {(afwijkingen == 0 ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nSYSVAR error: {ex.Message}");
         }
     }
 
@@ -3660,7 +3624,7 @@ public partial class Commands
             }
             finally
             {
-                try { LayoutManager.Current.CurrentLayout = originalLayout; } catch { }
+                LayoutManager.Current.CurrentLayout = originalLayout;
             }
         }
         catch (Exception ex)
@@ -4620,6 +4584,7 @@ public partial class Commands
         }
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static void EditSettingsDialog(Editor ed, LegendSettings s)
     {
         try
@@ -4643,6 +4608,7 @@ public partial class Commands
         }
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static void EditDescriptionsDialog(Editor ed)
     {
         try

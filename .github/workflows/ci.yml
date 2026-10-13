@@ -57,6 +57,9 @@ jobs:
             10.0.x
       - name: Build plugin (NuGet AutoCAD-referenties)
         run: dotnet build src/NlcsLegenda.Plugin/NlcsLegenda.Plugin.csproj -c Release -p:AcadVersion=${{ matrix.acad }} -p:UseNuGetAcad=true
+      - name: Test profielherstel en PowerShell-syntax
+        if: matrix.acad == '2025'
+        run: ./dev/scripts/Test-CoreConsoleState.ps1
       - name: Upload plugin
         uses: actions/upload-artifact@v7
         with:

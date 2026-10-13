@@ -253,6 +253,7 @@ public partial class Commands
 
     // Bewerkt de instellingen van precies één legenda (op LegendId) en bouwt die legenda
     // atomair opnieuw op. Annuleren wijzigt niets; andere legenda's blijven ongemoeid.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private void ManagerEditSettings(Editor ed, Database db, LegendRegistry registry)
     {
         var def = PickLegendFromList(ed, registry, "de instellingen aanpassen van");

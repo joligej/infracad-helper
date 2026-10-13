@@ -270,7 +270,9 @@ tekeningen voor stijlen, xrefs, symbolen, arceringen, eigen lagen, plaatsing en 
 legenda's. Het script controleert de geladen DLL-hash, echte QSAVE, heropenen, vijftig
 updates en ongewijzigde systeemvariabelen. Het stopt bij een fout of ontbrekend testresultaat.
 Gebruik `-AcadVersion 2027` voor de 2027-host en `-PluginPath <geïnstalleerde DLL>` voor
-acceptatie na installatie. Logs en resultaten blijven lokaal onder `artifacts/acceptance/`.
+acceptatie na installatie. De runners vereisen PowerShell 7.4 of nieuwer; sluit AutoCAD
+en wacht tot andere Core Console-taken klaar zijn. Ze controleren ook de opgeslagen
+profielwaarden. Logs en resultaten blijven lokaal onder `artifacts/acceptance/`.
 
 ## Ondersteunde versies
 

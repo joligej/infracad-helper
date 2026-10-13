@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.29.9 - 2026-10-13
+
+- Dialoogcommando's weigeren nu veilig in Core Console. De vensterbibliotheek kon
+  bij onder meer Instellingen al vóór de hostcontrole laden en een native crash veroorzaken.
+- De systeemvariabeletest controleert vijftien waarden na afzonderlijke bewerkingen,
+  met FILEDIA=0 en 1. Een onleesbare waarde kan niet meer als geslaagd tellen.
+- De testrunners controleren ook de opgeslagen profielwaarden, herstellen afwijkingen
+  exact en stoppen bij fouten, ontbrekende resultaten, timeouts of een mislukte build.
+  Tests gebruiken kopieën en starten alleen zonder andere CAD-processen.
+
 ## 1.29.8 - 2026-10-13
 
 - Opgeslagen legenda's met ontbrekende kerngegevens worden geweigerd. Een ontbrekend

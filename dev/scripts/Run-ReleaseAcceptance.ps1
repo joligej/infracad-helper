@@ -16,6 +16,7 @@ param(
     [switch]$SkipReopen
 )
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'CoreConsole.ps1')
 $repoRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $framework=if($AcadVersion -eq '2027'){'net10.0-windows'}else{'net8.0-windows'}
 if(!$PluginPath){$PluginPath=Join-Path $repoRoot "src/NlcsLegenda.Plugin/bin/Release/$framework/NlcsLegenda.dll"}
@@ -63,7 +64,7 @@ $specs=@{
  customany=@('NLCSLEGENDAEIGENANYTEST','EIGENANY: totaal -> OK')
  customhatch=@('NLCSLEGENDAEIGENHATCHTEST','EIGENHATCH: gerenderde hatches=')
  blank=@('NLCSLEGENDABLANCOTEST','BLANCO: totaal -> OK')
- sysvars=@('NLCSLEGENDASYSVARTEST','SYSVAR: 11 variabele(n) gecontroleerd, 0 gewijzigd -> OK')
+ sysvars=@('NLCSLEGENDASYSVARTEST','SYSVAR totaal: OK; 15 variabelen; 34 controles; FILEDIA=0/1')
  mtext=@('NLCSLEGENDAMTEXTTEST','MTEXT: totaal -> OK')
  heights=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAHOOGTETEST",'HOOGTE: body=0.6(True) kop=0.8(True) titel=1.2(True) geen-default(True) -> OK')
  symboltext=@('NLCSLEGENDASYMBOOLTEKST2TEST','SYMFID: totaal -> OK')
@@ -101,16 +102,8 @@ _.QUIT
 _Y
 "@ | Set-Content -LiteralPath $script -Encoding ascii
  $raw=Join-Path $dir "$Name.raw.log"
- $arguments=@('/i', ('"{0}"' -f $Drawing), '/s', ('"{0}"' -f $script), '/l', 'en-US')
- $process=Start-Process -FilePath $core -ArgumentList $arguments -WorkingDirectory $dir -PassThru -WindowStyle Hidden -RedirectStandardOutput $raw -RedirectStandardError "$raw.stderr"
- try {
-  if(!$process.WaitForExit(300000)){
-   $process.Kill()
-   $process.WaitForExit()
-   throw "Test $Name overschrijdt vijf minuten; uitsluitend dit testproces is gestopt. Log: $raw"
-  }
-  $exitCode=$process.ExitCode
- } finally { $process.Dispose() }
+ $run=Invoke-NlcsCoreConsole -Executable $core -Drawing $Drawing -Script $script -Log $raw
+ $exitCode=$run.ExitCode
  $log=(Get-Content -LiteralPath $raw -Raw) -replace "`0",''
  $log | Set-Content -LiteralPath (Join-Path $dir "$Name.log") -Encoding utf8
  $actual=($log -split "`r?`n" | Where-Object {$_ -notmatch '^Command:'}) -join "`n"
@@ -122,7 +115,7 @@ _Y
  if($actual -match '(?im)^.*(?:->\s*FAIL|totaal:?\s*(?:->\s*)?FAIL|\bFAIL:|fatale fout|\berror:|\bfout:|Unknown command|Invalid option keyword|An error occurred during save|overgeslagen|GEEN VERSCHIL|host zonder NLCS-content|geen papier-layout).*$'){
   $failures.Add($Matches[0])
  }
- $result=[pscustomobject]@{Case=$Name;Passed=($failures.Count -eq 0);ExitCode=$exitCode;Failures=@($failures);Log=(Join-Path $dir "$Name.log");PluginHash=$pluginHash}
+ $result=[pscustomobject]@{Case=$Name;Passed=($failures.Count -eq 0);ExitCode=$exitCode;Failures=@($failures);Log=(Join-Path $dir "$Name.log");PluginHash=$pluginHash;ProfileValuesChecked=$run.ProfileValuesChecked}
  $results.Add($result)
  $results | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'results.json') -Encoding utf8
  Write-Output "$Name : $(if($result.Passed){'PASS'}else{'FAIL'})"
