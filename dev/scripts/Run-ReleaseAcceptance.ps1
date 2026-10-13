@@ -31,7 +31,7 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
- metadata=@('NLCSLEGENDAMETADATATEST','METADATA vier onleesbare tekeningen afgewezen; geldige tekening 7m; bronbestanden ongewijzigd -> OK')
+ metadata=@('NLCSLEGENDAMETADATATEST','METADATA 12 onleesbare tekeningen afgewezen; geldige tekening 7m; bronbestanden ongewijzigd -> OK')
  abclocal=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAABCSETUP",'ABC: setup klaar','NLCSLEGENDAABCVERIFY','ABC: na A bewerken B/C-vingerafdruk ongewijzigd')
  abcxref=@('NLCSLEGENDAABCXREFSETUP','ABCX: setup klaar','NLCSLEGENDAABCXREFVERIFY','ABCX: xref-isolatie A=OK B=OK C=OK -> OK')
  oldreopen=@('NLCSLEGENDAOLDREOPENSETUP','HEROPEN: setup klaar','NLCSLEGENDAOLDREOPENVERIFY','handles=2 pos=True orphan=0 -> OK')

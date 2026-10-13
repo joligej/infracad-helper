@@ -11,8 +11,10 @@ public sealed class LegendRegistry
     // v2: omschrijvingen staan als onafhankelijke snapshot per legenda.
     public const int CurrentSchemaVersion = 2;
 
+    [JsonRequired]
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
+    [JsonRequired]
     public List<LegendDefinition> Legends { get; set; } = new();
 
     [JsonIgnore]
@@ -54,7 +56,8 @@ public sealed class LegendRegistry
 
     public void Normalize()
     {
-        Legends ??= new List<LegendDefinition>();
+        if (Legends is null)
+            throw new JsonException("De lijst met opgeslagen legenda's ontbreekt.");
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var groups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var l in Legends)
@@ -63,9 +66,9 @@ public sealed class LegendRegistry
                 || (!string.IsNullOrEmpty(l.GroupName) && !groups.Add(l.GroupName)))
                 throw new JsonException("Legenda-gegevens bevatten een ontbrekende of dubbele identiteit.");
             l.Name ??= string.Empty;
-            l.GroupName ??= string.Empty;
-            l.SourceHandles ??= new List<string>();
-            (l.Settings ??= new LegendSettings()).Normalize();
+            if (l.GroupName is null || l.SourceHandles is null || l.Settings is null || !Enum.IsDefined(l.Scope))
+                throw new JsonException("De opgeslagen bronselectie, groep of instellingen zijn ongeldig.");
+            l.Settings.Normalize();
         }
     }
 

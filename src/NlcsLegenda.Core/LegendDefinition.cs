@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace NlcsLegenda.Core;
 
 // Waar de bron van een legenda vandaan komt.
@@ -20,19 +22,24 @@ public static class LegendScopeExtensions
 // instellingen-snapshot. De geometrie hoort bij de AutoCAD-group met naam GroupName.
 public sealed class LegendDefinition
 {
+    [JsonRequired]
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
     public string Name { get; set; } = string.Empty;
 
+    [JsonRequired]
     public LegendScope Scope { get; set; } = LegendScope.WholeDrawing;
 
     // DWG-Handles van de bronobjecten bij Scope=Selection. Handles blijven stabiel in de
     // tekening; ObjectIds niet, dus die worden nooit persistent opgeslagen.
+    [JsonRequired]
     public List<string> SourceHandles { get; set; } = new();
 
     // Naam van de AutoCAD-group die de legenda-entiteiten bevat.
+    [JsonRequired]
     public string GroupName { get; set; } = string.Empty;
 
+    [JsonRequired]
     public LegendSettings Settings { get; set; } = new();
 
     public string CreatedWithVersion { get; set; } = string.Empty;
