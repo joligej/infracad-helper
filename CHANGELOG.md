@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.29.8 - 2026-10-13
+
+- Opgeslagen legenda's met ontbrekende kerngegevens worden geweigerd. Een ontbrekend
+  ID, bronselectie of instellingenblok wordt niet meer stil met standaardwaarden
+  ingevuld. De bestaande gegevens blijven behouden, ook bij batch-export.
+
 ## 1.29.7 - 2026-10-13
 
 - Een ongeldige schaal in een laagnaam breekt de analyse niet meer af. Lagen met een

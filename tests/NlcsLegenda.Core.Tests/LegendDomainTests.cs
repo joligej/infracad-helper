@@ -53,10 +53,9 @@ public class LegendDomainTests
     }
 
     [Fact]
-    public void Registry_NormalizesNullCollections()
+    public void Registry_ExplicitEmptyList_IsValid()
     {
-        // JSON zonder legends-array en zonder sourceHandles.
-        const string json = """{ "schemaVersion": 2 }""";
+        const string json = """{ "schemaVersion": 2, "legends": [] }""";
         Assert.True(LegendRegistry.TryParse(json, out var reg, out _));
         Assert.NotNull(reg.Legends);
         Assert.Empty(reg.Legends);

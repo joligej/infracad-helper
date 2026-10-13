@@ -22,7 +22,7 @@ public class InputBoundaryTests
     [InlineData(1)]
     public void UnsupportedOldRegistry_IsNotTreatedAsCurrent(int schema)
     {
-        Assert.False(LegendRegistry.TryParse($$"""{"schemaVersion":{{schema}}}""", out var registry, out _));
+        Assert.False(LegendRegistry.TryParse($$"""{"schemaVersion":{{schema}},"legends":[]}""", out var registry, out _));
         Assert.False(registry.IsSupported);
     }
 
@@ -99,7 +99,7 @@ public class InputBoundaryTests
     [Fact]
     public void NullRegistryEntry_IsRejectedWithoutThrowing()
     {
-        Assert.False(LegendRegistry.TryParse("""{"legends":[null]}""", out _, out var error));
+        Assert.False(LegendRegistry.TryParse("""{"schemaVersion":2,"legends":[null]}""", out _, out var error));
         Assert.NotEmpty(error);
     }
 

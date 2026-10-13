@@ -467,7 +467,17 @@ public partial class Commands
         {
             var directory = System.IO.Path.Join(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "metadata");
             System.IO.Directory.CreateDirectory(directory);
-            var invalid = new[] { "", "{ kapot", "{\"legends\":[null]}", "{\"schemaVersion\":999,\"legends\":[]}" };
+            var invalid = new[]
+            {
+                "", "{ kapot", """{"schemaVersion":2,"legends":[null]}""",
+                """{"schemaVersion":999,"legends":[]}""",
+                "{}", """{"schemaVersion":2}""", """{"schemaVersion":2,"legends":null}""",
+                """{"schemaVersion":2,"legends":[{"scope":1,"sourceHandles":["1A"],"groupName":"g","settings":{}}]}""",
+                """{"schemaVersion":2,"legends":[{"id":"a","sourceHandles":["1A"],"groupName":"g","settings":{}}]}""",
+                """{"schemaVersion":2,"legends":[{"id":"a","scope":1,"sourceHandles":["1A"],"groupName":"g","settings":null}]}""",
+                """{"schemaVersion":2,"legends":[{"id":"a","scope":1,"sourceHandles":null,"groupName":"g","settings":{}}]}""",
+                """{"schemaVersion":2,"legends":[{"id":"a","scope":99,"sourceHandles":["1A"],"groupName":"g","settings":{}}]}"""
+            };
             for (int i = 0; i <= invalid.Length; i++)
             {
                 using var db = new Database(true, true);
@@ -505,10 +515,10 @@ public partial class Commands
             var good = results.Single(r => r.Drawing == invalid.Length + ".dwg");
             bool unchanged = hashes.All(p => p.Value == Convert.ToHexString(
                 System.Security.Cryptography.SHA256.HashData(System.IO.File.ReadAllBytes(p.Key))));
-            if (results.Count != 5 || results.Count(r => r.Error is not null) != 4 || good.Error is not null
+            if (results.Count != invalid.Length + 1 || results.Count(r => r.Error is not null) != invalid.Length || good.Error is not null
                 || good.Entries.Count != 1 || Math.Abs(good.Entries[0].Metric.Length - 7) > 1e-8 || !unchanged)
                 throw new InvalidOperationException("Batch accepteert onleesbare gegevens of wijzigt een bronbestand.");
-            doc.Editor.WriteMessage("\nMETADATA vier onleesbare tekeningen afgewezen; geldige tekening 7m; bronbestanden ongewijzigd -> OK");
+            doc.Editor.WriteMessage("\nMETADATA 12 onleesbare tekeningen afgewezen; geldige tekening 7m; bronbestanden ongewijzigd -> OK");
         }
         catch (System.Exception ex) { doc.Editor.WriteMessage($"\nMETADATA FAIL: {ex}"); }
     }
