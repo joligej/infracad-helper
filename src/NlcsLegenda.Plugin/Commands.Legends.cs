@@ -197,7 +197,7 @@ public partial class Commands
         if (LegendManagement.TryGetGroupExtents(db, tr, def.GroupName, out var ext))
         {
             var doc = AcApp.DocumentManager.MdiActiveDocument;
-            var view = doc.Editor.GetCurrentView();
+            using var view = doc.Editor.GetCurrentView();
             view.CenterPoint = new Point2d((ext.MinPoint.X + ext.MaxPoint.X) / 2, (ext.MinPoint.Y + ext.MaxPoint.Y) / 2);
             view.Width = (ext.MaxPoint.X - ext.MinPoint.X) * 1.2;
             view.Height = (ext.MaxPoint.Y - ext.MinPoint.Y) * 1.2;
@@ -253,13 +253,14 @@ public partial class Commands
 
     // Bewerkt de instellingen van precies één legenda (op LegendId) en bouwt die legenda
     // atomair opnieuw op. Annuleren wijzigt niets; andere legenda's blijven ongemoeid.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private void ManagerEditSettings(Editor ed, Database db, LegendRegistry registry)
     {
         var def = PickLegendFromList(ed, registry, "de instellingen aanpassen van");
         if (def is null) return;
         string id = def.Id;
         var working = def.Settings.Clone();
-        using var dialog = new SettingsDialog(working, $"Legenda: {def.Name}", BuildCompositionItems(db, working), CollectXrefNames(db));
+        using var dialog = new SettingsDialog(working, $"Legenda: {def.Name}", BuildCompositionItems(db, working, id), CollectXrefNames(db));
         dialog.ApplyRequested += (_, _) => ApplySettingsAndRebuild(ed, db, id, working);
         if (AcWindows.ShowModalDialog(dialog) == WinForms.DialogResult.OK)
             ApplySettingsAndRebuild(ed, db, id, working);
@@ -413,7 +414,7 @@ public partial class Commands
                 ? (note.Length > 0
                     ? $"\nBron aangepast en legenda bijgewerkt. Let op: {note}."
                     : "\nBron aangepast en legenda bijgewerkt.")
-                : $"\nBron aangepast, maar geen inhoud om te tekenen ({note}).");
+                : $"\nGeen inhoud om te tekenen ({note}); bron en legenda blijven ongewijzigd.");
         }
         catch (Exception ex)
         {

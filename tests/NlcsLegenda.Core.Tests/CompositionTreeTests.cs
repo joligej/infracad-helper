@@ -123,4 +123,33 @@ public class CompositionTreeTests
         tree.SetGroup(tree.Groups[0], false);
         Assert.Equal(3, tree.ExcludedKeys().Count);
     }
+    [Fact]
+    public void AbsentExcludedSource_RemainsExcludedWhenItReturns()
+    {
+        var tree = CompositionTree.Build(new[] { ("visible", "Zichtbaar", "Groep") },
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "missing" });
+        var saved = tree.ExcludedKeys();
+        var reopened = CompositionTree.Build(new[] { ("missing", "Teruggekeerd", "Groep") }, saved);
+        Assert.False(Assert.Single(reopened.AllLeaves()).Included);
+    }
+
+    [Fact]
+    public void EnablingVisibleSource_PreservesAbsentExclusions()
+    {
+        var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "VISIBLE", "missing" };
+        var tree = CompositionTree.Build(new[] { ("visible", "Zichtbaar", "Groep") }, excluded);
+        tree.SetGroup(tree.Groups[0], true);
+        var saved = tree.ExcludedKeys();
+        Assert.Equal(new[] { "missing" }, saved);
+        Assert.Equal(2, excluded.Count);
+    }
+
+    [Fact]
+    public void EmptyComposition_PreservesExclusionsWithoutSharingInput()
+    {
+        var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "missing" };
+        var tree = CompositionTree.Build(Array.Empty<(string, string, string)>(), excluded);
+        excluded.Clear();
+        Assert.Contains("missing", tree.ExcludedKeys());
+    }
 }

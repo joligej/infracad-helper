@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.29.9 - 2026-10-13
+
+- Samenstellen gebruikt de bronselectie en omschrijvingen van de gekozen legenda.
+  Geplaatste legenda's tellen niet mee; uitsluitingen van tijdelijk ontbrekende bronnen blijven bewaard.
+- Globale profielen nemen alle omschrijvingen mee. Opnieuw bewerken vervangt oude
+  tekstoverrides en een schrijffout laat de vorige bestanden intact.
+  Beschrijvingen vóór het plaatsen gelden alleen voor de nieuwe legenda.
+- Bij lagen samenvoegen verhuizen attribuutreferenties mee en blijft een behouden
+  bronlaag vergrendeld. Alleen hoofdletters wijzigen wordt als hernoemen behandeld.
+- Dialoogcommando's weigeren nu veilig in Core Console. De vensterbibliotheek kon
+  bij onder meer Instellingen al vóór de hostcontrole laden en een native crash veroorzaken.
+- De systeemvariabeletest controleert vijftien waarden na afzonderlijke bewerkingen,
+  met FILEDIA=0 en 1. Een onleesbare waarde kan niet meer als geslaagd tellen.
+- De testrunners controleren ook de opgeslagen profielwaarden, herstellen afwijkingen
+  exact en stoppen bij fouten, ontbrekende resultaten, timeouts of een mislukte build.
+  Tests gebruiken kopieën en starten alleen zonder andere CAD-processen.
+
 ## 1.29.8 - 2026-10-13
 
 - Opgeslagen legenda's met ontbrekende kerngegevens worden geweigerd. Een ontbrekend

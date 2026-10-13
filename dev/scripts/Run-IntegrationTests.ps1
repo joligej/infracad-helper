@@ -13,9 +13,9 @@
          weigeren (geen GetEntity/native crash), en met NLCSLEGENDA_TARGET de juiste
          legenda bijwerken.
 
-    Na elke run wordt de exitcode gecontroleerd en het Windows Application Event Log op
-    nieuwe accoreconsole-crashes (1000/1001/1026) gecontroleerd. Runs zijn strikt
-    sequentieel; nooit twee accoreconsole-processen tegelijk.
+    Elke run controleert de procescode, het eindresultaat en de systeemvariabelen,
+    inclusief de opgeslagen profielwaarden. Runs hebben een timeout en starten
+    alleen zonder andere CAD-processen. Foutlogs blijven in artifacts/integration.
 
 .EXAMPLE
     ./Run-IntegrationTests.ps1 -Drawing "C:\pad\ontwerp.dwg" -AcadVersion 2027
@@ -23,31 +23,31 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Drawing,
-    [string]$AcadVersion = "2027",
+    [ValidateSet("2025","2026","2027")][string]$AcadVersion = "2027",
     [ValidateSet("Debug", "Release")][string]$Configuration = "Release"
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "CoreConsole.ps1")
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $pluginProj = Join-Path $repoRoot "src\NlcsLegenda.Plugin\NlcsLegenda.Plugin.csproj"
 $accore = "C:\Program Files\Autodesk\AutoCAD $AcadVersion\accoreconsole.exe"
+$Drawing = (Resolve-Path -LiteralPath $Drawing).Path
+$sourceHash = (Get-FileHash -LiteralPath $Drawing).Hash
 $tfm = if ($AcadVersion -eq "2027") { "net10.0-windows" } else { "net8.0-windows" }
 
 if (-not (Test-Path $accore)) { throw "accoreconsole niet gevonden: $accore" }
 if (-not (Test-Path $Drawing)) { throw "Tekening niet gevonden: $Drawing" }
 
-# Eén-procesregel: voorkom dat twee instanties van deze test tegelijk accoreconsole starten.
-$mutex = New-Object System.Threading.Mutex($false, "Global\NlcsLegendaIntegrationTest")
-if (-not $mutex.WaitOne(0)) { throw "Een andere integratietest draait al; draai sequentieel." }
-
 try {
     Write-Host "==> Plugin bouwen ($Configuration, $AcadVersion)..." -ForegroundColor Cyan
-    dotnet build $pluginProj -c $Configuration -p:AcadVersion=$AcadVersion | Out-Null
+    dotnet build $pluginProj -c $Configuration -p:AcadVersion=$AcadVersion
+    if ($LASTEXITCODE -ne 0) { throw "Build mislukt; er wordt geen bestaande DLL getest." }
     $dll = Join-Path $repoRoot "src\NlcsLegenda.Plugin\bin\$Configuration\$tfm\NlcsLegenda.dll"
     if (-not (Test-Path $dll)) { throw "Plugin-DLL niet gevonden: $dll" }
     $dllFwd = (Resolve-Path $dll).Path -replace '\\', '/'
 
-    $work = Join-Path ([System.IO.Path]::GetTempPath()) ("nlcs_it_" + [Guid]::NewGuid().ToString("N"))
+    $work = Join-Path $repoRoot ("artifacts/integration/" + [Guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Force -Path $work | Out-Null
 
     $script:fail = 0
@@ -56,31 +56,28 @@ try {
         else { Write-Host "  [FOUT] $name" -ForegroundColor Red; $script:fail++ }
     }
 
-    # Draait één accoreconsole-run sequentieel (-Wait), geeft exitcode + schone output terug.
+    # Elke run moet zijn eindmelding bereiken; een procescode 0 alleen is onvoldoende.
     function Invoke-Accore($dwg, $scriptBody, $tag, $envTarget) {
         $scr = Join-Path $work "$tag.scr"
-        Set-Content -Path $scr -Value $scriptBody -Encoding ASCII
+        $end = '(princ (strcat "\nINTEGRATION_SYSVARS=" (if (and (= __f (getvar "FILEDIA")) (= __o (getvar "SECURELOAD"))) "OK" "FAIL")))' + "`n" + '(princ "\nINTEGRATION_END\n")' + "`n_.QUIT`n_Y"
+        $scriptBody = $scriptBody.Replace('_.QUIT', $end)
+        Set-Content -LiteralPath $scr -Value $scriptBody -Encoding ASCII
         $outFile = Join-Path $work "$tag.out"
-        $startedAt = Get-Date
-        $prev = $env:NLCSLEGENDA_TARGET
-        if ($null -ne $envTarget) { $env:NLCSLEGENDA_TARGET = $envTarget }
-        try {
-            $p = Start-Process -FilePath $accore `
-                -ArgumentList "/i `"$dwg`" /s `"$scr`" /l en-US" `
-                -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outFile
+        $childEnvironment = @{}
+        if ($null -ne $envTarget) { $childEnvironment.NLCSLEGENDA_TARGET = $envTarget }
+        $run = Invoke-NlcsCoreConsole -Executable $accore -Drawing $dwg -Script $scr -Log $outFile -Environment $childEnvironment
+        $raw = (Get-Content -LiteralPath $outFile -Raw) -replace "`0", ""
+        $actual = ($raw -split "`r?`n" | Where-Object { $_ -notmatch '^Command:' }) -join "`n"
+        if (!$actual.Contains("`nINTEGRATION_END") -or !$actual.Contains('INTEGRATION_SYSVARS=OK')) {
+            throw "Onvolledige run of gewijzigde systeemvariabelen: $outFile"
         }
-        finally {
-            if ($null -ne $envTarget) {
-                if ($null -ne $prev) { $env:NLCSLEGENDA_TARGET = $prev } else { Remove-Item Env:\NLCSLEGENDA_TARGET -ErrorAction SilentlyContinue }
-            }
+        if ($actual -match '(?i)Unhandled|FATAL ERROR|AccessViolation|Unknown command|Invalid option|An error occurred during save|\berror:|\bfout:') {
+            throw "Fout in Core Console: $outFile"
         }
-        $raw = if (Test-Path $outFile) { (Get-Content $outFile -Raw) -replace "`0", "" } else { "" }
-        $crashes = @(Get-WinEvent -FilterHashtable @{LogName = 'Application'; StartTime = $startedAt } -ErrorAction SilentlyContinue |
-            Where-Object { $_.Message -match 'accoreconsole' -and ($_.Id -in 1000, 1001, 1026) })
-        [pscustomobject]@{ Exit = $p.ExitCode; Out = $raw; Crashes = $crashes.Count }
+        [pscustomobject]@{ Exit = $run.ExitCode; Out = $actual }
     }
 
-    $load = "(setq __o (getvar `"SECURELOAD`"))(setvar `"SECURELOAD`" 0)`n(command `"_.NETLOAD`" `"$dllFwd`")(setvar `"SECURELOAD`" __o)"
+    $load = "(setq __f (getvar `"FILEDIA`"))`n(setq __o (getvar `"SECURELOAD`"))(setvar `"SECURELOAD`" 0)`n(command `"_.NETLOAD`" `"$dllFwd`")(setvar `"SECURELOAD`" __o)"
 
     # --- Scenario 1: één legenda ---
     Write-Host "==> Scenario 1: een legenda" -ForegroundColor Cyan
@@ -94,13 +91,14 @@ try {
     $r1 = Invoke-Accore $dwg1 $s1 "one" $null
 
     Check "Scenario 1 exitcode 0" ($r1.Exit -eq 0)
-    Check "Scenario 1 geen crash-events" ($r1.Crashes -eq 0)
     $placed = [regex]::Match($r1.Out, 'NLCSTEST placed rows=(\d+)')
     Check "NLCSLEGENDATEST plaatst regels" ($placed.Success -and [int]$placed.Groups[1].Value -gt 0)
-    Check "NLCSLEGENDAINFO geeft een overzicht" ($r1.Out -match 'overzicht|regel\(s\)|legenda')
+    Check "NLCSLEGENDAINFO geeft een overzicht" ($r1.Out -match "1 legenda\('s\) in deze tekening:")
     Check "NLCSLEGENDAEXPORT schrijft CSV" (Test-Path $csv)
     Check "NLCSLEGENDAEXPORT schrijft JSON" (Test-Path $json)
-    Check "CSV heeft een kop en regels" ((Test-Path $csv) -and ((Get-Content $csv).Count -gt 1))
+    Check "CSV en JSON bevatten de geplaatste regels" ((Test-Path $csv) -and (Test-Path $json) -and $placed.Success -and
+        @(Import-Csv -LiteralPath $csv -Delimiter ';').Count -eq [int]$placed.Groups[1].Value -and
+        @(Get-Content -LiteralPath $json -Raw | ConvertFrom-Json).Count -eq [int]$placed.Groups[1].Value)
     Check "NLCSLEGENDAUPDATE werkt bij (1 legenda, auto)" ($r1.Out -match 'bijgewerkt')
     Check "Scenario 1 geen onafgevangen fout" (-not ($r1.Out -match 'Unhandled|FATAL ERROR'))
 
@@ -117,22 +115,19 @@ try {
     $upd = "$load`nNLCSLEGENDAUPDATE`n_.QUIT`n"
     $rRefuse = Invoke-Accore $dwg2 $upd "refuse" $null
     Check "Twee legenda's: exitcode 0" ($rRefuse.Exit -eq 0)
-    Check "Twee legenda's: GEEN crash-event" ($rRefuse.Crashes -eq 0)
     Check "Twee legenda's: veilige weigering" ($rRefuse.Out -match 'Meerdere legenda' -and $rRefuse.Out -match 'NLCSLEGENDA_TARGET')
     Check "Twee legenda's: geen GetEntity-crash" (-not ($rRefuse.Out -match 'Unhandled|FATAL ERROR|AccessViolation'))
 
     # Niet-interactief: NLCSLEGENDA_TARGET wijst de juiste legenda aan.
     $rTarget = Invoke-Accore $dwg2 $upd "target" "Legenda 2"
     Check "Niet-interactief: exitcode 0" ($rTarget.Exit -eq 0)
-    Check "Niet-interactief: geen crash-event" ($rTarget.Crashes -eq 0)
     Check "Niet-interactief: juiste legenda bijgewerkt" ($rTarget.Out -match 'Legenda 2.*bijgewerkt')
 
-    Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Output "Integratielogs: $work"
 
     if ($script:fail -eq 0) { Write-Host "==> Alle integratiechecks geslaagd." -ForegroundColor Green; exit 0 }
     Write-Host "==> $($script:fail) integratiecheck(s) mislukt." -ForegroundColor Red; exit 1
 }
 finally {
-    $mutex.ReleaseMutex()
-    $mutex.Dispose()
+    if ((Get-FileHash -LiteralPath $Drawing).Hash -ne $sourceHash) { throw "Brontekening gewijzigd." }
 }

@@ -1,115 +1,66 @@
 <#
 .SYNOPSIS
-    Bouwt de NLCS Legenda-plugin en draait een headless regressietest tegen een
-    tekening via de AutoCAD Core Console (accoreconsole.exe).
-
+    Bouwt de plugin en controleert een legenda op een kopie van de opgegeven tekening.
 .DESCRIPTION
-    Laadt de gebouwde plugin met NETLOAD (SECURELOAD wordt tijdelijk uitgezet en
-    daarna hersteld) en voert het commando NLCSLEGENDATEST uit. De brontekening
-    wordt NIET overschreven; er wordt niets opgeslagen tenzij -SaveResult is opgegeven.
-    Tijdelijk gewijzigde systeemvariabelen (SECURELOAD, en bij -SaveResult FILEDIA)
-    worden in het script hersteld; na afloop controleert het script of FILEDIA weer op
-    de oorspronkelijke waarde staat en herstelt die zo nodig, zodat het AutoCAD-profiel
-    niet blijvend verandert.
-
-.EXAMPLE
-    ./Run-HeadlessLegendTest.ps1 -Drawing "C:\pad\naar\ontwerp.dwg"
-
-.EXAMPLE
-    ./Run-HeadlessLegendTest.ps1 -Drawing "ontwerp.dwg" -AcadVersion 2027 -SaveResult
+    Gebruikt Core Console zonder andere CAD-sessies. Controleert procescode,
+    testresultaat, DLL-hash en systeemvariabelen binnen CAD en in het opgeslagen profiel.
+    De bron blijft ongewijzigd. Met -SaveResult blijft de gegenereerde DWG in de uitvoermap.
 #>
+#requires -Version 7.4
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$Drawing,
-
-    [string]$AcadVersion = "2025",
-
-    [ValidateSet("Debug", "Release")]
-    [string]$Configuration = "Debug",
-
+    [Parameter(Mandatory)][string]$Drawing,
+    [ValidateSet('2025','2026','2027')][string]$AcadVersion = '2025',
+    [ValidateSet('Debug','Release')][string]$Configuration = 'Debug',
     [switch]$SaveResult
 )
-
-$ErrorActionPreference = "Stop"
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$pluginProj = Join-Path $repoRoot "src\NlcsLegenda.Plugin\NlcsLegenda.Plugin.csproj"
-$accore = "C:\Program Files\Autodesk\AutoCAD $AcadVersion\accoreconsole.exe"
-
-if (-not (Test-Path $accore)) { throw "accoreconsole niet gevonden: $accore" }
-if (-not (Test-Path $Drawing)) { throw "Tekening niet gevonden: $Drawing" }
-
-Write-Host "==> Plugin bouwen ($Configuration, AutoCAD $AcadVersion)..." -ForegroundColor Cyan
-dotnet build $pluginProj -c $Configuration -p:AcadVersion=$AcadVersion | Out-Null
-
-$tfm = if ($AcadVersion -eq "2027") { "net10.0-windows" } else { "net8.0-windows" }
-$dll = Join-Path $repoRoot "src\NlcsLegenda.Plugin\bin\$Configuration\$tfm\NlcsLegenda.dll"
-if (-not (Test-Path $dll)) { throw "Plugin-DLL niet gevonden: $dll" }
-$dllFwd = $dll -replace '\\', '/'
-
-$work = Join-Path $repoRoot "_dev_tmp"
-New-Item -ItemType Directory -Force -Path $work | Out-Null
-$scrPath = Join-Path $work "headless_run.scr"
-$sysvarPath = (Join-Path $work "sysvars.txt") -replace '\\', '/'
-
-# SAVEAS met een expliciet pad werkt in accoreconsole zonder FILEDIA-manipulatie (headless
-# toont sowieso geen dialogen); er wordt dus bewust geen systeemvariabele gewijzigd.
-$saveLine = ""
-if ($SaveResult) {
-    $resultDwg = (Join-Path $work "legenda_result.dwg") -replace '\\', '/'
-    $saveLine = "(command `"_.SAVEAS`" `"2018`" `"$resultDwg`")"
-}
-
-# FILEDIA en SECURELOAD worden aan het begin én eind van dezelfde run vastgelegd, zodat
-# achteraf te controleren is dat de run ze niet blijvend heeft gewijzigd (SECURELOAD wordt
-# tijdens NETLOAD tijdelijk uitgezet en meteen hersteld).
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'CoreConsole.ps1')
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$Drawing = (Resolve-Path -LiteralPath $Drawing).Path
+$sourceHash = (Get-FileHash -LiteralPath $Drawing).Hash
+$core = "C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
+if (!(Test-Path -LiteralPath $core)) { throw "Core Console ontbreekt: $core" }
+dotnet build (Join-Path $repoRoot 'src/NlcsLegenda.Plugin/NlcsLegenda.Plugin.csproj') -c $Configuration -p:AcadVersion=$AcadVersion
+if ($LASTEXITCODE -ne 0) { throw 'Build mislukt; er wordt geen bestaande DLL getest.' }
+$framework = if ($AcadVersion -eq '2027') { 'net10.0-windows' } else { 'net8.0-windows' }
+$dll = (Resolve-Path -LiteralPath (Join-Path $repoRoot "src/NlcsLegenda.Plugin/bin/$Configuration/$framework/NlcsLegenda.dll")).Path
+$dllHash = (Get-FileHash -LiteralPath $dll).Hash
+$work = Join-Path $repoRoot ('artifacts/headless/' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $work | Out-Null
+$copy = Join-Path $work 'test.dwg'
+Copy-Item -LiteralPath $Drawing -Destination $copy
+Set-ItemProperty -LiteralPath $copy -Name IsReadOnly -Value $false
+$script = Join-Path $work 'run.scr'
+$save = if ($SaveResult) { '_.QSAVE' } else { '' }
 @"
-(setq __fBefore (getvar "FILEDIA"))
-(setq __sBefore (getvar "SECURELOAD"))
+(setq testF (getvar "FILEDIA") testS (getvar "SECURELOAD"))
 (setvar "SECURELOAD" 0)
-(command "_.NETLOAD" "$dllFwd")
-(setvar "SECURELOAD" __sBefore)
-(command "NLCSLEGENDATEST")
-$saveLine
-(setq __f (open "$sysvarPath" "w"))
-(write-line (strcat "FILEDIA_before=" (itoa __fBefore)) __f)
-(write-line (strcat "FILEDIA_after=" (itoa (getvar "FILEDIA"))) __f)
-(write-line (strcat "SECURELOAD_before=" (itoa __sBefore)) __f)
-(write-line (strcat "SECURELOAD_after=" (itoa (getvar "SECURELOAD"))) __f)
-(close __f)
-(princ)
-"@ | Set-Content -Path $scrPath -Encoding ASCII
-
-Write-Host "==> NLCSLEGENDATEST draaien op: $Drawing" -ForegroundColor Cyan
-$logPath = Join-Path $work "headless_console.log"
-& $accore /i "$Drawing" /s "$scrPath" 2>&1 | Out-File -FilePath $logPath -Encoding UTF8
-
-# accoreconsole-output kan als UTF-16 verschijnen (spaties/NUL tussen tekens);
-# verwijder NUL en spaties zodat de sleutelregels leesbaar zijn.
-Get-Content $logPath |
-    ForEach-Object { ($_ -replace "`0", "") -replace ' ', '' } |
-    Where-Object { $_ -match "NLCSTEST|geladen|error|Exception" } |
-    ForEach-Object { Write-Host "    $_" }
-
-# Bevestig dat tijdelijk gewijzigde systeemvariabelen weer op hun beginwaarde staan.
-$sysvarFile = Join-Path $work "sysvars.txt"
-if (Test-Path $sysvarFile) {
-    $v = @{}
-    Get-Content $sysvarFile | ForEach-Object {
-        if ($_ -match '^(\w+)=(\d+)$') { $v[$Matches[1]] = [int]$Matches[2] }
+(command "_.NETLOAD" "$($dll.Replace('\','/'))")
+(setvar "SECURELOAD" testS)
+NLCSLEGENDAAUDITVERSION
+NLCSLEGENDATEST
+$save
+(princ (strcat "\nHEADLESS_DBMOD=" (itoa (getvar "DBMOD"))))
+(princ (strcat "\nHEADLESS_SYSVARS=" (if (and (= testF (getvar "FILEDIA")) (= testS (getvar "SECURELOAD"))) "OK" "FAIL")))
+(princ "\nHEADLESS_END\n")
+_.QUIT
+_Y
+"@ | Set-Content -LiteralPath $script -Encoding ascii
+try {
+    $run = Invoke-NlcsCoreConsole -Executable $core -Drawing $copy -Script $script -Log (Join-Path $work 'console.log')
+    $log = ((Get-Content -LiteralPath $run.Log -Raw) -replace "`0", '')
+    $actual = ($log -split "`r?`n" | Where-Object { $_ -notmatch '^Command:' }) -join "`n"
+    foreach ($marker in @("SHA256=$dllHash", 'HEADLESS_SYSVARS=OK', "`nHEADLESS_END")) {
+        if (!$actual.Contains($marker)) { throw "Resultaat ontbreekt: $marker. Log: $($run.Log)" }
     }
-    $leaked = @()
-    foreach ($name in "FILEDIA", "SECURELOAD") {
-        if ($v["${name}_after"] -ne $v["${name}_before"]) {
-            $leaked += "$name ($($v["${name}_before"]) -> $($v["${name}_after"]))"
-        }
+    if ($SaveResult -and !$actual.Contains("HEADLESS_DBMOD=0")) { throw "QSAVE heeft wijzigingen niet opgeslagen. Log: $($run.Log)" }
+    if ($actual -notmatch 'NLCSTEST placed rows=[1-9]\d*' -or
+        $actual -match '(?i)\bFAIL\b|\berror:|\bfout:|Unknown command|Invalid option|An error occurred during save') {
+        throw "Legendatest mislukt. Log: $($run.Log)"
     }
-    if ($leaked.Count -gt 0) {
-        Write-Warning "Systeemvariabele(n) niet hersteld: $($leaked -join ', ')."
-    }
-    else {
-        Write-Host "    Systeemvariabelen ongewijzigd na de run." -ForegroundColor DarkGray
-    }
+    Write-Output "HEADLESS PASS; profielwaarden gecontroleerd: $($run.ProfileValuesChecked); uitvoer: $work"
 }
-
-Write-Host "==> Klaar." -ForegroundColor Green
+finally {
+    if ((Get-FileHash -LiteralPath $Drawing).Hash -ne $sourceHash) { throw 'Brontekening gewijzigd.' }
+}

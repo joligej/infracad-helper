@@ -125,6 +125,11 @@ verschillende statussen samen, maar alleen als lijn, vlak, arcering en symbool e
 hetzelfde uitzien. Standaard staat dit uit, omdat de status in NLCS meestal juist de kleur
 bepaalt.
 
+De keuzelijst bij Samenstellen volgt de bron van de gekozen legenda. Uitgevinkte
+regels blijven uitgevinkt als hun bron tijdelijk ontbreekt. Instellingen en
+beschrijvingen die je vóór het plaatsen aanpast, gelden alleen voor die nieuwe legenda.
+Gebruik Instellingen met de keuze Globaal om de standaard voor nieuwe legenda's te wijzigen.
+
 ### Statussen, xrefs en profielen
 
 Naast de vaste statussen (Nieuw, Bestaand, Vervallen, Tijdelijk, Revisie) maak je met
@@ -270,7 +275,9 @@ tekeningen voor stijlen, xrefs, symbolen, arceringen, eigen lagen, plaatsing en 
 legenda's. Het script controleert de geladen DLL-hash, echte QSAVE, heropenen, vijftig
 updates en ongewijzigde systeemvariabelen. Het stopt bij een fout of ontbrekend testresultaat.
 Gebruik `-AcadVersion 2027` voor de 2027-host en `-PluginPath <geïnstalleerde DLL>` voor
-acceptatie na installatie. Logs en resultaten blijven lokaal onder `artifacts/acceptance/`.
+acceptatie na installatie. De runners vereisen PowerShell 7.4 of nieuwer; sluit AutoCAD
+en wacht tot andere Core Console-taken klaar zijn. Ze controleren ook de opgeslagen
+profielwaarden. Logs en resultaten blijven lokaal onder `artifacts/acceptance/`.
 
 ## Ondersteunde versies
 

@@ -1,0 +1,82 @@
+namespace NlcsLegenda.Core;
+
+// Instellingen en omschrijvingen vormen samen de globale standaard. Een profiel krijgt
+// een volledige snapshot; in de globale bestanden wordt iedere tekst maar eenmaal bewaard.
+public static class GlobalLegendSettings
+{
+    public static LegendSettings Load(string directory)
+    {
+        var settingsPath = Path.Combine(directory, "settings.json");
+        var descriptionsPath = Path.Combine(directory, "omschrijvingen.json");
+        var settings = new LegendSettings();
+        if (File.Exists(settingsPath) && !LegendSettings.TryParse(File.ReadAllText(settingsPath), out settings))
+            throw new InvalidDataException("De globale instellingen zijn onleesbaar of hebben een niet-ondersteunde versie.");
+        var descriptions = new DescriptionCatalog();
+        if (File.Exists(descriptionsPath) && !DescriptionCatalog.TryParse(File.ReadAllText(descriptionsPath), out descriptions))
+            throw new InvalidDataException("De globale omschrijvingen zijn onleesbaar.");
+        // Bestaande versies konden profielteksten ook in settings.json opslaan. Behoud
+        // die voorrang bij het lezen; bij opslaan gaan alle teksten naar het tekstbestand.
+        descriptions.MergeFrom(settings.DescriptionOverrides);
+        settings.DescriptionOverrides = descriptions.Clone();
+        return settings;
+    }
+
+    public static void SaveDescriptions(string directory, DescriptionCatalog descriptions)
+    {
+        var settings = Load(directory);
+        settings.DescriptionOverrides = descriptions.Clone();
+        Save(directory, settings);
+    }
+
+    public static void Save(string directory, LegendSettings settings)
+    {
+        var stored = settings.Clone();
+        var descriptions = stored.DescriptionOverrides;
+        stored.DescriptionOverrides = new DescriptionCatalog();
+        Directory.CreateDirectory(directory);
+        var contents = new Dictionary<string, string>
+        {
+            [Path.Combine(directory, "settings.json")] = stored.ToJson(),
+            [Path.Combine(directory, "omschrijvingen.json")] = descriptions.ToJson()
+        };
+        var originals = contents.Keys.ToDictionary(path => path, path => File.Exists(path) ? File.ReadAllBytes(path) : null);
+        var temporary = new Dictionary<string, string>();
+        var replaced = new List<string>();
+        try
+        {
+            // Schrijf beide bestanden volledig voordat een bestaand bestand wordt vervangen.
+            foreach (var item in contents)
+            {
+                string temp = item.Key + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                temporary.Add(item.Key, temp);
+                File.WriteAllText(temp, item.Value);
+            }
+            foreach (var item in temporary)
+            {
+                File.Move(item.Value, item.Key, overwrite: true);
+                replaced.Add(item.Key);
+            }
+        }
+        catch (Exception failure)
+        {
+            var errors = new List<Exception> { failure };
+            foreach (string path in replaced)
+            {
+                try
+                {
+                    if (originals[path] is { } bytes) File.WriteAllBytes(path, bytes);
+                    else File.Delete(path);
+                }
+                catch (Exception restoreFailure) { errors.Add(restoreFailure); }
+            }
+            if (errors.Count > 1)
+                throw new AggregateException("Opslaan en terugzetten van de globale standaard zijn mislukt.", errors);
+            throw;
+        }
+        finally
+        {
+            foreach (string temp in temporary.Values)
+                if (File.Exists(temp)) File.Delete(temp);
+        }
+    }
+}

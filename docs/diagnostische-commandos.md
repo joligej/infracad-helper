@@ -32,12 +32,15 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDAOLDUPDATETEST` | Bootst een oude legenda met DBText na en controleert dat bijwerken dezelfde legenda MText-only teruggeeft met behoud van id, bron, instellingen en positie. |
 | `NLCSLEGENDAOLDUPDATEBROADTEST` | Hetzelfde maar voor WholeDrawing, Selection (met bronhandles), een eigen bronlaag, blanco regels en xref-instellingen naast elkaar. |
 | `NLCSLEGENDAOLDREOPENSETUP` / `NLCSLEGENDAOLDREOPENVERIFY` | Oude DBText-Selection-legenda; na QSAVE/heropenen bijwerken en controleren dat tekst MText-only wordt met behoud van bronhandles en plaats. |
-| `NLCSLEGENDASYSVARTEST` | Legt relevante systeemvariabelen vast, draait de hoofdcommando's en controleert dat elke waarde daarna exact gelijk is (geen state-lek). |
+| `NLCSLEGENDASYSVARTEST` | Controleert vijftien systeemvariabelen na afzonderlijke analyse-, bouw-, update-, export- en foutpaden met FILEDIA=0 en 1. Test ook headless weigering van dialoogcommando's; dit voert geen interactieve dialogen uit. |
 | `NLCSLEGENDAEIGENXREFTEST` | Koppelt dezelfde eigen laagnaam in host (3 m) en twee xrefs (5 m en 11 m) en controleert dat Lokaal alleen de host telt (3), SpecifiekeXref alleen die xref (5), ElkeBron alle bronnen (19) en dat xref-uitsluiting geen regel oplevert. |
 | `NLCSLEGENDAEIGENZICHTBAARTEST` | Bevriest een eigen laag en een NLCS-laag en controleert dat beide gelijk reageren op "onzichtbare lagen meenemen". |
 | `NLCSLEGENDAVIEWPORTTEST` | Controleert viewport-plaatsing en -schaal rond de legenda. |
 | `NLCSLEGENDAXREFSETUP` / `NLCSLEGENDAXREFVERIFY` | Bouwen een xref-scenario en verifiëren de opname ervan. |
 | `NLCSLEGENDAXREFANALYSE` | Analyseert een tekening met echte xrefs en toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. |
+| `NLCSLEGENDACOMPOSITIONTEST` | Controleert de samenstellijst van een selectielegenda, uitsluiting van eigen geometrie en een verdwenen bronselectie. |
+| `NLCSLEGENDALAYERMERGETEST` | Controleert laagvergrendeling, attribuutreferenties en wijzigen van alleen hoofdletters bij hernoemen/samenvoegen. |
+| `NLCSLEGENDAGLOBALSETTINGSTEST` | Controleert volledige globale profielen, vervangen van tekstoverrides en afwijzen van onleesbare instellingen; herstelt beide gebruikersbestanden. |
 | `NLCSLEGENDAAUDITVERSION` | Toont versie, geladen DLL-pad en SHA-256 voor controle van de werkelijk geteste installatie. |
 | `NLCSLEGENDAAUDITFIXTURE` | Maakt drie lijnen en een symbool voor niet-lege opmaak-, hoogte- en isolatiecontroles. |
 | `NLCSLEGENDAENTITYSTYLETEST` | Controleert expliciete bronkleuren, vaste hoeveelheden en echte swatches na een gedeelde laagwijziging. |
@@ -60,6 +63,17 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 
 De releasecontrole `dev/scripts/Run-ReleaseAcceptance.ps1` voert een vaste selectie van deze commando's uit op afzonderlijke kopieën, controleert de geladen DLL-hash en stopt bij een fout, ontbrekend resultaat of mislukte QSAVE. Gebruik deze testcommando's uitsluitend in een testtekening: fixturecommando's voegen objecten en tijdelijke xrefs toe.
 
-De runner controleert dat `SECURELOAD` en `FILEDIA` terugstaan op hun oorspronkelijke
-waarde. Isolatie- en exporttests die tijdelijk gebruikersinstellingen wijzigen, herstellen
-die in een `finally`-blok. Draai deze controles zonder gelijktijdig instellingen te bewerken.
+De runners vereisen PowerShell 7.4 of nieuwer en starten alleen zonder andere CAD-processen.
+Elke run heeft een timeout. De controle vergelijkt de tijdelijke `FILEDIA`- en
+`SECURELOAD`-waarden binnen CAD én de opgeslagen profielwaarden na afsluiten.
+`FILEDIA` staat in het register als `FixedProfile/General Configuration/FileDialog`;
+de gelijknamige waarde onder `SysvarMonitor` is alleen de gewenste monitorwaarde.
+Een gelekte profielwaarde wordt exact hersteld (inclusief type en oorspronkelijke 0),
+en de test mislukt alsnog. Als intussen een andere CAD-sessie is gestart, stopt de
+runner met een fout en de vastgelegde beginwaarden; hij overschrijft die actieve sessie niet.
+
+De plugin forceert geen systeemvariabelen bij opstarten. Een groene Core Console-test
+bewijst geen normale GUI-start, bediening, annulering van een venster of DPI-weergave.
+Isolatie- en exporttests die tijdelijk gebruikersinstellingen wijzigen, herstellen
+die in een `finally`-blok. Bewerk instellingen niet tegelijk met deze controles.
+Testuitvoer staat in `artifacts/` en kan na beoordeling worden verwijderd.

@@ -12,6 +12,8 @@ public enum TriState
 // kinderen. Puur datamodel zodat de tri-state-logica los van WinForms testbaar is.
 public sealed class CompositionTree
 {
+    private readonly HashSet<string> _unlistedExclusions = new(StringComparer.OrdinalIgnoreCase);
+
     public sealed class Leaf
     {
         public string Key { get; init; } = string.Empty;
@@ -44,6 +46,7 @@ public sealed class CompositionTree
         IEnumerable<(string Key, string Label, string Group)> items, ISet<string> excluded)
     {
         var tree = new CompositionTree();
+        tree._unlistedExclusions.UnionWith(excluded);
         var byLabel = new Dictionary<string, Group>(StringComparer.CurrentCultureIgnoreCase);
         foreach (var (key, label, group) in items)
         {
@@ -54,6 +57,7 @@ public sealed class CompositionTree
                 byLabel[groupLabel] = g;
                 tree.Groups.Add(g);
             }
+            tree._unlistedExclusions.Remove(key);
             g.Leaves.Add(new Leaf
             {
                 Key = key,
@@ -72,10 +76,11 @@ public sealed class CompositionTree
 
     public IEnumerable<Leaf> AllLeaves() => Groups.SelectMany(g => g.Leaves);
 
-    // De uitgevinkte sleutels; dit is wat als exclusions wordt opgeslagen.
+    // Bewaar ook uitsluitingen van tijdelijk ontbrekende bronnen. Alleen zichtbare regels
+    // kunnen hier opnieuw worden aangevinkt; afwezigheid is geen verzoek om herstel.
     public HashSet<string> ExcludedKeys()
     {
-        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var set = new HashSet<string>(_unlistedExclusions, StringComparer.OrdinalIgnoreCase);
         foreach (var leaf in AllLeaves())
             if (!leaf.Included)
                 set.Add(leaf.Key);
