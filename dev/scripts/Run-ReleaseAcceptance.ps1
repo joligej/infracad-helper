@@ -12,7 +12,7 @@ param(
     [string]$PluginPath,
     [string]$TemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('realsize','templatecontract','scalevariant','livetarget','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('realsize','templatecontract','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen
 )
 $ErrorActionPreference='Stop'
@@ -36,6 +36,7 @@ $specs=@{
  templatecontract=@('NLCSLEGENDATEMPLATECONTRACTTEST','TEMPLATECONTRACT DWT-meetpunten, lege hoststijl, notities en schaalbalk op 1:200/500/1000 -> OK')
  scalevariant=@('NLCSLEGENDASCALEVARIANTTEST','SCALEVARIANT xref 1:200/500 naar 1:200/500/1000: symbool 4mm, patroon 1mm, bron ongewijzigd -> OK')
  livetarget=@("NLCSLEGENDALIVETARGETTEST`nNLCSLEGENDALIVETARGETERASE`n_.U`nNLCSLEGENDALIVETARGETVERIFY",'LIVETARGET UNDO: A/B bereikbaar; metadata behouden -> OK')
+ liveempty=@('NLCSLEGENDALIVEEMPTYTEST','LIVEEMPTY geen actieve legenda: bronexport 5m, metadata behouden -> OK')
  globalsettings=@('NLCSLEGENDAGLOBALSETTINGSTEST','GLOBALSETTINGS totaal: OK (0 fouten)')
  layermerge=@('NLCSLEGENDALAYERMERGETEST','LAYERMERGE totaal: OK (0 fouten)')
  composition=@('NLCSLEGENDACOMPOSITIONTEST','COMPOSITION totaal: OK (0 fouten)')
@@ -134,7 +135,10 @@ foreach($case in $Cases){
  New-Item -ItemType Directory -Path $dir | Out-Null
  $drawing=Join-Path $dir 'host.dwg'
  Copy-Item -LiteralPath $TemplatePath -Destination $drawing
- Run-Case $case $drawing $specs[$case][0] @($specs[$case][1])
+ $expected=@($specs[$case][1])
+ if($case -eq 'livetarget'){$expected+="1 legenda('s) in deze tekening:"}
+ if($case -eq 'liveempty'){$expected+='Geen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.'}
+ Run-Case $case $drawing $specs[$case][0] $expected
  if($case -in @('abclocal','abcxref','oldreopen')){
   $expected=@($specs[$case][3])
   if($case -eq 'abclocal'){$expected+='ABC: viewport A=OK B=OK C=OK'}

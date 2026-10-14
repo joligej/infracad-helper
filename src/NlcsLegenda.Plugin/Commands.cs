@@ -177,7 +177,7 @@ public partial class Commands
         try
         {
             using var tr = db.TransactionManager.StartTransaction();
-            var registry = LegendStore.Load(db, tr);
+            var registry = LegendManagement.ActiveRegistry(db, tr, LegendStore.Load(db, tr));
 
             if (registry.Legends.Count > 0)
             {
@@ -236,7 +236,7 @@ public partial class Commands
             LegendRegistry registry;
             using (var trReg = db.TransactionManager.StartTransaction())
             {
-                registry = LegendStore.Load(db, trReg);
+                registry = LegendManagement.ActiveRegistry(db, trReg, LegendStore.Load(db, trReg));
                 trReg.Commit();
             }
 
@@ -434,7 +434,7 @@ public partial class Commands
             LegendRegistry registry;
             using (var trReg = db.TransactionManager.StartTransaction())
             {
-                registry = LegendStore.Load(db, trReg);
+                registry = LegendManagement.ActiveRegistry(db, trReg, LegendStore.Load(db, trReg));
                 trReg.Commit();
             }
 
@@ -581,7 +581,7 @@ public partial class Commands
             LegendRegistry reg;
             using (var trPick = db.TransactionManager.StartTransaction())
             {
-                reg = LegendStore.Load(db, trPick);
+                reg = LegendManagement.ActiveRegistry(db, trPick, LegendStore.Load(db, trPick));
                 trPick.Commit();
             }
             if (reg.Legends.Count == 0)
@@ -1843,15 +1843,6 @@ public partial class Commands
         if (res.Status != PromptStatus.OK)
             return false;
         return res.StringResult == "Ja";
-    }
-
-    private static bool LegendGroupExists(Database db)
-    {
-        using var tr = db.TransactionManager.StartTransaction();
-        var reg = LegendStore.Load(db, tr);
-        var exists = reg.Legends.Count > 0;
-        tr.Commit();
-        return exists;
     }
 
     // Headless smoke-test via AutoCAD Core Console: plaatst een beheerde hele-tekeninglegenda.
