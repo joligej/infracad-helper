@@ -103,8 +103,8 @@ public class KlicDataTests
         settings.MergedDimensions.UnionWith(Enum.GetValues<GroupDimension>());
         var split = Build();
         Assert.Equal(2, split.Count); Assert.Equal(19, split.Sum(e => e.Metric.Length));
-        Assert.Contains(split, e => e.DisplayDescription.Contains("110 mm") && e.Metric.Length == 12);
-        Assert.Contains(split, e => e.DisplayDescription.Contains("160 mm") && e.Metric.Length == 7);
+        Assert.Contains(split, e => e.DisplayDescription.Contains("110 mm") && Math.Abs(e.Metric.Length - 12) < 1e-9);
+        Assert.Contains(split, e => e.DisplayDescription.Contains("160 mm") && Math.Abs(e.Metric.Length - 7) < 1e-9);
         Assert.NotEqual(LegendOrder.Key(split[0]), LegendOrder.Key(split[1]));
         settings.SortMode = LegendSortMode.Handmatig;
         settings.ManualEntryOrder = LegendOrder.Remember(new List<string>(), split.Reverse());

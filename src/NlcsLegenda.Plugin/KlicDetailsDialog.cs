@@ -8,6 +8,20 @@ namespace NlcsLegenda.Plugin;
 
 internal sealed class KlicDetailsDialog : LegendDialog
 {
+    internal static string ResolveAttachmentPath(string path, string drawing)
+    {
+        if (!Path.IsPathFullyQualified(path))
+        {
+            if (Path.IsPathRooted(path)) throw new InvalidOperationException("Gebruik een volledig bijlagepad of een pad relatief aan de brontekening.");
+            if (!Path.IsPathFullyQualified(drawing)) throw new InvalidOperationException("Sla de brontekening eerst op om een relatieve bijlage te openen.");
+            path = Path.Join(Path.GetDirectoryName(drawing)!, path);
+        }
+        path = Path.GetFullPath(path);
+        if (path.IndexOf(':', 2) >= 0 || !new[] { ".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff" }.Contains(Path.GetExtension(path).ToLowerInvariant()))
+            throw new InvalidOperationException("Alleen PDF- en afbeeldingsbestanden kunnen hier worden geopend.");
+        return path;
+    }
+
     public KlicDetailsDialog(LegendEntry entry)
     {
         Text = "KLIC-details – " + entry.Description; Font = SystemFonts.MessageBoxFont;
@@ -52,11 +66,7 @@ internal sealed class KlicDetailsDialog : LegendDialog
             if (attachments.CurrentRow is not { } row) return;
             try
             {
-                string path = row.Cells[0].Value as string ?? "";
-                if (!Path.IsPathFullyQualified(path)) path = Path.Combine(Path.GetDirectoryName(row.Cells[1].Value as string) ?? "", path);
-                path = Path.GetFullPath(path);
-                if (path.IndexOf(':', 2) >= 0 || !new[] { ".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff" }.Contains(Path.GetExtension(path).ToLowerInvariant()))
-                    throw new InvalidOperationException("Alleen lokale PDF- en afbeeldingsbestanden kunnen hier worden geopend.");
+                string path = ResolveAttachmentPath(row.Cells[0].Value as string ?? "", row.Cells[1].Value as string ?? "");
                 if (!File.Exists(path)) throw new FileNotFoundException("De bijlage is niet gevonden. Controleer het pad in de brontekening.", path);
                 Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             }

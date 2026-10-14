@@ -20,14 +20,13 @@ public partial class Commands
             var layerId = ReviewLayer(db, tr, "B-WE-KL-DATA-G");
             var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
             var xml = new XElement("KLIC");
-            foreach (var (length, provider) in new[] { (3d, first), (5d, second), (2d, "") })
+            foreach (var (length, provider, material, diameter) in new[] { (3d, first, "PE", "0.11"), (5d, second, "PVC", "0.16"), (2d, "", "", "0") })
             {
                 using var line = new Line(Point3d.Origin, new Point3d(length, 0, 0)) { LayerId = layerId };
                 model.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                 xml.Add(new XElement("KLIC_Administratief", new XElement("Handle", line.Handle.ToString()), new XElement("Netbeheerder", provider)));
                 xml.Add(new XElement("KLIC_LeidingLijn", new XElement("Handle", line.Handle.ToString()),
-                    new XElement("Materiaal", length == 3 ? "PE" : length == 5 ? "PVC" : ""),
-                    new XElement("DiameterM", length == 3 ? "0.11" : length == 5 ? "0.16" : "0")));
+                    new XElement("Materiaal", material), new XElement("DiameterM", diameter)));
             }
             var dictionary = (DBDictionary)tr.GetObject(db.NamedObjectsDictionaryId, OpenMode.ForWrite);
             using var map = new DBDictionary();

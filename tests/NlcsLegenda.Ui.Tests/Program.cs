@@ -170,6 +170,14 @@ internal static class Program
 
     private static void CheckKlic(string? output)
     {
+        Check(KlicDetailsDialog.ResolveAttachmentPath(@"..\bijlagen\info.pdf", @"C:\bron\dwg\klic.dwg") == @"C:\bron\bijlagen\info.pdf", "bijlagepad volgt brontekening");
+        foreach (string path in new[] { @"C:info.pdf", @"\info.pdf", "https://example.invalid/file.pdf", "script.exe", @"file.pdf:stream.pdf" })
+        {
+            bool rejected = false;
+            try { KlicDetailsDialog.ResolveAttachmentPath(path, @"C:\bron\klic.dwg"); }
+            catch (InvalidOperationException) { rejected = true; }
+            Check(rejected, "onbruikbaar bijlagepad geweigerd: " + path);
+        }
         var original = new KlicOptions();
         foreach (float scale in new[] { 1f, 1.5f, 2f })
         {
@@ -197,7 +205,7 @@ internal static class Program
                     Directory.CreateDirectory(output);
                     using var image = new Bitmap(options.Width, options.Height);
                     options.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
-                    image.Save(Path.Combine(output, $"klic-{tabs.SelectedIndex}-{scale}.png"));
+                    image.Save(Path.Join(output, $"klic-{tabs.SelectedIndex}-{scale}.png"));
                 }
             }
             options.DialogResult = DialogResult.Cancel; options.Close();

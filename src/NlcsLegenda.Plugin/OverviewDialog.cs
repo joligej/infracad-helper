@@ -31,7 +31,7 @@ internal sealed class OverviewDialog : LegendDialog
     private readonly Label _summary = new() { AutoSize = true, Dock = DockStyle.Top, Padding = new Padding(8) };
     private readonly FlowLayoutPanel _moves = new() { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(6) };
     private List<LegendEntry> _entries = new();
-    private List<LegendEntry> _visible = new();
+    private readonly List<LegendEntry> _visible = new();
     private readonly Func<OverviewLegend, IReadOnlyList<LegendEntry>>? _analyze;
     private readonly TextBox _filter = new() { Width = 210, PlaceholderText = "Zoek waarde of tekst" };
     private readonly ComboBox _field = new() { Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };

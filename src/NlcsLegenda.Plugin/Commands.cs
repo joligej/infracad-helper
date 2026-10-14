@@ -3871,7 +3871,7 @@ public partial class Commands
                 symbool = new { insertSchaal = symScale, paperBreedteMm = symPaperW, paperHoogteMm = symPaperH, aantal = symCount }
             }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             string outPath = Environment.GetEnvironmentVariable("NLCS_METING_OUT")
-                ?? Path.Combine(Path.GetTempPath(), "nlcs-template-meting.json");
+                ?? Path.Join(Path.GetTempPath(), "nlcs-template-meting.json");
             File.WriteAllText(outPath, json);
             ed.WriteMessage($"\nMETEN: meting geschreven naar {outPath}");
         }

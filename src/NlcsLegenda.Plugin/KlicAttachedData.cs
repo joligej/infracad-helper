@@ -114,7 +114,7 @@ internal sealed class KlicAttachedData : IDisposable
             var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "ManagedMapApi");
             if (assembly is null)
             {
-                string file = Path.Combine(Path.GetDirectoryName(typeof(Database).Assembly.Location)!, "Map", "ManagedMapApi.dll");
+                string file = Path.Join(Path.GetDirectoryName(typeof(Database).Assembly.Location)!, "Map", "ManagedMapApi.dll");
                 if (!File.Exists(file)) throw new InvalidOperationException("Deze AutoCAD-host heeft geen Map-API.");
                 assembly = Assembly.LoadFrom(file);
             }
