@@ -35,10 +35,23 @@ public partial class Commands
                 }
                 tr.Commit();
             }
-            using var dialog = new OverviewDialog(items, changed => SaveOverviewOrder(doc.Database, changed));
+            using var dialog = new OverviewDialog(items, changed => SaveOverviewOrder(doc.Database, changed), item => AnalyzeOverview(doc.Database, item));
             AcWindows.ShowModalDialog(dialog);
         }
         catch (System.Exception ex) { doc.Editor.WriteMessage($"\nOverzicht kon niet worden geopend: {ex.Message}"); }
+    }
+
+    private static IReadOnlyList<LegendEntry> AnalyzeOverview(Database db, OverviewLegend item)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var registry = LegendManagement.ActiveRegistry(db, tr, LegendStore.Load(db, tr));
+        var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+        var definition = registry.FindById(item.Id);
+        if (item.Id.Length > 0 && definition is null) throw new InvalidOperationException("Deze legenda is niet meer aanwezig.");
+        var selected = definition?.Scope == LegendScope.Selection
+            ? LegendManagement.ResolveHandles(db, definition.SourceHandles, out _).Where(id => !excluded.Contains(id)).ToArray() : null;
+        return selected is { Length: 0 } ? Array.Empty<LegendEntry>()
+            : DrawingAnalyzer.Analyze(db, tr, item.Settings, selected, DescriptionCatalog.Default(), excluded).Entries;
     }
 
     private static string? SaveOverviewOrder(Database db, IReadOnlyList<OverviewLegend> changed)
@@ -52,6 +65,7 @@ public partial class Commands
             {
                 if (active.FindById(item.Id) is null) return "Een legenda is niet meer aanwezig. Open Overzicht opnieuw.";
                 var target = registry.FindById(item.Id)!;
+                target.Settings.Klic = item.Settings.Klic.Clone();
                 target.Settings.SortMode = item.Settings.SortMode;
                 target.Settings.ManualEntryOrder = new List<string>(item.Settings.ManualEntryOrder);
                 if (BuildManagedLegend(db, tr, registry, target, out _, out _) != UpdateResult.Updated)

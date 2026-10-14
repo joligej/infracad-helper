@@ -49,6 +49,8 @@ public sealed class NlcsLayerName
 
     public string Netbeheerder { get; init; } = string.Empty;
 
+    public string KlicGroupKey { get; init; } = string.Empty;
+
     public string GroupKey => $"{StatusCode}|{Discipline}|{Hoofdgroep}|{Element}";
 
     public override string ToString() => LocalName;

@@ -43,6 +43,10 @@ public partial class Commands
             }
             var manual = new LegendSettings { SortMode = LegendSortMode.Handmatig };
             manual.ManualEntryOrder = LegendOrder.Remember(Array.Empty<string>(), entries.AsEnumerable().Reverse());
+            manual.Klic.Columns = new() { "Materiaal", "DiameterM", "Bijlage" };
+            manual.Klic.GroupFields = new() { "Materiaal" };
+            manual.Klic.DescriptionFields = new() { "DiameterM" };
+            manual.Klic.PreferredSource = KlicSource.PropertySets;
             var change = new OverviewLegend { Id = aId, Name = "A", Settings = manual, Entries = entries };
             var error = SaveOverviewOrder(db, new[] { change });
             if (error is not null) throw new InvalidOperationException(error);
@@ -92,6 +96,11 @@ public partial class Commands
         var registry = LegendStore.Load(db, tr);
         var a = registry.Legends.Single(l => l.Name == "Volgorde A");
         var b = registry.Legends.Single(l => l.Name == "Volgorde B");
+        if (!a.Settings.Klic.Columns.SequenceEqual(new[] { "Materiaal", "DiameterM", "Bijlage" })
+            || !a.Settings.Klic.GroupFields.SequenceEqual(new[] { "Materiaal" })
+            || !a.Settings.Klic.DescriptionFields.SequenceEqual(new[] { "DiameterM" })
+            || a.Settings.Klic.PreferredSource != KlicSource.PropertySets || b.Settings.Klic.GroupFields.Count != 0)
+            throw new InvalidOperationException("KLIC-keuzes per legenda niet bewaard.");
         if (a.Settings.SortMode != LegendSortMode.Handmatig || b.Settings.SortMode != LegendSortMode.Status)
             throw new InvalidOperationException("Sorteerkeuze niet bewaard.");
         if (BuildManagedLegend(db, tr, registry, a, out _, out _) != UpdateResult.Updated)

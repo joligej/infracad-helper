@@ -16,6 +16,7 @@ internal static class Program
             foreach (float scale in new[] { 1f, 1.5f, 2f })
                 CheckSettings(scale, args.FirstOrDefault());
             CheckOverview();
+            CheckKlic(args.FirstOrDefault());
             CheckNestedEditors();
             Func<Form>[] factories = {
                 () => new XrefInclusionDialog(new[] { "Een lange xrefnaam met veel informatie.dwg" }, new()),
@@ -27,7 +28,12 @@ internal static class Program
                 () => new CustomLayerDialog(new[] { new CustomLayerRule { Layer = "Eigen laag" } }),
                 () => new LegendManageDialog(new[] { new EntryCheckItem("key", "Regel", "DATA") }, new()),
                 () => new LayerEditDialog(new NlcsLayerComponents(), "N-WE-KL-DATA-G", 10, false, null),
-                () => new HelpDialog("test")
+                () => new HelpDialog("test"),
+                () => new KlicOptionsDialog(new KlicOptions()),
+                () => new KlicDetailsDialog(new LegendEntry { Status = NlcsStatus.Bestaand, Discipline = "WE", Hoofdgroep = "KL", Element = "WATER", Description = "Waterleiding", KlicObjects = new[] {
+                    new KlicObjectData("C:/voorbeeld/een lange bronnaam.dwg", "ABC", "KLIC", new[] {
+                        new KlicRecord(KlicSource.InfraCAD, "KLIC_LeidingLijn", new Dictionary<string,string> { ["DiameterM"] = "0.11", ["Materiaal"] = "PE", ["Bijlage"] = "C:/voorbeeld/bijlage.pdf" }) },
+                        new[] { "Object Data niet gecontroleerd in deze testhost." }, KlicSource.InfraCAD) } })
             };
             foreach (var scale in new[] { 1f, 1.5f, 2f })
             foreach (var factory in factories)
@@ -162,6 +168,77 @@ internal static class Program
         Check(seen, "onderliggend venster geopend: " + title);
     }
 
+    private static void CheckKlic(string? output)
+    {
+        var original = new KlicOptions();
+        foreach (float scale in new[] { 1f, 1.5f, 2f })
+        {
+            using var options = new KlicOptionsDialog(original);
+            OpenOffscreen(options);
+            options.AutoScaleMode = AutoScaleMode.None;
+            options.Scale(new SizeF(scale, scale));
+            options.Font = new Font(options.Font.FontFamily, 9f * scale);
+            options.MinimumSize = new Size(480, 340);
+            options.ClientSize = new Size(720, 540);
+            var tabs = Descendants(options).OfType<TabControl>().Single();
+            foreach (TabPage page in tabs.TabPages)
+            {
+                tabs.SelectedTab = page; Application.DoEvents(); CheckButtons(options);
+                foreach (var list in Descendants(page).OfType<CheckedListBox>())
+                {
+                    Check(list.Height > list.ItemHeight * 3, "KLIC-velden bereikbaar bij vergroting");
+                    list.TopIndex = list.Items.Count - 1;
+                    list.SetItemChecked(list.Items.Count - 1, true);
+                    Check(list.CheckedItems.Cast<KlicField>().Any(f => f.Key == "Disclaimer"), "laatste KLIC-veld te kiezen");
+                    list.TopIndex = 0;
+                }
+                if (output is not null)
+                {
+                    Directory.CreateDirectory(output);
+                    using var image = new Bitmap(options.Width, options.Height);
+                    options.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
+                    image.Save(Path.Combine(output, $"klic-{tabs.SelectedIndex}-{scale}.png"));
+                }
+            }
+            options.DialogResult = DialogResult.Cancel; options.Close();
+            Check(original.GroupFields.Count == 0 && original.Columns.Count == 3, "annuleren wijzigt KLIC-keuzes niet");
+        }
+        using var edit = new KlicOptionsDialog(original);
+        OpenOffscreen(edit);
+        var lists = Descendants(edit).OfType<CheckedListBox>().ToArray();
+        foreach (var list in lists)
+        {
+            for (int i = 0; i < list.Items.Count; i++) list.SetItemChecked(i, ((KlicField)list.Items[i]).Key == "DiameterM");
+        }
+        Descendants(edit).OfType<ComboBox>().Single().SelectedIndex = (int)KlicSource.PropertySets;
+        edit.DialogResult = DialogResult.OK; edit.Close();
+        Check(edit.Result.GroupFields.SequenceEqual(new[] { "DiameterM" }) && edit.Result.PreferredSource == KlicSource.PropertySets,
+            "KLIC-keuzes bevestigd");
+        var entry = new LegendEntry { Status = NlcsStatus.Bestaand, Discipline = "WE", Hoofdgroep = "KL", Element = "WATER", Description = "Water",
+            KlicObjects = new[] { new KlicObjectData("bron.dwg", "AB", "XREF", new[] {
+            new KlicRecord(KlicSource.InfraCAD, "KLIC_LeidingLijn", new Dictionary<string,string> { ["Materiaal"] = "PE" }),
+            new KlicRecord(KlicSource.PropertySets, "KLIC_LeidingLijn", new Dictionary<string,string> { ["Materiaal"] = "PVC" })
+        }, Array.Empty<string>(), KlicSource.PropertySets) } };
+        var legend = new OverviewLegend { Id = "A", Name = "KLIC", Settings = new() { SortMode = LegendSortMode.Handmatig }, Entries = new[] { entry, Entry("Leeg") } };
+        using var overview = new OverviewDialog(new[] { legend }, _ => null);
+        OpenOffscreen(overview);
+        var grid = Descendants(overview).OfType<DataGridView>().Single();
+        var search = Descendants(overview).OfType<TextBox>().Single();
+        search.Text = "PVC";
+        Check(grid.Rows.Count == 1, "KLIC-waarde filtert overzicht");
+        Check(!Descendants(overview).OfType<Button>().Single(b => b.Text == "Naar boven").Enabled, "verplaatsen bij filter uitgeschakeld");
+        search.Clear();
+        Descendants(overview).OfType<CheckBox>().Single().Checked = true;
+        Check(grid.Rows.Count == 1, "bronverschillen filtert overzicht");
+        using var details = new KlicDetailsDialog(entry);
+        OpenOffscreen(details);
+        var detailTabs = Descendants(details).OfType<TabControl>().Single();
+        var values = detailTabs.TabPages[0].Controls.OfType<DataGridView>().Single();
+        Check(values.Rows.Count == 2 && values.Rows.Cast<DataGridViewRow>().Count(r => (string)r.Cells[4].Value == "Ja") == 1,
+            "beide bronwaarden en gekozen bron zichtbaar");
+        details.Close(); overview.Close();
+    }
+
     private static void CheckOverview()
     {
         var entries = new[] { Entry("A"), Entry("B"), Entry("C") };
@@ -177,7 +254,7 @@ internal static class Program
         grid.CurrentCell = grid.Rows[2].Cells[1];
         controls.OfType<Button>().Single(c => c.Text == "Naar begin").PerformClick();
         Check((string)grid.Rows[0].Cells[1].Value == "C", "regel naar begin verplaatsen");
-        var legends = controls.OfType<ComboBox>().Single(c => c != sort);
+        var legends = controls.OfType<ComboBox>().Single(c => c.Items.OfType<OverviewLegend>().Any());
         legends.SelectedIndex = 1;
         Check((string)grid.Rows[0].Cells[1].Value == "A" && !b.Changed, "andere legenda blijft gelijk");
         legends.SelectedIndex = 0;
@@ -203,7 +280,7 @@ internal static class Program
                 if (parent is ScrollableControl { AutoScroll: true } scroll) scroll.ScrollControlIntoView(button);
             Application.DoEvents();
             var bounds = form.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
-            Check(form.ClientRectangle.Contains(bounds), form.Text + ": knop bereikbaar: " + button.Text);
+            Check(form.ClientRectangle.Contains(bounds), form.Text + ": knop bereikbaar: " + button.Text + " " + bounds + " binnen " + form.ClientRectangle);
             Check(button.ClientSize.Width >= TextRenderer.MeasureText(button.Text, button.Font).Width, form.Text + ": knoptekst past: " + button.Text);
         }
     }

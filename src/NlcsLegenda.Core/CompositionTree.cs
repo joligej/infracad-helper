@@ -49,7 +49,7 @@ public sealed class CompositionTree
         var expanded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in excluded)
         {
-            var members = available.Where(i => string.Equals(LegendSettings.BaseEntryKey(i.Key), key, StringComparison.OrdinalIgnoreCase)).Select(i => i.Key).ToArray();
+            var members = available.Where(i => (string.Equals(LegendSettings.BaseEntryKey(i.Key), key, StringComparison.OrdinalIgnoreCase) || string.Equals(LegendSettings.WithoutKlicGroup(i.Key), key, StringComparison.OrdinalIgnoreCase))).Select(i => i.Key).ToArray();
             if (members.Length == 0) expanded.Add(key);
             else expanded.UnionWith(members);
         }

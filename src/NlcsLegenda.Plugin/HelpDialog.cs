@@ -41,6 +41,16 @@ internal sealed class HelpDialog : LegendDialog
             "spanning/druk, uitvoering, volgnummer en netbeheerder. Hoeveelheden tellen op.\n\n" +
             "Netbeheerders worden uit de InfraCAD-metadata van de bron gelezen.\n" +
             "Samenstellen toont de afzonderlijke bronregels om aan of uit te zetten."),
+        ("KLIC-gegevens",
+            "Kies in Overzicht → KLIC-instellingen welke gegevens je wilt tonen en exporteren.\n\n" +
+            "Legenda-omschrijving voegt gekozen velden aan de tekst toe. Afzonderlijke regels\n" +
+            "splitst bijvoorbeeld verschillende materialen en diameters. De keuzes gelden\n" +
+            "voor één legenda. Wis het zoekfilter voordat je regels handmatig verplaatst.\n\n" +
+            "KLIC-details toont waarden per bron en tabel, bronverschillen en bijlagen.\n" +
+            "Gegevensbron bepaalt welke opslagvorm voorrang krijgt. Object Data vereist\n" +
+            "een geopende bron-DWG in Civil 3D/Map; xrefs gebruiken de overige leesbare\n" +
+            "gegevens. Niet-leesbare bronnen worden gemeld.\n\n" +
+            "Een nulwaarde is geen gemeten diepte. Een standaarddiepte is apart benoemd."),
         ("Eigen lagen",
             "Heb je eigen lagen die geen NLCS zijn maar wel mee moeten tellen? Koppel ze onder\n" +
             "Eigen lagen in de instellingen.\n\n" +
