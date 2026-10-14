@@ -15,6 +15,19 @@ public static class KlicMetadata
     public static IReadOnlyDictionary<string, string> ReadProviders(IEnumerable<byte[]> tables)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (handle, records) in ReadRecords(tables))
+        {
+            var providers = records.SelectMany(r => r.Values.TryGetValue("Netbeheerder", out var value) && value.Trim().Length > 0
+                ? new[] { value.Trim() } : Array.Empty<string>()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (providers.Length > 1) throw new InvalidDataException("Een KLIC-object heeft tegenstrijdige netbeheerders in de brongegevens.");
+            if (providers.Length == 1) result.Add(handle, providers[0]);
+        }
+        return result;
+    }
+
+    public static IReadOnlyDictionary<string, IReadOnlyList<KlicRecord>> ReadRecords(IEnumerable<byte[]> tables)
+    {
+        var result = new Dictionary<string, List<KlicRecord>>(StringComparer.OrdinalIgnoreCase);
         long compressed = 0, expanded = 0;
         foreach (var bytes in tables)
         {
@@ -40,15 +53,18 @@ public static class KlicMetadata
                     using var recordReader = xml.ReadSubtree();
                     var record = XElement.Load(recordReader);
                     string handle = record.Elements().FirstOrDefault(e => e.Name.LocalName == "Handle")?.Value.Trim() ?? "";
-                    string provider = record.Elements().FirstOrDefault(e => e.Name.LocalName == "Netbeheerder")?.Value.Trim() ?? "";
-                    if (provider.Length == 0 || !ulong.TryParse(handle, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var number)) continue;
+                    if (!ulong.TryParse(handle, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var number)) continue;
                     handle = number.ToString("X", CultureInfo.InvariantCulture);
-                    if (result.TryGetValue(handle, out var previous) && !string.Equals(previous, provider, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("Een KLIC-object heeft tegenstrijdige netbeheerders in de brongegevens.");
-                    result.TryAdd(handle, provider);
+                    var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+                    foreach (var field in record.Elements().Where(e => KlicFields.Find(e.Name.LocalName) is not null))
+                        if (!fields.TryAdd(field.Name.LocalName, field.Value.Trim()))
+                            throw new InvalidDataException("Dubbel veld in KLIC-brongegevens.");
+                    if (fields.Count == 0) continue;
+                    if (!result.TryGetValue(handle, out var records)) result.Add(handle, records = new());
+                    records.Add(new KlicRecord(KlicSource.InfraCAD, record.Name.LocalName, fields));
                 }
             }
         }
-        return result;
+        return result.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<KlicRecord>)kv.Value, StringComparer.OrdinalIgnoreCase);
     }
 }

@@ -9,31 +9,42 @@ public static class LegendExport
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
     public static string ToCsv(IEnumerable<LegendEntry> entries, int decimals = 0,
-        string unitArea = "m\u00B2", string unitLength = "m", string unitCount = "st")
+        string unitArea = "m\u00B2", string unitLength = "m", string unitCount = "st", IEnumerable<string>? klicFields = null)
     {
+        var fields = KlicFields.Valid(klicFields);
         var nl = CultureInfo.GetCultureInfo("nl-NL");
         string fmt = "N" + Math.Max(0, decimals);
         var sb = new StringBuilder();
-        sb.AppendLine(string.Join(';', CsvHeader()));
+        sb.AppendLine(string.Join(';', CsvHeader().Concat(KlicHeaders(fields))));
         foreach (var e in entries)
-            sb.AppendLine(string.Join(';', CsvFields(e, fmt, nl, unitArea, unitLength, unitCount)));
+            sb.AppendLine(string.Join(';', CsvFields(e, fmt, nl, unitArea, unitLength, unitCount).Concat(KlicValues(e, fields))));
         return sb.ToString();
     }
 
     public static string ToCombinedCsv(
         IEnumerable<(string Drawing, IReadOnlyList<LegendEntry> Entries)> perDrawing, int decimals = 0,
-        string unitArea = "m\u00B2", string unitLength = "m", string unitCount = "st")
+        string unitArea = "m\u00B2", string unitLength = "m", string unitCount = "st", IEnumerable<string>? klicFields = null)
     {
+        var fields = KlicFields.Valid(klicFields);
         var nl = CultureInfo.GetCultureInfo("nl-NL");
         string fmt = "N" + Math.Max(0, decimals);
         var sb = new StringBuilder();
-        sb.AppendLine(string.Join(';', new[] { "Tekening" }.Concat(CsvHeader())));
+        sb.AppendLine(string.Join(';', new[] { "Tekening" }.Concat(CsvHeader()).Concat(KlicHeaders(fields))));
         foreach (var (drawing, entries) in perDrawing)
             foreach (var e in entries)
                 sb.AppendLine(string.Join(';',
-                    new[] { Csv(drawing) }.Concat(CsvFields(e, fmt, nl, unitArea, unitLength, unitCount))));
+                    new[] { Csv(drawing) }.Concat(CsvFields(e, fmt, nl, unitArea, unitLength, unitCount).Concat(KlicValues(e, fields)))));
         return sb.ToString();
     }
+
+    private static IEnumerable<string> KlicHeaders(IReadOnlyList<string> fields) => fields.Select(k => "KLIC " + KlicFields.Find(k)!.Label)
+        .Concat(fields.Count == 0 ? Array.Empty<string>() : new[] { "KLIC gebruikte bronnen", "KLIC broncontrole" });
+
+    private static IEnumerable<string> KlicValues(LegendEntry entry, IReadOnlyList<string> fields) =>
+        fields.Select(k => Csv(KlicSummary.Field(entry.KlicObjects, k)))
+            .Concat(fields.Count == 0 ? Array.Empty<string>() : new[] {
+                Csv(string.Join("; ", fields.Select(k => KlicFields.Find(k)!.Label + ": " + KlicSummary.Sources(entry.KlicObjects, k)))),
+                Csv(KlicSummary.Issues(entry.KlicObjects)) });
 
     private static string[] CsvHeader() => new[]
     {
@@ -70,8 +81,9 @@ public static class LegendExport
     private static string ExportElement(LegendEntry e) => e.IsBlank ? string.Empty : e.Element;
 
     public static string ToJson(IEnumerable<LegendEntry> entries, int decimals = 0,
-        string unitArea = "m\u00B2", string unitLength = "m", string unitCount = "st")
+        string unitArea = "m\u00B2", string unitLength = "m", string unitCount = "st", IEnumerable<string>? klicFields = null)
     {
+        var fields = KlicFields.Valid(klicFields);
         var nl = CultureInfo.GetCultureInfo("nl-NL");
         string fmt = "N" + Math.Max(0, decimals);
         int round = Math.Max(0, decimals);
@@ -83,6 +95,10 @@ public static class LegendExport
             element = ExportElement(e),
             omschrijving = e.Description,
             netbeheerders = e.Netbeheerders,
+            legendaOmschrijving = e.DisplayDescription,
+            klic = fields.ToDictionary(k => k, k => KlicSummary.Field(e.KlicObjects, k)),
+            klicBronnen = fields.ToDictionary(k => k, k => KlicSummary.Sources(e.KlicObjects, k)),
+            klicBroncontrole = KlicSummary.Issues(e.KlicObjects),
             herkomst = SourceLabel(e.DescriptionSource),
             types = e.LayersByType.Keys.Select(k => k.ToString()).ToArray(),
             aantal = e.Metric.Count,
@@ -97,8 +113,9 @@ public static class LegendExport
 
     public static string ToCombinedJson(
         IEnumerable<(string Drawing, IReadOnlyList<LegendEntry> Entries)> perDrawing, int decimals = 0,
-        string unitArea = "m\u00B2", string unitLength = "m", string unitCount = "st")
+        string unitArea = "m\u00B2", string unitLength = "m", string unitCount = "st", IEnumerable<string>? klicFields = null)
     {
+        var fields = KlicFields.Valid(klicFields);
         var nl = CultureInfo.GetCultureInfo("nl-NL");
         string fmt = "N" + Math.Max(0, decimals);
         int round = Math.Max(0, decimals);
@@ -111,6 +128,10 @@ public static class LegendExport
             element = ExportElement(e),
             omschrijving = e.Description,
             netbeheerders = e.Netbeheerders,
+            legendaOmschrijving = e.DisplayDescription,
+            klic = fields.ToDictionary(k => k, k => KlicSummary.Field(e.KlicObjects, k)),
+            klicBronnen = fields.ToDictionary(k => k, k => KlicSummary.Sources(e.KlicObjects, k)),
+            klicBroncontrole = KlicSummary.Issues(e.KlicObjects),
             herkomst = SourceLabel(e.DescriptionSource),
             types = e.LayersByType.Keys.Select(k => k.ToString()).ToArray(),
             aantal = e.Metric.Count,

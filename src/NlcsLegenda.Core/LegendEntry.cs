@@ -20,8 +20,19 @@ public sealed class LegendEntry
 
     public IReadOnlyList<string> Netbeheerders { get; init; } = Array.Empty<string>();
 
-    public string DisplayDescription => Netbeheerders.Count == 0 ? Description
-        : Description + " (" + string.Join(", ", Netbeheerders) + ")";
+    public IReadOnlyList<KlicObjectData> KlicObjects { get; init; } = Array.Empty<KlicObjectData>();
+    public string KlicGroupKey { get; init; } = string.Empty;
+    public IReadOnlyList<string> KlicDescriptionFields { get; init; } = Array.Empty<string>();
+
+    public string DisplayDescription
+    {
+        get
+        {
+            var text = Netbeheerders.Count == 0 ? Description : Description + " (" + string.Join(", ", Netbeheerders) + ")";
+            var extra = KlicSummary.Description(KlicObjects, KlicDescriptionFields);
+            return extra.Length == 0 ? text : text + " · " + extra;
+        }
+    }
 
     public DescriptionSource DescriptionSource { get; init; } = DescriptionSource.Catalogus;
 

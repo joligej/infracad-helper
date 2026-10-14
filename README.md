@@ -132,10 +132,26 @@ keuzemenu vóór het plaatsen. `NLCSLEGENDAINFO` meldt welke soorten uitstaan.
 
 ### KLIC-tekeningen
 
-Netbeheerders komen uit de ingebedde InfraCAD Map-metadatatabellen van de bron-DWG,
-ook bij geneste xrefs. De plugin leidt ze niet af uit volgnummers zoals DATA2.
-Zonder deze metadata blijft de netbeheerder leeg. Beschadigde of tegenstrijdige
-metadata wordt gemeld; de bestaande legenda blijft dan behouden.
+Netbeheerders en andere KLIC-gegevens komen uit de bron-DWG, ook bij geneste xrefs.
+De plugin leest ingebedde InfraCAD Map-tabellen en, waar de AutoCAD-host dit ondersteunt,
+Property Sets en Object Data. Voor Object Data moet de bron-DWG zelf in Civil 3D/Map geopend
+zijn; bij xrefs worden de ingebedde gegevens en leesbare Property Sets gebruikt en wordt deze
+beperking gemeld. Netbeheerders worden niet afgeleid uit volgnummers zoals DATA2.
+
+Kies in **Overzicht → KLIC-instellingen** welke velden als kolommen en in de export verschijnen.
+Je kunt zoeken in de zichtbare velden of één gekozen eigenschap. Dit filter verandert alleen
+de lijst en haar export. Dubbelklik op een regel of kies **KLIC-details** voor alle gelezen
+waarden per bron en tabel, objecthandles, voorzorgsmaatregelen en bijlagen.
+
+Onder **Legenda-omschrijving** voeg je eigenschappen toe aan de tekst; onder **Afzonderlijke
+regels** kies je bijvoorbeeld materiaal en diameter om varianten apart weer te geven.
+Zonder die keuzes blijft de bestaande legenda behouden. Opgeslagen keuzes gelden per legenda.
+Met **Volgorde → Handmatig** verplaats je regels; maak eerst het zoekfilter leeg.
+
+Verschillende bronwaarden blijven zichtbaar. **Gegevensbron** bepaalt welke opslagvorm
+voorrang krijgt. Ontbreekt een veld in die bron, dan wordt een andere beschikbare bron gelezen.
+Een aanwezige lege waarde wordt niet stilzwijgend vervangen. Nulwaarden geven geen gemeten
+diepte aan; een standaarddiepte is apart benoemd. Zie [KLIC-gegevens](docs/klic-bronnen.md).
 
 Voor KLIC-tekeningen (kabels en leidingen) kun je regels samenvoegen op een eigenschap.
 Onder *Groepering* in de instellingen zet je los aan of je samenvoegt op soort, spanning/druk,

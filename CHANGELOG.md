@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.31.0 - 2026-10-14
+
+- Overzicht toont instelbare KLIC-kolommen, een zoekfilter en een filter voor bronmeldingen.
+  De gekozen velden en gebruikte bronnen gaan mee in CSV- en JSON-export.
+- KLIC-details toont veldwaarden per bron en tabel, bronobjecten, voorzorgsmaatregelen
+  en bijlagen. PDF- en afbeeldingsbijlagen kunnen op eigen verzoek worden geopend.
+- Materiaal, diameter en andere KLIC-eigenschappen kunnen aan de omschrijving worden
+  toegevoegd of voor afzonderlijke regels worden gebruikt. Elke legenda bewaart haar
+  eigen keuzes en handmatige volgorde. De bestaande opmaak blijft behouden.
+- Ingebedde InfraCAD-gegevens, Property Sets en Object Data worden afzonderlijk gelezen.
+  Bronverschillen zijn zichtbaar; de gebruiker kiest welke opslagvorm voorrang krijgt.
+  Object Data vereist een geopende bron-DWG in Civil 3D/Map; xrefs gebruiken de overige
+  leesbare bronnen. Niet-leesbare bronnen worden gemeld. Vergelijking gebeurt binnen dezelfde KLIC-tabel.
+- Diameters worden in millimeters getoond. Niet-opgegeven waarden en standaarddieptes
+  worden onderscheiden van opgegeven dieptes; nul wordt niet als gemeten diepte getoond.
+
 ## 1.30.1 - 2026-10-14
 
 - De typekeuze onderscheidt VLAk en VULling ook bij bediening via het toetsenbord.

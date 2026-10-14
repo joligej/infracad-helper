@@ -75,7 +75,8 @@ public static class DrawingAnalyzer
         public readonly HashSet<string> CustomSourceLayers = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<ObjectId> Excluded = new();
         public LayerTable? Layers;
-        public readonly KlicSourceMetadata Klic = new();
+        public required KlicSourceMetadata Klic;
+        public readonly Dictionary<string, List<KlicObjectData>> KlicObjects = new(StringComparer.OrdinalIgnoreCase);
     }
 
     // Veiligheidslimiet tegen ontspoorde recursie; echte cycli worden met een pad-set
@@ -90,7 +91,8 @@ public static class DrawingAnalyzer
         Action<double, double>? reportTimings = null)
     {
         var timer = reportTimings is null ? null : System.Diagnostics.Stopwatch.StartNew();
-        var c = new Collector();
+        using var klic = new KlicSourceMetadata(settings.Klic);
+        var c = new Collector { Klic = klic };
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (excludedIds is { Count: > 0 })
             c.Excluded = new HashSet<ObjectId>(excludedIds);
@@ -169,7 +171,8 @@ public static class DrawingAnalyzer
             catalog,
             RenderId,
             name => c.CustomDesc.ContainsKey(name) ? DescriptionSource.EigenKoppeling : (DescriptionSource?)null,
-            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.RenderIdentity : null);
+            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.RenderIdentity : null,
+            name => c.KlicObjects.TryGetValue(name, out var objects) ? objects : Array.Empty<KlicObjectData>());
 
         if (timer is not null)
         {
@@ -249,16 +252,22 @@ public static class DrawingAnalyzer
         Matrix3d transform, string sourceXref, LayerDisplayStyle style, LayerDisplayStyle layerStyle)
     {
         var layerName = ent.Layer;
+        KlicObjectData? metadata = null;
         CustomLayerRule? rule = null;
         NlcsLayerName? parsed;
         if (TryMatchCustomRule(ent, tr, settings, layerName, sourceXref, out rule, out parsed))
         {
-            if (!settings.IsIncluded(parsed!)) return;
+            metadata = c.Klic.Read(ent, sourceXref);
+            parsed = CopyLayer(parsed!, sourceXref, ElementProperties.IsKlic(parsed!.Discipline, parsed.Hoofdgroep) ? metadata.Provider : string.Empty,
+                metadata.GroupKey(settings.Klic.GroupFields));
+            if (!settings.IsIncluded(parsed)) return;
         }
         else
         {
             if (!NlcsLayerParser.TryParse(layerName, out parsed)) return;
-            parsed = CopyLayer(parsed, sourceXref, ElementProperties.IsKlic(parsed.Discipline, parsed.Hoofdgroep) ? c.Klic.Provider(ent) : string.Empty);
+            metadata = c.Klic.Read(ent, sourceXref);
+            parsed = CopyLayer(parsed, sourceXref, ElementProperties.IsKlic(parsed.Discipline, parsed.Hoofdgroep) ? metadata.Provider : string.Empty,
+                metadata.GroupKey(settings.Klic.GroupFields));
             if (!settings.IsIncluded(parsed))
             {
                 c.ExcludedNlcs.Add(parsed.LocalName);
@@ -291,10 +300,16 @@ public static class DrawingAnalyzer
             symbol = new SymbolSample(blockName, identity, SymbolTransform.From(transform * br.BlockTransform))
             { InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceScale = parsed.Scale, TargetScale = settings.Scale };
         }
+        metadata ??= c.Klic.Read(ent, sourceXref);
         string appearance = SampleSignature(style, hatch, symbol);
-        string key = parsed.GroupKey + "\u0001" + parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
+        string key = parsed.GroupKey + "\u0001" + parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + parsed.KlicGroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
         (rule is null ? c.NlcsSourceLayers : c.CustomSourceLayers).Add(layerName);
         c.Parsed[key] = parsed;
+        if (metadata.HasData || metadata.ReadIssues.Count > 0)
+        {
+            if (!c.KlicObjects.TryGetValue(key, out var objects)) c.KlicObjects.Add(key, objects = new());
+            objects.Add(metadata);
+        }
         c.NlcsRawKeys.Add(key);
         c.Styles[key] = style;
         if (rule is not null)
@@ -341,10 +356,10 @@ public static class DrawingAnalyzer
         finally { path.Remove(id); }
     }
 
-    private static NlcsLayerName CopyLayer(NlcsLayerName p, string source, string provider) => new()
+    private static NlcsLayerName CopyLayer(NlcsLayerName p, string source, string provider, string klicGroup = "") => new()
     {
         Raw = p.Raw, LocalName = p.LocalName, IsXref = source.Length > 0,
-        XrefName = source, Netbeheerder = provider, StatusCode = p.StatusCode, Status = p.Status,
+        XrefName = source, Netbeheerder = provider, KlicGroupKey = klicGroup, StatusCode = p.StatusCode, Status = p.Status,
         Discipline = p.Discipline, Hoofdgroep = p.Hoofdgroep, Element = p.Element,
         TypeSuffix = p.TypeSuffix, DrawType = p.DrawType, Scale = p.Scale
     };
@@ -542,18 +557,19 @@ public static class DrawingAnalyzer
 
     private sealed record LayerSample(NlcsLayerName Parsed, string Signature, LayerMetric Metric,
         HatchSample? Hatch, SymbolSample? Symbol, LayerDisplayStyle Style, string? Description,
-        Dictionary<string, int>? Attributes);
+        Dictionary<string, int>? Attributes, IReadOnlyList<KlicObjectData> KlicObjects);
 
     private static void CoalesceNlcsSources(Collector c)
     {
         var samples = c.NlcsRawKeys.Select(key => new LayerSample(c.Parsed[key],
             SampleSignature(c.Styles[key], c.Hatches.GetValueOrDefault(key), c.SymbolSamples.GetValueOrDefault(key)),
             c.Metrics.GetValueOrDefault(key), c.Hatches.GetValueOrDefault(key), c.SymbolSamples.GetValueOrDefault(key),
-            c.Styles[key], c.CustomDesc.GetValueOrDefault(key), c.AttrOms.GetValueOrDefault(key))).ToList();
+            c.Styles[key], c.CustomDesc.GetValueOrDefault(key), c.AttrOms.GetValueOrDefault(key),
+            c.KlicObjects.TryGetValue(key, out var objects) ? objects : Array.Empty<KlicObjectData>())).ToList();
         c.Parsed.Clear(); c.Metrics.Clear(); c.Hatches.Clear(); c.SymbolSamples.Clear();
-        c.Styles.Clear(); c.CustomDesc.Clear(); c.AttrOms.Clear(); c.NlcsRawKeys.Clear();
+        c.Styles.Clear(); c.CustomDesc.Clear(); c.AttrOms.Clear(); c.NlcsRawKeys.Clear(); c.KlicObjects.Clear();
 
-        foreach (var logical in samples.GroupBy(x => x.Parsed.GroupKey + "\u0001" + x.Parsed.Netbeheerder.ToUpperInvariant()).OrderBy(x => x.Key, StringComparer.Ordinal))
+        foreach (var logical in samples.GroupBy(x => x.Parsed.GroupKey + "\u0001" + x.Parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + x.Parsed.KlicGroupKey).OrderBy(x => x.Key, StringComparer.Ordinal))
         {
             var bundles = new List<(List<LayerSample> Layers, string Signature)>();
             foreach (var source in logical.GroupBy(x => x.Parsed.SourceIdentity, StringComparer.OrdinalIgnoreCase))
@@ -593,11 +609,12 @@ public static class DrawingAnalyzer
                     {
                         Raw = rep.Parsed.Raw, LocalName = clean, IsXref = rep.Parsed.IsXref, XrefName = rep.Parsed.XrefName,
                         SourceLayers = members.Select(x => x.Parsed.Source).Distinct().ToArray(),
-                        Netbeheerder = rep.Parsed.Netbeheerder,
+                        Netbeheerder = rep.Parsed.Netbeheerder, KlicGroupKey = rep.Parsed.KlicGroupKey,
                         StatusCode = rep.Parsed.StatusCode, Status = rep.Parsed.Status, Discipline = rep.Parsed.Discipline,
                         Hoofdgroep = rep.Parsed.Hoofdgroep, Element = rep.Parsed.Element, TypeSuffix = rep.Parsed.TypeSuffix,
                         DrawType = rep.Parsed.DrawType, Scale = rep.Parsed.Scale, RenderLayerName = key, RenderIdentity = renderClass.Key
                     });
+                    c.KlicObjects[key] = KlicSummary.Combine(members.SelectMany(x => x.KlicObjects)).ToList();
                     c.Metrics[key] = members.Aggregate(LayerMetric.Empty, (total, x) => total + x.Metric);
                     c.Styles[key] = rep.Style;
                     if (rep.Hatch is not null) c.Hatches[key] = rep.Hatch;

@@ -256,6 +256,13 @@ internal sealed class SettingsDialog : LegendDialog
         var page = new TabPage("Inhoud") { Padding = new Padding(10), AutoScroll = true };
         var root = new SettingsStack();
 
+        var klic = new Button { Text = "KLIC-velden en groepering…", AutoSize = true, Padding = new Padding(6, 3, 6, 3) };
+        klic.Click += (_, _) =>
+        {
+            using var dialog = new KlicOptionsDialog(_settings.Klic);
+            if (dialog.ShowDialog(this) == DialogResult.OK) _settings.Klic = dialog.Result;
+        };
+        root.Controls.Add(klic);
         root.Controls.Add(Group("Elementsoorten",
             BoundCheck("Geometrie / lijnen", () => _settings.ToonGeometrie, v => _settings.ToonGeometrie = v),
             BoundCheck("Vlakken", () => _settings.ToonVlakken, v => _settings.ToonVlakken = v),

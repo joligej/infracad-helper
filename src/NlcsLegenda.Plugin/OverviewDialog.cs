@@ -1,4 +1,6 @@
 using System.Drawing;
+using System.IO;
+using System.Text;
 using System.Windows.Forms;
 using NlcsLegenda.Core;
 
@@ -9,7 +11,7 @@ internal sealed class OverviewLegend
     public required string Id { get; init; }
     public required string Name { get; init; }
     public required LegendSettings Settings { get; init; }
-    public required IReadOnlyList<LegendEntry> Entries { get; init; }
+    public required IReadOnlyList<LegendEntry> Entries { get; set; }
     public bool Changed { get; set; }
     public override string ToString() => Name;
 }
@@ -29,13 +31,20 @@ internal sealed class OverviewDialog : LegendDialog
     private readonly Label _summary = new() { AutoSize = true, Dock = DockStyle.Top, Padding = new Padding(8) };
     private readonly FlowLayoutPanel _moves = new() { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(6) };
     private List<LegendEntry> _entries = new();
+    private readonly List<LegendEntry> _visible = new();
+    private readonly Func<OverviewLegend, IReadOnlyList<LegendEntry>>? _analyze;
+    private readonly TextBox _filter = new() { Width = 210, PlaceholderText = "Zoek waarde of tekst" };
+    private readonly ComboBox _field = new() { Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly CheckBox _issuesOnly = new() { Text = "Alleen bronmeldingen", AutoSize = true };
     private bool _loading;
     private OverviewLegend Current => _legends[_legend.SelectedIndex];
 
-    public OverviewDialog(IReadOnlyList<OverviewLegend> legends, Func<IReadOnlyList<OverviewLegend>, string?> save)
+    public OverviewDialog(IReadOnlyList<OverviewLegend> legends, Func<IReadOnlyList<OverviewLegend>, string?> save,
+        Func<OverviewLegend, IReadOnlyList<LegendEntry>>? analyze = null)
     {
         _legends = legends;
         _save = save;
+        _analyze = analyze;
         Text = "NLCS Legenda – overzicht";
         Font = SystemFonts.MessageBoxFont;
         ClientSize = new Size(960, 620);
@@ -50,8 +59,23 @@ internal sealed class OverviewDialog : LegendDialog
         top.Controls.Add(new Label { Text = "Volgorde:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
         top.Controls.Add(_sort);
         _sort.Items.AddRange(Enum.GetNames<LegendSortMode>());
-        foreach (var (name, width) in new[] { ("Status", 100), ("Omschrijving", 260), ("Netbeheerder", 180), ("Soort", 100), ("Hoeveelheid", 100), ("Bronlagen", 230), ("Samengevoegd", 170) })
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = name, FillWeight = width, MinimumWidth = Math.Min(width, 100), SortMode = DataGridViewColumnSortMode.NotSortable, DefaultCellStyle = { WrapMode = DataGridViewTriState.True } });
+        var tools = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8) };
+        void ActionButton(string title, Action action)
+        {
+            var button = new Button { Text = title, AutoSize = true, Padding = new Padding(4) };
+            button.Click += (_, _) => action(); tools.Controls.Add(button);
+        }
+        ActionButton("KLIC-instellingen…", EditKlic);
+        ActionButton("KLIC-details…", ShowKlicDetails);
+        ActionButton("Exporteer lijst…", ExportVisible);
+        _field.Items.Add("Alle zichtbare velden");
+        _field.Items.AddRange(KlicFields.All.Cast<object>().ToArray());
+        _field.SelectedIndex = 0;
+        tools.Controls.Add(_field); tools.Controls.Add(_filter); tools.Controls.Add(_issuesOnly);
+        _filter.TextChanged += (_, _) => { if (!_loading) FillGrid(0); };
+        _field.SelectedIndexChanged += (_, _) => { if (!_loading) FillGrid(0); };
+        _issuesOnly.CheckedChanged += (_, _) => { if (!_loading) FillGrid(0); };
+        _grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) ShowKlicDetails(); };
         AddMoveEntry("Naar boven", -1);
         AddMoveEntry("Naar beneden", 1);
         AddMoveEntry("Naar begin", int.MinValue);
@@ -68,8 +92,10 @@ internal sealed class OverviewDialog : LegendDialog
         AcceptButton = buttons.Ok;
         CancelButton = buttons.Cancel;
         FormClosing += (_, e) => { if (DialogResult == DialogResult.OK && !SaveChanges()) e.Cancel = true; };
+        SizeChanged += (_, _) => _summary.MaximumSize = new Size(Math.Max(100, ClientSize.Width), 0);
         Controls.Add(_grid);
         Controls.Add(_summary);
+        Controls.Add(tools);
         Controls.Add(top);
         Controls.Add(_moves);
         Controls.Add(buttons);
@@ -98,7 +124,17 @@ internal sealed class OverviewDialog : LegendDialog
         _sort.SelectedItem = Current.Settings.SortMode.ToString();
         _sort.Enabled = Current.Id.Length > 0;
         _loading = false;
+        ConfigureColumns();
         LoadEntries();
+    }
+
+    private void ConfigureColumns()
+    {
+        _grid.Columns.Clear();
+        foreach (var name in new[] { "Status", "Omschrijving", "Netbeheerder", "Soort", "Hoeveelheid", "Bronlagen", "Samengevoegd" }
+            .Concat(Current.Settings.Klic.Columns.Select(k => KlicFields.Find(k)!.Label)).Concat(new[] { "Broncontrole" }))
+            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = name, MinimumWidth = 100, FillWeight = name == "Omschrijving" ? 240 : 120,
+                SortMode = DataGridViewColumnSortMode.NotSortable, DefaultCellStyle = { WrapMode = DataGridViewTriState.True } });
     }
 
     private void LoadEntries()
@@ -114,10 +150,25 @@ internal sealed class OverviewDialog : LegendDialog
     private void FillGrid(int selected)
     {
         _grid.Rows.Clear();
+        _visible.Clear();
+        _moves.Enabled = Current.Id.Length > 0 && Current.Settings.SortMode == LegendSortMode.Handmatig && _filter.Text.Length == 0 && !_issuesOnly.Checked;
         foreach (var entry in _entries)
-            _grid.Rows.Add(entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.Description, string.Join(", ", entry.Netbeheerders),
+        {
+            var issues = KlicSummary.Issues(entry.KlicObjects);
+            if (_issuesOnly.Checked && issues.Length == 0) continue;
+            var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, string.Join(", ", entry.Netbeheerders),
                 string.Join(", ", entry.LayersByType.Keys), entry.QuantityText(Current.Settings.QuantityDecimals, Current.Settings.UnitArea, Current.Settings.UnitLength, Current.Settings.UnitCount),
-                string.Join(Environment.NewLine, entry.SourceLayers.Select(s => s.SourceLayerName).Distinct()), string.Join(", ", entry.MergedMembers));
+                string.Join(Environment.NewLine, entry.SourceLayers.Select(s => s.SourceLayerName).Distinct()), string.Join(", ", entry.MergedMembers) };
+            values.AddRange(Current.Settings.Klic.Columns.Select(k => KlicSummary.Field(entry.KlicObjects, k)));
+            values.Add(issues);
+            string search = _field.SelectedItem is KlicField field ? KlicSummary.Field(entry.KlicObjects, field.Key) : string.Join(" ", values);
+            if (_filter.Text.Trim().Length > 0 && !search.Contains(_filter.Text.Trim(), StringComparison.CurrentCultureIgnoreCase)) continue;
+            _visible.Add(entry);
+            _grid.Rows.Add(values.Cast<object>().ToArray());
+        }
+        _summary.Text = $"{_visible.Count} van {_entries.Count} regels · voorkeursbron: {KlicFields.SourceLabel(Current.Settings.Klic.PreferredSource)}. "
+            + (Current.Id.Length == 0 ? "Voorbeeld; instellingen worden niet opgeslagen." : "Wijzigingen gelden alleen voor deze legenda.")
+            + (_filter.Text.Length > 0 || _issuesOnly.Checked ? " Filter geldt voor deze lijst en export; wis het filter om regels te verplaatsen." : "");
         if (_grid.Rows.Count > 0) _grid.CurrentCell = _grid.Rows[Math.Clamp(selected, 0, _grid.Rows.Count - 1)].Cells[1];
     }
 
@@ -133,6 +184,48 @@ internal sealed class OverviewDialog : LegendDialog
         Current.Settings.ManualEntryOrder = LegendOrder.Remember(Current.Settings.ManualEntryOrder, _entries);
         Current.Changed = true;
         FillGrid(to);
+    }
+
+    private void EditKlic()
+    {
+        using var dialog = new KlicOptionsDialog(Current.Settings.Klic);
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        var previous = Current.Settings.Klic;
+        try
+        {
+            Current.Settings.Klic = dialog.Result;
+            if (_analyze is not null) Current.Entries = _analyze(Current);
+            Current.Changed = Current.Id.Length > 0;
+            ConfigureColumns(); LoadEntries();
+        }
+        catch (Exception ex)
+        {
+            Current.Settings.Klic = previous;
+            MessageBox.Show(this, "De KLIC-instellingen zijn niet toegepast: " + ex.Message, "KLIC-gegevens", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private void ShowKlicDetails()
+    {
+        if (_grid.CurrentRow is not { } row) return;
+        var entry = _visible[row.Index];
+        if (entry.KlicObjects.Count == 0) { MessageBox.Show(this, "Geen KLIC-gegevens bij deze regel gevonden.", "KLIC-details"); return; }
+        using var dialog = new KlicDetailsDialog(entry);
+        dialog.ShowDialog(this);
+    }
+
+    private void ExportVisible()
+    {
+        using var dialog = new SaveFileDialog { Filter = "CSV-bestand (*.csv)|*.csv|JSON-bestand (*.json)|*.json", FileName = "NLCS-overzicht.csv", AddExtension = true, OverwritePrompt = true };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        try
+        {
+            var s = Current.Settings;
+            string text = dialog.FilterIndex == 2 ? LegendExport.ToJson(_visible, s.QuantityDecimals, s.UnitArea, s.UnitLength, s.UnitCount, s.Klic.Columns)
+                : LegendExport.ToCsv(_visible, s.QuantityDecimals, s.UnitArea, s.UnitLength, s.UnitCount, s.Klic.Columns);
+            File.WriteAllText(dialog.FileName, text, new UTF8Encoding(dialog.FilterIndex == 1));
+        }
+        catch (Exception ex) { MessageBox.Show(this, "Exporteren is niet gelukt: " + ex.Message, "Overzicht", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
     }
 
     private bool SaveChanges()

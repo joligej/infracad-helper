@@ -20,11 +20,13 @@ public partial class Commands
             var layerId = ReviewLayer(db, tr, "B-WE-KL-DATA-G");
             var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
             var xml = new XElement("KLIC");
-            foreach (var (length, provider) in new[] { (3d, first), (5d, second), (2d, "") })
+            foreach (var (length, provider, material, diameter) in new[] { (3d, first, "PE", "0.11"), (5d, second, "PVC", "0.16"), (2d, "", "", "0") })
             {
                 using var line = new Line(Point3d.Origin, new Point3d(length, 0, 0)) { LayerId = layerId };
                 model.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                 xml.Add(new XElement("KLIC_Administratief", new XElement("Handle", line.Handle.ToString()), new XElement("Netbeheerder", provider)));
+                xml.Add(new XElement("KLIC_LeidingLijn", new XElement("Handle", line.Handle.ToString()),
+                    new XElement("Materiaal", material), new XElement("DiameterM", diameter)));
             }
             var dictionary = (DBDictionary)tr.GetObject(db.NamedObjectsDictionaryId, OpenMode.ForWrite);
             using var map = new DBDictionary();
@@ -96,6 +98,26 @@ public partial class Commands
         var merged = DrawingAnalyzer.Analyze(db, tr, settings);
         if (merged.Entries.Count != 1 || merged.Entries[0].Netbeheerders.Count != 4 || Math.Abs(merged.Entries[0].Metric.Length - 30) > 1e-8)
             throw new InvalidOperationException("Samenvoegen verliest bronnen of hoeveelheden.");
+        settings.Klic.GroupFields = new() { "Materiaal", "DiameterM" };
+        settings.Klic.DescriptionFields = new() { "Materiaal", "DiameterM" };
+        var partitioned = DrawingAnalyzer.Analyze(db, tr, settings);
+        if (partitioned.Entries.Count != 3 || Math.Abs(partitioned.Entries.Sum(e => e.Metric.Length) - 30) > 1e-8
+            || Math.Abs(partitioned.Entries.Single(e => e.DisplayDescription.Contains("Materiaal: PE")).Metric.Length - 9) > 1e-8
+            || !partitioned.Entries.Any(e => e.DisplayDescription.Contains("Diameter: 160 mm")))
+            throw new InvalidOperationException("KLIC-veldgroepering verliest metadata of hoeveelheden.");
+        settings.SortMode = LegendSortMode.Handmatig;
+        var reverse = partitioned.Entries.Reverse().Select(LegendOrder.Key).ToList();
+        settings.ManualEntryOrder = reverse;
+        var ordered = DrawingAnalyzer.Analyze(db, tr, settings);
+        if (!ordered.Entries.Select(LegendOrder.Key).SequenceEqual(reverse))
+            throw new InvalidOperationException("Handmatige KLIC-volgorde verloren.");
+        var partitionBlock = LegendBuilder.BuildBlock(db, tr, ordered, settings, out var partitionRows, out var partitionIssues);
+        var partitionText = ((BlockTableRecord)tr.GetObject(partitionBlock, OpenMode.ForRead)).Cast<ObjectId>()
+            .Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<MText>().Select(t => t.Text).ToArray();
+        if (partitionRows != 3 || partitionIssues.Count > 0 || !partitionText.Any(t => t.Contains("Diameter: 110 mm")))
+            throw new InvalidOperationException("Gekozen KLIC-velden ontbreken in de getekende legenda.");
+        settings.Klic = new KlicOptions();
+        settings.SortMode = LegendSortMode.Status;
         settings.MergedDimensions.Clear();
         settings.ExcludedEntries.Add(LegendSettings.EntryKey(entries.Single(e => e.Netbeheerders.Contains("Net B"))));
         var filtered = DrawingAnalyzer.Analyze(db, tr, settings);

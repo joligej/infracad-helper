@@ -16,7 +16,8 @@ public static class LegendGrouping
         DescriptionCatalog? catalog = null,
         Func<string, string?>? renderIdentity = null,
         Func<string, DescriptionSource?>? descriptionSourceOf = null,
-        Func<string, string?>? symbolRenderIdentity = null)
+        Func<string, string?>? symbolRenderIdentity = null,
+        Func<string, IReadOnlyList<KlicObjectData>>? klicObjects = null)
     {
         // Per-legenda omschrijvingen liggen bovenop de (globale) catalogus. Dit is de enige plek
         // waar ze worden toegepast, zodat elke aanroeper dezelfde effectieve teksten krijgt.
@@ -35,7 +36,7 @@ public static class LegendGrouping
             // Uitgeschakelde elementsoorten tellen ook niet mee voor hoeveelheden.
             if (!settings.IsDrawTypeIncluded(layer.DrawType)) continue;
 
-            var splitKey = layer.GroupKey + "\u0001" + layer.Netbeheerder.ToUpperInvariant() + "\u0001" + layer.RenderIdentity;
+            var splitKey = layer.GroupKey + "\u0001" + layer.Netbeheerder.ToUpperInvariant() + "\u0001" + layer.KlicGroupKey + "\u0001" + layer.RenderIdentity;
             if (!groups.TryGetValue(splitKey, out var list))
             {
                 list = new List<NlcsLayerName>();
@@ -82,6 +83,9 @@ public static class LegendGrouping
                 Hoofdgroep = representative.Hoofdgroep,
                 Element = representative.Element,
                 Netbeheerders = string.IsNullOrEmpty(representative.Netbeheerder) ? Array.Empty<string>() : new[] { representative.Netbeheerder },
+                KlicGroupKey = representative.KlicGroupKey,
+                KlicObjects = KlicSummary.Combine(group.SelectMany(l => klicObjects?.Invoke(l.EffectiveRenderLayerName) ?? Array.Empty<KlicObjectData>())),
+                KlicDescriptionFields = settings.Klic.DescriptionFields.ToArray(),
                 Description = ResolveDescription(
                     group, representative, settings, layerDescription, descriptions, descriptionSourceOf, out var descSource),
                 DescriptionSource = descSource,
@@ -169,7 +173,7 @@ public static class LegendGrouping
             var renderPart = e.RenderIdentity.Length > 0 ? e.RenderIdentity : string.Empty;
             var content = ElementProperties.IsKlic(e.Discipline, e.Hoofdgroep)
                 ? props.MergeKey(settings.MergedDimensions) : e.Element;
-            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{content}|{renderPart}";
+            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{content}|{e.KlicGroupKey}|{renderPart}";
         }
 
         var merged = new List<LegendEntry>();
@@ -209,6 +213,9 @@ public static class LegendGrouping
             Discipline = rep.Discipline,
             Hoofdgroep = rep.Hoofdgroep,
             Element = rep.Element,
+            KlicObjects = KlicSummary.Combine(group.SelectMany(e => e.KlicObjects)),
+            KlicGroupKey = rep.KlicGroupKey,
+            KlicDescriptionFields = rep.KlicDescriptionFields,
             Description = rep.Description,
             DescriptionSource = rep.DescriptionSource,
             LayersByType = rep.LayersByType,

@@ -413,12 +413,15 @@ public sealed class LegendSettings
     [Browsable(false)]
     public List<CustomLayerRule> CustomLayerRules { get; set; } = new();
 
+    [Browsable(false)]
+    public KlicOptions Klic { get; set; } = new();
+
     public CustomStatus? FindCustomStatus(string entryKey)
     {
         if (string.IsNullOrEmpty(entryKey))
             return null;
         foreach (var cs in CustomStatuses)
-            if (cs.IsValid && (cs.Members.Contains(entryKey, StringComparer.OrdinalIgnoreCase) || cs.Members.Contains(BaseEntryKey(entryKey), StringComparer.OrdinalIgnoreCase)))
+            if (cs.IsValid && (cs.Members.Contains(entryKey, StringComparer.OrdinalIgnoreCase) || cs.Members.Contains(BaseEntryKey(entryKey), StringComparer.OrdinalIgnoreCase) || cs.Members.Contains(WithoutKlicGroup(entryKey), StringComparer.OrdinalIgnoreCase)))
                 return cs;
         return null;
     }
@@ -427,10 +430,14 @@ public sealed class LegendSettings
         $"{statusCode}|{discipline}|{hoofdgroep}|{element}".ToUpperInvariant();
 
     public static string EntryKey(LegendEntry entry) =>
-        ProviderEntryKey(EntryKey(entry.Status.Code(), entry.Discipline, entry.Hoofdgroep, entry.Element), entry.Netbeheerders);
+        KlicEntryKey(ProviderEntryKey(EntryKey(entry.Status.Code(), entry.Discipline, entry.Hoofdgroep, entry.Element), entry.Netbeheerders), entry.KlicGroupKey);
 
     public static string EntryKey(NlcsLayerName layer) =>
-        ProviderEntryKey(EntryKey(layer.Status.Code(), layer.Discipline, layer.Hoofdgroep, layer.Element), new[] { layer.Netbeheerder });
+        KlicEntryKey(ProviderEntryKey(EntryKey(layer.Status.Code(), layer.Discipline, layer.Hoofdgroep, layer.Element), new[] { layer.Netbeheerder }), layer.KlicGroupKey);
+
+    private static string KlicEntryKey(string basic, string group) => group.Length == 0 ? basic : basic + "|KLIC:" + group;
+
+    internal static string WithoutKlicGroup(string key) => key.Split("|KLIC:", 2, StringSplitOptions.None)[0];
 
     private static string ProviderEntryKey(string basic, IEnumerable<string> providers)
     {
@@ -438,7 +445,7 @@ public sealed class LegendSettings
         return names.Length == 0 ? basic : basic + "|" + System.Text.Json.JsonSerializer.Serialize(names);
     }
 
-    public bool IsEntryExcluded(string key) => ExcludedEntries.Contains(key) || ExcludedEntries.Contains(BaseEntryKey(key));
+    public bool IsEntryExcluded(string key) => ExcludedEntries.Contains(key) || ExcludedEntries.Contains(WithoutKlicGroup(key)) || ExcludedEntries.Contains(BaseEntryKey(key));
 
     internal static string BaseEntryKey(string key) => string.Join("|", key.Split('|').Take(4));
 
@@ -489,6 +496,7 @@ public sealed class LegendSettings
             if (p is { CanRead: true, CanWrite: true } && !IsCollectionProperty(p))
                 p.SetValue(this, p.GetValue(other));
 
+        Klic = other.Klic.Clone();
         IncludedStatuses = new HashSet<NlcsStatus>(other.IncludedStatuses);
         IncludedDrawTypes = new HashSet<NlcsDrawType>(other.IncludedDrawTypes);
         ExcludedDisciplines = new HashSet<string>(other.ExcludedDisciplines, StringComparer.OrdinalIgnoreCase);
@@ -551,7 +559,7 @@ public sealed class LegendSettings
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
             or nameof(CustomLayerRules) or nameof(BlankEntries)
-            or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder);
+            or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder) or nameof(Klic);
 
     [JsonIgnore, Browsable(false)]
     public double ModelUnitsPerPaperMm => Scale / 1000.0;
@@ -615,6 +623,7 @@ public sealed class LegendSettings
     {
         if (SchemaVersion < 1 || SchemaVersion > CurrentSchemaVersion)
             throw new NotSupportedException($"Profielversie {SchemaVersion} wordt niet ondersteund.");
+        Klic = (Klic ?? new KlicOptions()).Clone();
         IncludedStatuses ??= new HashSet<NlcsStatus>();
         IncludedDrawTypes ??= new HashSet<NlcsDrawType>();
         ManualEntryOrder = (ManualEntryOrder ?? new List<string>()).Where(k => !string.IsNullOrWhiteSpace(k)).Distinct(StringComparer.Ordinal).ToList();

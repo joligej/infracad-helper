@@ -298,10 +298,10 @@ public partial class Commands
             var csvPath = baseName + ".csv";
             var jsonPath = baseName + ".json";
             File.WriteAllText(csvPath,
-                LegendExport.ToCsv(entries, settings.QuantityDecimals, settings.UnitArea, settings.UnitLength, settings.UnitCount),
+                LegendExport.ToCsv(entries, settings.QuantityDecimals, settings.UnitArea, settings.UnitLength, settings.UnitCount, settings.Klic.Columns),
                 new UTF8Encoding(true));
             File.WriteAllText(jsonPath,
-                LegendExport.ToJson(entries, settings.QuantityDecimals, settings.UnitArea, settings.UnitLength, settings.UnitCount));
+                LegendExport.ToJson(entries, settings.QuantityDecimals, settings.UnitArea, settings.UnitLength, settings.UnitCount, settings.Klic.Columns));
 
             ed.WriteMessage($"\n{entries.Count} regel(s) geëxporteerd naar:\n  {csvPath}\n  {jsonPath}");
         }
@@ -398,10 +398,10 @@ public partial class Commands
         var csvPath = Path.Combine(folder, $"NLCS-uittrekstaat_{stamp}.csv");
         var jsonPath = Path.Combine(folder, $"NLCS-uittrekstaat_{stamp}.json");
         File.WriteAllText(csvPath,
-            LegendExport.ToCombinedCsv(withEntries, settings.QuantityDecimals, settings.UnitArea, settings.UnitLength, settings.UnitCount),
+            LegendExport.ToCombinedCsv(withEntries, settings.QuantityDecimals, settings.UnitArea, settings.UnitLength, settings.UnitCount, settings.Klic.Columns),
             new UTF8Encoding(true));
         File.WriteAllText(jsonPath,
-            LegendExport.ToCombinedJson(withEntries, settings.QuantityDecimals, settings.UnitArea, settings.UnitLength, settings.UnitCount));
+            LegendExport.ToCombinedJson(withEntries, settings.QuantityDecimals, settings.UnitArea, settings.UnitLength, settings.UnitCount, settings.Klic.Columns));
 
         int totalRows = withEntries.Sum(w => w.Entries.Count);
         var failed = results.Where(r => r.Error is not null).ToList();
@@ -2325,7 +2325,7 @@ public partial class Commands
                 : null;
             var entries = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, LoadCatalog(db), excluded).Entries;
             return LegendExport.ToCsv(entries, def.Settings.QuantityDecimals,
-                def.Settings.UnitArea, def.Settings.UnitLength, def.Settings.UnitCount);
+                def.Settings.UnitArea, def.Settings.UnitLength, def.Settings.UnitCount, def.Settings.Klic.Columns);
         }
         catch (Exception ex)
         {
@@ -3871,7 +3871,7 @@ public partial class Commands
                 symbool = new { insertSchaal = symScale, paperBreedteMm = symPaperW, paperHoogteMm = symPaperH, aantal = symCount }
             }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             string outPath = Environment.GetEnvironmentVariable("NLCS_METING_OUT")
-                ?? Path.Combine(Path.GetTempPath(), "nlcs-template-meting.json");
+                ?? Path.Join(Path.GetTempPath(), "nlcs-template-meting.json");
             File.WriteAllText(outPath, json);
             ed.WriteMessage($"\nMETEN: meting geschreven naar {outPath}");
         }
