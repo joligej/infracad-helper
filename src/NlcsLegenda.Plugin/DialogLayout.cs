@@ -1,0 +1,43 @@
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace NlcsLegenda.Plugin;
+
+internal class LegendDialog : Form
+{
+    public LegendDialog()
+    {
+        AutoScaleDimensions = new SizeF(96, 96);
+        AutoScaleMode = AutoScaleMode.Dpi;
+    }
+
+    protected override void OnLoad(EventArgs e)
+    {
+        var area = Screen.FromControl(Owner ?? this).WorkingArea;
+        var available = new Size(Math.Max(1, area.Width - 24), Math.Max(1, area.Height - 24));
+        MinimumSize = new Size(Math.Min(MinimumSize.Width, available.Width), Math.Min(MinimumSize.Height, available.Height));
+        Size = new Size(Math.Min(Width, available.Width), Math.Min(Height, available.Height));
+        base.OnLoad(e);
+    }
+}
+
+// Een verticale inhoudskolom met echte voorkeurshoogtes. De tabpagina verzorgt het scrollen.
+internal sealed class SettingsStack : TableLayoutPanel
+{
+    public SettingsStack()
+    {
+        Dock = DockStyle.Top;
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        ColumnCount = 1;
+        ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        Margin = Padding.Empty;
+    }
+
+    protected override void OnControlAdded(ControlEventArgs e)
+    {
+        base.OnControlAdded(e);
+        e.Control!.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        RowStyles.Add(new RowStyle(SizeType.AutoSize));
+    }
+}

@@ -27,6 +27,13 @@ try {
     Restore-NlcsProfileState @($before) | Out-Null
     if ((Get-NlcsRegistryValue $testKey MissingValue).Exists) { throw 'Oorspronkelijk ontbrekende waarde is blijven staan.' }
     $count++
+    $emptyBefore = @()
+    New-ItemProperty -LiteralPath $testKey -Name NewProfileValue -Value 0 -PropertyType DWord | Out-Null
+    $changes = @(Get-NlcsProfileChanges $emptyBefore @((Get-NlcsRegistryValue $testKey NewProfileValue)))
+    if ($changes.Count -ne 1 -or $changes[0].Exists) { throw 'Nieuw profiel niet herkend.' }
+    Restore-NlcsProfileState $changes | Out-Null
+    if ((Get-NlcsRegistryValue $testKey NewProfileValue).Exists) { throw 'Nieuwe profielwaarde niet verwijderd.' }
+    $count++
     foreach ($scriptFile in Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1') {
         $tokens = $null; $errors = $null
         [Management.Automation.Language.Parser]::ParseFile($scriptFile.FullName, [ref]$tokens, [ref]$errors) | Out-Null

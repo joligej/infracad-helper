@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/NlcsLegenda.Plugin/OverviewDialog.cs" Link="OverviewDialog.cs" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/DialogLayout.cs" Link="DialogLayout.cs" />
+    <ProjectReference Include="../../src/NlcsLegenda.Core/NlcsLegenda.Core.csproj" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/Dialogs.cs" Link="Dialogs.cs" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/ManageDialog.cs" Link="ManageDialog.cs" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/TriStateTree.cs" Link="TriStateTree.cs" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/LayerEditDialog.cs" Link="LayerEditDialog.cs" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/HelpDialog.cs" Link="HelpDialog.cs" />
+  </ItemGroup>
+</Project>

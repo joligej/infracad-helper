@@ -8,7 +8,12 @@ public readonly record struct ViewportPlan(
 
 public static class ViewportMath
 {
-    public static double PaperMmPerModel(double scale) => 1000.0 / scale;
+    public static double PaperMmPerModel(double scale)
+    {
+        if (!double.IsFinite(scale) || scale <= 0)
+            throw new ArgumentOutOfRangeException(nameof(scale), "De schaal moet een eindig getal groter dan nul zijn.");
+        return 1000.0 / scale;
+    }
 
     public static ViewportPlan Compute(double modelWidth, double modelHeight, double scale, double marginMm)
     {

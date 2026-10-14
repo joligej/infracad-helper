@@ -44,7 +44,7 @@ public partial class Commands
         var db = doc.Database;
         var ed = doc.Editor;
         Dictionary<string, object>? original = null;
-        string temp = Path.Combine(Path.GetTempPath(), "nlcs_sysvars_" + Guid.NewGuid().ToString("N"));
+        string temp = Path.Join(Path.GetTempPath(), "nlcs_sysvars_" + Guid.NewGuid().ToString("N"));
         int checks = 0;
         bool passed = false;
         void Check(string name, Action operation)
@@ -111,8 +111,8 @@ public partial class Commands
                 {
                     using var tr = db.TransactionManager.StartTransaction();
                     var analysis = DrawingAnalyzer.Analyze(db, tr, settings);
-                    File.WriteAllText(Path.Combine(temp, "regels.csv"), LegendExport.ToCsv(analysis.Entries));
-                    File.WriteAllText(Path.Combine(temp, "regels.json"), LegendExport.ToJson(analysis.Entries));
+                    File.WriteAllText(Path.Join(temp, "regels.csv"), LegendExport.ToCsv(analysis.Entries));
+                    File.WriteAllText(Path.Join(temp, "regels.json"), LegendExport.ToJson(analysis.Entries));
                     tr.Commit();
                 });
                 Check("eigen laag en blanco", () =>
@@ -126,13 +126,13 @@ public partial class Commands
                 });
                 Check("configuratiebestand", () =>
                 {
-                    string path = Path.Combine(temp, "settings.json");
+                    string path = Path.Join(temp, "settings.json");
                     settings.Save(path);
                     LegendSettings.Load(path);
                 });
                 Check("onleesbare DWG", () =>
                 {
-                    string path = Path.Combine(temp, "invalid.dwg");
+                    string path = Path.Join(temp, "invalid.dwg");
                     File.WriteAllText(path, "Geen DWG");
                     if (BatchExport.AnalyzeFile(path, settings, DescriptionCatalog.Default()).Error is null)
                         throw new InvalidOperationException("Ongeldige DWG werd geaccepteerd.");

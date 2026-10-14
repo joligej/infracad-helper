@@ -77,7 +77,7 @@ internal static class RibbonBuilder
         var tab = ribbon.FindTab(TabId);
         if (tab is null)
             return (false, 0, 0, _lastError ?? "tab niet gevonden");
-        int buttons = tab.Panels.Sum(p => p.Source?.Items.Count ?? 0);
+        int buttons = tab.Panels.Sum(p => p.Source?.Items.OfType<RibbonRowPanel>().Sum(row => row.Items.OfType<RibbonButton>().Count()) ?? 0);
         return (true, tab.Panels.Count, buttons, "ok");
     }
 
@@ -113,91 +113,58 @@ internal static class RibbonBuilder
     private static void Build(RibbonControl ribbon)
     {
         var tab = new RibbonTab { Title = "NLCS Legenda", Id = TabId };
+        AddPanel(tab, "Legenda",
+            ("Genereren", "NLCSLEGENDA", "Maak een legenda van de tekening of selectie."),
+            ("Bijwerken", "NLCSLEGENDAUPDATE", "Teken een bestaande legenda opnieuw."),
+            ("Overzicht", "NLCSLEGENDAINFO", "Bekijk alle regels en pas de volgorde aan."));
+        AddPanel(tab, "Inhoud",
+            ("Samenstellen", "NLCSLEGENDASAMENSTELLEN", "Regels uitvinken en eigen regels toevoegen."),
+            ("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN", "De tekst per element bewerken."),
+            ("Elementtekst", "NLCSLEGENDATEKST", "Eén aangeklikte regel aanpassen."),
+            ("Statussen", "NLCSLEGENDASTATUS", "Eigen statussen maken en regels toewijzen."),
+            ("Xrefs", "NLCSLEGENDAXREFS", "Kiezen welke xrefs meetellen."),
+            ("Laagnaam", "NLCSLEGENDALAAGNAAM", "Een NLCS-laagnaam bewerken."));
+        AddPanel(tab, "Uitvoer",
+            ("Viewport", "NLCSLEGENDAVIEWPORT", "Maak een viewport rond de legenda."),
+            ("Exporteren", "NLCSLEGENDAEXPORT", "Schrijf de regels weg als CSV en JSON."),
+            ("Batch", "NLCSLEGENDABATCH", "Alle tekeningen in een map in één uittrekstaat."));
+        AddPanel(tab, "Instellingen",
+            ("Instellingen", "NLCSLEGENDAOPTIES", "Schaal, opmaak en inhoud van een legenda."),
+            ("Standaard", "NLCSLEGENDASTANDAARD", "Instellingen voor nieuwe legenda's."),
+            ("Profielen", "NLCSLEGENDAPRESET", "Instellingen bewaren en opnieuw gebruiken."));
+        AddPanel(tab, "Beheer en hulp",
+            ("Legenda's", "NLCSLEGENDABEHEER", "Legenda's hernoemen, opzoeken en verwijderen."),
+            ("Controleren", "NLCSLEGENDAELEMENT", "Zie of een aangeklikt object in de legenda komt."),
+            ("Bestanden", "NLCSLEGENDACONFIG", "De instellingenbestanden en hun paden tonen."),
+            ("Help", "NLCSLEGENDAHELP", "Uitleg over de functies."));
         ribbon.Tabs.Add(tab);
-
-        // Hoofdworkflow: groot en vooraan.
-        var legenda = Panel(tab, "Legenda");
-        legenda.Items.Add(Button("Genereren", "NLCSLEGENDA",
-            "Maak een legenda van de tekening of selectie."));
-        legenda.Items.Add(Button("Bijwerken", "NLCSLEGENDAUPDATE",
-            "Teken een bestaande legenda opnieuw."));
-        legenda.Items.Add(Button("Legenda's", "NLCSLEGENDABEHEER",
-            "Legenda's bekijken, bijwerken, hernoemen en verwijderen."));
-
-        // Controleren en uitvoeren.
-        var uitvoer = Panel(tab, "Uitvoer");
-        uitvoer.Items.Add(Button("Overzicht", "NLCSLEGENDAINFO",
-            "Laat zien wat erin komt, zonder te tekenen.", large: false));
-        uitvoer.Items.Add(Button("Controleren", "NLCSLEGENDAELEMENT",
-            "Klik een object aan en zie of het in de legenda komt.", large: false));
-        uitvoer.Items.Add(Button("Viewport", "NLCSLEGENDAVIEWPORT",
-            "Maak een viewport rond de legenda.", large: false));
-        uitvoer.Items.Add(Button("Exporteren", "NLCSLEGENDAEXPORT",
-            "Schrijf de regels weg als CSV en JSON.", large: false));
-        uitvoer.Items.Add(Button("Batch", "NLCSLEGENDABATCH",
-            "Alle tekeningen in een map in één uittrekstaat.", large: false));
-
-        // Wat er in de legenda staat.
-        var inhoud = Panel(tab, "Inhoud");
-        inhoud.Items.Add(Button("Samenstellen", "NLCSLEGENDASAMENSTELLEN",
-            "Regels uitvinken en eigen regels toevoegen.", large: false));
-        inhoud.Items.Add(Button("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN",
-            "De tekst per element bewerken.", large: false));
-        inhoud.Items.Add(Button("Elementtekst", "NLCSLEGENDATEKST",
-            "Eén aangeklikte regel aanpassen.", large: false));
-        inhoud.Items.Add(Button("Statussen", "NLCSLEGENDASTATUS",
-            "Eigen statussen maken en regels toewijzen.", large: false));
-
-        // De tekening als bron.
-        var bronnen = Panel(tab, "Bronnen");
-        bronnen.Items.Add(Button("Xrefs", "NLCSLEGENDAXREFS",
-            "Kiezen welke xrefs meetellen.", large: false));
-        bronnen.Items.Add(Button("Laagnaam", "NLCSLEGENDALAAGNAAM",
-            "Een NLCS-laagnaam bewerken en de laag hernoemen.", large: false));
-
-        // Instellingen en profielen.
-        var instellingen = Panel(tab, "Instellingen");
-        instellingen.Items.Add(Button("Instellingen", "NLCSLEGENDAOPTIES",
-            "Schaal, opmaak en inhoud instellen.", large: false));
-        instellingen.Items.Add(Button("Standaard", "NLCSLEGENDASTANDAARD",
-            "Instellingen voor nieuwe legenda's. Bestaande legenda's houden hun eigen instellingen.", large: false));
-        instellingen.Items.Add(Button("Profielen", "NLCSLEGENDAPRESET",
-            "Instellingen bewaren en opnieuw gebruiken.", large: false));
-        instellingen.Items.Add(Button("Bestanden", "NLCSLEGENDACONFIG",
-            "De instellingenbestanden en hun paden tonen.", large: false));
-
-        // Help apart, aan de rechterkant.
-        var help = Panel(tab, "Help");
-        help.Items.Add(Button("Help", "NLCSLEGENDAHELP",
-            "Korte uitleg over de belangrijkste functies."));
     }
 
-    private static RibbonPanelSource Panel(RibbonTab tab, string title)
+    private static void AddPanel(RibbonTab tab, string title, params (string Text, string Command, string Tip)[] buttons)
     {
         var source = new RibbonPanelSource { Title = title };
         tab.Panels.Add(new RibbonPanel { Source = source });
-        return source;
+        // Elke kolom heeft maximaal drie gelijke knoppen; de hoogte blijft binnen het lint.
+        for (int start = 0; start < buttons.Length; start += 3)
+        {
+            var column = new RibbonRowPanel();
+            for (int i = start; i < Math.Min(start + 3, buttons.Length); i++)
+            {
+                if (i > start) column.Items.Add(new RibbonRowBreak());
+                var (text, command, tip) = buttons[i];
+                column.Items.Add(new RibbonButton
+                {
+                    Text = text, ShowText = true, ShowImage = true, Size = RibbonItemSize.Standard,
+                    Orientation = System.Windows.Controls.Orientation.Horizontal,
+                    IsToolTipEnabled = true, Image = RibbonIcons.Get(command, 16), LargeImage = RibbonIcons.Get(command, 32),
+                    CommandParameter = command, CommandHandler = CommandRunner.Instance,
+                    ToolTip = new RibbonToolTip { Title = text, Content = tip, Command = command }
+                });
+            }
+            source.Items.Add(column);
+        }
     }
 
-    private static RibbonButton Button(string text, string command, string tooltip, bool large = true)
-    {
-        return new RibbonButton
-        {
-            Text = text,
-            ShowText = true,
-            ShowImage = true,
-            Size = large ? RibbonItemSize.Large : RibbonItemSize.Standard,
-            Orientation = large
-                ? System.Windows.Controls.Orientation.Vertical
-                : System.Windows.Controls.Orientation.Horizontal,
-            IsToolTipEnabled = true,
-            LargeImage = RibbonIcons.Get(command, 32),
-            Image = RibbonIcons.Get(command, 16),
-            CommandParameter = command,
-            CommandHandler = CommandRunner.Instance,
-            ToolTip = new RibbonToolTip { Title = text, Content = tooltip, Command = command }
-        };
-    }
 }
 
 internal sealed class CommandRunner : ICommand

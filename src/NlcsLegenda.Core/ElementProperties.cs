@@ -8,7 +8,8 @@ public enum GroupDimension
     Soort,         // basis, bijv. DATA, ET, GAS
     Specificatie,  // spanning/druk: LS, MS, HD, LD
     Uitvoering,    // MANTELBUIS, HULPSTUK
-    Nummer         // volgnummer, bijv. DATA2 -> 2
+    Nummer,        // volgnummer, bijv. DATA2 -> 2
+    Netbeheerder   // oorspronkelijke organisatie uit KLIC-metadata
 }
 
 // Ontleedt een NLCS-elementnaam in groepeerbare eigenschappen. Vooral bedoeld voor de KL-
@@ -16,7 +17,11 @@ public enum GroupDimension
 // zodat samenvoegen die niet per ongeluk combineert.
 public sealed class ElementProperties
 {
-    private static readonly string[] Specificaties = { "LS", "MS", "HD", "LD" };
+    public static bool IsKlic(string discipline, string hoofdgroep) =>
+        string.Equals(discipline, "KL", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(hoofdgroep, "KL", StringComparison.OrdinalIgnoreCase);
+
+    private static readonly string[] Specificaties = { "LS", "MS", "HS", "HD", "LD" };
     private static readonly string[] Uitvoeringen = { "MANTELBUIS", "HULPSTUK" };
 
     public string Soort { get; private init; } = string.Empty;
@@ -24,7 +29,9 @@ public sealed class ElementProperties
     public string Uitvoering { get; private init; } = string.Empty;
     public string Nummer { get; private init; } = string.Empty;
 
-    public static ElementProperties From(string element)
+    public string Netbeheerder { get; private init; } = string.Empty;
+
+    public static ElementProperties From(string element, string netbeheerder = "")
     {
         var e = (element ?? string.Empty).Trim().ToUpperInvariant();
         string uitvoering = string.Empty;
@@ -68,7 +75,8 @@ public sealed class ElementProperties
             Soort = string.Join('_', tokens),
             Specificatie = specificatie,
             Uitvoering = uitvoering,
-            Nummer = nummer
+            Nummer = nummer,
+            Netbeheerder = netbeheerder.Trim().ToUpperInvariant()
         };
     }
 
@@ -78,6 +86,7 @@ public sealed class ElementProperties
         GroupDimension.Specificatie => Specificatie,
         GroupDimension.Uitvoering => Uitvoering,
         GroupDimension.Nummer => Nummer,
+        GroupDimension.Netbeheerder => Netbeheerder,
         _ => string.Empty
     };
 

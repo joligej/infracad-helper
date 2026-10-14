@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.30.0 - 2026-10-14
+
+- Instellingen en andere vensters passen zich aan de beschikbare schermruimte aan.
+  Lange teksten lopen door en de schaalbalkinstellingen zijn zichtbaar en bereikbaar.
+- Overzicht opent een lijstvenster. Kies Handmatig om regels te verplaatsen; iedere
+  legenda bewaart haar eigen volgorde, ook na bijwerken en opnieuw openen.
+- KLIC-netbeheerders worden uit de ingebedde InfraCAD-metadatatabellen gelezen,
+  ook via geneste xrefs. Apart tonen, samenvoegen en afzonderlijk uitsluiten behouden
+  de juiste hoeveelheden. Overzicht en export vermelden de netbeheerders.
+- De ribbon groepeert de knoppen per taak en gebruikt overal dezelfde icoongrootte.
+- Samenstellen en Omschrijvingen ondersteunen Toepassen binnen Instellingen.
+  Gedeelde instellingen blijven gelijk tussen tabbladen; eigen laagregels zijn bewerkbaar.
+- Symboolonderdelen op laag 0 volgen de zichtbaarheid van hun invoeglaag.
+  Hoogspanning wordt als afzonderlijke KLIC-eigenschap herkend.
+- Core Console-tests herstellen ook profielwaarden die tijdens een test ontstaan.
+  GitHub-controles omvatten nu de vensters en hun bediening.
+
 ## 1.29.11 - 2026-10-14
 
 - Overzicht, export, elementcontrole en viewportkeuze tellen alleen aanwezige

@@ -12,7 +12,7 @@ param(
     [string]$PluginPath,
     [string]$TemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('realsize','templatecontract','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('klic','overview','realsize','templatecontract','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen
 )
 $ErrorActionPreference='Stop'
@@ -32,6 +32,8 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ klic=@('NLCSLEGENDAKLICTEST','KLIC lokale en geneste xrefs: 4 netbeheerders, onbekend, 30m, samenvoegen en uitsluiten -> OK','NLCSLEGENDAKLICVERIFY','KLIC na heropenen: netbeheerders en 30m behouden -> OK')
+ overview=@('NLCSLEGENDAOVERVIEWTEST','OVERVIEW handmatige volgorde, echte geometrie, B-isolatie en rollback -> OK','NLCSLEGENDAOVERVIEWVERIFY','OVERVIEW na heropenen en bijwerken: C/B/A, B gelijk -> OK')
  realsize=@('NLCSLEGENDAREALSIZETEST','REALSIZE grote xref-symbolen: modelmaat, schaalvariant, samenvoeging en vrije tekstruimte -> OK')
  templatecontract=@('NLCSLEGENDATEMPLATECONTRACTTEST','TEMPLATECONTRACT DWT-meetpunten, lege hoststijl, notities en schaalbalk op 1:200/500/1000 -> OK')
  scalevariant=@('NLCSLEGENDASCALEVARIANTTEST','SCALEVARIANT xref 1:200/500 naar 1:200/500/1000: symbool 4mm, patroon 1mm, bron ongewijzigd -> OK')
@@ -139,7 +141,7 @@ foreach($case in $Cases){
  if($case -eq 'livetarget'){$expected+="1 legenda('s) in deze tekening:"}
  if($case -eq 'liveempty'){$expected+='Geen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.'}
  Run-Case $case $drawing $specs[$case][0] $expected
- if($case -in @('abclocal','abcxref','oldreopen')){
+ if($case -in @('klic','overview','abclocal','abcxref','oldreopen')){
   $expected=@($specs[$case][3])
   if($case -eq 'abclocal'){$expected+='ABC: viewport A=OK B=OK C=OK'}
   Run-Case "$case-verify" $drawing $specs[$case][2] $expected

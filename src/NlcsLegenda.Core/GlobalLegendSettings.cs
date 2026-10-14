@@ -6,8 +6,8 @@ public static class GlobalLegendSettings
 {
     public static LegendSettings Load(string directory)
     {
-        var settingsPath = Path.Combine(directory, "settings.json");
-        var descriptionsPath = Path.Combine(directory, "omschrijvingen.json");
+        var settingsPath = Path.Join(directory, "settings.json");
+        var descriptionsPath = Path.Join(directory, "omschrijvingen.json");
         var settings = new LegendSettings();
         if (File.Exists(settingsPath) && !LegendSettings.TryParse(File.ReadAllText(settingsPath), out settings))
             throw new InvalidDataException("De globale instellingen zijn onleesbaar of hebben een niet-ondersteunde versie.");
@@ -36,8 +36,8 @@ public static class GlobalLegendSettings
         Directory.CreateDirectory(directory);
         var contents = new Dictionary<string, string>
         {
-            [Path.Combine(directory, "settings.json")] = stored.ToJson(),
-            [Path.Combine(directory, "omschrijvingen.json")] = descriptions.ToJson()
+            [Path.Join(directory, "settings.json")] = stored.ToJson(),
+            [Path.Join(directory, "omschrijvingen.json")] = descriptions.ToJson()
         };
         var originals = contents.Keys.ToDictionary(path => path, path => File.Exists(path) ? File.ReadAllBytes(path) : null);
         var temporary = new Dictionary<string, string>();

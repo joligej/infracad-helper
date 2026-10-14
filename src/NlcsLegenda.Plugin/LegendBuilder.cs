@@ -387,7 +387,7 @@ public static class LegendBuilder
             if (textColWidth < textH * 3)
                 textColWidth = textH * 3;
 
-            var mt = CreateDescription(db, s, styleId, entry.Description, textColWidth);
+            var mt = CreateDescription(db, s, styleId, entry.DisplayDescription, textColWidth);
             // Gelijke basislijn voor woorden met en zonder onderlengte (g, j, p).
             mt.Attachment = AttachmentPoint.TopLeft;
             mt.Location = new Point3d(x + sampleColumnWidth + textGap + TextBearing(tr, styleId, textH),
@@ -599,7 +599,7 @@ public static class LegendBuilder
             throw new InvalidOperationException($"Symbooldefinitie '{localName}' ontbreekt in de bron.");
         var sourceId = table[localName];
         // Alleen de kopie wordt hernoemd. De geladen xref en het bronbestand blijven intact.
-        string sourceVersion = source.FingerprintGuid.ToString() + source.VersionGuid.ToString();
+        string sourceVersion = source.FingerprintGuid + source.VersionGuid;
         string prefix = "NLCS_SRC_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(sourceVersion)))[..20] + "_";
         var originalLayers = new Dictionary<ObjectId, string>();
@@ -693,7 +693,7 @@ public static class LegendBuilder
                         throw new InvalidOperationException("Een symboolafhankelijkheid hoort niet bij de hostdatabase.");
                     if (!includeInvisible && !piece.Visible) continue;
                     var pieceLayer = (LayerTableRecord)tr.GetObject(piece.LayerId, OpenMode.ForRead);
-                    if (!includeInvisible && (pieceLayer.IsOff || pieceLayer.IsFrozen)) continue;
+                    if (!includeInvisible && LayerNaming.LocalName(pieceLayer.Name) != "0" && (pieceLayer.IsOff || pieceLayer.IsFrozen)) continue;
                     piece.Visible = true;
                     var pieceLayerStyle = DrawingAnalyzer.EntityLayerStyle(piece, tr, inheritedLayer);
                     var parentStyle = DrawingAnalyzer.EntityStyle(reference, tr, null, inheritedLayer);

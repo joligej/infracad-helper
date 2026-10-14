@@ -98,6 +98,14 @@ kiest het type (lijn, vlak, arcering, vlakvulling of symbool), de laag en de
 omschrijving. In `NLCSLEGENDABEHEER` staat dit bij elkaar in één venster. Het uitvinken
 en de eigen regels horen bij de globale standaard of bij één legenda.
 
+### Overzicht en eigen volgorde
+
+**Overzicht** (`NLCSLEGENDAINFO`) opent een lijst met regels, hoeveelheden, bronlagen
+en netbeheerders. Kies de legenda en zet **Volgorde** op **Handmatig** om regels met
+de knoppen of Alt+↑ / Alt+↓ te verplaatsen. **Toepassen** werkt de gekozen legenda bij;
+**Opslaan** sluit daarna het venster. Andere legenda's houden hun eigen instellingen.
+Tijdelijk uitgezette regels onthouden hun plaats. Nieuwe regels komen achteraan.
+
 ### Eigen lagen
 
 Heb je eigen (niet-NLCS) lagen die als echte bron moeten meetellen, dan koppel je die in
@@ -124,9 +132,14 @@ keuzemenu vóór het plaatsen. `NLCSLEGENDAINFO` meldt welke soorten uitstaan.
 
 ### KLIC-tekeningen
 
+Netbeheerders komen uit de ingebedde InfraCAD Map-metadatatabellen van de bron-DWG,
+ook bij geneste xrefs. De plugin leidt ze niet af uit volgnummers zoals DATA2.
+Zonder deze metadata blijft de netbeheerder leeg. Beschadigde of tegenstrijdige
+metadata wordt gemeld; de bestaande legenda blijft dan behouden.
+
 Voor KLIC-tekeningen (kabels en leidingen) kun je regels samenvoegen op een eigenschap.
 Onder *Groepering* in de instellingen zet je los aan of je samenvoegt op soort, spanning/druk,
-uitvoering (mantelbuis/hulpstuk) of volgnummer. Zo worden bijvoorbeeld DATA, DATA2 en DATA3
+uitvoering (mantelbuis/hulpstuk), volgnummer of netbeheerder. Zo worden bijvoorbeeld DATA, DATA2 en DATA3
 één regel, of hoog- en laagspanning samen. De hoeveelheden tellen op en het is omkeerbaar:
 zet je de groepering uit, dan staat elke laag weer apart. Generieke placeholdertekst uit
 KLIC-symbolen (zoals "TYPE \ LABEL \ OMSCHRIJVING") wordt standaard weggelaten; echte tekst

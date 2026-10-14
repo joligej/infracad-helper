@@ -5,7 +5,7 @@ namespace NlcsLegenda.Plugin;
 
 // Eenvoudig helpvenster: links de onderwerpen, rechts de tekst. Werkt zonder internet; de tekst
 // staat in de plugin zelf. Alleen basisuitleg voor dagelijks gebruik, geen volledige handleiding.
-internal sealed class HelpDialog : Form
+internal sealed class HelpDialog : LegendDialog
 {
     private static readonly (string Title, string Body)[] Topics =
     {
@@ -31,6 +31,16 @@ internal sealed class HelpDialog : Form
             "Bij één aanwezige legenda open je die direct. Bij meerdere kies je welke.\n" +
             "Standaard bewerkt de instellingen voor nieuwe legenda's.\n\n" +
             "Opmaak → template zet de maatvoering terug; eigen teksten blijven behouden."),
+        ("Overzicht en volgorde",
+            "Overzicht opent een lijst met regels, hoeveelheden, bronlagen en netbeheerders.\n\n" +
+            "Kies Handmatig en verplaats regels met de knoppen of Alt+↑ / Alt+↓.\n" +
+            "Toepassen werkt de legenda bij; Opslaan sluit het venster. Elke legenda\n" +
+            "onthoudt haar eigen volgorde, ook na opnieuw openen."),
+        ("KLIC-groepering",
+            "Onder Groepering kies je welke eigenschappen je wilt samenvoegen: soort,\n" +
+            "spanning/druk, uitvoering, volgnummer en netbeheerder. Hoeveelheden tellen op.\n\n" +
+            "Netbeheerders worden uit de InfraCAD-metadata van de bron gelezen.\n" +
+            "Samenstellen toont de afzonderlijke bronregels om aan of uit te zetten."),
         ("Eigen lagen",
             "Heb je eigen lagen die geen NLCS zijn maar wel mee moeten tellen? Koppel ze onder\n" +
             "Eigen lagen in de instellingen.\n\n" +
@@ -74,13 +84,14 @@ internal sealed class HelpDialog : Form
         var split = new SplitContainer
         {
             Dock = DockStyle.Fill,
-            SplitterDistance = 170,
+            Size = new Size(640, 380),
             Panel1MinSize = 120,
             Panel2MinSize = 200,
+            SplitterDistance = 170,
             Padding = new Padding(8)
         };
 
-        var list = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false, TabIndex = 0 };
+        var list = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true, TabIndex = 0 };
         foreach (var t in Topics) list.Items.Add(t.Title);
         split.Panel1.Controls.Add(list);
 

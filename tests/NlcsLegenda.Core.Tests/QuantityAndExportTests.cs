@@ -169,6 +169,20 @@ public class QuantityAndExportTests
     }
 
     [Fact]
+    public void CsvQuotesCarriageReturnsAndExportsCustomStatus()
+    {
+        var entry = new LegendEntry
+        {
+            Status = NlcsStatus.Nieuw, CustomStatusName = "Fase 2", Discipline = "WE", Hoofdgroep = "KL",
+            Element = "DATA", Description = "Data", Netbeheerders = new[] { "Net A\r=1+1" }
+        };
+        Assert.Contains("\"Net A\r=1+1\"", LegendExport.ToCsv(new[] { entry }));
+        Assert.Contains("Fase 2;", LegendExport.ToCsv(new[] { entry }));
+        using var json = JsonDocument.Parse(LegendExport.ToJson(new[] { entry }));
+        Assert.Equal("Fase 2", json.RootElement[0].GetProperty("status").GetString());
+    }
+
+    [Fact]
     public void CombinedCsv_HasTekeningColumnPerDrawing()
     {
         var a = LegendGrouping.Build(Parse("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A"), new LegendSettings());

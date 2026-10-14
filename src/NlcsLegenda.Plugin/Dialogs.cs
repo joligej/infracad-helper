@@ -5,8 +5,9 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-internal sealed class ButtonBar : FlowLayoutPanel
+internal sealed class ButtonBar : TableLayoutPanel
 {
+    private readonly FlowLayoutPanel _extras = new() { Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
     public Button Ok { get; }
     public Button Cancel { get; }
     public Button? Apply { get; }
@@ -14,27 +15,32 @@ internal sealed class ButtonBar : FlowLayoutPanel
     public ButtonBar(bool withApply)
     {
         Dock = DockStyle.Bottom;
-        FlowDirection = FlowDirection.RightToLeft;
-        WrapContents = true;
+        ColumnCount = 1;
+        ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+        Controls.Add(_extras, 0, 0);
+        Controls.Add(actions, 0, 1);
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Padding = new Padding(8, 6, 8, 8);
 
         Ok = MakeButton("Opslaan", DialogResult.OK);
         Cancel = MakeButton("Annuleren", DialogResult.Cancel);
-        Controls.Add(Ok);
-        Controls.Add(Cancel);
+        actions.Controls.Add(Ok);
+        actions.Controls.Add(Cancel);
         if (withApply)
         {
             Apply = MakeButton("Toepassen", DialogResult.None);
-            Controls.Add(Apply);
+            actions.Controls.Add(Apply);
         }
     }
 
     public Button AddExtra(string text)
     {
         var button = MakeButton(text, DialogResult.None);
-        Controls.Add(button);
+        _extras.Controls.Add(button);
         return button;
     }
 
@@ -53,12 +59,13 @@ internal sealed class ButtonBar : FlowLayoutPanel
     };
 }
 
-internal sealed class SettingsDialog : Form
+internal sealed class SettingsDialog : LegendDialog
 {
     private readonly List<Action> _resync = new();
     private readonly LegendSettings _settings;
     private readonly IReadOnlyList<EntryCheckItem>? _composition;
     private readonly IReadOnlyList<string> _xrefNames;
+    private readonly Func<LegendSettings, IReadOnlyList<EntryCheckItem>>? _compositionSource;
     private bool _syncing;
 
     public event EventHandler? ApplyRequested;
@@ -69,16 +76,18 @@ internal sealed class SettingsDialog : Form
     // (uitsluitingen + eigen regels) en eigen statussen leden toewijzen; de xref-namen voeden
     // de per-xref keuze.
     public SettingsDialog(LegendSettings settings, string contextLabel,
-        IReadOnlyList<EntryCheckItem>? composition = null, IReadOnlyList<string>? xrefNames = null)
+        IReadOnlyList<EntryCheckItem>? composition = null, IReadOnlyList<string>? xrefNames = null,
+        Func<LegendSettings, IReadOnlyList<EntryCheckItem>>? compositionSource = null)
     {
         _composition = composition;
+        _compositionSource = compositionSource;
         _xrefNames = xrefNames ?? Array.Empty<string>();
         _settings = settings;
 
         Text = "NLCS Legenda \u2013 instellingen";
         Font = SystemFonts.MessageBoxFont;
-        ClientSize = new Size(600, 640);
-        MinimumSize = new Size(560, 500);
+        ClientSize = new Size(720, 680);
+        MinimumSize = new Size(560, 420);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = false;
@@ -89,14 +98,13 @@ internal sealed class SettingsDialog : Form
         {
             Dock = DockStyle.Top,
             Text = contextLabel,
-            AutoSize = false,
-            Height = 28,
+            AutoSize = true,
             TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(10, 0, 0, 0),
             Font = new Font(SystemFonts.MessageBoxFont!, FontStyle.Bold)
         };
 
-        var tabs = new TabControl { Dock = DockStyle.Fill };
+        var tabs = new TabControl { Dock = DockStyle.Fill, Multiline = true };
         tabs.TabPages.Add(BuildAlgemeenTab());
         tabs.TabPages.Add(BuildInhoudTab());
         tabs.TabPages.Add(BuildOpmaakTab());
@@ -112,7 +120,7 @@ internal sealed class SettingsDialog : Form
         };
         var remarks = buttons.AddExtra("Opmerkingen\u2026");
         remarks.Click += (_, _) => EditRemarks();
-        if (_composition is not null)
+        if (_composition is not null || _compositionSource is not null)
         {
             var samenstellen = buttons.AddExtra("Samenstellen\u2026");
             samenstellen.Click += (_, _) => EditComposition();
@@ -153,7 +161,7 @@ internal sealed class SettingsDialog : Form
             Minimum = min, Maximum = max, DecimalPlaces = decimals, Increment = increment,
             Width = width, Value = start
         };
-        n.ValueChanged += (_, _) => { if (!_syncing) set((double)n.Value); };
+        n.ValueChanged += (_, _) => { if (!_syncing) { set((double)n.Value); SyncAll(); } };
         _resync.Add(() => n.Value = ClampDecimal((decimal)get(), min, max));
         return LabeledRow(label, n);
     }
@@ -167,7 +175,7 @@ internal sealed class SettingsDialog : Form
             Minimum = min, Maximum = max, DecimalPlaces = 0, Increment = 1,
             Width = width, Value = start
         };
-        n.ValueChanged += (_, _) => { if (!_syncing) set((int)n.Value); };
+        n.ValueChanged += (_, _) => { if (!_syncing) { set((int)n.Value); SyncAll(); } };
         _resync.Add(() => n.Value = Math.Clamp(get(), min, max));
         return LabeledRow(label, n);
     }
@@ -175,7 +183,7 @@ internal sealed class SettingsDialog : Form
     private Panel TextRow(string label, Func<string> get, Action<string> set, int width = 220)
     {
         var t = new TextBox { Text = get(), Width = width };
-        t.TextChanged += (_, _) => { if (!_syncing) set(t.Text); };
+        t.TextChanged += (_, _) => { if (!_syncing) { set(t.Text); SyncAll(); } };
         _resync.Add(() => { if (t.Text != get()) t.Text = get(); });
         return LabeledRow(label, t);
     }
@@ -208,7 +216,7 @@ internal sealed class SettingsDialog : Form
 
     private static GroupBox Group(string title, params Control[] controls)
     {
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(6) };
+        var flow = new SettingsStack { Padding = new Padding(6) };
         flow.Controls.AddRange(controls);
         var box = new GroupBox { Text = title, Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(6) };
         box.Controls.Add(flow);
@@ -218,7 +226,7 @@ internal sealed class SettingsDialog : Form
     private TabPage BuildAlgemeenTab()
     {
         var page = new TabPage("Algemeen") { Padding = new Padding(10), AutoScroll = true };
-        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        var root = new SettingsStack();
 
         var scale = new NumericUpDown { Minimum = 1, Maximum = 1_000_000, Value = (decimal)Math.Clamp(_settings.Scale, 1, 1_000_000), Width = 100 };
         scale.ValueChanged += (_, _) => _settings.Scale = (double)scale.Value;
@@ -246,7 +254,7 @@ internal sealed class SettingsDialog : Form
     private TabPage BuildInhoudTab()
     {
         var page = new TabPage("Inhoud") { Padding = new Padding(10), AutoScroll = true };
-        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        var root = new SettingsStack();
 
         root.Controls.Add(Group("Elementsoorten",
             BoundCheck("Geometrie / lijnen", () => _settings.ToonGeometrie, v => _settings.ToonGeometrie = v),
@@ -265,6 +273,7 @@ internal sealed class SettingsDialog : Form
             BoundCheck("Soort samenvoegen", () => _settings.SamenvoegenSoort, v => _settings.SamenvoegenSoort = v),
             BoundCheck("Spanning/druk samenvoegen", () => _settings.SamenvoegenSpecificatie, v => _settings.SamenvoegenSpecificatie = v),
             BoundCheck("Uitvoering samenvoegen", () => _settings.SamenvoegenUitvoering, v => _settings.SamenvoegenUitvoering = v),
+            BoundCheck("Netbeheerder samenvoegen", () => _settings.MergedDimensions.Contains(GroupDimension.Netbeheerder), v => { if (v) _settings.MergedDimensions.Add(GroupDimension.Netbeheerder); else _settings.MergedDimensions.Remove(GroupDimension.Netbeheerder); }),
             BoundCheck("Volgnummer samenvoegen", () => _settings.SamenvoegenNummer, v => _settings.SamenvoegenNummer = v),
             BoundCheck("KLIC-placeholdertekst weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v)));
         root.Controls.Add(Group("Lagen",
@@ -272,7 +281,7 @@ internal sealed class SettingsDialog : Form
             BoundCheck("Xref-lagen meenemen", () => _settings.IncludeXrefLayers, v => _settings.IncludeXrefLayers = v)));
 
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Padding = new Padding(3) };
-        if (_composition is not null)
+        if (_composition is not null || _compositionSource is not null)
         {
             var samen = new Button { Text = "Samenstellen\u2026", AutoSize = true };
             samen.Click += (_, _) => EditComposition();
@@ -295,18 +304,21 @@ internal sealed class SettingsDialog : Form
         return page;
     }
 
-    private static Panel LabeledRow(string label, Control control)
+    internal static Panel LabeledRow(string label, Control control)
     {
-        var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Margin = new Padding(3) };
-        panel.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 6, 0) });
-        panel.Controls.Add(control);
+        var panel = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = new Padding(3) };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
+        panel.Controls.Add(new Label { Text = label, AutoSize = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0, 4, 6, 4) }, 0, 0);
+        control.Anchor = control is TextBox or ComboBox ? AnchorStyles.Left | AnchorStyles.Right : AnchorStyles.Left;
+        panel.Controls.Add(control, 1, 0);
         return panel;
     }
 
     private TabPage BuildOpmaakTab()
     {
         var page = new TabPage("Opmaak") { Padding = new Padding(10), AutoScroll = true };
-        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        var root = new SettingsStack();
 
         root.Controls.Add(Group("Weergave",
             BoundCheck("Kader rond legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
@@ -336,7 +348,7 @@ internal sealed class SettingsDialog : Form
     private TabPage BuildTekstenTab()
     {
         var page = new TabPage("Teksten") { Padding = new Padding(10), AutoScroll = true };
-        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        var root = new SettingsStack();
 
         root.Controls.Add(Group("Omschrijvingen",
             BoundCheck("Omschrijvingen tonen", () => _settings.IncludeText, v => _settings.IncludeText = v),
@@ -371,7 +383,7 @@ internal sealed class SettingsDialog : Form
     private TabPage BuildHoeveelhedenTab()
     {
         var page = new TabPage("Hoeveelheden") { Padding = new Padding(10), AutoScroll = true };
-        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        var root = new SettingsStack();
 
         root.Controls.Add(BoundCheck("Hoeveelheden tonen", () => _settings.IncludeQuantities, v => _settings.IncludeQuantities = v));
         root.Controls.Add(Group("Eenheden",
@@ -390,7 +402,7 @@ internal sealed class SettingsDialog : Form
     private TabPage BuildSchaalbalkTab()
     {
         var page = new TabPage("Schaalbalk / Extra") { Padding = new Padding(10), AutoScroll = true };
-        var root = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        var root = new SettingsStack();
 
         root.Controls.Add(Group("Schaalbalk",
             BoundCheck("Schaalbalk tonen", () => _settings.IncludeScaleBar, v => _settings.IncludeScaleBar = v),
@@ -423,8 +435,10 @@ internal sealed class SettingsDialog : Form
     {
         var available = new List<(string Key, string Label)>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (_composition is not null)
-            foreach (var item in _composition)
+        var composition = CompositionItems();
+        if (composition is null) return;
+        if (_composition is not null || _compositionSource is not null)
+            foreach (var item in composition)
                 if (seen.Add(item.Key))
                     available.Add((item.Key, item.Label));
         foreach (var manual in _settings.ManualEntries)
@@ -463,12 +477,16 @@ internal sealed class SettingsDialog : Form
     // Hetzelfde DescriptionOverrides-model als het losse commando.
     private void EditDescriptions()
     {
-        using var dlg = new DescriptionsDialog(_settings.DescriptionOverrides.Clone());
-        if (dlg.ShowDialog(this) == DialogResult.OK)
+        var effective = DescriptionCatalog.Default();
+        effective.MergeFrom(_settings.DescriptionOverrides);
+        using var dlg = new DescriptionsDialog(effective);
+        void Apply()
         {
-            _settings.DescriptionOverrides = dlg.ToCatalog();
+            _settings.DescriptionOverrides = dlg.ToCatalog().Diff(DescriptionCatalog.Default());
             SyncAll();
         }
+        dlg.ApplyRequested += (_, _) => Apply();
+        if (dlg.ShowDialog(this) == DialogResult.OK) Apply();
     }
 
     // Eigen (niet-NLCS) bronlagen koppelen. Werkt op een kopie; alleen OK schrijft terug.
@@ -506,17 +524,31 @@ internal sealed class SettingsDialog : Form
     }
 
     // Dezelfde boom-editor als het losse commando, op de werkkopie.
+    private IReadOnlyList<EntryCheckItem>? CompositionItems()
+    {
+        try { return _compositionSource?.Invoke(_settings) ?? _composition ?? Array.Empty<EntryCheckItem>(); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "De bronregels konden niet worden gelezen.\n\n" + ex.Message,
+                "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return null;
+        }
+    }
+
     private void EditComposition()
     {
-        if (_composition is null)
-            return;
-        using var dlg = new LegendManageDialog(_composition, _settings);
-        if (dlg.ShowDialog(this) == DialogResult.OK)
+        if (_composition is null && _compositionSource is null) return;
+        var composition = CompositionItems();
+        if (composition is null) return;
+        using var dlg = new LegendManageDialog(composition, _settings);
+        void Apply()
         {
             _settings.ExcludedEntries = dlg.ExcludedKeys;
             _settings.ManualEntries = dlg.ManualEntries;
             RefreshGrids();
         }
+        dlg.ApplyRequested += (_, _) => Apply();
+        if (dlg.ShowDialog(this) == DialogResult.OK) Apply();
     }
 
     private bool ValidateScale()
@@ -548,9 +580,9 @@ internal sealed class SettingsDialog : Form
 
 // Begint bij de effectieve keuze (IsXrefIncluded, inclusief default-fallback) en geeft bij OK een
 // expliciete map terug.
-internal sealed class XrefInclusionDialog : Form
+internal sealed class XrefInclusionDialog : LegendDialog
 {
-    private readonly CheckedListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false, CheckOnClick = true };
+    private readonly CheckedListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true, CheckOnClick = true };
     private readonly IReadOnlyList<string> _names;
 
     public XrefInclusionDialog(IReadOnlyList<string> names, LegendSettings settings)
@@ -604,12 +636,12 @@ internal sealed class XrefInclusionDialog : Form
 }
 
 // Werkt op een diepe kopie; leden zijn entry-keys (zelfde model als NLCSLEGENDASTATUS).
-internal sealed class CustomStatusDialog : Form
+internal sealed class CustomStatusDialog : LegendDialog
 {
     private readonly List<CustomStatus> _statuses;
     private readonly IReadOnlyList<(string Key, string Label)> _available;
-    private readonly ListBox _statusList = new() { Dock = DockStyle.Fill, IntegralHeight = false };
-    private readonly CheckedListBox _members = new() { Dock = DockStyle.Fill, IntegralHeight = false, CheckOnClick = true };
+    private readonly ListBox _statusList = new() { Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true };
+    private readonly CheckedListBox _members = new() { Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true, CheckOnClick = true };
     private bool _loading;
 
     public CustomStatusDialog(IReadOnlyList<CustomStatus> initial, IReadOnlyList<(string Key, string Label)> available)
@@ -662,7 +694,7 @@ internal sealed class CustomStatusDialog : Form
         split.Panel1.Controls.Add(_statusList);
         split.Panel1.Controls.Add(leftButtons);
 
-        var memberLabel = new Label { Dock = DockStyle.Top, Text = "Toegewezen regels:", Height = 22, TextAlign = ContentAlignment.MiddleLeft };
+        var memberLabel = new Label { Dock = DockStyle.Top, Text = "Toegewezen regels:", AutoSize = true, TextAlign = ContentAlignment.MiddleLeft };
         split.Panel2.Controls.Add(_members);
         split.Panel2.Controls.Add(memberLabel);
 
@@ -744,7 +776,7 @@ internal sealed class CustomStatusDialog : Form
 
     private string? Prompt(string label, string initial = "")
     {
-        using var dlg = new Form
+        using var dlg = new LegendDialog
         {
             Text = label,
             Font = SystemFonts.MessageBoxFont,
@@ -767,7 +799,7 @@ internal sealed class CustomStatusDialog : Form
 
 // Meerregelige editor voor de opmerkingen: Enter maakt een nieuwe regel, met scrollbar en
 // gewone klembord-ondersteuning. Regeleindes en lege regels blijven exact behouden.
-internal sealed class RemarksEditDialog : Form
+internal sealed class RemarksEditDialog : LegendDialog
 {
     private readonly TextBox _title;
     private readonly TextBox _body;
@@ -832,7 +864,7 @@ internal sealed class RemarksEditDialog : Form
     public string RemarksTitle => _title.Text.Trim();
 
     // Body niet trimmen op regelniveau: bewuste lege regels en inspringing blijven staan.
-    public string RemarksText => _body.Text.Replace("\r\n", "\n").Trim('\n');
+    public string RemarksText => _body.Text.Replace("\r\n", "\n");
 }
 
 public sealed class DescriptionRow
@@ -844,7 +876,7 @@ public sealed class DescriptionRow
     public string Specifiek { get; set; } = string.Empty;
 }
 
-internal sealed class DescriptionsDialog : Form
+internal sealed class DescriptionsDialog : LegendDialog
 {
     private readonly DataGridView _grid;
     private BindingList<DescriptionRow> _rows = new();
@@ -974,7 +1006,7 @@ internal sealed class DescriptionsDialog : Form
     }
 }
 
-internal sealed class TextEditDialog : Form
+internal sealed class TextEditDialog : LegendDialog
 {
     private readonly TextBox _algemeen;
     private readonly TextBox _specifiek;
@@ -1058,10 +1090,10 @@ internal sealed class TextEditDialog : Form
 // Beheert de blanco (statische, bewust lege) legendaregels: toevoegen, bewerken (tekst + status),
 // verwijderen en dupliceren. Werkt op een diepe kopie; de aanroeper neemt het resultaat alleen bij
 // OK over. Elke regel houdt zijn eigen identiteit, ook bij dupliceren met dezelfde tekst.
-internal sealed class BlankEntryDialog : Form
+internal sealed class BlankEntryDialog : LegendDialog
 {
     private readonly List<BlankEntry> _items;
-    private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false };
+    private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true };
 
     public BlankEntryDialog(IReadOnlyList<BlankEntry> initial)
     {
@@ -1080,7 +1112,7 @@ internal sealed class BlankEntryDialog : Form
         var hint = new Label
         {
             Dock = DockStyle.Top,
-            Height = 40,
+            AutoSize = true,
             Text = "Een blanco regel is een lege regel die je zelf later invult. "
                  + "Standaardtekst: \u201c[blanco]\u201d.",
             Padding = new Padding(4, 2, 4, 2)
@@ -1126,7 +1158,7 @@ internal sealed class BlankEntryDialog : Form
     // Bewerkt tekst en status van één blanco regel. True bij OK.
     private bool EditItem(BlankEntry item)
     {
-        using var dlg = new Form
+        using var dlg = new LegendDialog
         {
             Text = "Blanco regel",
             Font = SystemFonts.MessageBoxFont,
@@ -1140,14 +1172,9 @@ internal sealed class BlankEntryDialog : Form
         status.Items.AddRange(Enum.GetNames<NlcsStatus>());
         status.SelectedItem = item.Status.ToString();
 
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(8) };
-        FlowLayoutPanel Row(string label, Control c)
-        {
-            var p = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
-            p.Controls.Add(new Label { Text = label, AutoSize = true, Width = 120, Padding = new Padding(0, 6, 0, 0) });
-            p.Controls.Add(c);
-            return p;
-        }
+        var flow = new SettingsStack { Padding = new Padding(8) };
+        Panel Row(string label, Control c) => SettingsDialog.LabeledRow(label, c);
+
         flow.Controls.Add(Row("Tekst:", text));
         flow.Controls.Add(Row("Status:", status));
         flow.Controls.Add(new Label { Text = "Leeg laten = \u201c[blanco]\u201d.", AutoSize = true, ForeColor = SystemColors.GrayText });
@@ -1157,7 +1184,9 @@ internal sealed class BlankEntryDialog : Form
         var barBtn = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Padding = new Padding(6) };
         barBtn.Controls.Add(cancel); barBtn.Controls.Add(ok);
         dlg.AcceptButton = ok; dlg.CancelButton = cancel;
-        dlg.Controls.Add(flow); dlg.Controls.Add(barBtn);
+        var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        scroll.Controls.Add(flow);
+        dlg.Controls.Add(scroll); dlg.Controls.Add(barBtn);
 
         if (dlg.ShowDialog(this) != DialogResult.OK)
             return false;
@@ -1169,10 +1198,10 @@ internal sealed class BlankEntryDialog : Form
 
 // Beheert de eigen-laagkoppelingen: een lijst met toevoegen/bewerken/verwijderen. Werkt op een
 // diepe kopie; de aanroeper neemt het resultaat alleen bij OK over.
-internal sealed class CustomLayerDialog : Form
+internal sealed class CustomLayerDialog : LegendDialog
 {
     private readonly List<CustomLayerRule> _rules;
-    private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false };
+    private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true };
 
     public CustomLayerDialog(IReadOnlyList<CustomLayerRule> initial)
     {
@@ -1191,7 +1220,7 @@ internal sealed class CustomLayerDialog : Form
         var hint = new Label
         {
             Dock = DockStyle.Top,
-            Height = 36,
+            AutoSize = true,
             Text = "Koppel een eigen (niet-NLCS) laag als bron. Dit is iets anders dan een handmatige "
                  + "regel: een eigen laag telt alleen mee als er objecten op die laag staan.",
             Padding = new Padding(4, 2, 4, 2)
@@ -1201,7 +1230,7 @@ internal sealed class CustomLayerDialog : Form
         var add = new Button { Text = "Toevoegen\u2026", AutoSize = true };
         add.Click += (_, _) => { var r = EditRule(new CustomLayerRule()); if (r is not null) { _rules.Add(r); Reload(_rules.Count - 1); } };
         var edit = new Button { Text = "Bewerken\u2026", AutoSize = true };
-        edit.Click += (_, _) => { int i = _list.SelectedIndex; if (i < 0) return; var r = EditRule(_rules[i].Clone()); if (r is not null) { _rules[i] = r; Reload(i); } };
+        edit.Click += (_, _) => { int i = _list.SelectedIndex; if (i < 0) return; var r = EditRule(_rules[i].Clone(), i); if (r is not null) { _rules[i] = r; Reload(i); } };
         var remove = new Button { Text = "Verwijderen", AutoSize = true };
         remove.Click += (_, _) => { int i = _list.SelectedIndex; if (i < 0) return; _rules.RemoveAt(i); Reload(Math.Min(i, _rules.Count - 1)); };
         bar.Controls.AddRange(new Control[] { add, edit, remove });
@@ -1231,9 +1260,9 @@ internal sealed class CustomLayerDialog : Form
     }
 
     // Bewerkt één regel in een subvenster. Geeft de regel terug bij OK, anders null.
-    private CustomLayerRule? EditRule(CustomLayerRule rule)
+    private CustomLayerRule? EditRule(CustomLayerRule rule, int editingIndex = -1)
     {
-        using var dlg = new Form
+        using var dlg = new LegendDialog
         {
             Text = "Eigen laag",
             Font = SystemFonts.MessageBoxFont,
@@ -1264,14 +1293,9 @@ internal sealed class CustomLayerDialog : Form
         var xref = new TextBox { Text = rule.XrefName, Width = 160 };
         var block = new TextBox { Text = rule.BlockName ?? string.Empty, Width = 160 };
 
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(8) };
-        FlowLayoutPanel Row(string label, Control c)
-        {
-            var p = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
-            p.Controls.Add(new Label { Text = label, AutoSize = true, Width = 150, Padding = new Padding(0, 6, 0, 0) });
-            p.Controls.Add(c);
-            return p;
-        }
+        var flow = new SettingsStack { Padding = new Padding(8) };
+        Panel Row(string label, Control c) => SettingsDialog.LabeledRow(label, c);
+
         flow.Controls.Add(Row("Laagnaam:", layer));
         flow.Controls.Add(Row("Logisch element:", element));
         flow.Controls.Add(Row("Omschrijving:", desc));
@@ -1287,7 +1311,9 @@ internal sealed class CustomLayerDialog : Form
         var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Padding = new Padding(6) };
         bar.Controls.Add(cancel); bar.Controls.Add(ok);
         dlg.AcceptButton = ok; dlg.CancelButton = cancel;
-        dlg.Controls.Add(flow); dlg.Controls.Add(bar);
+        var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        scroll.Controls.Add(flow);
+        dlg.Controls.Add(scroll); dlg.Controls.Add(bar);
 
         ok.Click += (_, _) =>
         {
@@ -1304,7 +1330,7 @@ internal sealed class CustomLayerDialog : Form
             { Warn("Geef een geldige laagnaam op."); return; }
             if (string.IsNullOrWhiteSpace(rule.Element))
             { Warn("Geef een logisch element op."); return; }
-            if (_rules.Any(o => !ReferenceEquals(o, rule) && SameMapping(o, rule)))
+            if (_rules.Where((_, index) => index != editingIndex).Any(o => SameMapping(o, rule)))
             { Warn("Er bestaat al een koppeling voor deze laag en bron."); return; }
             dlg.DialogResult = DialogResult.OK;
         };

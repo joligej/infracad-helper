@@ -245,7 +245,7 @@ public partial class Commands
             foreach (var by in bodyCentersY)
                 foreach (var cy in swatchCentersY)
                     vertDev = Math.Min(vertDev, Math.Abs(by - cy));
-            double vertDevMm = s.ModelUnitsPerPaperMm > 0 && vertDev != double.MaxValue ? vertDev / s.ModelUnitsPerPaperMm : double.NaN;
+            double vertDevMm = s.ModelUnitsPerPaperMm > 0 && !vertDev.Equals(double.MaxValue) ? vertDev / s.ModelUnitsPerPaperMm : double.NaN;
             bool vertOk = !double.IsNaN(vertDevMm) && vertDevMm < 0.05;
             ed.WriteMessage($"\nVOLOPMAAK verticaal: body-midden t.o.v. swatch-midden={vertDevMm:0.###} mm -> {(vertOk ? "OK" : "FAIL")}");
 

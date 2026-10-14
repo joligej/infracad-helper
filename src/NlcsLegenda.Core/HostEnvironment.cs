@@ -21,7 +21,7 @@ public static class HostEnvironment
 
     private static string? CurrentProcessName()
     {
-        try { return Process.GetCurrentProcess().ProcessName; }
+        try { using var process = Process.GetCurrentProcess(); return process.ProcessName; }
         catch { return null; }
     }
 }

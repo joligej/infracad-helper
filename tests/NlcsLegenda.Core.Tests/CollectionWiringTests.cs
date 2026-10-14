@@ -17,6 +17,7 @@ public class CollectionWiringTests
         nameof(LegendSettings.MergedDimensions),
         nameof(LegendSettings.ExcludedEntries),
         nameof(LegendSettings.ManualEntries),
+        nameof(LegendSettings.ManualEntryOrder),
         nameof(LegendSettings.BlankEntries),
         nameof(LegendSettings.CustomStatuses),
         nameof(LegendSettings.CustomLayerRules),
@@ -55,6 +56,7 @@ public class CollectionWiringTests
         s.IncludedDrawTypes.Add(NlcsDrawType.Symbool);
         s.MergedDimensions.Add(GroupDimension.Soort);
         s.ExcludedEntries.Add("N|WE|VH|X");
+        s.ManualEntryOrder.Add("row-key");
         s.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-X-G", Description = "Eigen" });
         s.BlankEntries.Add(new BlankEntry { Text = "Reservering" });
         s.CustomStatuses.Add(new CustomStatus { Name = "Onder voorbehoud", Members = { "N|WE|RI|R" } });
@@ -77,6 +79,7 @@ public class CollectionWiringTests
         Assert.Equal(new[] { NlcsDrawType.Symbool }, back.IncludedDrawTypes);
         Assert.Contains(GroupDimension.Soort, back.MergedDimensions);
         Assert.Contains("N|WE|VH|X", back.ExcludedEntries);
+        Assert.Equal(new[] { "row-key" }, back.ManualEntryOrder);
         Assert.Single(back.ManualEntries);
         Assert.Equal("Eigen", back.ManualEntries[0].Description);
         Assert.Single(back.BlankEntries);
@@ -102,6 +105,7 @@ public class CollectionWiringTests
         original.IncludedDrawTypes.Add(NlcsDrawType.Geometrie);
         original.MergedDimensions.Add(GroupDimension.Specificatie);
         original.ExcludedEntries.Add("extra");
+        original.ManualEntryOrder.Add("extra");
         original.ManualEntries.Add(new ManualEntry { Layer = "N-WE-VH-Y-G", Description = "Extra" });
         original.BlankEntries.Add(new BlankEntry { Text = "Extra" });
         original.CustomStatuses[0].Members.Add("extra");
@@ -115,6 +119,7 @@ public class CollectionWiringTests
         Assert.Single(clone.IncludedDrawTypes);
         Assert.Single(clone.MergedDimensions);
         Assert.Single(clone.ExcludedEntries);
+        Assert.Equal(new[] { "row-key" }, clone.ManualEntryOrder);
         Assert.Single(clone.ManualEntries);
         Assert.Single(clone.BlankEntries);
         Assert.Single(clone.CustomStatuses[0].Members);

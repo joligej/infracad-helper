@@ -6,5 +6,7 @@ public enum LegendSortMode
 
     Naam,
 
-    Hoeveelheid
+    Hoeveelheid,
+
+    Handmatig
 }

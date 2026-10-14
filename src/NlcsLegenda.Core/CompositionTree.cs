@@ -45,10 +45,19 @@ public sealed class CompositionTree
     public static CompositionTree Build(
         IEnumerable<(string Key, string Label, string Group)> items, ISet<string> excluded)
     {
+        var available = items.ToList();
+        var expanded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in excluded)
+        {
+            var members = available.Where(i => string.Equals(LegendSettings.BaseEntryKey(i.Key), key, StringComparison.OrdinalIgnoreCase)).Select(i => i.Key).ToArray();
+            if (members.Length == 0) expanded.Add(key);
+            else expanded.UnionWith(members);
+        }
+        excluded = expanded;
         var tree = new CompositionTree();
         tree._unlistedExclusions.UnionWith(excluded);
         var byLabel = new Dictionary<string, Group>(StringComparer.CurrentCultureIgnoreCase);
-        foreach (var (key, label, group) in items)
+        foreach (var (key, label, group) in available)
         {
             var groupLabel = string.IsNullOrWhiteSpace(group) ? "Overig" : group.Trim();
             if (!byLabel.TryGetValue(groupLabel, out var g))

@@ -41,6 +41,22 @@ public class KlicGroupingTests
         return s;
     }
 
+    [Theory]
+    [InlineData("ET_HS", "ET", "HS", "", "")]
+    [InlineData("ET_HS2", "ET", "HS", "", "2")]
+    public void HighVoltageIsAnIndependentDimension(string element, string soort, string spec, string uitv, string num)
+        => From_DecomposesElement(element, soort, spec, uitv, num);
+
+    [Fact]
+    public void KlicDimensionsDoNotMergeRoadObjects()
+    {
+        var settings = KlicSettings();
+        settings.MergedDimensions = Enum.GetValues<GroupDimension>().ToHashSet();
+        var result = LegendGrouping.Build(Parse("N-WE-VH-WEG-G", "N-WE-VH-PAD-G", "B-WE-KL-DATA-G", "B-WE-KL-DATA2-G"), settings);
+        Assert.Equal(3, result.Count);
+        Assert.Single(result, e => e.MergedMembers.Count == 2);
+    }
+
     [Fact]
     public void MergeNummer_CombinesDataCables()
     {

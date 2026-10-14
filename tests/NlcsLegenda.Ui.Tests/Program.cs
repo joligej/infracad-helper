@@ -1,0 +1,226 @@
+using System.Drawing;
+using System.Windows.Forms;
+using NlcsLegenda.Core;
+using NlcsLegenda.Plugin;
+
+internal static class Program
+{
+    private static int _checks;
+    private static readonly List<string> Errors = new();
+    [STAThread]
+    private static int Main(string[] args)
+    {
+        Application.EnableVisualStyles();
+        try
+        {
+            foreach (float scale in new[] { 1f, 1.5f, 2f })
+                CheckSettings(scale, args.FirstOrDefault());
+            CheckOverview();
+            CheckNestedEditors();
+            Func<Form>[] factories = {
+                () => new XrefInclusionDialog(new[] { "Een lange xrefnaam met veel informatie.dwg" }, new()),
+                () => new CustomStatusDialog(new[] { new CustomStatus { Name = "Eigen status" } }, new[] { ("key", "Voorbeeldregel") }),
+                () => new RemarksEditDialog("Notities", StandardTexts.DrawingRemarks),
+                () => new DescriptionsDialog(DescriptionCatalog.Default()),
+                () => new TextEditDialog("VH|ELEMENT", new DescriptionEntry { Specifiek = "Een langere omschrijving" }, new()),
+                () => new BlankEntryDialog(new[] { new BlankEntry() }),
+                () => new CustomLayerDialog(new[] { new CustomLayerRule { Layer = "Eigen laag" } }),
+                () => new LegendManageDialog(new[] { new EntryCheckItem("key", "Regel", "DATA") }, new()),
+                () => new LayerEditDialog(new NlcsLayerComponents(), "N-WE-KL-DATA-G", 10, false, null),
+                () => new HelpDialog("test")
+            };
+            foreach (var scale in new[] { 1f, 1.5f, 2f })
+            foreach (var factory in factories)
+            {
+                using var form = factory();
+                OpenOffscreen(form);
+                form.AutoScaleMode = AutoScaleMode.None;
+                form.Scale(new SizeF(scale, scale));
+                form.Font = new Font(form.Font.FontFamily, 9f * scale);
+                form.MinimumSize = new Size(480, 340);
+                form.ClientSize = new Size(720, 540);
+                Application.DoEvents();
+                CheckButtons(form);
+                Check(Descendants(form).All(c => c is not TextBox || c.Height >= c.Font.Height), form.Text + ": teksthoogte");
+                form.Close();
+            }
+        }
+        catch(Exception ex) { Errors.Add(ex.ToString()); }
+        foreach(var error in Errors) Console.WriteLine("FAIL " + error);
+        Console.WriteLine($"UI: {_checks} controles; {Errors.Count} fouten");
+        return Errors.Count == 0 ? 0 : 1;
+    }
+
+    private static void CheckSettings(float scale, string? output)
+    {
+        var settings = new LegendSettings();
+        using var form = new SettingsDialog(settings, "Legenda: voorbeeld", new[] { new EntryCheckItem("key", "Data", "DATA") });
+        OpenOffscreen(form);
+        // Vergroot ook het lettertype: een geometrische schaaltest alleen mist tekstafbreking.
+        form.AutoScaleMode = AutoScaleMode.None;
+        form.Scale(new SizeF(scale, scale));
+        form.Font = new Font(form.Font.FontFamily, 9f * scale);
+        form.MinimumSize = new Size(560, 420);
+        form.ClientSize = new Size(scale == 1 ? 720 : 900, 620);
+        var tabs = form.Controls.OfType<TabControl>().Single();
+        foreach(TabPage page in tabs.TabPages)
+        {
+            tabs.SelectedTab = page;
+            Application.DoEvents();
+            foreach(var group in Descendants(page).OfType<GroupBox>())
+            {
+                Check(group.Width > 100 && group.Height > group.Font.Height * 2, $"{scale} / {page.Text} / {group.Text}: niet ingeklapt");
+                Check(group.Controls[0].Height >= 25, $"{group.Text}: inhoud zichtbaar");
+            }
+            foreach(var control in Descendants(page).Where(c => c is NumericUpDown or TextBox or ComboBox or CheckBox))
+            {
+                page.ScrollControlIntoView(control);
+                Application.DoEvents();
+                Check(control.Width >= 30 && control.Height >= control.Font.Height, $"{scale} / {page.Text} / {control.Text}: bedienbare afmetingen");
+            }
+            page.AutoScrollPosition = Point.Empty;
+            CheckButtons(form);
+            if (output is not null && page.Text.StartsWith("Schaalbalk"))
+            {
+                Directory.CreateDirectory(output);
+                using var bitmap = new Bitmap(form.Width, form.Height);
+                form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+                bitmap.Save(Path.Join(output, $"settings-{scale:0.0}.png"));
+            }
+        }
+        tabs.SelectedIndex = 1;
+        var number = Descendants(tabs.SelectedTab!).OfType<CheckBox>().Single(c => c.Text == "Volgnummer samenvoegen");
+        number.Checked = true;
+        Check(settings.SamenvoegenNummer, "KLIC-keuze wijzigt de instelling");
+        number.Checked = false;
+        Check(!settings.SamenvoegenNummer, "KLIC-keuze is omkeerbaar");
+        form.Close();
+    }
+
+    private static void CheckNestedEditors()
+    {
+        var settings = new LegendSettings();
+        settings.ManualEntries.Add(new ManualEntry { Layer = "Bron", Description = "Oud" });
+        int loads = 0;
+        using var parent = new SettingsDialog(settings, "Test", compositionSource: _ => { loads++; return new[] { new EntryCheckItem("key", "Data", "DATA") }; });
+        OpenOffscreen(parent);
+        Check(loads == 0, "Instellingen analyseert pas bij openen Samenstellen");
+        InModal("NLCS Legenda – samenstellen", dialog =>
+        {
+            var grid = Descendants(dialog).OfType<DataGridView>().Single();
+            grid.Rows[0].Cells[2].Value = "Nieuw";
+            grid.EndEdit();
+            Descendants(dialog).OfType<Button>().Single(b => b.Text == "Toepassen").PerformClick();
+            dialog.DialogResult = DialogResult.Cancel;
+            dialog.Close();
+        }, () => Descendants(parent).OfType<Button>().First(b => b.Visible && b.Text.StartsWith("Samenstellen")).PerformClick());
+        Check(loads == 1 && settings.ManualEntries.Single().Description == "Nieuw", "onderliggende Samenstellen past werkkopie toe");
+        var tabs = Descendants(parent).OfType<TabControl>().Single();
+        tabs.SelectedIndex = 3;
+        InModal("NLCS Legenda – omschrijvingen", dialog =>
+        {
+            var grid = Descendants(dialog).OfType<DataGridView>().Single();
+            Check(grid.Rows.Count > 10, "standaardomschrijvingen zijn zichtbaar");
+            grid.Rows[0].Cells[2].Value = "Eigen omschrijving";
+            grid.EndEdit();
+            Descendants(dialog).OfType<Button>().Single(b => b.Text == "Toepassen").PerformClick();
+            dialog.DialogResult = DialogResult.Cancel;
+            dialog.Close();
+        }, () => Descendants(parent).OfType<Button>().First(b => b.Visible && b.Text.StartsWith("Omschrijvingen")).PerformClick());
+        Check(settings.DescriptionOverrides.Elementen.Count == 1, "omschrijvingen bewaart alleen gewijzigde tekst");
+        parent.Close();
+        using var custom = new CustomLayerDialog(new[] { new CustomLayerRule { Layer = "Bron", Element = "DATA", Description = "Oud" } });
+        OpenOffscreen(custom);
+        InModal("Eigen laag", dialog =>
+        {
+            CheckButtons(dialog);
+            Descendants(dialog).OfType<TextBox>().Single(t => t.Text == "Oud").Text = "Gewijzigd";
+            Descendants(dialog).OfType<Button>().Single(b => b.Text == "OK").PerformClick();
+        }, () => Descendants(custom).OfType<Button>().Single(b => b.Text.StartsWith("Bewerken")).PerformClick());
+        Check(custom.Result.Single().Description == "Gewijzigd", "bestaande laag bewerken zonder valse duplicaatmelding");
+        custom.Close();
+        using var remarks = new RemarksEditDialog("Kop", "\nRegel\n\n");
+        Check(remarks.RemarksText == "\nRegel\n\n", "bewuste lege regels blijven behouden");
+    }
+
+    private static void InModal(string title, Action<Form> inspect, Action open)
+    {
+        using var timer = new System.Windows.Forms.Timer { Interval = 50 };
+        bool seen = false;
+        timer.Tick += (_, _) =>
+        {
+            var dialog = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.Text == title);
+            if (dialog is null) return;
+            timer.Stop();
+            seen = true;
+            try { inspect(dialog); }
+            catch(Exception ex) { Errors.Add(ex.Message); dialog.DialogResult = DialogResult.Cancel; dialog.Close(); }
+        };
+        timer.Start();
+        open();
+        timer.Stop();
+        Check(seen, "onderliggend venster geopend: " + title);
+    }
+
+    private static void CheckOverview()
+    {
+        var entries = new[] { Entry("A"), Entry("B"), Entry("C") };
+        var a = new OverviewLegend { Id = "A", Name = "Legenda A", Settings = new(), Entries = entries };
+        var b = new OverviewLegend { Id = "B", Name = "Legenda B", Settings = new(), Entries = entries };
+        int saves = 0;
+        using var form = new OverviewDialog(new[] { a, b }, changes => { Check(changes.Count == 1 && changes[0].Id == "A", "alleen gewijzigde legenda opslaan"); saves++; return null; });
+        OpenOffscreen(form);
+        var controls = Descendants(form).ToList();
+        var sort = controls.OfType<ComboBox>().Single(c => c.Items.Contains("Handmatig"));
+        sort.SelectedItem = "Handmatig";
+        var grid = controls.OfType<DataGridView>().Single();
+        grid.CurrentCell = grid.Rows[2].Cells[1];
+        controls.OfType<Button>().Single(c => c.Text == "Naar begin").PerformClick();
+        Check((string)grid.Rows[0].Cells[1].Value == "C", "regel naar begin verplaatsen");
+        var legends = controls.OfType<ComboBox>().Single(c => c != sort);
+        legends.SelectedIndex = 1;
+        Check((string)grid.Rows[0].Cells[1].Value == "A" && !b.Changed, "andere legenda blijft gelijk");
+        legends.SelectedIndex = 0;
+        Check((string)grid.Rows[0].Cells[1].Value == "C", "volgorde blijft bij wisselen");
+        controls.OfType<Button>().Single(c => c.Text == "Toepassen").PerformClick();
+        Check(saves == 1 && !a.Changed, "Toepassen slaat eenmaal op");
+        CheckButtons(form);
+        form.Close();
+        var cancelled = new OverviewLegend { Id = "A", Name = "Annuleren", Settings = new(), Entries = entries };
+        using var cancel = new OverviewDialog(new[] { cancelled }, _ => { saves++; return null; });
+        OpenOffscreen(cancel);
+        Descendants(cancel).OfType<ComboBox>().Single(c => c.Items.Contains("Handmatig")).SelectedItem = "Handmatig";
+        cancel.DialogResult = DialogResult.Cancel;
+        cancel.Close();
+        Check(saves == 1, "Annuleren schrijft niets");
+    }
+    private static LegendEntry Entry(string name) => new() { Status = NlcsStatus.Nieuw, Discipline = "WE", Hoofdgroep = "KL", Element = name, Description = name };
+    private static void CheckButtons(Form form)
+    {
+        foreach (var button in Descendants(form).OfType<Button>().Where(b => b.Visible))
+        {
+            for (Control? parent = button.Parent; parent is not null; parent = parent.Parent)
+                if (parent is ScrollableControl { AutoScroll: true } scroll) scroll.ScrollControlIntoView(button);
+            Application.DoEvents();
+            var bounds = form.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
+            Check(form.ClientRectangle.Contains(bounds), form.Text + ": knop bereikbaar: " + button.Text);
+            Check(button.ClientSize.Width >= TextRenderer.MeasureText(button.Text, button.Font).Width, form.Text + ": knoptekst past: " + button.Text);
+        }
+    }
+    private static void OpenOffscreen(Form form)
+    {
+        form.StartPosition = FormStartPosition.Manual;
+        form.Location = new Point(-20000, -20000);
+        form.Show();
+        Application.DoEvents();
+    }
+    private static void Check(bool ok, string message) { _checks++; if (!ok) Errors.Add(message); }
+    private static IEnumerable<Control> Descendants(Control parent)
+    {
+        foreach (Control child in parent.Controls)
+        {
+            yield return child;
+            foreach(var nested in Descendants(child)) yield return nested;
+        }
+    }
+}

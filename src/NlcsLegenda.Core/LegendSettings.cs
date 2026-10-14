@@ -122,6 +122,9 @@ public sealed class LegendSettings
     [Category("Weergave"), DisplayName("Sortering")]
     public LegendSortMode SortMode { get; set; } = LegendSortMode.Status;
 
+    [Browsable(false)]
+    public List<string> ManualEntryOrder { get; set; } = new();
+
     [Category("Weergave"), DisplayName("Exploderen bij plaatsen"), Description("Losse entiteiten; anders blijft het één blok.")]
     public bool ExplodeOnPlace { get; set; } = false;
 
@@ -415,7 +418,7 @@ public sealed class LegendSettings
         if (string.IsNullOrEmpty(entryKey))
             return null;
         foreach (var cs in CustomStatuses)
-            if (cs.IsValid && cs.Members.Contains(entryKey, StringComparer.OrdinalIgnoreCase))
+            if (cs.IsValid && (cs.Members.Contains(entryKey, StringComparer.OrdinalIgnoreCase) || cs.Members.Contains(BaseEntryKey(entryKey), StringComparer.OrdinalIgnoreCase)))
                 return cs;
         return null;
     }
@@ -424,10 +427,20 @@ public sealed class LegendSettings
         $"{statusCode}|{discipline}|{hoofdgroep}|{element}".ToUpperInvariant();
 
     public static string EntryKey(LegendEntry entry) =>
-        EntryKey(entry.Status.Code(), entry.Discipline, entry.Hoofdgroep, entry.Element);
+        ProviderEntryKey(EntryKey(entry.Status.Code(), entry.Discipline, entry.Hoofdgroep, entry.Element), entry.Netbeheerders);
 
     public static string EntryKey(NlcsLayerName layer) =>
-        EntryKey(layer.Status.Code(), layer.Discipline, layer.Hoofdgroep, layer.Element);
+        ProviderEntryKey(EntryKey(layer.Status.Code(), layer.Discipline, layer.Hoofdgroep, layer.Element), new[] { layer.Netbeheerder });
+
+    private static string ProviderEntryKey(string basic, IEnumerable<string> providers)
+    {
+        var names = providers.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim().ToUpperInvariant()).Distinct().OrderBy(p => p, StringComparer.Ordinal).ToArray();
+        return names.Length == 0 ? basic : basic + "|" + System.Text.Json.JsonSerializer.Serialize(names);
+    }
+
+    public bool IsEntryExcluded(string key) => ExcludedEntries.Contains(key) || ExcludedEntries.Contains(BaseEntryKey(key));
+
+    internal static string BaseEntryKey(string key) => string.Join("|", key.Split('|').Take(4));
 
     public string StatusLabel(NlcsStatus status) => status switch
     {
@@ -483,6 +496,7 @@ public sealed class LegendSettings
         ExcludedEntries = new HashSet<string>(other.ExcludedEntries, StringComparer.OrdinalIgnoreCase);
         DescriptionOverrides = other.DescriptionOverrides.Clone();
         XrefInclusion = new Dictionary<string, bool>(other.XrefInclusion, StringComparer.OrdinalIgnoreCase);
+        ManualEntryOrder = new List<string>(other.ManualEntryOrder);
         ManualEntries = other.ManualEntries.Select(m => m.Clone()).ToList();
         BlankEntries = other.BlankEntries.Select(b => b.Clone()).ToList();
         CustomStatuses = other.CustomStatuses.Select(cs => cs.Clone()).ToList();
@@ -537,7 +551,7 @@ public sealed class LegendSettings
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
             or nameof(CustomLayerRules) or nameof(BlankEntries)
-            or nameof(MergedDimensions) or nameof(DescriptionOverrides);
+            or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder);
 
     [JsonIgnore, Browsable(false)]
     public double ModelUnitsPerPaperMm => Scale / 1000.0;
@@ -552,7 +566,7 @@ public sealed class LegendSettings
     {
         var key = EntryKey(layer);
         // Uitvinken en een uitgeschakelde xref winnen altijd, ook van een eigen status.
-        if (ExcludedEntries.Contains(key)) return "de regel is handmatig uitgevinkt";
+        if (IsEntryExcluded(key)) return "de regel is handmatig uitgevinkt";
         if (layer.IsXref && !IsXrefIncluded(layer.XrefName))
             return $"xref '{layer.XrefName}' wordt niet meegenomen";
         // Een handmatige toewijzing aan een eigen status haalt de laag door de
@@ -603,6 +617,7 @@ public sealed class LegendSettings
             throw new NotSupportedException($"Profielversie {SchemaVersion} wordt niet ondersteund.");
         IncludedStatuses ??= new HashSet<NlcsStatus>();
         IncludedDrawTypes ??= new HashSet<NlcsDrawType>();
+        ManualEntryOrder = (ManualEntryOrder ?? new List<string>()).Where(k => !string.IsNullOrWhiteSpace(k)).Distinct(StringComparer.Ordinal).ToList();
         ManualEntries ??= new List<ManualEntry>();
         BlankEntries ??= new List<BlankEntry>();
         CustomStatuses ??= new List<CustomStatus>();

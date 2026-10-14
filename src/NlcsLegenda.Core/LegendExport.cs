@@ -38,7 +38,7 @@ public static class LegendExport
     private static string[] CsvHeader() => new[]
     {
         "Status", "Discipline", "Hoofdgroep", "Element", "Omschrijving",
-        "Herkomst", "Types", "Aantal", "Lengte_m", "Oppervlak_m2", "Hoeveelheid", "Eenheid"
+        "Herkomst", "Types", "Aantal", "Lengte_m", "Oppervlak_m2", "Hoeveelheid", "Eenheid", "Netbeheerders"
     };
 
     private static string[] CsvFields(LegendEntry e, string fmt, CultureInfo nl,
@@ -47,7 +47,7 @@ public static class LegendExport
         var types = string.Join('+', e.LayersByType.Keys.Select(k => k.ToString()));
         return new[]
         {
-            Csv(e.Status.DisplayName()),
+            Csv(e.CustomStatusName ?? e.Status.DisplayName()),
             Csv(ExportDiscipline(e)),
             Csv(ExportHoofdgroep(e)),
             Csv(ExportElement(e)),
@@ -58,7 +58,8 @@ public static class LegendExport
             e.Metric.Length.ToString("0.##", Inv),
             e.Metric.Area.ToString("0.##", Inv),
             Csv(QuantityValue(e, fmt, nl)),
-            Csv(QuantityUnit(e, unitArea, unitLength, unitCount))
+            Csv(QuantityUnit(e, unitArea, unitLength, unitCount)),
+            Csv(string.Join("; ", e.Netbeheerders))
         };
     }
 
@@ -76,11 +77,12 @@ public static class LegendExport
         int round = Math.Max(0, decimals);
         var rows = entries.Select(e => new
         {
-            status = e.Status.DisplayName(),
+            status = e.CustomStatusName ?? e.Status.DisplayName(),
             discipline = ExportDiscipline(e),
             hoofdgroep = ExportHoofdgroep(e),
             element = ExportElement(e),
             omschrijving = e.Description,
+            netbeheerders = e.Netbeheerders,
             herkomst = SourceLabel(e.DescriptionSource),
             types = e.LayersByType.Keys.Select(k => k.ToString()).ToArray(),
             aantal = e.Metric.Count,
@@ -103,11 +105,12 @@ public static class LegendExport
         var rows = perDrawing.SelectMany(d => d.Entries.Select(e => new
         {
             tekening = d.Drawing,
-            status = e.Status.DisplayName(),
+            status = e.CustomStatusName ?? e.Status.DisplayName(),
             discipline = ExportDiscipline(e),
             hoofdgroep = ExportHoofdgroep(e),
             element = ExportElement(e),
             omschrijving = e.Description,
+            netbeheerders = e.Netbeheerders,
             herkomst = SourceLabel(e.DescriptionSource),
             types = e.LayersByType.Keys.Select(k => k.ToString()).ToArray(),
             aantal = e.Metric.Count,
@@ -159,7 +162,7 @@ public static class LegendExport
         if (firstNonSpace.Length > 0 && (firstNonSpace[0] is '=' or '+' or '-' or '@'))
             text = "'" + text;
 
-        if (text.Contains(';') || text.Contains('"') || text.Contains('\n'))
+        if (text.Contains(';') || text.Contains('"') || text.Contains('\n') || text.Contains('\r'))
             return "\"" + text.Replace("\"", "\"\"") + "\"";
         return text;
     }
