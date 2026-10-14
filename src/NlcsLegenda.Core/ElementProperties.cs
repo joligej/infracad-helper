@@ -6,7 +6,7 @@ namespace NlcsLegenda.Core;
 public enum GroupDimension
 {
     Soort,         // basis, bijv. DATA, ET, GAS
-    Specificatie,  // spanning/druk: LS, MS, HD, LD
+    Specificatie,  // spanning/druk: LS, MS, HS, HD, LD
     Uitvoering,    // MANTELBUIS, HULPSTUK
     Nummer,        // volgnummer, bijv. DATA2 -> 2
     Netbeheerder   // oorspronkelijke organisatie uit KLIC-metadata

@@ -926,9 +926,9 @@ public partial class Commands
     {
         var pko = new PromptKeywordOptions("\nType");
         pko.Keywords.Add("Lijn");
-        pko.Keywords.Add("Vlak");
+        pko.Keywords.Add("Vlak", "VLAk", "VLAk");
         pko.Keywords.Add("Arcering");
-        pko.Keywords.Add("Vulling");
+        pko.Keywords.Add("Vulling", "VULling", "VULling");
         pko.Keywords.Add("Symbool");
         pko.Keywords.Default = "Lijn";
         pko.AllowNone = true;
@@ -2396,20 +2396,6 @@ public partial class Commands
                     && csvA != csvB && csvA != csvC && csvB != csvC;
                 ed.WriteMessage($"\nABC: export A={csvA.Length}tk B={csvB.Length}tk C={csvC.Length}tk -> {(exportOk ? "verschillend OK" : "FAIL")}");
 
-                // Viewport per legenda: elk om de eigen extents, op schaal, zonder clipping.
-                string VpCheck(LegendDefinition d)
-                {
-                    if (!LegendManagement.TryGetGroupExtents(db, tr, d.GroupName, out var ext))
-                        return "geen-extents";
-                    double mw = ext.MaxPoint.X - ext.MinPoint.X;
-                    double mh = ext.MaxPoint.Y - ext.MinPoint.Y;
-                    var plan = ViewportMath.Compute(mw, mh, d.Settings.Scale, 5.0);
-                    double paperPerModel = 1000.0 / d.Settings.Scale;
-                    bool marginsOk = Math.Abs(plan.PaperWidthMm - (mw * paperPerModel + 10)) < 1e-3
-                        && Math.Abs(plan.PaperHeightMm - (mh * paperPerModel + 10)) < 1e-3;
-                    return marginsOk ? "OK" : "FAIL";
-                }
-                ed.WriteMessage($"\nABC: viewport A={VpCheck(a)} B={VpCheck(b)} C={VpCheck(c)}");
 
                 tr.Commit();
             }
@@ -3564,6 +3550,8 @@ public partial class Commands
     private void RunViewportScaleChecks(Editor ed, Database db)
     {
         {
+            bool allChecks = true;
+            int checks = 0;
             bool Measure(LegendSettings s, out double mw, out double mh, out Point2d center)
             {
                 mw = mh = 0; center = default;
@@ -3585,7 +3573,8 @@ public partial class Commands
                 return true;
             }
 
-            void CheckAt(string label, double mw, double mh, Point2d center, double scale)
+            void CheckAt(string label, double mw, double mh, Point2d center, double scale,
+                double? expectedWidth = null, double? expectedHeight = null)
             {
                 const double margin = 5.0;
                 var plan = ViewportMath.Compute(mw, mh, scale, margin);
@@ -3611,18 +3600,25 @@ public partial class Commands
                 double implied = h / vh;
                 bool exact = Math.Abs(implied - paperPerModel) < 1e-6;
                 // Marges: papiermaat moet legenda + 2x marge zijn (geen clipping, geen overmaat).
-                double expW = mw * paperPerModel + 2 * margin;
-                double expH = mh * paperPerModel + 2 * margin;
+                double expW = expectedWidth ?? mw * paperPerModel + 2 * margin;
+                double expH = expectedHeight ?? mh * paperPerModel + 2 * margin;
                 bool marginsOk = Math.Abs(w - expW) < 1e-3 && Math.Abs(h - expH) < 1e-3;
                 // Clipping: zichtbaar model moet de legenda volledig omvatten.
                 bool noClip = vw + 1e-6 >= mw && vh + 1e-6 >= mh;
+                checks++;
+                allChecks &= exact && marginsOk && noClip;
                 ed.WriteMessage(
                     $"\nVPTEST: {label} 1:{scale:0} vp {w:0.0}x{h:0.0}mm schaal {(exact ? "OK" : "FAIL")} " +
                     $"marges {(marginsOk ? "OK" : "FAIL")} clipping {(noClip ? "geen" : "FAIL")}");
             }
 
+            // Onafhankelijke referentiematen: 12 x 8 meter met 5 mm papiermarge.
+            CheckAt("referentie", 12, 8, new Point2d(6, 4), 200, 70, 50);
+            CheckAt("referentie", 12, 8, new Point2d(6, 4), 500, 34, 26);
+            CheckAt("referentie", 12, 8, new Point2d(6, 4), 1000, 22, 18);
+
             // Variant 1: standaard legenda op vier schalen.
-            if (!Measure(LoadGlobalDefaults(), out var mw0, out var mh0, out var c0))
+            if (!Measure(new LegendSettings { Scale = 200 }, out var mw0, out var mh0, out var c0))
             {
                 ed.WriteMessage("\nVPTEST: geen legenda om omheen te meten.");
                 return;
@@ -3633,7 +3629,7 @@ public partial class Commands
                 CheckAt("standaard", mw0, mh0, c0, scale);
 
             // Variant 2: twee kolommen geeft een smaller/hoger profiel, zelfde viewport-contract.
-            var twoCol = LoadGlobalDefaults();
+            var twoCol = new LegendSettings { Scale = 200 };
             twoCol.Columns = 2;
             if (Measure(twoCol, out var mw1, out var mh1, out var c1))
             {
@@ -3643,7 +3639,7 @@ public partial class Commands
             }
 
             // Variant 3: zonder kader, opmerkingen en schaalbalk (minimale omvang).
-            var bare = LoadGlobalDefaults();
+            var bare = new LegendSettings { Scale = 200 };
             bare.DrawBorder = false;
             bare.IncludeRemarks = false;
             bare.IncludeScaleBar = false;
@@ -3655,7 +3651,7 @@ public partial class Commands
             }
 
             // Variant 4: drie kolommen (breder profiel).
-            var threeCol = LoadGlobalDefaults();
+            var threeCol = new LegendSettings { Scale = 200 };
             threeCol.Columns = 3;
             if (Measure(threeCol, out var mw3, out var mh3, out var c3))
             {
@@ -3665,7 +3661,7 @@ public partial class Commands
             }
 
             // Variant 5: hoeveelheden + opmerkingen + schaalbalk (volledige breedte) op 1:500.
-            var full = LoadGlobalDefaults();
+            var full = new LegendSettings { Scale = 200 };
             full.IncludeQuantities = true;
             full.IncludeRemarks = true;
             full.IncludeScaleBar = true;
@@ -3681,7 +3677,7 @@ public partial class Commands
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var reg = LegendStore.Load(db, tr);
-                var def = IsoDef(reg, LoadGlobalDefaults());
+                var def = IsoDef(reg, new LegendSettings { Scale = 200 });
                 reg.Add(def);
                 if (BuildManagedLegend(db, tr, reg, def, out _, out _) == UpdateResult.Updated)
                 {
@@ -3709,6 +3705,7 @@ public partial class Commands
                     tr.Commit();
                     PurgePending(db);
                     ed.WriteMessage($"\nVPTEST: verplaatst center {(moved ? "OK" : "FAIL")}");
+                    allChecks &= moved;
                     CheckAt("verplaatst", mwm, mhm, cAfter, 200.0);
                 }
                 else
@@ -3718,7 +3715,7 @@ public partial class Commands
             }
 
             // Variant 7: symboolzware legenda (alleen symbolen) frameren.
-            var sym = LoadGlobalDefaults();
+            var sym = new LegendSettings { Scale = 200 };
             sym.ToonGeometrie = false; sym.ToonVlakken = false; sym.ToonArceringen = false;
             sym.ToonVlakvullingen = false; sym.ToonSymbolen = true; sym.InsertSymbolBlocks = true;
             if (Measure(sym, out var mw5, out var mh5, out var c5))
@@ -3730,7 +3727,7 @@ public partial class Commands
 
             // Variant 8: lange meerregelige opmerkingen maken de legenda hoger; de viewport moet
             // die extra hoogte meenemen (geen clipping).
-            var rem = LoadGlobalDefaults();
+            var rem = new LegendSettings { Scale = 200 };
             rem.IncludeRemarks = true;
             rem.RemarksText = string.Join("\n",
                 Enumerable.Range(1, 18).Select(i => $"Opmerkingregel {i} met wat extra tekst om te laten teruglopen"));
@@ -3740,6 +3737,7 @@ public partial class Commands
                 ed.WriteMessage($"\nVPTEST: opmerkingzwaar {mw6:0.0} x {mh6:0.0} modeleenheden");
                 CheckAt("opmerkingzwaar", mw6, mh6, c6, 200.0);
             }
+            ed.WriteMessage($"\nVPTEST totaal: {checks} controles -> {(allChecks && checks == 14 ? "OK" : "FAIL")}");
         }
     }
 

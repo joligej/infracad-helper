@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.30.1 - 2026-10-14
+
+- De typekeuze onderscheidt VLAk en VULling ook bij bediening via het toetsenbord.
+- Viewportproeven controleren echte CAD-objecten met onafhankelijke referentiematen
+  en een gezamenlijke einduitslag; een dubbele berekening gold ten onrechte als bewijs.
+- De teksthoogteproef controleert ook een bestaande NLCS-ISO-stijl met vaste hoogte.
+
 ## 1.30.0 - 2026-10-14
 
 - Instellingen en andere vensters passen zich aan de beschikbare schermruimte aan.

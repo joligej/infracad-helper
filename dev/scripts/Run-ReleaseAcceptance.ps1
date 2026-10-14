@@ -80,7 +80,7 @@ $specs=@{
  symboltext=@('NLCSLEGENDASYMBOOLTEKST2TEST','SYMFID: totaal -> OK')
  oldupdate=@('NLCSLEGENDAOLDUPDATEBROADTEST','BREED: totaal -> OK')
  isolation=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAISOLATIETEST",'ISO: A.manual=1/status=1 B.manual=0 C.manual=0 -> OK')
- viewport=@("NLCSLEGENDAMTEXTTEST`nNLCSLEGENDAVIEWPORTTEST",'VPTEST: opmerkingzwaar 1:200')
+ viewport=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAMTEXTTEST`nNLCSLEGENDAVIEWPORTTEST",'VPTEST totaal: 14 controles -> OK')
  consumer=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDACONSUMERTEST",'CONSUMER: exploderen=')
  layout=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAOPMAAKMEETTEST`nNLCSLEGENDAVOLOPMAAKTEST",'VOLOPMAAK: totaal -> OK')
 }
@@ -143,7 +143,6 @@ foreach($case in $Cases){
  Run-Case $case $drawing $specs[$case][0] $expected
  if($case -in @('klic','overview','abclocal','abcxref','oldreopen')){
   $expected=@($specs[$case][3])
-  if($case -eq 'abclocal'){$expected+='ABC: viewport A=OK B=OK C=OK'}
   Run-Case "$case-verify" $drawing $specs[$case][2] $expected
  }
  if($case -eq 'snapshot'){
