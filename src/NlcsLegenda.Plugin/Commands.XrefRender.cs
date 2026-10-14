@@ -1714,10 +1714,12 @@ public partial class Commands
                     .First();
                 var bodyExtents = bodyText.GeometricExtents;
                 double mmPerModelUnit = 1.0 / settings.ToModel(1.0);
-                double anchorDeviationMm = System.Math.Abs(bodyText.Location.Y - swatchCenterY) * mmPerModelUnit;
+                double anchorDeviationMm = System.Math.Abs(bodyText.Location.Y
+                    - Math.Max(bodyText.TextHeight * (1 - 0.28388973), bodyText.ActualHeight / 2) - swatchCenterY) * mmPerModelUnit;
                 double extentsDeviationMm = System.Math.Abs(
                     (bodyExtents.MinPoint.Y + bodyExtents.MaxPoint.Y) / 2.0 - swatchCenterY) * mmPerModelUnit;
-                bool mtextPositionOk = anchorDeviationMm < 1e-6 && extentsDeviationMm <= 0.25;
+                bool mtextPositionOk = anchorDeviationMm < 1e-6 && bodyText.Attachment == AttachmentPoint.TopLeft
+                    && extentsDeviationMm <= settings.TextHeightMm * 0.22;
                 customHeightsOk = hasBody && hasHeader && hasTitle && mtextPositionOk;
                 tr.Commit();
                 ed.WriteMessage($"\nPLACEMENT MText-verticaal: ankerafwijking={anchorDeviationMm:0.###} mm extentsafwijking={extentsDeviationMm:0.###} mm -> {(mtextPositionOk ? "OK" : "FAIL")}");

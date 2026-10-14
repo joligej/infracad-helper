@@ -22,20 +22,20 @@ public class LegendaOpmaakTests
     {
         Assert.Equal(24.0, TemplateDefaults.SwatchWidthMm);
         Assert.Equal(5.0, TemplateDefaults.SwatchHeightMm);
-        Assert.Equal(6.3, TemplateDefaults.RowPitchMm);
+        Assert.Equal(6.3099, TemplateDefaults.RowPitchMm);
         Assert.Equal(1.35, TemplateDefaults.LineSpacingFactor);
     }
 
     [Fact]
     public void Kolom_en_marge_maten_zijn_vast()
     {
-        Assert.Equal(5.7, TemplateDefaults.TextGapMm);
-        Assert.Equal(6.0, TemplateDefaults.HeaderSpacingMm);
-        Assert.Equal(67.0, TemplateDefaults.ColumnWidthMm);
+        Assert.Equal(5.7188, TemplateDefaults.TextGapMm);
+        Assert.Equal(6.9257, TemplateDefaults.HeaderSpacingMm);
+        Assert.Equal(143.0, TemplateDefaults.ColumnWidthMm);
         Assert.Equal(10.0, TemplateDefaults.ColumnGapMm);
         Assert.Equal(18.0, TemplateDefaults.QuantityColumnWidthMm);
         Assert.Equal(5.0, TemplateDefaults.BorderMarginMm);
-        Assert.Equal(90.0, TemplateDefaults.RemarksWidthMm);
+        Assert.Equal(128.8894, TemplateDefaults.RemarksWidthMm);
     }
 
     [Fact]

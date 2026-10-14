@@ -8,6 +8,20 @@ namespace NlcsLegenda.Plugin;
 // transactie zodat registry en geometrie samen committen.
 internal static class LegendManagement
 {
+    // Alleen legenda's met nog aanwezige geometrie doen mee aan gewone bediening.
+    // De opgeslagen registratie blijft intact: UNDO van ERASE herstelt ook de bediening.
+    public static LegendRegistry ActiveRegistry(Database db, Transaction tr, LegendRegistry registry)
+    {
+        var groups = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+        return new LegendRegistry
+        {
+            Legends = registry.Legends.Where(def => groups.Contains(def.GroupName)
+                && tr.GetObject(groups.GetAt(def.GroupName), OpenMode.ForRead) is Group group
+                && group.GetAllEntityIds().Any(id => !id.IsNull && id.IsValid && !id.IsErased
+                    && tr.GetObject(id, OpenMode.ForRead) is Entity)).ToList()
+        };
+    }
+
     // Alle ObjectIds die bij een beheerde legenda horen. De analyse sluit deze uit, zodat
     // geplaatste legenda's de brontelling niet beïnvloeden.
     public static HashSet<ObjectId> CollectManagedIds(Database db, Transaction tr, LegendRegistry registry)

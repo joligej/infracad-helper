@@ -32,6 +32,12 @@ public sealed class HatchSample
 
     public double PatternScale { get; set; } = 1.0;
 
+    public int? SourceScale { get; set; }
+
+    public double TargetScale { get; set; } = 1000;
+
+    public double ScaleForLegend(double legendScale) => SourceScale is > 0 ? legendScale / SourceScale.Value : 1.0;
+
     public double PatternAngle { get; set; }
 
     public bool IsSolid { get; set; }

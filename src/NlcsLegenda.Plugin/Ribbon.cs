@@ -159,6 +159,8 @@ internal static class RibbonBuilder
         var instellingen = Panel(tab, "Instellingen");
         instellingen.Items.Add(Button("Instellingen", "NLCSLEGENDAOPTIES",
             "Schaal, opmaak en inhoud instellen.", large: false));
+        instellingen.Items.Add(Button("Standaard", "NLCSLEGENDASTANDAARD",
+            "Instellingen voor nieuwe legenda's. Bestaande legenda's houden hun eigen instellingen.", large: false));
         instellingen.Items.Add(Button("Profielen", "NLCSLEGENDAPRESET",
             "Instellingen bewaren en opnieuw gebruiken.", large: false));
         instellingen.Items.Add(Button("Bestanden", "NLCSLEGENDACONFIG",

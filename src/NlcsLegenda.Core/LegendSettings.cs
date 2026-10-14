@@ -36,16 +36,16 @@ public sealed class LegendSettings
     public string GeneralSeparator { get; set; } = " - ";
 
     [Category("Teksten"), DisplayName("Label Nieuw")]
-    public string LabelNieuw { get; set; } = "Nieuwe situatie";
+    public string LabelNieuw { get; set; } = "Nieuwe situatie:";
 
     [Category("Teksten"), DisplayName("Label Bestaand")]
-    public string LabelBestaand { get; set; } = "Bestaande situatie";
+    public string LabelBestaand { get; set; } = "Bestaande situatie:";
 
     [Category("Teksten"), DisplayName("Label Vervallen")]
-    public string LabelVervallen { get; set; } = "Vervallen situatie";
+    public string LabelVervallen { get; set; } = "Vervallen situatie:";
 
     [Category("Teksten"), DisplayName("Label Tijdelijk")]
-    public string LabelTijdelijk { get; set; } = "Tijdelijke situatie";
+    public string LabelTijdelijk { get; set; } = "Tijdelijke situatie:";
 
     [Category("Teksten"), DisplayName("Label Revisie")]
     public string LabelRevisie { get; set; } = "Revisie";
@@ -100,19 +100,12 @@ public sealed class LegendSettings
     public string RemarksTitle { get; set; } = "OPMERKINGEN";
 
     [Category("Opmerkingen"), DisplayName("Tekst")]
-    public string RemarksText { get; set; } =
-        "De tekeningen zijn globaal en uitsluitend gebaseerd op de leggingsgegevens zoals deze " +
-        "bekend zijn bij het KLIC. De exacte ligging, zowel horizontaal als verticaal, kan door " +
-        "tal van oorzaken afwijken. Deze dient daarom in het veld te worden vastgesteld d.m.v. " +
-        "proefgaten of -sleuven. Praktische richtlijnen om zorgvuldig te graven zijn te verkrijgen " +
-        "bij het CROW (www.crow.nl, brochure 'Graafschade voorkomen aan kabels en leidingen'). " +
-        "Mofslagen en huisaansluitingen zijn sporadisch aangeduid; de diepteligging is nooit " +
-        "aangegeven. Van een 'gebruikelijke' of constante diepteligging kan nooit worden uitgegaan.";
+    public string RemarksText { get; set; } = StandardTexts.DrawingRemarks;
 
     // ---- Weergave ----
 
     [Category("Weergave"), DisplayName("Kader rond legenda")]
-    public bool DrawBorder { get; set; } = true;
+    public bool DrawBorder { get; set; } = false;
 
     [Category("Weergave"), DisplayName("Kader per swatch")]
     public bool DrawSwatchFrame { get; set; } = true;
@@ -201,7 +194,7 @@ public sealed class LegendSettings
     public double ScaleBarSegmentMeters { get; set; } = 0.0;
 
     [Category("Schaalbalk"), DisplayName("Hoogte (mm)")]
-    public double ScaleBarHeightMm { get; set; } = 2.5;
+    public double ScaleBarHeightMm { get; set; } = 2.0;
 
     // ---- Viewport ----
 
@@ -254,7 +247,7 @@ public sealed class LegendSettings
     [Category("Maatvoering (mm)"), DisplayName("Teksthoogte titel")]
     public double TitleTextHeightMm { get; set; } = TemplateDefaults.TitleTextHeightMm;
 
-    [Category("Maatvoering (mm)"), DisplayName("Witruimte boven kopregel")]
+    [Category("Maatvoering (mm)"), DisplayName("Afstand titel–kop (basislijnen)")]
     public double HeaderSpacingMm { get; set; } = TemplateDefaults.HeaderSpacingMm;
 
     [Category("Maatvoering (mm)"), DisplayName("Kolombreedte")]
@@ -273,6 +266,9 @@ public sealed class LegendSettings
 
     [Category("Lagen"), DisplayName("Kaderlaag")]
     public string FrameLayer { get; set; } = "X-XX-AL-LEGENDA_KADER-G";
+
+    [Category("Lagen"), DisplayName("Hulpkaders (niet plotbaar)")]
+    public string SwatchFrameLayer { get; set; } = "X-XX-AL-HULPLIJN-G";
 
     [Category("Lagen"), DisplayName("Tekstlaag omschrijvingen")]
     public string TextLayer { get; set; } = "X-XX-AL-LEGENDA-T25";
@@ -526,10 +522,12 @@ public sealed class LegendSettings
         ScaleBarSegmentMeters = d.ScaleBarSegmentMeters;
         ScaleBarHeightMm = d.ScaleBarHeightMm;
         HatchScaleFactor = d.HatchScaleFactor;
+        DrawBorder = d.DrawBorder;
         DrawSwatchFrame = d.DrawSwatchFrame;
         ExplodeOnPlace = d.ExplodeOnPlace;
         TextStyle = d.TextStyle;
         FrameLayer = d.FrameLayer;
+        SwatchFrameLayer = d.SwatchFrameLayer;
         TextLayer = d.TextLayer;
         HeaderTextLayer = d.HeaderTextLayer;
     }

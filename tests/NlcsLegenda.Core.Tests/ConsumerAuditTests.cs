@@ -81,6 +81,7 @@ public class ConsumerAuditTests
         [nameof(LegendSettings.ColumnGapMm)] = "LegendLayoutEngine kolomtussenruimte",
         [nameof(LegendSettings.QuantityColumnWidthMm)] = "LegendLayoutEngine hoeveelheidkolom",
         [nameof(LegendSettings.BorderMarginMm)] = "LegendBuilder/ViewportMath kadermarge",
+        [nameof(LegendSettings.SwatchFrameLayer)] = "LegendBuilder niet-plotbare hulpkaderlaag",
         [nameof(LegendSettings.FrameLayer)] = "LegendBuilder kaderlaag",
         [nameof(LegendSettings.TextLayer)] = "LegendBuilder tekstlaag",
         [nameof(LegendSettings.HeaderTextLayer)] = "LegendBuilder koplaag",

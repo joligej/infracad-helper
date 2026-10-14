@@ -12,7 +12,7 @@ param(
     [string]$PluginPath,
     [string]$TemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('realsize','templatecontract','scalevariant','livetarget','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen
 )
 $ErrorActionPreference='Stop'
@@ -32,6 +32,10 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ realsize=@('NLCSLEGENDAREALSIZETEST','REALSIZE grote xref-symbolen: modelmaat, schaalvariant, samenvoeging en vrije tekstruimte -> OK')
+ templatecontract=@('NLCSLEGENDATEMPLATECONTRACTTEST','TEMPLATECONTRACT DWT-meetpunten, lege hoststijl, notities en schaalbalk op 1:200/500/1000 -> OK')
+ scalevariant=@('NLCSLEGENDASCALEVARIANTTEST','SCALEVARIANT xref 1:200/500 naar 1:200/500/1000: symbool 4mm, patroon 1mm, bron ongewijzigd -> OK')
+ livetarget=@("NLCSLEGENDALIVETARGETTEST`nNLCSLEGENDALIVETARGETERASE`n_.U`nNLCSLEGENDALIVETARGETVERIFY",'LIVETARGET UNDO: A/B bereikbaar; metadata behouden -> OK')
  globalsettings=@('NLCSLEGENDAGLOBALSETTINGSTEST','GLOBALSETTINGS totaal: OK (0 fouten)')
  layermerge=@('NLCSLEGENDALAYERMERGETEST','LAYERMERGE totaal: OK (0 fouten)')
  composition=@('NLCSLEGENDACOMPOSITIONTEST','COMPOSITION totaal: OK (0 fouten)')
@@ -46,7 +50,7 @@ $specs=@{
  review=@('NLCSLEGENDAREVIEWTEST','REVIEW totaal: OK (0 fouten)')
  polyownership=@('NLCSLEGENDAPOLYOWNERSHIPTEST','POLYOWNERSHIP 2D/3D 14m en bronvertices ongewijzigd na drie analyses -> OK')
  symboledge=@('NLCSLEGENDASYMBOLEDGETEST','SYMBOLEDGE leeg/verborgen/lijn/verschillende arceringscontouren -> OK')
- paperscale=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAPAPERSCALETEST",'PAPERSCALE 1:1000 vakken24x5/tekst2.5/kop2.5/titel5/gap5.7/centrering/kader -> OK')
+ paperscale=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAPAPERSCALETEST",'PAPERSCALE 1:1000 vakken24x5/tekst2.5/kop2.5/titel5/gap5.7188/basislijn/kader -> OK')
  properties=@('NLCSLEGENDAPROPERTYTEST','PROPERTY mislukte tekenregel: vorige legenda en registratie behouden -> OK')
  entitystyle=@('NLCSLEGENDAENTITYSTYLETEST','ENTITYSTYLE echte rode/groene swatches blijven gelijk na laagwijziging -> OK')
  dependencies=@('NLCSLEGENDADEPENDENCYTEST','DEPENDENCY SaveAs -> OK')
@@ -82,7 +86,7 @@ $sourceText=(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src/NlcsLegenda.Pl
 foreach($case in $Cases){
  if(!$specs.ContainsKey($case)){throw "Onbekende test: $case"}
  foreach($command in ($specs[$case][0] -split "`n" | Where-Object {$_})){
-  if(!$sourceText.Contains('[CommandMethod("'+$command+'"')){throw "Onbekend testcommando: $command"}
+  if($command.StartsWith('NLCS') -and !$sourceText.Contains('[CommandMethod("'+$command+'"')){throw "Onbekend testcommando: $command"}
  }
 }
 $results=[Collections.Generic.List[object]]::new()
@@ -143,7 +147,7 @@ foreach($case in $Cases){
   Copy-Item -LiteralPath (Join-Path $dir 'reload_replacement.dwg') -Destination (Join-Path $dir 'reload_source.dwg') -Force
   Run-Case 'reload-verify' $drawing 'NLCSLEGENDAXREFRELOADVERIFY' @('XREFRELOAD totaal: OK')
  }
- if(!$SkipReopen -and $case -in @('properties','entitystyle','dependencies','sampleconflict','placement','render','nested','hatch','oldupdate','mtext')){
+ if(!$SkipReopen -and $case -in @('realsize','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','hatch','oldupdate','mtext')){
   $commands='NLCSLEGENDASTABILITYTEST'
   $expected=@('STABILITY updates=10','STABILITY updates=50','STABILITY orphan blocks=0 -> OK')
   if($case -eq 'placement'){

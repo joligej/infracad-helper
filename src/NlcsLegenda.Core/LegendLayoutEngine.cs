@@ -53,7 +53,9 @@ public sealed class LegendLayout
 
 public static class LegendLayoutEngine
 {
-    public static LegendLayout Compute(IReadOnlyList<LegendEntry> entries, LegendSettings s)
+    public static LegendLayout Compute(IReadOnlyList<LegendEntry> entries, LegendSettings s,
+        Func<string, double, double>? measureTextHeight = null,
+        Func<LegendEntry, double>? minimumRowHeight = null)
     {
         double titleH = s.ToModel(s.TitleTextHeightMm);
         double headerH = s.ToModel(s.HeaderTextHeightMm);
@@ -62,9 +64,10 @@ public static class LegendLayoutEngine
         double textH = s.ToModel(s.TextHeightMm);
         double lineHeight = textH * Math.Max(1.0, s.LineSpacingFactor);
         double rowGap = Math.Max(s.ToModel(s.RowPitchMm - s.SwatchHeightMm), textH * 0.3);
-        double headerBand = headerH + s.ToModel(s.HeaderSpacingMm) * 0.6;
-        double subHeaderBand = subHeaderH + s.ToModel(s.HeaderSpacingMm) * 0.4;
-        double titleBand = titleH + s.ToModel(s.HeaderSpacingMm);
+        double baselineOffset = textH * TemplateDefaults.TextBaselineOffsetRatio;
+        double headerBand = Math.Max(headerH, headerH + s.ToModel(s.RowPitchMm) - swatchH / 2 - baselineOffset);
+        double subHeaderBand = headerBand;
+        double titleBand = titleH + s.ToModel(s.HeaderSpacingMm) - headerH;
         double colWidth = s.ToModel(s.ColumnWidthMm);
         double colGap = s.ToModel(s.ColumnGapMm);
 
@@ -83,8 +86,10 @@ public static class LegendLayoutEngine
             var lines = TextWrap.Wrap(s.IncludeText ? entry.Description : string.Empty, maxChars);
             if (lines.Count == 0)
                 lines = new List<string> { string.Empty };
-            double textBlockH = (lines.Count - 1) * lineHeight + textH;
-            double rh = Math.Max(swatchH, textBlockH);
+            double textBlockH = measureTextHeight is not null && s.IncludeText
+                ? measureTextHeight(entry.Description, Math.Max(s.ToModel(textColMm), textH * 3))
+                : (lines.Count - 1) * lineHeight + textH;
+            double rh = Math.Max(Math.Max(swatchH, textBlockH), minimumRowHeight?.Invoke(entry) ?? 0);
             entryLines.Add(lines);
             entryHeights.Add(rh);
             totalEntryHeight += rh + rowGap;
@@ -163,8 +168,12 @@ public static class LegendLayoutEngine
             bool columnBroke = false;
             bool budgetReached = rows >= 1 && col < columnsNeeded - 1
                 && colHeight + entryHeights[i] * 0.5 >= columnBudget;
+            double extraHeader = needStatusHeader ? headerBand + (rows > 0 ? swatchH / 2 + baselineOffset - headerH : 0) : 0;
+            if (s.IncludeHoofdgroepHeaders && !entry.IsBlank
+                && !string.Equals(curHoofd, entry.Hoofdgroep, StringComparison.OrdinalIgnoreCase))
+                extraHeader += subHeaderBand;
             bool heightExceeded = rows >= 1 && maxColHeight < double.MaxValue
-                && colHeight + entryHeights[i] > maxColHeight;
+                && colTop - y + extraHeader + entryHeights[i] > maxColHeight;
             if (rows >= maxRowsCap || budgetReached || heightExceeded)
             {
                 col++;
@@ -176,6 +185,8 @@ public static class LegendLayoutEngine
 
             if (needStatusHeader || (columnBroke && s.IncludeGroupHeaders))
             {
+                if (rows > 0)
+                    y -= swatchH / 2 + baselineOffset - headerH;
                 items.Add(new LegendPlacement
                 {
                     Kind = LegendItemKind.Header, X = ColX(col), YTop = y,

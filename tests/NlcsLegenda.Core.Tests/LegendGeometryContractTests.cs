@@ -43,7 +43,7 @@ public class LegendGeometryContractTests
                 Assert.Equal(reference[i].y, ToPaperMm(layout.Items[i].YTop, scale), 3);
             }
             // Totale breedte in papier-mm blijft gelijk aan de kolombreedte (1 kolom).
-            Assert.Equal(67.0, ToPaperMm(layout.MaxX - layout.MinX, scale), 3);
+            Assert.Equal(143.0, ToPaperMm(layout.MaxX - layout.MinX, scale), 3);
         }
     }
 
@@ -66,9 +66,9 @@ public class LegendGeometryContractTests
         var title = layout.Items.First(i => i.Kind == LegendItemKind.Title);
         Assert.Equal(0.0, ToPaperMm(title.YTop, 200), 3);
 
-        // Eerste inhoud (kop of regel) begint onder de titelband: titel 5mm + witruimte 6mm.
+        // Eerste inhoud (kop of regel) begint onder de titelband: basislijnafstand 6,9257 mm tussen titel en eerste kop.
         var firstBelow = layout.Items.First(i => i.Kind != LegendItemKind.Title);
-        Assert.Equal(-(5.0 + 6.0), ToPaperMm(firstBelow.YTop, 200), 3);
+        Assert.Equal(-(5.0 + 6.9257 - 2.5), ToPaperMm(firstBelow.YTop, 200), 3);
     }
 
     [Fact]
@@ -88,6 +88,6 @@ public class LegendGeometryContractTests
         var col0 = layout.Items.Where(i => i.Column == 0).Select(i => ToPaperMm(i.X, 500)).Distinct().Single();
         var col1 = layout.Items.Where(i => i.Column == 1).Select(i => ToPaperMm(i.X, 500)).Distinct().Single();
         Assert.Equal(0.0, col0, 3);
-        Assert.Equal(67.0 + 10.0, col1 - col0, 3); // kolombreedte 67 + tussenruimte 10
+        Assert.Equal(143.0 + 10.0, col1 - col0, 3); // kolombreedte 143 + tussenruimte 10
     }
 }

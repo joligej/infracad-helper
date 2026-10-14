@@ -55,5 +55,5 @@ model_eenheid = papier_mm * schaal / 1000
 ```
 
 De standaardmaten zijn 2,5 mm voor regeltekst en koppen, 5 mm voor de titel,
-24 × 5 mm voor het voorbeeldvak en 6,3 mm tussen opeenvolgende rijen.
-De afstand tussen het voorbeeldvak en de tekst is 5,7 mm. Deze maten zijn instelbaar.
+24 × 5 mm voor het voorbeeldvak en 6,3099 mm tussen opeenvolgende rijen.
+De afstand tussen het voorbeeldvak en de tekst is 5,7188 mm. Deze maten zijn instelbaar.

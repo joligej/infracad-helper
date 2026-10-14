@@ -50,6 +50,7 @@ public class SettingsUiMapTests
         [nameof(LegendSettings.MaxLegendHeightMm)] = new("Opmaak", Binding.Numeric),
         [nameof(LegendSettings.TextStyle)] = new("Opmaak", Binding.Text),
         [nameof(LegendSettings.FrameLayer)] = new("Opmaak", Binding.Text),
+        [nameof(LegendSettings.SwatchFrameLayer)] = new("Opmaak", Binding.Text),
         [nameof(LegendSettings.TextLayer)] = new("Opmaak", Binding.Text),
         [nameof(LegendSettings.HeaderTextLayer)] = new("Opmaak", Binding.Text),
 

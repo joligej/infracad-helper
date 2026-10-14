@@ -333,7 +333,7 @@ public partial class Commands
                 return ((BlockTableRecord)tr.GetObject(reference.BlockTableRecord, OpenMode.ForRead)).Cast<ObjectId>()
                     .Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Circle>().Single().Radius;
             }
-            if (Math.Abs(Radius() - 0.2) > 1e-8) throw new InvalidOperationException("De opgeslagen legenda is al veranderd.");
+            if (Math.Abs(Radius() - 1.0) > 1e-8) throw new InvalidOperationException("De opgeslagen legenda is al veranderd.");
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var registry = LegendStore.Load(db, tr);
@@ -343,7 +343,7 @@ public partial class Commands
                 tr.Commit();
             }
             PurgePending(db);
-            if (Math.Abs(Radius() - 0.4) > 1e-8) throw new InvalidOperationException("De herladen bron levert niet de nieuwe symboolvorm.");
+            if (Math.Abs(Radius() - 2.0) > 1e-8) throw new InvalidOperationException("De herladen bron levert niet de nieuwe symboolvorm.");
             doc.Editor.WriteMessage("\nSNAPSHOTVERIFY herladen bron; nieuwe symboolvorm -> OK");
         }
         catch (System.Exception ex) { doc.Editor.WriteMessage($"\nSNAPSHOTVERIFY FAIL: {ex}"); }

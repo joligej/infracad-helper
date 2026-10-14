@@ -21,8 +21,8 @@ public class TemplateDefaultsTests
     {
         Assert.Equal(24.0, TemplateDefaults.SwatchWidthMm);
         Assert.Equal(5.0, TemplateDefaults.SwatchHeightMm);
-        Assert.Equal(6.3, TemplateDefaults.RowPitchMm);
-        Assert.Equal(67.0, TemplateDefaults.ColumnWidthMm);
+        Assert.Equal(6.3099, TemplateDefaults.RowPitchMm);
+        Assert.Equal(143.0, TemplateDefaults.ColumnWidthMm);
     }
 
     [Fact]
@@ -85,10 +85,10 @@ public class TemplateDefaultsTests
         Assert.Equal(TemplateDefaults.ColumnWidthMm, s.ColumnWidthMm);
 
         var defaults = new LegendSettings();
-        Assert.Equal("Nieuwe situatie", defaults.LabelNieuw);
-        Assert.Equal("Bestaande situatie", defaults.LabelBestaand);
-        Assert.Equal("Vervallen situatie", defaults.LabelVervallen);
-        Assert.Equal("Tijdelijke situatie", defaults.LabelTijdelijk);
+        Assert.Equal("Nieuwe situatie:", defaults.LabelNieuw);
+        Assert.Equal("Bestaande situatie:", defaults.LabelBestaand);
+        Assert.Equal("Vervallen situatie:", defaults.LabelVervallen);
+        Assert.Equal("Tijdelijke situatie:", defaults.LabelTijdelijk);
         Assert.Equal("Revisie", defaults.LabelRevisie);
         Assert.Equal(defaults.LabelNieuw, s.LabelNieuw);
         Assert.Equal(defaults.LabelBestaand, s.LabelBestaand);

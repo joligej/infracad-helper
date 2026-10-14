@@ -81,7 +81,7 @@ public class LegendaLayoutGeometrieTests
 
         var title = layout.Items.Single(i => i.Kind == LegendItemKind.Title);
         var first = layout.Items.Where(i => i.Kind == LegendItemKind.Entry).OrderByDescending(i => i.YTop).First();
-        double titleBand = s.ToModel(s.TitleTextHeightMm) + s.ToModel(s.HeaderSpacingMm);
+        double titleBand = s.ToModel(s.TitleTextHeightMm) + s.ToModel(s.HeaderSpacingMm) - s.ToModel(s.HeaderTextHeightMm);
         Assert.Equal(title.YTop - titleBand, first.YTop, 6);
     }
 }

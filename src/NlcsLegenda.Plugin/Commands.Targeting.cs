@@ -28,10 +28,8 @@ public partial class Commands
         };
     }
 
-    // Kiest het doel van een instelmutatie. Zonder legenda's is er alleen de globale standaard.
-    // Met legenda's ligt de bestaande legenda voor de hand, maar globaal blijft kiesbaar zodat
-    // je bewust de standaard voor nieuwe legenda's kunt zetten. Headless is er geen prompt: bij
-    // precies één legenda wordt die gekozen, anders de globale standaard.
+    // Zonder legenda wordt de standaard bewerkt; één aanwezige legenda is eenduidig.
+    // De standaard blijft rechtstreeks bereikbaar via NLCSLEGENDASTANDAARD.
     private static bool ResolveMutationTarget(Editor ed, Database db, out MutationTarget target,
         string promptVerb = "Waarop toepassen", string pickVerb = "aanpassen")
     {
@@ -39,31 +37,12 @@ public partial class Commands
         LegendRegistry reg;
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            reg = LegendStore.Load(db, tr);
+            reg = LegendManagement.ActiveRegistry(db, tr, LegendStore.Load(db, tr));
             tr.Commit();
         }
         if (reg.Legends.Count == 0)
             return true;
-
-        if (HostEnvironment.IsCoreConsole)
-        {
-            if (LegendTargeting.ResolveAuto(reg, out var auto) == TargetResolution.Single && auto is not null)
-                target = MutationTarget.ForLegend(auto);
-            return true;
-        }
-
-        var pko = new PromptKeywordOptions("\n" + promptVerb);
-        pko.Keywords.Add("Legenda");
-        pko.Keywords.Add("Globaal");
-        pko.Keywords.Default = "Legenda";
-        pko.AllowNone = true;
-        var res = ed.GetKeywords(pko);
-        if (res.Status != PromptStatus.OK)
-            return false;
-        if (res.StringResult == "Globaal")
-            return true;
-
-        var def = PickLegendFromList(ed, reg, pickVerb);
+        var def = ResolveTargetLegend(ed, db, reg, pickVerb);
         if (def is null)
             return false;
         target = MutationTarget.ForLegend(def);
@@ -78,7 +57,7 @@ public partial class Commands
         using var tr = db.TransactionManager.StartTransaction();
         var reg = LegendStore.Load(db, tr);
         var def = reg.FindById(target.LegendId);
-        var clone = (def?.Settings ?? new LegendSettings()).Clone();
+        var clone = (def ?? throw new InvalidOperationException("De gekozen legenda bestaat niet meer.")).Settings.Clone();
         tr.Commit();
         return clone;
     }
