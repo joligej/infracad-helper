@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.29.10 - 2026-10-14
+
+- Instellingen openen direct bij één aanwezige legenda. Gewiste legenda's tellen
+  niet mee in de keuze; Undo herstelt hun bereikbaarheid. Standaard opent de
+  instellingen voor nieuwe legenda's rechtstreeks.
+- Titel, statuskoppen, regelafstand, tekstkolom, opmerkingen en schaalbalk volgen
+  de opnieuw gemeten maatvoering. Hulpkaders blijven zichtbaar in modelruimte
+  en worden niet geplot. Een lege hosttekening krijgt de juiste NLCS-tekststijl.
+- Broninserts worden niet nogmaals geschaald of passend gemaakt in een vakje.
+  Expliciete NLCS-schaalvarianten worden eenmaal omgerekend. Grote symbolen
+  krijgen meer ruimte; ongelijke schaalverhoudingen blijven behouden.
+- Samenvoegen vergelijkt symbolen en arceringen op hun uiterlijk bij de gekozen
+  legendaschaal. Werkelijke MText-hoogte bepaalt de rijruimte en statuskoppen
+  tellen mee bij de maximale kolomhoogte.
+- Bestaande legenda's houden hun eigen instellingen. Opmaak → template zet
+  maatvoering en lagen terug; Tekeningnotities herstelt desgewenst de standaardtekst.
+
 ## 1.29.9 - 2026-10-13
 
 - Samenstellen gebruikt de bronselectie en omschrijvingen van de gekozen legenda.

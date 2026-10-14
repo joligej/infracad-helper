@@ -28,8 +28,9 @@ internal sealed class HelpDialog : Form
             "verwijderen."),
         ("Instellingen",
             "Open Instellingen voor schaal, inhoud, opmaak, teksten en hoeveelheden.\n\n" +
-            "Kies een bestaande legenda of de globale standaard voor nieuwe legenda's.\n" +
-            "Elke bestaande legenda houdt zijn eigen instellingen."),
+            "Bij één aanwezige legenda open je die direct. Bij meerdere kies je welke.\n" +
+            "Standaard bewerkt de instellingen voor nieuwe legenda's.\n\n" +
+            "Opmaak → template zet de maatvoering terug; eigen teksten blijven behouden."),
         ("Eigen lagen",
             "Heb je eigen lagen die geen NLCS zijn maar wel mee moeten tellen? Koppel ze onder\n" +
             "Eigen lagen in de instellingen.\n\n" +

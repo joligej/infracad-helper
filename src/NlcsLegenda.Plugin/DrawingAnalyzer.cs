@@ -265,6 +265,8 @@ public static class DrawingAnalyzer
         HatchSample? hatch = ent is Hatch h ? HatchSample.From(h, transform) : null;
         if (hatch is not null)
         {
+            hatch.SourceScale = parsed.Scale;
+            hatch.TargetScale = settings.Scale;
             hatch.Color = style.Color;
             hatch.Transparency = style.Transparency;
         }
@@ -282,7 +284,7 @@ public static class DrawingAnalyzer
                 c.SymbolDefinitionIdentities[cacheKey] = identity;
             }
             symbol = new SymbolSample(blockName, identity, SymbolTransform.From(transform * br.BlockTransform))
-            { InsertionStyle = style, InsertionLayerStyle = layerStyle };
+            { InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceScale = parsed.Scale, TargetScale = settings.Scale };
         }
         string appearance = SampleSignature(style, hatch, symbol);
         string key = parsed.GroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
@@ -607,9 +609,9 @@ public static class DrawingAnalyzer
         return string.Join(":", "H",
             hatch.PatternType,
             hatch.PatternName.Trim().ToUpperInvariant(),
-            NumberSignature(hatch.PatternScale),
+            NumberSignature(hatch.PatternScale * hatch.ScaleForLegend(hatch.TargetScale)),
             NumberSignature(hatch.PatternAngle),
-            NumberSignature(hatch.PatternSpace), hatch.PatternDouble,
+            NumberSignature(hatch.PatternSpace * hatch.ScaleForLegend(hatch.TargetScale)), hatch.PatternDouble,
             hatch.IsSolid,
             hatch.Color is null ? string.Empty : ColorSignature(hatch.Color),
             hatch.Transparency.Signature);

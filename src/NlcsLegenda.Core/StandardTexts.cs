@@ -4,6 +4,20 @@ namespace NlcsLegenda.Core;
 
 public static class StandardTexts
 {
+    public const string DrawingRemarks =
+        "-\tMaten in meters en materiaalmaten in millimeters, tenzij anders aangegeven.\n" +
+        "-\tHoogtemaatvoering in meters t.o.v. NAP, tenzij anders aangegeven.\n" +
+        "-\tHoeken in graden.\n" +
+        "-\tCoördinaten in meters t.o.v. Rijksdriehoeksstelsel.";
+
+    public const string KlicDisclaimer = "De tekeningen zijn globaal en uitsluitend gebaseerd op de leggingsgegevens zoals deze " +
+        "bekend zijn bij het KLIC. De exacte ligging, zowel horizontaal als verticaal, kan door " +
+        "tal van oorzaken afwijken. Deze dient daarom in het veld te worden vastgesteld d.m.v. " +
+        "proefgaten of -sleuven. Praktische richtlijnen om zorgvuldig te graven zijn te verkrijgen " +
+        "bij het CROW (www.crow.nl, brochure 'Graafschade voorkomen aan kabels en leidingen'). " +
+        "Mofslagen en huisaansluitingen zijn sporadisch aangeduid; de diepteligging is nooit " +
+        "aangegeven. Van een 'gebruikelijke' of constante diepteligging kan nooit worden uitgegaan.";
+
     private static readonly Dictionary<string, string> Hoofdgroepen = new(StringComparer.OrdinalIgnoreCase)
     {
         ["VH"] = "Verharding",

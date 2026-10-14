@@ -128,18 +128,21 @@ public partial class Commands
         {
             using var tr = db.TransactionManager.StartTransaction();
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
-            var orphans = new List<ObjectId>();
-            foreach (ObjectId id in bt)
+            // Na het wissen van een buitenblok kunnen zijn eigen symbooldefinities
+            // pas in de volgende doorgang verweesd zijn.
+            while (true)
             {
-                if (tr.GetObject(id, OpenMode.ForRead) is not BlockTableRecord btr || btr.IsErased)
-                    continue;
-                if (btr.Name.StartsWith("NLCS_LEGENDA_", StringComparison.OrdinalIgnoreCase)
-                    && btr.GetBlockReferenceIds(true, false).Count == 0)
-                    orphans.Add(id);
+                var orphans = new List<ObjectId>();
+                foreach (ObjectId id in bt)
+                {
+                    if (id.IsErased || tr.GetObject(id, OpenMode.ForRead) is not BlockTableRecord btr) continue;
+                    if (btr.Name.StartsWith("NLCS_LEGENDA_", StringComparison.OrdinalIgnoreCase)
+                        && btr.GetBlockReferenceIds(true, false).Count == 0)
+                        orphans.Add(id);
+                }
+                if (orphans.Count == 0) break;
+                foreach (var id in orphans) ((BlockTableRecord)tr.GetObject(id, OpenMode.ForWrite)).Erase();
             }
-            foreach (var id in orphans)
-                if (tr.GetObject(id, OpenMode.ForWrite) is BlockTableRecord btr && !btr.IsErased)
-                    btr.Erase();
             tr.Commit();
         }
         catch

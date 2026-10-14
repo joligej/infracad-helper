@@ -162,13 +162,13 @@ public partial class Commands
         var db = doc.Database;
         try
         {
-            var mt = new List<(double H, AttachmentPoint A, string L, double X, double Y, double W, bool U)>();
+            var mt = new List<(double H, AttachmentPoint A, string L, double X, double Y, double W, bool U, double AH)>();
             var frames = new List<(double W, double H, double X, double CY)>();
             var samples = new List<double>();
             int hatches = 0, symbolEnts = 0;
 
             LegendSettings s = LoadGlobalDefaults();
-            s.DrawSwatchFrame = true; s.IncludeQuantities = true; s.IncludeRemarks = true;
+            s.DrawBorder = true; s.DrawSwatchFrame = true; s.IncludeQuantities = true; s.IncludeRemarks = true;
             s.IncludeScaleBar = true; s.IncludeGroupHeaders = true; s.IncludeHoofdgroepHeaders = true;
             if (string.IsNullOrWhiteSpace(s.RemarksText)) s.RemarksText = "Opmerking een.\nOpmerking twee.";
 
@@ -188,12 +188,13 @@ public partial class Commands
                 void Walk(ObjectId id, int depth)
                 {
                     if (depth > 8 || tr.GetObject(id, OpenMode.ForRead) is not Entity e) return;
-                    bool frame = string.Equals(e.Layer, s.FrameLayer, StringComparison.OrdinalIgnoreCase);
+                    bool frame = string.Equals(e.Layer, s.FrameLayer, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(e.Layer, s.SwatchFrameLayer, StringComparison.OrdinalIgnoreCase);
                     switch (e)
                     {
                         case MText m:
                             mt.Add((m.TextHeight, m.Attachment, m.Layer, m.Location.X, m.Location.Y, m.Width,
-                                m.Contents != null && m.Contents.StartsWith("\\L", StringComparison.Ordinal)));
+                                m.Contents != null && m.Contents.StartsWith("\\L", StringComparison.Ordinal), m.ActualHeight));
                             break;
                         case Hatch: hatches++; break;
                         case Polyline p:
@@ -218,17 +219,17 @@ public partial class Commands
             PurgePending(db);
 
             bool Near(double a, double b, double tol = 1e-4) => Math.Abs(a - b) < tol;
-            bool titleOk = mt.Any(x => Near(x.H, titleH) && x.A == AttachmentPoint.MiddleLeft && x.U && string.Equals(x.L, s.HeaderTextLayer, StringComparison.OrdinalIgnoreCase));
+            bool titleOk = mt.Any(x => Near(x.H, titleH) && x.A == AttachmentPoint.TopLeft && x.U && string.Equals(x.L, s.HeaderTextLayer, StringComparison.OrdinalIgnoreCase));
             bool headOk = mt.Any(x => Near(x.H, headH) && x.U && string.Equals(x.L, s.TextLayer, StringComparison.OrdinalIgnoreCase));
-            bool bodyOk = mt.Any(x => Near(x.H, bodyH) && x.A == AttachmentPoint.MiddleLeft && x.W > 0 && string.Equals(x.L, s.TextLayer, StringComparison.OrdinalIgnoreCase));
+            bool bodyOk = mt.Any(x => Near(x.H, bodyH) && x.A == AttachmentPoint.TopLeft && x.W > 0 && string.Equals(x.L, s.TextLayer, StringComparison.OrdinalIgnoreCase));
             bool qtyOk = mt.Any(x => x.A == AttachmentPoint.MiddleRight && string.Equals(x.L, s.TextLayer, StringComparison.OrdinalIgnoreCase));
             bool scaleOk = mt.Any(x => x.A == AttachmentPoint.MiddleCenter);
             bool swatchOk = frames.Any(f => Near(f.W, swW, 0.02) && Near(f.H, swH, 0.02));
             bool sampleOk = samples.Any(w => Near(w, swW, 0.05));
             bool borderOk = frames.Any(f => f.W > swW * 2 && f.H > swH * 2);
             double swatchLeft = frames.Where(f => Near(f.W, swW, 0.02) && Near(f.H, swH, 0.02)).Select(f => f.X).DefaultIfEmpty(double.NaN).Min();
-            double bodyMinX = mt.Where(x => Near(x.H, bodyH) && x.A == AttachmentPoint.MiddleLeft && x.W > 0).Select(x => x.X).DefaultIfEmpty(double.NaN).Min();
-            bool gapOk = !double.IsNaN(bodyMinX) && !double.IsNaN(swatchLeft) && Near(bodyMinX - (swatchLeft + swW), textGap, 0.05);
+            double bodyMinX = mt.Where(x => Near(x.H, bodyH) && x.A == AttachmentPoint.TopLeft && x.W > 0 && x.X >= swatchLeft + swW).Select(x => x.X).DefaultIfEmpty(double.NaN).Min();
+            bool gapOk = !double.IsNaN(bodyMinX) && !double.IsNaN(swatchLeft) && Near(bodyMinX - (swatchLeft + swW), textGap + bodyH * 0.1, 0.05);
 
             ed.WriteMessage($"\nVOLOPMAAK tekst: titel({titleOk}) kop({headOk}) body-wrap({bodyOk}) hoeveelheid-rechts({qtyOk}) schaallabel-midden({scaleOk}) -> {(titleOk && headOk && bodyOk && qtyOk && scaleOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nVOLOPMAAK swatch: kader {swW:0.##}x{swH:0.##}({swatchOk}) lijnsample({sampleOk}) buitenkader({borderOk}) -> {(swatchOk && sampleOk && borderOk ? "OK" : "FAIL")}");
@@ -239,7 +240,7 @@ public partial class Commands
             // midden van de tekst en moet samenvallen met het verticale midden van de swatch op
             // dezelfde rij. Rapporteer de kleinste afwijking in papier-mm.
             var swatchCentersY = frames.Where(f => Near(f.W, swW, 0.02) && Near(f.H, swH, 0.02)).Select(f => f.CY).ToList();
-            var bodyCentersY = mt.Where(x => Near(x.H, bodyH) && x.A == AttachmentPoint.MiddleLeft && x.W > 0).Select(x => x.Y).ToList();
+            var bodyCentersY = mt.Where(x => Near(x.H, bodyH) && x.A == AttachmentPoint.TopLeft && x.W > 0).Select(x => x.Y - Math.Max(x.H * (1 - 0.28388973), x.AH / 2)).ToList();
             double vertDev = double.MaxValue;
             foreach (var by in bodyCentersY)
                 foreach (var cy in swatchCentersY)
@@ -673,7 +674,7 @@ public partial class Commands
                 {
                     if (depth > 8 || tr.GetObject(id, OpenMode.ForRead) is not Entity e) return;
                     if (e is MText m) { heights.Add(m.TextHeight); if (m.Width > 0) wrapSeen = true; }
-                    else if (e is Polyline p && string.Equals(p.Layer, s.FrameLayer, StringComparison.OrdinalIgnoreCase) && p.NumberOfVertices == 4)
+                    else if (e is Polyline p && string.Equals(p.Layer, s.SwatchFrameLayer, StringComparison.OrdinalIgnoreCase) && p.NumberOfVertices == 4)
                     {
                         var ext = p.GeometricExtents;
                         double w = ext.MaxPoint.X - ext.MinPoint.X, h = ext.MaxPoint.Y - ext.MinPoint.Y;

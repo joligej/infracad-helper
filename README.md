@@ -47,12 +47,11 @@ de paper space een viewport rond de gekozen legenda op de ingestelde schaal.
 
 De globale instellingen zijn het startpunt voor een **nieuwe** legenda. Zet je later de
 globale standaard anders, dan verandert een bestaande legenda niet mee: die houdt de
-instellingen waarmee hij is gemaakt. De instelcommando's (`NLCSLEGENDAOPTIES`,
-`NLCSLEGENDASAMENSTELLEN`, `NLCSLEGENDATEKST`, `NLCSLEGENDASTATUS`, `NLCSLEGENDAXREFS`,
-`NLCSLEGENDAUITVINKEN`, `NLCSLEGENDATOEVOEGEN`, `NLCSLEGENDAPRESET`) vragen eerst waarop je
-het toepast: op een bestaande legenda (die wordt dan meteen bijgewerkt) of op de globale
-standaard voor nieuwe legenda's. Bestaat er nog geen legenda, dan geldt vanzelf de globale
-standaard. De instellingen van één bestaande legenda bewerk je ook via `NLCSLEGENDABEHEER`.
+instellingen waarmee hij is gemaakt. Bij één aanwezige legenda openen de instelcommando's direct die legenda. Bij meerdere
+klik je de gewenste legenda aan of kies je uit een lijst. Gewiste legenda's tellen niet
+mee; Undo maakt ze weer bereikbaar. Zonder legenda bewerk je de globale standaard.
+De knop **Standaard** (`NLCSLEGENDASTANDAARD`) opent die standaard ook als er al legenda's
+zijn. De instellingen van één bestaande legenda bewerk je ook via `NLCSLEGENDABEHEER`.
 Het instellingenvenster bundelt alles in tabbladen: naast schaal, inhoud, opmaak, teksten,
 hoeveelheden en schaalbalk zitten daar ook de per-xref keuze, de eigen statussen inclusief
 ledentoewijzing en de omschrijvingen. De losse commando's blijven als snelkoppeling bestaan.
@@ -68,11 +67,24 @@ De teksten volgen de NLCS-template: tekststijl `NLCS-ISO` met standaardhoogtes (
 regels en statuskoppen, 5 mm voor de titel) op de tekstlagen `-T25` en `-T50`. Alle tekst
 in de legenda bestaat uit gewone MText-objecten, zodat je die in AutoCAD net als andere tekst
 kunt selecteren en bewerken. De teksthoogtes zijn per legenda instelbaar.
-De standaard statuskoppen zijn "Nieuwe situatie", "Bestaande situatie", "Vervallen situatie",
-"Tijdelijke situatie" en "Revisie"; je kunt ze in de instellingen aanpassen.
+De standaard statuskoppen zijn "Nieuwe situatie:", "Bestaande situatie:", "Vervallen situatie:",
+"Tijdelijke situatie:" en "Revisie"; je kunt ze in de instellingen aanpassen.
 
-Onder de legenda komen standaard een meeschalende schaalbalk en een opmerkingenblok.
-Allebei kun je uitzetten of aanpassen.
+Onder de legenda staan standaard de tekeningnotities, een schaalbalk en de schaaltekst.
+De schaalbalk heeft vier segmenten van elk 10 mm op papier, met afwisselende halve
+vullingen. Teksten en onderdelen kun je aanpassen of uitzetten. In het opmerkingenvenster
+kies je tussen tekeningnotities en de KLIC-waarschuwing.
+
+De legenda is bedoeld voor modelruimte in meters. Papiermaten worden eenmaal met de
+gekozen schaal omgerekend. Symbolen behouden hun modelmaat; een expliciete NLCS-schaalvariant
+wordt naar de gekozen schaal omgerekend. Grote symbolen krijgen meer rij- en kolomruimte.
+De hulpkaders zijn in modelruimte zichtbaar en worden niet geplot; een buitenkader staat
+standaard uit. De tekststijl gebruikt `NLCS-ISO.ttf`. Ontbreekt dat lettertype, installeer
+het of kies in Instellingen een bestaande tekststijl.
+
+Bestaande legenda's houden hun opgeslagen instellingen. Kies **Opmaak → template** om
+de maatvoering bij te werken. Eigen teksten, bronnen, filters en de gekozen schaal blijven
+behouden. De standaardmaatvoering staat in [Maatvoering](docs/template-maatvoering.md).
 
 `NLCSLEGENDAEXPORT` schrijft de regels van de huidige tekening weg als CSV en JSON.
 Wil je een hele projectmap in één keer, dan leest `NLCSLEGENDABATCH` elke DWG in een
@@ -128,7 +140,7 @@ bepaalt.
 De keuzelijst bij Samenstellen volgt de bron van de gekozen legenda. Uitgevinkte
 regels blijven uitgevinkt als hun bron tijdelijk ontbreekt. Instellingen en
 beschrijvingen die je vóór het plaatsen aanpast, gelden alleen voor die nieuwe legenda.
-Gebruik Instellingen met de keuze Globaal om de standaard voor nieuwe legenda's te wijzigen.
+Gebruik Standaard om de instellingen voor nieuwe legenda's te wijzigen.
 
 ### Statussen, xrefs en profielen
 
@@ -138,8 +150,8 @@ NLCS-lagen door ze in de tekening aan te wijzen, handmatige regels via een lijst
 regel verschijnt dan onder de eigen kopregel, ook als de gewone status ervan uitstaat.
 
 Werk je met externe referenties, dan bepaalt `NLCSLEGENDAXREFS` per gekoppelde xref of
-die meetelt. Kies daarbij een bestaande legenda of de globale standaard voor nieuwe
-legenda's. Is het xref-bestand op schijf gewijzigd sinds het laden, herlaad dan eerst de
+die meetelt. De keuze geldt voor de aanwezige of gekozen legenda. Voor nieuwe
+legenda's pas je de xref-keuze aan onder Standaard. Is het xref-bestand op schijf gewijzigd sinds het laden, herlaad dan eerst de
 xref voordat je de legenda bijwerkt. Zo blijven hoeveelheden en voorbeelden op dezelfde
 bronversie gebaseerd; bij een versieverschil blijft de bestaande legenda behouden.
 
@@ -164,6 +176,7 @@ een opzet met collega's kunt delen.
 | `NLCSLEGENDABATCH` | Alle DWG's in een map samen in één uittrekstaat (CSV/JSON) met een kolom Tekening. |
 | `NLCSLEGENDAVIEWPORT` | Een viewport in de huidige layout rond de legenda, op schaal. |
 | `NLCSLEGENDAOPTIES` | Alle instellingen bewerken in een venster met normale tabbladen (schaal, inhoud, opmaak, teksten). |
+| `NLCSLEGENDASTANDAARD` | De instellingen voor nieuwe legenda's bewerken. |
 | `NLCSLEGENDAOMSCHRIJVINGEN` | De omschrijvingen per element bewerken in een tabel. |
 | `NLCSLEGENDATEKST` | Klik een element aan en pas de tekst ervan aan (meerdere regels mogelijk). |
 | `NLCSLEGENDASAMENSTELLEN` | Regels uitvinken en eigen regels toevoegen in één venster. |

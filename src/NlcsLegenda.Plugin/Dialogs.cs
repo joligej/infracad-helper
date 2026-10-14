@@ -326,6 +326,7 @@ internal sealed class SettingsDialog : Form
         root.Controls.Add(Group("Stijl en lagen",
             TextRow("Tekststijl (leeg = huidige):", () => _settings.TextStyle, v => _settings.TextStyle = v, 180),
             TextRow("Kaderlaag:", () => _settings.FrameLayer, v => _settings.FrameLayer = v, 180),
+            TextRow("Hulpkaders (niet plotten):", () => _settings.SwatchFrameLayer, v => _settings.SwatchFrameLayer = v, 180),
             TextRow("Tekstlaag omschrijvingen:", () => _settings.TextLayer, v => _settings.TextLayer = v, 180),
             TextRow("Tekstlaag koppen/titel:", () => _settings.HeaderTextLayer, v => _settings.HeaderTextLayer = v, 180)));
         page.Controls.Add(root);
@@ -401,14 +402,14 @@ internal sealed class SettingsDialog : Form
         root.Controls.Add(Group("Geavanceerd \u2013 maatvoering (mm)",
             NumRow("Swatch breedte:", () => _settings.SwatchWidthMm, v => _settings.SwatchWidthMm = v, 1, 200, 1, 0.5M),
             NumRow("Swatch hoogte:", () => _settings.SwatchHeightMm, v => _settings.SwatchHeightMm = v, 1, 200, 1, 0.5M),
-            NumRow("Regelafstand:", () => _settings.RowPitchMm, v => _settings.RowPitchMm = v, 1, 100, 1, 0.1M),
-            NumRow("Regelhoogte-factor tekst:", () => _settings.LineSpacingFactor, v => _settings.LineSpacingFactor = v, 0.5M, 5, 2, 0.05M),
-            NumRow("Breedte opmerkingen:", () => _settings.RemarksWidthMm, v => _settings.RemarksWidthMm = v, 1, 500, 1, 1),
-            NumRow("Ruimte swatch-tekst:", () => _settings.TextGapMm, v => _settings.TextGapMm = v, 0, 50, 1, 0.5M),
+            NumRow("Regelafstand:", () => _settings.RowPitchMm, v => _settings.RowPitchMm = v, 1, 100, 4, 0.1M),
+            NumRow("Regelhoogte-factor tekst:", () => _settings.LineSpacingFactor, v => _settings.LineSpacingFactor = v, 0.25M, 4, 2, 0.05M),
+            NumRow("Breedte opmerkingen:", () => _settings.RemarksWidthMm, v => _settings.RemarksWidthMm = v, 1, 500, 4, 1),
+            NumRow("Ruimte swatch-tekst:", () => _settings.TextGapMm, v => _settings.TextGapMm = v, 0, 50, 4, 0.5M),
             NumRow("Teksthoogte omschrijving:", () => _settings.TextHeightMm, v => _settings.TextHeightMm = v, 0.5M, 50, 2, 0.1M),
             NumRow("Teksthoogte kopregel:", () => _settings.HeaderTextHeightMm, v => _settings.HeaderTextHeightMm = v, 0.5M, 50, 2, 0.1M),
             NumRow("Teksthoogte titel:", () => _settings.TitleTextHeightMm, v => _settings.TitleTextHeightMm = v, 0.5M, 50, 2, 0.1M),
-            NumRow("Witruimte boven kopregel:", () => _settings.HeaderSpacingMm, v => _settings.HeaderSpacingMm = v, 0, 50, 1, 0.5M),
+            NumRow("Titel-kop (basislijnen):", () => _settings.HeaderSpacingMm, v => _settings.HeaderSpacingMm = v, 0, 50, 4, 0.5M),
             NumRow("Kolombreedte:", () => _settings.ColumnWidthMm, v => _settings.ColumnWidthMm = v, 1, 500, 1, 1),
             NumRow("Kolomtussenruimte:", () => _settings.ColumnGapMm, v => _settings.ColumnGapMm = v, 0, 100, 1, 0.5M),
             NumRow("Hoeveelheidkolom breedte:", () => _settings.QuantityColumnWidthMm, v => _settings.QuantityColumnWidthMm = v, 1, 200, 1, 0.5M),
@@ -819,6 +820,8 @@ internal sealed class RemarksEditDialog : Form
         var buttons = new ButtonBar(withApply: false);
         AcceptButton = buttons.Ok;
         CancelButton = buttons.Cancel;
+        buttons.AddExtra("Tekeningnotities").Click += (_, _) => _body.Text = StandardTexts.DrawingRemarks.Replace("\n", Environment.NewLine);
+        buttons.AddExtra("KLIC-waarschuwing").Click += (_, _) => _body.Text = StandardTexts.KlicDisclaimer;
         // Enter in het meerregelige veld hoort een regeleinde te maken, niet OK te drukken.
         buttons.Ok.Click += (_, _) => DialogResult = DialogResult.OK;
 

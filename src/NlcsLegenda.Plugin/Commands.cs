@@ -669,8 +669,16 @@ public partial class Commands
         NlcsLegendaOptiesInteractive();
     }
 
+    [CommandMethod("NLCSLEGENDASTANDAARD", CommandFlags.Modal)]
+    public void NlcsLegendaStandaard()
+    {
+        var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
+        if (ed is null || !RequireInteractive(ed, "NLCSLEGENDASTANDAARD")) return;
+        NlcsLegendaOptiesInteractive(globalDefaults: true);
+    }
+
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private void NlcsLegendaOptiesInteractive()
+    private void NlcsLegendaOptiesInteractive(bool globalDefaults = false)
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
@@ -680,7 +688,8 @@ public partial class Commands
 
         try
         {
-            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+            var target = MutationTarget.Global;
+            if (!globalDefaults && !ResolveMutationTarget(ed, db, out target)) { ed.WriteMessage("\nGeannuleerd."); return; }
             var settings = GetTargetSettings(db, target);
             using var dialog = new SettingsDialog(settings, target.ContextLabel, BuildCompositionItems(db, settings, target.IsGlobal ? null : target.LegendId), CollectXrefNames(db));
             dialog.ApplyRequested += (_, _) => ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
@@ -1895,7 +1904,7 @@ public partial class Commands
                 FinalizePlacement(tr, db, br, settings, def.GroupName);
                 registry.Add(def);
                 LegendStore.Save(db, tr, registry);
-                _pendingPurge.Add(btrId);
+
                 ed.WriteMessage($"\nNLCSTEST placed rows={rows} at {insert.X:0.0},{insert.Y:0.0} name={def.Name}");
                 tr.Commit();
             }
@@ -2484,7 +2493,7 @@ public partial class Commands
                     else if (e is BlockReference) symbols++;
                     else if (e is Curve)
                     {
-                        if (string.Equals(e.Layer, s.FrameLayer, StringComparison.OrdinalIgnoreCase)) frames++;
+                        if (string.Equals(e.Layer, s.SwatchFrameLayer, StringComparison.OrdinalIgnoreCase)) frames++;
                         else samples++; // een lijn op een niet-kaderlaag zou een sample zijn (mag niet)
                     }
                 }
@@ -3410,7 +3419,7 @@ public partial class Commands
                 }
                 // Proefbouw terugdraaien: geen ongeregistreerde legenda als bron achterlaten.
                 tr.Abort();
-                _pendingPurge.RemoveAll(id => id.IsNull || !id.IsValid || id.IsErased);
+
                 return n;
             }
 

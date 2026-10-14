@@ -102,7 +102,9 @@ public class SettingsSerializationTests
     {
         var s = new LegendSettings();
         Assert.True(s.IncludeRemarks);
-        Assert.Contains("KLIC", s.RemarksText);
+        Assert.Contains("Maten in meters", s.RemarksText);
+        Assert.Contains("NAP", s.RemarksText);
+        Assert.DoesNotContain("KLIC", s.RemarksText);
         Assert.Equal("OPMERKINGEN", s.RemarksTitle);
     }
 

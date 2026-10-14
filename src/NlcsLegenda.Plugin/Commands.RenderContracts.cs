@@ -226,26 +226,28 @@ public partial class Commands
             foreach (double scale in new[] { 100d, 200d, 500d, 1000d })
             {
                 using var tr = db.TransactionManager.StartTransaction();
-                var settings = new LegendSettings { Scale = scale, IncludeQuantities = true };
+                var settings = new LegendSettings { Scale = scale, IncludeQuantities = true, DrawSwatchFrame = true, DrawBorder = true, ToonSymbolen = false };
                 var analysis = DrawingAnalyzer.Analyze(db, tr, settings);
                 var id = LegendBuilder.BuildBlock(db, tr, analysis, settings, out int rowCount, out var issues);
                 var block = (BlockTableRecord)tr.GetObject(id, OpenMode.ForRead);
                 var entities = block.Cast<ObjectId>().Select(e => tr.GetObject(e, OpenMode.ForRead)).OfType<Entity>().ToList();
                 double paper = 1000d / scale;
                 bool Near(double a, double b) => Math.Abs(a - b) < 0.03;
-                var frames = entities.OfType<Polyline>().Where(e => e.Closed && e.Layer == settings.FrameLayer)
+                var frames = entities.OfType<Polyline>().Where(e => e.Closed && e.Layer == settings.SwatchFrameLayer)
                     .Select(e => e.GeometricExtents).Where(e => Near((e.MaxPoint.X - e.MinPoint.X) * paper, 24)
                         && Near((e.MaxPoint.Y - e.MinPoint.Y) * paper, 5)).ToList();
-                if (rowCount != 4 || frames.Count != 4 || issues.Count != 0)
-                    throw new InvalidOperationException("Niet vier vakken van 24 x 5 mm.");
+                if (rowCount != 3 || frames.Count != 3 || issues.Count != 0)
+                    throw new InvalidOperationException("Niet drie lijn-/vlakvakken van 24 x 5 mm.");
                 var text = entities.OfType<MText>().ToList();
                 if (!text.Any(t => t.Contents.Contains("LEGENDA") && Near(t.TextHeight * paper, 5) && t.Contents.StartsWith("\\L"))
                     || !text.Any(t => t.Contents.Contains("situatie") && Near(t.TextHeight * paper, 2.5) && t.Contents.StartsWith("\\L")))
                     throw new InvalidOperationException("Titel/statuskop wijkt af van 5/2,5 mm met onderstreping.");
-                var bodies = text.Where(t => t.Attachment == AttachmentPoint.MiddleLeft && t.Width > 0
-                    && Near(t.TextHeight * paper, 2.5) && frames.Any(f => Near((t.Location.X - f.MaxPoint.X) * paper, 5.7))).ToList();
-                if (bodies.Count != 4 || bodies.Any(t => !frames.Any(f => Math.Abs((t.Location.Y - (f.MinPoint.Y + f.MaxPoint.Y) / 2) * paper) < 0.03)))
-                    throw new InvalidOperationException($"Tekstpositie of afstand wijkt af: bodies={bodies.Count}; gaps=" + string.Join(";", text.Where(t => t.Attachment == AttachmentPoint.MiddleLeft && t.Width > 0).Select(t => $"h={t.TextHeight * paper:R},x={t.Location.X * paper:R},y={t.Location.Y * paper:R}")));
+                var bodies = text.Where(t => t.Attachment == AttachmentPoint.TopLeft && t.Width > 0
+                    && Near(t.TextHeight * paper, 2.5) && frames.Any(f => Near((t.Location.X - f.MaxPoint.X) * paper, 5.9688))).ToList();
+                if (bodies.Count != 3 || bodies.Any(t => !frames.Any(f => Math.Abs((t.Location.Y
+                    - Math.Max(t.TextHeight * (1 - 0.28388973), t.ActualHeight / 2)
+                    - (f.MinPoint.Y + f.MaxPoint.Y) / 2) * paper) < 0.03)))
+                    throw new InvalidOperationException($"Tekstbasislijn of afstand wijkt af: bodies={bodies.Count}.");
                 var border = entities.OfType<Polyline>().Where(e => e.Closed && e.Layer == settings.FrameLayer)
                     .Select(e => e.GeometricExtents).OrderByDescending(e => (e.MaxPoint.X - e.MinPoint.X) * (e.MaxPoint.Y - e.MinPoint.Y)).First();
                 foreach (var entity in entities)
@@ -256,7 +258,7 @@ public partial class Commands
                         throw new InvalidOperationException("Uitvoer steekt buiten het kader.");
                 }
                 tr.Abort();
-                doc.Editor.WriteMessage($"\nPAPERSCALE 1:{scale:0} vakken24x5/tekst2.5/kop2.5/titel5/gap5.7/centrering/kader -> OK");
+                doc.Editor.WriteMessage($"\nPAPERSCALE 1:{scale:0} vakken24x5/tekst2.5/kop2.5/titel5/gap5.7188/basislijn/kader -> OK");
             }
         }
         catch (System.Exception ex) { doc.Editor.WriteMessage($"\nPAPERSCALE FAIL: {ex}"); }

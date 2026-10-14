@@ -68,11 +68,8 @@ public partial class Commands
         }
 
         FinalizePlacement(tr, db, br, def.Settings, def.GroupName);
-        _pendingPurge.Add(btrId);
         return UpdateResult.Updated;
     }
-
-    private static readonly List<ObjectId> _pendingPurge = new();
 
     // Voegt een melding toe aan een bestaande note (puntkomma-gescheiden), leeg blijft leeg.
     private static string AppendNote(string note, string extra) =>
@@ -80,9 +77,6 @@ public partial class Commands
 
     private static void PurgePending(Database db)
     {
-        foreach (var id in _pendingPurge)
-            PurgeTempBlock(db, id);
-        _pendingPurge.Clear();
         PurgeOrphanLegendBlocks(db);
     }
 
@@ -103,7 +97,7 @@ public partial class Commands
                 LegendRegistry registry;
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
-                    registry = LegendStore.Load(db, tr);
+                    registry = LegendManagement.ActiveRegistry(db, tr, LegendStore.Load(db, tr));
                     tr.Commit();
                 }
 
@@ -166,7 +160,7 @@ public partial class Commands
         List<string> ids;
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            ids = LegendStore.Load(db, tr).Legends.Select(l => l.Id).ToList();
+            ids = LegendManagement.ActiveRegistry(db, tr, LegendStore.Load(db, tr)).Legends.Select(l => l.Id).ToList();
             tr.Commit();
         }
         // Iedere legenda in een eigen transactie: één fout blokkeert de rest niet.
@@ -588,7 +582,12 @@ public partial class Commands
     private static LegendDefinition? ResolveTargetLegend(
         Editor ed, Database db, LegendRegistry registry, string actie)
     {
-        var token = Environment.GetEnvironmentVariable(TargetEnvVar);
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            registry = LegendManagement.ActiveRegistry(db, tr, registry);
+            tr.Commit();
+        }
+        var token = HostEnvironment.IsCoreConsole ? Environment.GetEnvironmentVariable(TargetEnvVar) : null;
         if (!string.IsNullOrWhiteSpace(token))
         {
             if (LegendTargeting.TryResolveByToken(registry, token, out var byToken, out var err))
@@ -619,6 +618,8 @@ public partial class Commands
             AllowNone = true
         };
         var per = ed.GetEntity(peo);
+        if (per.Status != PromptStatus.OK && per.Status != PromptStatus.None)
+            return null;
         if (per.Status == PromptStatus.OK)
         {
             using var tr = db.TransactionManager.StartTransaction();
