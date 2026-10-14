@@ -24,6 +24,21 @@ function Get-NlcsProfileState {
     }
 }
 
+function Get-NlcsLogProfileState {
+    $root = 'HKCU:\Software\Autodesk\AutoCAD'
+    if (!(Test-Path -LiteralPath $root)) { return }
+    foreach ($series in Get-ChildItem -LiteralPath $root) {
+        foreach ($product in Get-ChildItem -LiteralPath $series.PSPath) {
+            $profiles = Join-Path $product.PSPath 'Profiles'
+            if (!(Test-Path -LiteralPath $profiles)) { continue }
+            foreach ($profile in Get-ChildItem -LiteralPath $profiles) {
+                Get-NlcsRegistryValue (Join-Path $profile.PSPath 'Editor Configuration') 'LogFilePath'
+                Get-NlcsRegistryValue (Join-Path $profile.PSPath 'General') 'LogFileOpen'
+            }
+        }
+    }
+}
+
 function Get-NlcsRegistryValue([string]$Path, [string]$Name) {
     if (!(Test-Path -LiteralPath $Path)) {
         return [pscustomobject]@{ Path=$Path; Name=$Name; Exists=$false; Value=$null; Kind=$null }
@@ -92,6 +107,7 @@ function Invoke-NlcsCoreConsole {
     $locked = $false
     $process = $null
     $before = @()
+    $logBefore = @()
     $failure = $null
     $restored = @()
     try {
@@ -102,7 +118,9 @@ function Invoke-NlcsCoreConsole {
             throw 'Sluit AutoCAD/Civil 3D en wacht tot andere Core Console-taken klaar zijn.'
         }
         $before = @(Get-NlcsProfileState)
+        $logBefore = @(Get-NlcsLogProfileState)
         $before | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$Log.profile-before.json" -Encoding utf8
+        $logBefore | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$Log.logging-before.json" -Encoding utf8
         $work = Split-Path -Parent ([IO.Path]::GetFullPath($Script))
         $arguments = @('/i', ('"{0}"' -f $Drawing), '/s', ('"{0}"' -f $Script), '/l', 'en-US')
         # Elke run kiest zijn doel zelf; een instelling uit de bovenliggende shell mag niet meeliften.
@@ -130,11 +148,17 @@ function Invoke-NlcsCoreConsole {
                 $after = @(Get-NlcsProfileState)
                 $after | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$Log.profile-after.json" -Encoding utf8
                 $changed = @(Get-NlcsProfileChanges $before $after)
-                if ($changed.Count -gt 0) {
+                $logAfter = @(Get-NlcsLogProfileState)
+                $logAfter | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$Log.logging-after.json" -Encoding utf8
+                $logChanged = @(Get-NlcsProfileChanges $logBefore $logAfter)
+                if ($changed.Count + $logChanged.Count -gt 0) {
                     if (Get-Process acad, accoreconsole -ErrorAction SilentlyContinue) {
                         throw "CAD is tijdens de test gestart; profielherstel is niet veilig. Beginwaarden: $Log.profile-before.json"
                     }
                     $restored = @(Restore-NlcsProfileState $changed)
+                    # Core Console bewaart zijn werkmap als logpad; dit is hostgedrag.
+                    # Zet dat pad en de logstand terug voordat testmappen worden verwijderd.
+                    Restore-NlcsProfileState $logChanged | Out-Null
                 }
             }
         }
