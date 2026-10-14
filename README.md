@@ -79,7 +79,7 @@ De legenda is bedoeld voor modelruimte in meters. Papiermaten worden eenmaal met
 gekozen schaal omgerekend. Symbolen behouden hun modelmaat; een expliciete NLCS-schaalvariant
 wordt naar de gekozen schaal omgerekend. Grote symbolen krijgen meer rij- en kolomruimte.
 De hulpkaders zijn in modelruimte zichtbaar en worden niet geplot; een buitenkader staat
-standaard uit. De tekststijl gebruikt `NLCS-ISO.ttf`. Ontbreekt dat lettertype, installeer
+standaard uit. Een lege tekststijl kiest `NLCS-ISO` met lettertype `NLCS-ISO.ttf`. Ontbreekt dat lettertype, installeer
 het of kies in Instellingen een bestaande tekststijl.
 
 Bestaande legenda's houden hun opgeslagen instellingen. Kies **Opmaak → template** om

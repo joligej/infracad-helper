@@ -80,7 +80,7 @@ public sealed class LegendSettings
     [Category("Teksten"), DisplayName("Decimalen hoeveelheden")]
     public int QuantityDecimals { get; set; } = 0;
 
-    [Category("Teksten"), DisplayName("Tekststijl"), Description("Naam van de AutoCAD-tekststijl (leeg = NLCS/huidige).")]
+    [Category("Teksten"), DisplayName("Tekststijl"), Description("Naam van de AutoCAD-tekststijl (leeg = NLCS-ISO).")]
     public string TextStyle { get; set; } = string.Empty;
 
     // ---- Koppen ----
