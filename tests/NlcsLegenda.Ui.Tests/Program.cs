@@ -61,7 +61,7 @@ internal static class Program
         form.Scale(new SizeF(scale, scale));
         form.Font = new Font(form.Font.FontFamily, 9f * scale);
         form.MinimumSize = new Size(560, 420);
-        form.ClientSize = new Size(scale == 1 ? 720 : 900, 620);
+        form.ClientSize = new Size(scale.Equals(1f) ? 720 : 900, 620);
         var tabs = form.Controls.OfType<TabControl>().Single();
         foreach(TabPage page in tabs.TabPages)
         {

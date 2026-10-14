@@ -214,8 +214,12 @@ public static class DrawingAnalyzer
         if (c.Excluded.Contains(ent.ObjectId))
             return;
 
-        if (!settings.IncludeInvisibleLayers && (!ent.Visible || !(inheritedLayerStyle is not null && LayerNaming.LocalName(ent.Layer) == "0") && !IsVisible(ent.Layer, tr, c)))
-            return;
+        if (!settings.IncludeInvisibleLayers)
+        {
+            if (!ent.Visible) return;
+            bool inheritsVisibleLayer = inheritedLayerStyle is not null && LayerNaming.LocalName(ent.Layer) == "0";
+            if (!inheritsVisibleLayer && !IsVisible(ent.Layer, tr, c)) return;
+        }
         var layerStyle = EntityLayerStyle(ent, tr, inheritedLayerStyle);
         var effectiveStyle = EntityStyle(ent, tr, inheritedStyle, layerStyle);
         Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle);
@@ -313,6 +317,13 @@ public static class DrawingAnalyzer
         }
     }
 
+    private static bool IsBlockPartVisible(Entity entity, LayerTableRecord layer)
+    {
+        if (!entity.Visible) return false;
+        if (LayerNaming.LocalName(layer.Name) == "0") return true;
+        return !layer.IsOff && !layer.IsFrozen;
+    }
+
     private static bool HasSymbolGeometry(ObjectId id, Transaction tr, bool includeInvisible, HashSet<ObjectId> path)
     {
         if (!path.Add(id)) return false;
@@ -322,7 +333,7 @@ public static class DrawingAnalyzer
                 if (tr.GetObject(child, OpenMode.ForRead) is Entity entity)
                 {
                     var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                    if (!includeInvisible && (!entity.Visible || LayerNaming.LocalName(layer.Name) != "0" && (layer.IsOff || layer.IsFrozen))) continue;
+                    if (!includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
                     if (entity is not BlockReference nested || HasSymbolGeometry(nested.BlockTableRecord, tr, includeInvisible, path)) return true;
                 }
             return false;
@@ -643,7 +654,7 @@ public static class DrawingAnalyzer
                 if (tr.GetObject(id, OpenMode.ForRead) is Entity entity)
                 {
                     var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                    if (!includeInvisible && (!entity.Visible || LayerNaming.LocalName(layer.Name) != "0" && (layer.IsOff || layer.IsFrozen))) continue;
+                    if (!includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
                     entities.Add(SymbolEntitySignature(entity, host, tr, path, depth, parent, parentLayer, includeInvisible));
                 }
             entities.Sort(StringComparer.Ordinal);

@@ -27,17 +27,17 @@ public partial class Commands
                 xml.Add(new XElement("KLIC_Administratief", new XElement("Handle", line.Handle.ToString()), new XElement("Netbeheerder", provider)));
             }
             var dictionary = (DBDictionary)tr.GetObject(db.NamedObjectsDictionaryId, OpenMode.ForWrite);
-            foreach (string name in new[] { "INFRACAD_MAP_DATA", "TABLES" })
-            {
-                var child = new DBDictionary(); dictionary.SetAt(name, child); tr.AddNewlyCreatedDBObject(child, true); dictionary = child;
-            }
+            using var map = new DBDictionary();
+            dictionary.SetAt("INFRACAD_MAP_DATA", map); tr.AddNewlyCreatedDBObject(map, true);
+            using var tables = new DBDictionary();
+            map.SetAt("TABLES", tables); tr.AddNewlyCreatedDBObject(tables, true);
             using var buffer = new MemoryStream();
             using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
             using (var writer = new StreamWriter(zip.CreateEntry("table.xml").Open(), Encoding.UTF8)) writer.Write(xml.ToString());
             var bytes = buffer.ToArray();
             var values = new List<TypedValue>();
             for (int offset = 0; offset < bytes.Length; offset += 127) values.Add(new TypedValue(310, bytes.Skip(offset).Take(127).ToArray()));
-            var record = new Xrecord(); dictionary.SetAt("test-table", record); tr.AddNewlyCreatedDBObject(record, true);
+            using var record = new Xrecord(); tables.SetAt("test-table", record); tr.AddNewlyCreatedDBObject(record, true);
             using var data = new ResultBuffer(values.ToArray()); record.Data = data;
             tr.Commit();
         }
