@@ -51,7 +51,7 @@ public partial class Commands
         var originals = new[] { ConfigPath, DescriptionsPath }.ToDictionary(p => p,
             p => File.Exists(p) ? File.ReadAllBytes(p) : null);
         bool existed = Directory.Exists(ConfigDir);
-        string temp = Path.Combine(Path.GetTempPath(), "nlcs_preset_" + Guid.NewGuid().ToString("N"));
+        string temp = Path.Join(Path.GetTempPath(), "nlcs_preset_" + Guid.NewGuid().ToString("N"));
         try
         {
             Directory.CreateDirectory(ConfigDir);

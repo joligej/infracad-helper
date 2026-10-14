@@ -25,6 +25,9 @@ function Get-NlcsProfileState {
 }
 
 function Get-NlcsRegistryValue([string]$Path, [string]$Name) {
+    if (!(Test-Path -LiteralPath $Path)) {
+        return [pscustomobject]@{ Path=$Path; Name=$Name; Exists=$false; Value=$null; Kind=$null }
+    }
     $key = Get-Item -LiteralPath $Path -ErrorAction Stop
     try {
         $exists = $key.GetValueNames() -contains $Name
@@ -40,6 +43,20 @@ function Get-NlcsRegistryValue([string]$Path, [string]$Name) {
 function Compare-NlcsRegistryValue($Before, $After) {
     $Before.Exists -eq $After.Exists -and $Before.Kind -eq $After.Kind -and
         (ConvertTo-Json -InputObject $Before.Value -Compress) -ceq (ConvertTo-Json -InputObject $After.Value -Compress)
+}
+
+function Get-NlcsProfileChanges([object[]]$Before, [object[]]$After) {
+    $old = @{}; $current = @{}
+    foreach ($value in $Before) { $old[$value.Path + '|' + $value.Name] = $value }
+    foreach ($value in $After) { $current[$value.Path + '|' + $value.Name] = $value }
+    foreach ($key in @($old.Keys) + @($current.Keys) | Select-Object -Unique) {
+        $beforeValue = $old[$key]; $afterValue = $current[$key]
+        if (!$beforeValue) {
+            $beforeValue = [pscustomobject]@{ Path=$afterValue.Path; Name=$afterValue.Name; Exists=$false; Value=$null; Kind=$null }
+        }
+        if (!$afterValue) { $afterValue = Get-NlcsRegistryValue $beforeValue.Path $beforeValue.Name }
+        if (!(Compare-NlcsRegistryValue $beforeValue $afterValue)) { $beforeValue }
+    }
 }
 
 function Restore-NlcsProfileState([object[]]$Before) {
@@ -109,12 +126,10 @@ function Invoke-NlcsCoreConsole {
                 }
                 finally { $process.Dispose() }
             }
-            if ($before.Count -gt 0) {
-                $after = @($before | ForEach-Object { Get-NlcsRegistryValue $_.Path $_.Name })
+            if ($null -ne $process) {
+                $after = @(Get-NlcsProfileState)
                 $after | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$Log.profile-after.json" -Encoding utf8
-                $changed = @(for ($i = 0; $i -lt $before.Count; $i++) {
-                    if (!(Compare-NlcsRegistryValue $before[$i] $after[$i])) { $before[$i] }
-                })
+                $changed = @(Get-NlcsProfileChanges $before $after)
                 if ($changed.Count -gt 0) {
                     if (Get-Process acad, accoreconsole -ErrorAction SilentlyContinue) {
                         throw "CAD is tijdens de test gestart; profielherstel is niet veilig. Beginwaarden: $Log.profile-before.json"
@@ -130,5 +145,5 @@ function Invoke-NlcsCoreConsole {
     }
     if ($failure) { throw $failure }
     if ($restored.Count -gt 0) { throw "De test lekte profielwaarden; exact hersteld: $($restored -join ', ')" }
-    [pscustomobject]@{ ExitCode = 0; Log = $Log; ProfileValuesChecked = $before.Count }
+    [pscustomobject]@{ ExitCode = 0; Log = $Log; ProfileValuesChecked = @(@($before) + @($after) | ForEach-Object { $_.Path + '|' + $_.Name } | Select-Object -Unique).Count }
 }

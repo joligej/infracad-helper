@@ -12,6 +12,8 @@ public partial class Commands
     {
         var probe = settings.Clone();
         probe.ExcludedEntries.Clear();
+        probe.MergedDimensions.Clear();
+        probe.MergeIdenticalStatuses = false;
         probe.ManualEntries.Clear();
         probe.BlankEntries.Clear();
         probe.IncludedStatuses = Enum.GetValues<NlcsStatus>().ToHashSet();
@@ -32,7 +34,7 @@ public partial class Commands
         var analysis = DrawingAnalyzer.Analyze(db, tr, probe, selection, catalog, excluded);
         var items = analysis.Entries
             .Select(e => new EntryCheckItem(LegendSettings.EntryKey(e),
-                $"[{e.Status.DisplayName()}] {e.Description}", EntryGroupLabel(e)))
+                $"[{e.Status.DisplayName()}] {e.DisplayDescription}", EntryGroupLabel(e)))
             .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First())
             .OrderBy(x => x.Group, StringComparer.CurrentCultureIgnoreCase)

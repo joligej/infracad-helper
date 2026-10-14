@@ -251,7 +251,7 @@ public partial class Commands
             NlcsLegendaExport();
             if (!File.Exists(path)) throw new InvalidOperationException("Geen export nadat alle legenda's gewist zijn.");
             using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
-            if (json.RootElement.GetArrayLength() != 1 || json.RootElement[0].GetProperty("lengteM").GetDouble() != 5)
+            if (json.RootElement.GetArrayLength() != 1 || Math.Abs(json.RootElement[0].GetProperty("lengteM").GetDouble() - 5) > 1e-9)
                 throw new InvalidOperationException("Export zonder aanwezige legenda bevat niet de bronlijn van 5 meter.");
             using var verify = db.TransactionManager.StartTransaction();
             var stored = LegendStore.Load(db, verify);

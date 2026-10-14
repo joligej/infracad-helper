@@ -64,6 +64,23 @@ public partial class Commands
                 tr.Commit();
             }
             Check("verdwenen selectie blijft leeg", BuildCompositionItems(db, settings, legendId) is { Count: 0 });
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                foreach (var name in new[] { "B-WE-KL-DATA-G", "B-WE-KL-DATA2-G" })
+                {
+                    using var line = new Line(Point3d.Origin, new Point3d(5, 0, 0));
+                    line.LayerId = ReviewLayer(db, tr, name);
+                    model.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
+                }
+                tr.Commit();
+            }
+            settings.SamenvoegenNummer = true;
+            var data = BuildCompositionItems(db, settings).Where(i => i.Group == "DATA").ToList();
+            Check("samengevoegde KLIC houdt alle bronkeuzes", data.Count == 2 && data.Any(i => i.Key.EndsWith("DATA2")));
+            var tree = CompositionTree.Build(data.Select(i => (i.Key, i.Label, i.Group)), settings.ExcludedEntries);
+            tree.SetGroup(tree.Groups.Single(), false);
+            Check("DATA in een klik uit", tree.ExcludedKeys().Count == 2);
         }
         catch (System.Exception ex)
         {

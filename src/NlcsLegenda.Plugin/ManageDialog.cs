@@ -36,7 +36,7 @@ public sealed class ManualRow
     public string Patroon { get; set; } = string.Empty;
 }
 
-internal sealed class LegendManageDialog : Form
+internal sealed class LegendManageDialog : LegendDialog
 {
     private static readonly string[] TypeNames = { "Lijn", "Vlak", "Arcering", "Vulling", "Symbool" };
     private static readonly string[] StatusNames = { "Nieuw", "Bestaand", "Vervallen", "Tijdelijk", "Revisie" };

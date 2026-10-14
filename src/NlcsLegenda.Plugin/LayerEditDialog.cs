@@ -7,7 +7,7 @@ namespace NlcsLegenda.Plugin;
 // Bewerkt een NLCS-laagnaam component voor component, met live preview en validatie tegen de
 // formele NLCS-codes. De dialog kent de tekening niet; de aanroeper levert het aantal geraakte
 // entiteiten en een probe die vertelt of de doelnaam al bestaat (botsing/samenvoegen).
-internal sealed class LayerEditDialog : Form
+internal sealed class LayerEditDialog : LegendDialog
 {
     private readonly NlcsLayerComponents _comp;
     private readonly Func<string, (bool exists, int count, string info)>? _probe;
@@ -22,8 +22,8 @@ internal sealed class LayerEditDialog : Form
     private readonly TextBox _object = new() { Dock = DockStyle.Fill };
     private readonly ComboBox _element = new() { DropDownStyle = ComboBoxStyle.DropDown, Width = 90 };
     private readonly TextBox _scale = new() { Width = 70 };
-    private readonly Label _preview = new() { AutoSize = false, Dock = DockStyle.Fill, Font = new Font(FontFamily.GenericMonospace, 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
-    private readonly Label _status2 = new() { AutoSize = false, Dock = DockStyle.Fill, ForeColor = Color.Firebrick, TextAlign = ContentAlignment.TopLeft };
+    private readonly Label _preview = new() { AutoSize = true, Dock = DockStyle.Fill, Font = new Font(FontFamily.GenericMonospace, 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+    private readonly Label _status2 = new() { AutoSize = true, Dock = DockStyle.Fill, ForeColor = Color.Firebrick, TextAlign = ContentAlignment.TopLeft };
     private readonly Button _ok;
 
     public NlcsLayerComponents Result => _comp;
@@ -54,7 +54,7 @@ internal sealed class LayerEditDialog : Form
         _status.Items.AddRange(NlcsLayerComponents.StatusCodes);
         _element.Items.AddRange(NlcsLayerComponents.ElementCodes);
 
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(10), AutoSize = false };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(10), AutoSize = false, AutoScroll = true };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 

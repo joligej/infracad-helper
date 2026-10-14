@@ -118,6 +118,7 @@ public partial class Commands
                 var layerId = layers.Add(layer); tr.AddNewlyCreatedDBObject(layer, true);
                 var blocks = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                ((LayerTableRecord)tr.GetObject(layers["0"], OpenMode.ForWrite)).IsOff = true;
                 for (int i = 0; i < 5; i++)
                 {
                     var block = new BlockTableRecord { Name = "EDGE_" + i };

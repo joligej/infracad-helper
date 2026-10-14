@@ -73,7 +73,7 @@ public class TemplateDefaultsTests
     [Fact]
     public void SampleConfig_MatchesTemplateDefaults()
     {
-        var path = FindRepoFile(System.IO.Path.Combine("deploy", "settings.sample.json"));
+        var path = FindRepoFile(System.IO.Path.Join("deploy", "settings.sample.json"));
         var s = LegendSettings.FromJson(System.IO.File.ReadAllText(path));
         Assert.Equal(TemplateDefaults.TextHeightMm, s.TextHeightMm);
         Assert.Equal(TemplateDefaults.HeaderTextHeightMm, s.HeaderTextHeightMm);
@@ -102,7 +102,7 @@ public class TemplateDefaultsTests
         var dir = System.AppContext.BaseDirectory;
         for (int i = 0; i < 8 && dir is not null; i++)
         {
-            var candidate = System.IO.Path.Combine(dir, relative);
+            var candidate = System.IO.Path.Join(dir, relative);
             if (System.IO.File.Exists(candidate))
                 return candidate;
             dir = System.IO.Directory.GetParent(dir)?.FullName;

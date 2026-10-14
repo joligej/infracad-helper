@@ -168,6 +168,11 @@ public partial class Commands
     [CommandMethod("NLCSLEGENDAINFO", CommandFlags.Modal)]
     public void NlcsLegendaInfo()
     {
+        if (!HostEnvironment.IsCoreConsole)
+        {
+            ShowLegendOverview();
+            return;
+        }
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
             return;
@@ -691,7 +696,8 @@ public partial class Commands
             var target = MutationTarget.Global;
             if (!globalDefaults && !ResolveMutationTarget(ed, db, out target)) { ed.WriteMessage("\nGeannuleerd."); return; }
             var settings = GetTargetSettings(db, target);
-            using var dialog = new SettingsDialog(settings, target.ContextLabel, BuildCompositionItems(db, settings, target.IsGlobal ? null : target.LegendId), CollectXrefNames(db));
+            using var dialog = new SettingsDialog(settings, target.ContextLabel, xrefNames: CollectXrefNames(db),
+                compositionSource: current => BuildCompositionItems(db, current, target.IsGlobal ? null : target.LegendId));
             dialog.ApplyRequested += (_, _) => ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
@@ -1009,7 +1015,7 @@ public partial class Commands
 
     private static string EntryGroupLabel(LegendEntry e)
     {
-        if (string.Equals(e.Discipline, "KL", StringComparison.OrdinalIgnoreCase))
+        if (ElementProperties.IsKlic(e.Discipline, e.Hoofdgroep))
         {
             var soort = ElementProperties.From(e.Element).Soort;
             if (!string.IsNullOrWhiteSpace(soort))
@@ -1948,10 +1954,10 @@ public partial class Commands
                 sA.CustomStatuses.Add(new CustomStatus { Name = "ISO-STATUS-A" });
 
                 var defA = IsoDef(reg, sA);
-                var defB = IsoDef(reg, sB);
-                var defC = IsoDef(reg, LoadGlobalDefaults());  // nieuwe C krijgt de globale default
                 reg.Add(defA);
+                var defB = IsoDef(reg, sB);
                 reg.Add(defB);
+                var defC = IsoDef(reg, LoadGlobalDefaults());
                 reg.Add(defC);
                 idA = defA.Id;
                 idB = defB.Id;
@@ -3859,20 +3865,16 @@ public partial class Commands
             ed.WriteMessage($"\nMETEN: teksthoogtes mm = {string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}");
             ed.WriteMessage($"\nMETEN: symbool insertschaal {symScale:0.###} ({symBlock}) -> {symPaperW:0.0}x{symPaperH:0.0} mm (n={symCount})");
 
-            var json = new StringBuilder();
-            json.Append("{\n");
-            json.Append($"  \"bron\": \"{Path.GetFileName(db.Filename)}\",\n");
-            json.Append($"  \"schaal\": {scale:0},\n");
-            json.Append($"  \"insunits\": {insunits},\n");
-            json.Append($"  \"lijnSampleBreedteMm\": {swWmm:0.0},\n");
-            json.Append($"  \"swatchKaderBreedteMm\": {frameWmm:0.0},\n");
-            json.Append($"  \"rijafstandMm\": {pitchMm:0.0},\n");
-            json.Append($"  \"teksthoogtesMm\": [{string.Join(", ", txtModes.Select(v => v.ToString("0.0")))}],\n");
-            json.Append($"  \"symbool\": {{ \"insertSchaal\": {symScale:0.###}, \"paperBreedteMm\": {symPaperW:0.0}, \"paperHoogteMm\": {symPaperH:0.0}, \"aantal\": {symCount} }}\n");
-            json.Append("}\n");
+            var json = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                bron = Path.GetFileName(db.Filename), schaal = scale, insunits,
+                lijnSampleBreedteMm = swWmm, swatchKaderBreedteMm = frameWmm,
+                rijafstandMm = pitchMm, teksthoogtesMm = txtModes,
+                symbool = new { insertSchaal = symScale, paperBreedteMm = symPaperW, paperHoogteMm = symPaperH, aantal = symCount }
+            }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             string outPath = Environment.GetEnvironmentVariable("NLCS_METING_OUT")
                 ?? Path.Combine(Path.GetTempPath(), "nlcs-template-meting.json");
-            File.WriteAllText(outPath, json.ToString());
+            File.WriteAllText(outPath, json);
             ed.WriteMessage($"\nMETEN: meting geschreven naar {outPath}");
         }
         catch (Exception ex)
@@ -4315,15 +4317,15 @@ public partial class Commands
             ed.WriteMessage($"\nHuidig: {OptionsSummary(s)}");
             var pko = new PromptKeywordOptions("\nOpties");
             pko.Keywords.Add("Schaal");
-            pko.Keywords.Add("Tekst");
+            pko.Keywords.Add("Tekst", "TEkst", "TEkst");
             pko.Keywords.Add("Algemeen");
             pko.Keywords.Add("Groepskoppen");
-            pko.Keywords.Add("Hoofdgroepen");
-            pko.Keywords.Add("Titel");
-            pko.Keywords.Add("Kader");
+            pko.Keywords.Add("Hoofdgroepen", "HOOfdgroepen", "HOOfdgroepen");
+            pko.Keywords.Add("Titel", "TItel", "TItel");
+            pko.Keywords.Add("Kader", "KAder", "KAder");
             pko.Keywords.Add("Datum");
-            pko.Keywords.Add("Hoeveelheden");
-            pko.Keywords.Add("Kolommen");
+            pko.Keywords.Add("Hoeveelheden", "HOEveelheden", "HOEveelheden");
+            pko.Keywords.Add("Kolommen", "KOlommen", "KOlommen");
             pko.Keywords.Add("Volgorde");
             pko.Keywords.Add("Filteren");
             pko.Keywords.Add("Elementsoorten");
@@ -4439,9 +4441,9 @@ public partial class Commands
                 all.Select(t => $"{t.DisplayName()}:{(s.IsDrawTypeIncluded(t) ? "aan" : "uit")}"));
             var pko = new PromptKeywordOptions($"\nElementsoorten [{state}] (kies om te wisselen)");
             pko.Keywords.Add("Geometrie");
-            pko.Keywords.Add("Vlakken");
+            pko.Keywords.Add("Vlakken", "VLAkken", "VLAkken");
             pko.Keywords.Add("Arceringen");
-            pko.Keywords.Add("Vlakvullingen");
+            pko.Keywords.Add("Vlakvullingen", "VULlingen", "VULlingen");
             pko.Keywords.Add("Symbolen");
             pko.Keywords.Add("Klaar");
             pko.Keywords.Default = "Klaar";
@@ -4466,11 +4468,12 @@ public partial class Commands
 
     private static void PromptSortMode(Editor ed, LegendSettings s)
     {
-        var pko = new PromptKeywordOptions($"\nSorteren op [Status/Naam/Hoeveelheid] <{s.SortMode}>");
+        var pko = new PromptKeywordOptions("\nSorteren op");
         pko.Keywords.Add("Status");
         pko.Keywords.Add("Naam");
         pko.Keywords.Add("Hoeveelheid");
-        pko.Keywords.Default = s.SortMode.ToString();
+        pko.Keywords.Add("Eigen", "Eigen", "Eigen (handmatig)");
+        pko.Keywords.Default = s.SortMode == LegendSortMode.Handmatig ? "Eigen" : s.SortMode.ToString();
         pko.AllowNone = true;
         var res = ed.GetKeywords(pko);
         if (res.Status == PromptStatus.OK)
@@ -4478,6 +4481,7 @@ public partial class Commands
             {
                 "Naam" => LegendSortMode.Naam,
                 "Hoeveelheid" => LegendSortMode.Hoeveelheid,
+                "Eigen" => LegendSortMode.Handmatig,
                 _ => LegendSortMode.Status
             };
     }

@@ -35,7 +35,7 @@ public static class LegendGrouping
             // Uitgeschakelde elementsoorten tellen ook niet mee voor hoeveelheden.
             if (!settings.IsDrawTypeIncluded(layer.DrawType)) continue;
 
-            var splitKey = layer.GroupKey + "\u0001" + layer.RenderIdentity;
+            var splitKey = layer.GroupKey + "\u0001" + layer.Netbeheerder.ToUpperInvariant() + "\u0001" + layer.RenderIdentity;
             if (!groups.TryGetValue(splitKey, out var list))
             {
                 list = new List<NlcsLayerName>();
@@ -81,6 +81,7 @@ public static class LegendGrouping
                 Discipline = representative.Discipline,
                 Hoofdgroep = representative.Hoofdgroep,
                 Element = representative.Element,
+                Netbeheerders = string.IsNullOrEmpty(representative.Netbeheerder) ? Array.Empty<string>() : new[] { representative.Netbeheerder },
                 Description = ResolveDescription(
                     group, representative, settings, layerDescription, descriptions, descriptionSourceOf, out var descSource),
                 DescriptionSource = descSource,
@@ -159,14 +160,16 @@ public static class LegendGrouping
 
         string KeyOf(LegendEntry e)
         {
-            var props = ElementProperties.From(e.Element);
+            var props = ElementProperties.From(e.Element, e.Netbeheerders.FirstOrDefault() ?? "");
             // Bij statussamenvoeging vervangt de render-identiteit de status in de sleutel,
             // zodat alleen visueel identieke regels over statussen heen samenvallen.
             var statusPart = mergeStatus && e.RenderIdentity.Length > 0
                 ? "R:" + e.RenderIdentity
                 : e.StatusGroupId;
             var renderPart = e.RenderIdentity.Length > 0 ? e.RenderIdentity : string.Empty;
-            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{props.MergeKey(settings.MergedDimensions)}|{renderPart}";
+            var content = ElementProperties.IsKlic(e.Discipline, e.Hoofdgroep)
+                ? props.MergeKey(settings.MergedDimensions) : e.Element;
+            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{content}|{renderPart}";
         }
 
         var merged = new List<LegendEntry>();
@@ -210,6 +213,7 @@ public static class LegendGrouping
             DescriptionSource = rep.DescriptionSource,
             LayersByType = rep.LayersByType,
             SourceLayers = group.SelectMany(e => e.SourceLayers).Distinct().ToArray(),
+            Netbeheerders = group.SelectMany(e => e.Netbeheerders).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p => p, StringComparer.CurrentCultureIgnoreCase).ToArray(),
             Metric = metric,
             SymbolBlockName = rep.SymbolBlockName,
             RenderIdentity = rep.RenderIdentity,
@@ -217,9 +221,16 @@ public static class LegendGrouping
         };
     }
 
-    private static List<LegendEntry> Sort(List<LegendEntry> entries, LegendSettings settings)
+    public static List<LegendEntry> Sort(IEnumerable<LegendEntry> source, LegendSettings settings)
     {
+        var entries = source.ToList();
         var mode = settings.SortMode;
+        if (mode == LegendSortMode.Handmatig)
+        {
+            var automatic = settings.Clone();
+            automatic.SortMode = LegendSortMode.Status;
+            return LegendOrder.Apply(Sort(entries, automatic), settings.ManualEntryOrder);
+        }
         // Eigen statussen komen als eigen sorteerband na de vaste NLCS-statussen.
         var ordered = entries
             .OrderBy(e => StatusBand(e, settings))

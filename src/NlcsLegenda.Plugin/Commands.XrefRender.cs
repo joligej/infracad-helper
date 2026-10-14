@@ -37,14 +37,14 @@ public partial class Commands
                 var gLayer = LayerC(XrefGLayer, 1);          // rood
                 var aLayer = LayerC(XrefALayer, 3); // groen
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(xdb), OpenMode.ForWrite);
-                var line = new Line(new Point3d(0, 0, 0), new Point3d(10, 0, 0)) { LayerId = gLayer };
+                using var line = new Line(new Point3d(0, 0, 0), new Point3d(10, 0, 0)) { LayerId = gLayer };
                 ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
-                var pl = new Polyline();
+                using var pl = new Polyline();
                 pl.AddVertexAt(0, new Point2d(0, 5), 0, 0, 0); pl.AddVertexAt(1, new Point2d(5, 5), 0, 0, 0);
                 pl.AddVertexAt(2, new Point2d(5, 10), 0, 0, 0); pl.AddVertexAt(3, new Point2d(0, 10), 0, 0, 0);
                 pl.Closed = true; pl.LayerId = aLayer;
                 var plId = ms.AppendEntity(pl); tr.AddNewlyCreatedDBObject(pl, true);
-                var hatch = new Hatch { LayerId = aLayer };
+                using var hatch = new Hatch { LayerId = aLayer };
                 ms.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
                 hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31");
                 hatch.PatternScale = 1.5;
@@ -59,9 +59,9 @@ public partial class Commands
                 var symbolId = blocks.Add(symbol);
                 tr.AddNewlyCreatedDBObject(symbol, true);
                 var zeroLayer = lt["0"];
-                var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 2.0) { LayerId = zeroLayer };
+                using var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 2.0) { LayerId = zeroLayer };
                 symbol.AppendEntity(circle); tr.AddNewlyCreatedDBObject(circle, true);
-                var label = new DBText
+                using var label = new DBText
                 {
                     Position = new Point3d(-1.0, -3.0, 0),
                     Height = 1.0,
@@ -70,7 +70,7 @@ public partial class Commands
                 };
                 label.SetDatabaseDefaults();
                 symbol.AppendEntity(label); tr.AddNewlyCreatedDBObject(label, true);
-                var symbolReference = new BlockReference(new Point3d(20, 0, 0), symbolId)
+                using var symbolReference = new BlockReference(new Point3d(20, 0, 0), symbolId)
                 {
                     LayerId = symbolLayer
                 };
@@ -97,7 +97,7 @@ public partial class Commands
             using (var tr = odb.TransactionManager.StartTransaction())
             {
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(odb), OpenMode.ForWrite);
-                var br = new BlockReference(Point3d.Origin, iid);
+                using var br = new BlockReference(Point3d.Origin, iid);
                 ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
                 tr.Commit();
             }
@@ -111,7 +111,7 @@ public partial class Commands
         ObjectId xid = db.AttachXref(path, name);
         using var tr = db.TransactionManager.StartTransaction();
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-        var br = new BlockReference(Point3d.Origin, xid);
+        using var br = new BlockReference(Point3d.Origin, xid);
         ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
         tr.Commit();
         return br.ObjectId;
@@ -138,7 +138,7 @@ public partial class Commands
                     + string.Join("; ", issues.Select(issue =>
                         $"{issue.Entry} [{issue.SourceLayer}; {issue.Kind}]: {issue.Reason}")));
             var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-            var br = new BlockReference(Point3d.Origin, btrId);
+            using var br = new BlockReference(Point3d.Origin, btrId);
             ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
             var definition = PlaceLegendAtPoint(tr, db, registry, settings, null, btrId, br, new Point3d(200, 0, 0));
             groupName = definition.GroupName;
@@ -318,7 +318,7 @@ public partial class Commands
         var doc = AcAp.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
         var db = doc.Database; var ed = doc.Editor;
-        string xpath = Path.Combine(Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath(), "xrefrender_src.dwg");
+        string xpath = Path.Join(Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath(), "xrefrender_src.dwg");
         try
         {
             CreateXrefRenderDwg(xpath);
@@ -520,8 +520,8 @@ public partial class Commands
         if (doc is null) return;
         var db = doc.Database; var ed = doc.Editor;
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
-        string inner = Path.Combine(dir, "xref_inner.dwg");
-        string outer = Path.Combine(dir, "xref_outer.dwg");
+        string inner = Path.Join(dir, "xref_inner.dwg");
+        string outer = Path.Join(dir, "xref_outer.dwg");
         try
         {
             CreateNestedXrefDwgs(inner, outer);
@@ -571,7 +571,7 @@ public partial class Commands
         var doc = AcAp.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
         var db = doc.Database; var ed = doc.Editor;
-        string xpath = Path.Combine(Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath(), "xrefrender_src.dwg");
+        string xpath = Path.Join(Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath(), "xrefrender_src.dwg");
         try
         {
             CreateXrefRenderDwg(xpath);
@@ -634,7 +634,7 @@ public partial class Commands
                 var r = new LayerTableRecord { Name = layerName, Color = AcColor.Color.FromColorIndex(AcColor.ColorMethod.ByAci, colorIndex), LineWeight = lineWeight };
                 var lid = lt.Add(r); tr.AddNewlyCreatedDBObject(r, true);
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(xdb), OpenMode.ForWrite);
-                var line = new Line(new Point3d(0, 0, 0), new Point3d(lengthM, 0, 0)) { LayerId = lid };
+                using var line = new Line(new Point3d(0, 0, 0), new Point3d(lengthM, 0, 0)) { LayerId = lid };
                 sourceLineId = ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                 if (symbolLayerName is not null || symbolBlockName is not null)
                 {
@@ -652,11 +652,11 @@ public partial class Commands
                     var symbolId = blocks.Add(symbol);
                     tr.AddNewlyCreatedDBObject(symbol, true);
                     var zeroLayer = lt["0"];
-                    var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 2.0) { LayerId = zeroLayer };
+                    using var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 2.0) { LayerId = zeroLayer };
                     symbol.AppendEntity(circle); tr.AddNewlyCreatedDBObject(circle, true);
-                    var marker = new Line(new Point3d(0, 0, 0), new Point3d(2, 1, 0)) { LayerId = zeroLayer };
+                    using var marker = new Line(new Point3d(0, 0, 0), new Point3d(2, 1, 0)) { LayerId = zeroLayer };
                     symbol.AppendEntity(marker); tr.AddNewlyCreatedDBObject(marker, true);
-                    var label = new DBText
+                    using var label = new DBText
                     {
                         Position = new Point3d(-1.0, -3.0, 0),
                         Height = 1.0,
@@ -665,7 +665,7 @@ public partial class Commands
                     };
                     label.SetDatabaseDefaults();
                     symbol.AppendEntity(label); tr.AddNewlyCreatedDBObject(label, true);
-                    var symbolReference = new BlockReference(new Point3d(20, 0, 0), symbolId)
+                    using var symbolReference = new BlockReference(new Point3d(20, 0, 0), symbolId)
                     {
                         LayerId = symbolLayerId,
                         ScaleFactors = new Scale3d(symbolMirrorX ? -symbolScale : symbolScale, symbolScale, symbolScale),
@@ -717,7 +717,7 @@ public partial class Commands
 
                 var modelSpace = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(xdb), OpenMode.ForWrite);
-                var boundary = new Polyline { LayerId = layerId };
+                using var boundary = new Polyline { LayerId = layerId };
                 boundary.AddVertexAt(0, new Point2d(0, 0), 0, 0, 0);
                 boundary.AddVertexAt(1, new Point2d(10, 0), 0, 0, 0);
                 boundary.AddVertexAt(2, new Point2d(10, 10), 0, 0, 0);
@@ -726,7 +726,7 @@ public partial class Commands
                 var boundaryId = modelSpace.AppendEntity(boundary);
                 tr.AddNewlyCreatedDBObject(boundary, true);
 
-                var hatch = new Hatch();
+                using var hatch = new Hatch();
                 hatch.SetDatabaseDefaults();
                 hatch.LayerId = layerId;
                 hatch.Associative = false;
@@ -771,7 +771,7 @@ public partial class Commands
                 for (int i = 0; i < patterns.Length; i++)
                 {
                     double x = i * 10.0;
-                    var boundary = new Polyline();
+                    using var boundary = new Polyline();
                     boundary.AddVertexAt(0, new Point2d(x, 0), 0, 0, 0);
                     boundary.AddVertexAt(1, new Point2d(x + 5, 0), 0, 0, 0);
                     boundary.AddVertexAt(2, new Point2d(x + 5, 5), 0, 0, 0);
@@ -781,7 +781,7 @@ public partial class Commands
                     var boundaryId = modelSpace.AppendEntity(boundary);
                     tr.AddNewlyCreatedDBObject(boundary, true);
 
-                    var hatch = new Hatch { LayerId = layerId, Associative = false };
+                    using var hatch = new Hatch { LayerId = layerId, Associative = false };
                     modelSpace.AppendEntity(hatch);
                     tr.AddNewlyCreatedDBObject(hatch, true);
                     hatch.SetHatchPattern(HatchPatternType.PreDefined, patterns[i]);
@@ -826,10 +826,10 @@ public partial class Commands
                     var definition = new BlockTableRecord { Name = names[i] };
                     var definitionId = blocks.Add(definition);
                     tr.AddNewlyCreatedDBObject(definition, true);
-                    var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 1.0 + i);
+                    using var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 1.0 + i);
                     definition.AppendEntity(circle);
                     tr.AddNewlyCreatedDBObject(circle, true);
-                    var reference = new BlockReference(new Point3d(i * 5.0, 0, 0), definitionId)
+                    using var reference = new BlockReference(new Point3d(i * 5.0, 0, 0), definitionId)
                     {
                         LayerId = layerId
                     };
@@ -865,7 +865,7 @@ public partial class Commands
         }
         var modelSpace = (BlockTableRecord)tr.GetObject(
             SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-        var line = new Line(new Point3d(0, 0, 0), new Point3d(lengthM, 0, 0)) { LayerId = layerId };
+        using var line = new Line(new Point3d(0, 0, 0), new Point3d(lengthM, 0, 0)) { LayerId = layerId };
         modelSpace.AppendEntity(line);
         tr.AddNewlyCreatedDBObject(line, true);
         tr.Commit();
@@ -929,8 +929,8 @@ public partial class Commands
         const string layer = "N-WE-VH-WEG-G";
         try
         {
-            string samePath = Path.Combine(dir, "hostxref_same.dwg");
-            string diffPath = Path.Combine(dir, "hostxref_diff.dwg");
+            string samePath = Path.Join(dir, "hostxref_same.dwg");
+            string diffPath = Path.Join(dir, "hostxref_diff.dwg");
             CreateXrefLineDwg(samePath, layer, 1, 7.0);
             CreateXrefLineDwg(diffPath, layer, 3, 7.0);
 
@@ -976,9 +976,9 @@ public partial class Commands
         const string layer = "N-WE-VH-WEG-G";
         try
         {
-            var a = Path.Combine(dir, "split_a.dwg");
-            var b = Path.Combine(dir, "split_b.dwg");
-            var cpath = Path.Combine(dir, "split_c.dwg");
+            var a = Path.Join(dir, "split_a.dwg");
+            var b = Path.Join(dir, "split_b.dwg");
+            var cpath = Path.Join(dir, "split_c.dwg");
             CreateXrefLineDwg(a, layer, 1, 5.0);    // rood 5 m
             CreateXrefLineDwg(b, layer, 1, 7.0);    // rood 7 m
             CreateXrefLineDwg(cpath, layer, 3, 3.0); // groen 3 m
@@ -1026,9 +1026,9 @@ public partial class Commands
         const string layer = "N-WE-VH-WEG-G";
         try
         {
-            var thin1 = Path.Combine(dir, "style_thin1.dwg");
-            var thin2 = Path.Combine(dir, "style_thin2.dwg");
-            var thick = Path.Combine(dir, "style_thick.dwg");
+            var thin1 = Path.Join(dir, "style_thin1.dwg");
+            var thin2 = Path.Join(dir, "style_thin2.dwg");
+            var thick = Path.Join(dir, "style_thick.dwg");
             CreateXrefLineDwg(thin1, layer, 1, 4.0, LineWeight.LineWeight025); // dun, 4 m
             CreateXrefLineDwg(thin2, layer, 1, 6.0, LineWeight.LineWeight025); // dun, 6 m (gelijk uiterlijk)
             CreateXrefLineDwg(thick, layer, 1, 2.0, LineWeight.LineWeight100); // dik, 2 m
@@ -1084,12 +1084,12 @@ public partial class Commands
         const string symbolLayer = "N-WE-VH-WEG-S";
         try
         {
-            string pathA = Path.Combine(dir, "symbol_a.dwg");
-            string pathB = Path.Combine(dir, "symbol_b.dwg");
-            string pathC = Path.Combine(dir, "symbol_c.dwg");
-            string pathD = Path.Combine(dir, "symbol_d.dwg");
-            string pathE = Path.Combine(dir, "symbol_e.dwg");
-            string pathF = Path.Combine(dir, "symbol_f.dwg");
+            string pathA = Path.Join(dir, "symbol_a.dwg");
+            string pathB = Path.Join(dir, "symbol_b.dwg");
+            string pathC = Path.Join(dir, "symbol_c.dwg");
+            string pathD = Path.Join(dir, "symbol_d.dwg");
+            string pathE = Path.Join(dir, "symbol_e.dwg");
+            string pathF = Path.Join(dir, "symbol_f.dwg");
             CreateXrefLineDwg(pathA, layer, 1, 5.0,
                 symbolLayerName: symbolLayer, symbolBlockName: "SYMBOL_A", symbolLabel: "SHARED");
             CreateXrefLineDwg(pathB, layer, 1, 7.0,
@@ -1239,7 +1239,7 @@ public partial class Commands
             };
             foreach (var fixture in fixtures)
             {
-                string path = Path.Combine(dir, fixture.File);
+                string path = Path.Join(dir, fixture.File);
                 CreateXrefHatchDwg(path, layer, 3, fixture.Pattern, fixture.Scale, fixture.Angle);
                 AttachAndInsert(db, path, fixture.Name);
             }
@@ -1356,12 +1356,12 @@ public partial class Commands
         const string symbolLayer = "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-S";
         try
         {
-            string hatchPath = Path.Combine(dir, "sample_hatch_conflict.dwg");
-            string symbolPath = Path.Combine(dir, "sample_symbol_conflict.dwg");
+            string hatchPath = Path.Join(dir, "sample_hatch_conflict.dwg");
+            string symbolPath = Path.Join(dir, "sample_symbol_conflict.dwg");
             CreateConflictingHatchDwg(hatchPath, hatchLayer);
             CreateConflictingSymbolDwg(symbolPath, symbolLayer);
             ObjectId hatchReference = AttachAndInsert(db, hatchPath, "HATCHCONFLICT");
-            ObjectId symbolReference = AttachAndInsert(db, symbolPath, "SYMBOLCONFLICT");
+            AttachAndInsert(db, symbolPath, "SYMBOLCONFLICT");
             var settings = new LegendSettings();
             settings.IncludeXrefLayers = true;
 
@@ -1415,8 +1415,8 @@ public partial class Commands
         var db = doc.Database;
         var ed = doc.Editor;
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
-        string sourcePath = Path.Combine(dir, "reload_source.dwg");
-        string replacementPath = Path.Combine(dir, "reload_replacement.dwg");
+        string sourcePath = Path.Join(dir, "reload_source.dwg");
+        string replacementPath = Path.Join(dir, "reload_replacement.dwg");
         const string layerName = "N-WE-VH-WEG-G";
 
         try
@@ -1549,7 +1549,7 @@ public partial class Commands
                 && ownership.MTexts > 0 && ownership.DbTexts == 0;
             bool allOk = analyzedRows == 1 && updatedRows == 1 && System.Math.Abs(length - 5.0) < 0.01
                 && colorOk && exportOk && infoOk && identityOk && positionOk && ownershipOk && textOk;
-            ed.WriteMessage($"\nXREFRELOAD na heropenen: rijen={analyzedRows} hoeveelheid={length:0.#} m kleur={ReadAci(db, renderedSwatchLayer)} laag={renderedSwatchLayer} export={exportOk} info={infoOk} -> {(analyzedRows == 1 && length == 5.0 && colorOk && exportOk && infoOk ? "OK" : "FAIL")}");
+            ed.WriteMessage($"\nXREFRELOAD na heropenen: rijen={analyzedRows} hoeveelheid={length:0.#} m kleur={ReadAci(db, renderedSwatchLayer)} laag={renderedSwatchLayer} export={exportOk} info={infoOk} -> {(analyzedRows == 1 && Math.Abs(length - 5.0) < 1e-9 && colorOk && exportOk && infoOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nXREFRELOAD update: rijen={updatedRows} id/groep={identityOk} positie={positionOk} -> {(updatedRows == 1 && identityOk && positionOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nXREFRELOAD ownership: entities={ownership.Entities} MText={ownership.MTexts} DBText={ownership.DbTexts} tekst={textOk} -> {(ownershipOk && textOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nXREFRELOAD totaal: {(allOk ? "OK" : "FAIL")}");
@@ -1576,7 +1576,7 @@ public partial class Commands
         const string symbolBlock = "PLACEMENT_SYMBOL";
         const string rollbackMarker = "NLCSLEGENDAXREFPLACEMENTTEST_ROLLBACK";
         string dir = Path.GetDirectoryName(activeDb.Filename) ?? Path.GetTempPath();
-        string hostPath = Path.Combine(dir, "placement_host.dwg");
+        string hostPath = Path.Join(dir, "placement_host.dwg");
         var previousWorkingDatabase = HostApplicationServices.WorkingDatabase;
 
         var settings = new LegendSettings();
@@ -1603,9 +1603,9 @@ public partial class Commands
         HostApplicationServices.WorkingDatabase = db;
         try
         {
-            string a = Path.Combine(dir, "placement_a.dwg");
-            string b = Path.Combine(dir, "placement_b.dwg");
-            string c = Path.Combine(dir, "placement_c.dwg");
+            string a = Path.Join(dir, "placement_a.dwg");
+            string b = Path.Join(dir, "placement_b.dwg");
+            string c = Path.Join(dir, "placement_c.dwg");
             using var sourceDb = CreateXrefLineDatabase(
                 a, layer, 1, 5.0, out var sourceLineId,
                 symbolLayerName: symbolLayer, symbolBlockName: symbolBlock);
@@ -1659,7 +1659,7 @@ public partial class Commands
                             $"{issue.Entry} [{issue.SourceLayer}; {issue.Kind}]: {issue.Reason}")));
                 var modelSpace = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var preview = new BlockReference(Point3d.Origin, blockId);
+                using var preview = new BlockReference(Point3d.Origin, blockId);
                 modelSpace.AppendEntity(preview);
                 tr.AddNewlyCreatedDBObject(preview, true);
                 var placementPoint = new Point3d(200, 0, 0);
@@ -1745,7 +1745,7 @@ public partial class Commands
                             $"{issue.Entry} [{issue.SourceLayer}; {issue.Kind}]: {issue.Reason}")));
                 var modelSpace = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var preview = new BlockReference(Point3d.Origin, blockId);
+                using var preview = new BlockReference(Point3d.Origin, blockId);
                 modelSpace.AppendEntity(preview);
                 tr.AddNewlyCreatedDBObject(preview, true);
                 var definition = PlaceLegendAtPoint(
@@ -1794,7 +1794,7 @@ public partial class Commands
                 var blockId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _, out _);
                 var modelSpace = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var preview = new BlockReference(Point3d.Origin, blockId);
+                using var preview = new BlockReference(Point3d.Origin, blockId);
                 modelSpace.AppendEntity(preview);
                 tr.AddNewlyCreatedDBObject(preview, true);
                 PlaceLegendAtPoint(tr, db, registry, settings, selection, blockId, preview, new Point3d(300, 0, 0));
@@ -1866,9 +1866,9 @@ public partial class Commands
                     && System.Math.Abs(greenLength - 3.0) < 0.01;
 
                 settingsOk = definition.Settings.IncludeXrefLayers
-                    && definition.Settings.TextHeightMm == 3.0
-                    && definition.Settings.HeaderTextHeightMm == 4.0
-                    && definition.Settings.TitleTextHeightMm == 6.0
+                    && definition.Settings.TextHeightMm.Equals(3.0)
+                    && definition.Settings.HeaderTextHeightMm.Equals(4.0)
+                    && definition.Settings.TitleTextHeightMm.Equals(6.0)
                     && !definition.Settings.ExplodeOnPlace;
                 var oldSettings = definition.Settings.Clone();
                 var result = BuildManagedLegend(db, tr, registry, definition, out updatedRows, out var note);
@@ -1876,9 +1876,9 @@ public partial class Commands
                     throw new InvalidOperationException($"Update-resultaat {result}: {note}");
                 LegendStore.Save(db, tr, registry);
                 stableIdentity = definition.Id == originalId && definition.GroupName == originalGroup
-                    && definition.Settings.TextHeightMm == oldSettings.TextHeightMm
-                    && definition.Settings.HeaderTextHeightMm == oldSettings.HeaderTextHeightMm
-                    && definition.Settings.TitleTextHeightMm == oldSettings.TitleTextHeightMm;
+                    && definition.Settings.TextHeightMm.Equals(oldSettings.TextHeightMm)
+                    && definition.Settings.HeaderTextHeightMm.Equals(oldSettings.HeaderTextHeightMm)
+                    && definition.Settings.TitleTextHeightMm.Equals(oldSettings.TitleTextHeightMm);
                 stablePosition = LegendManagement.TryGetGroupExtents(db, tr, originalGroup, out var newExtents)
                     && System.Math.Abs(oldExtents.MinPoint.X - newExtents.MinPoint.X) < 1e-6
                     && System.Math.Abs(oldExtents.MaxPoint.Y - newExtents.MaxPoint.Y) < 1e-6;

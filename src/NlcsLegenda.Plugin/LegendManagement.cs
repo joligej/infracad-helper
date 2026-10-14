@@ -224,21 +224,10 @@ internal static class LegendManagement
         {
             if (!gd.Contains(def.GroupName)) continue;
             if (tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead) is Group g
-                && GroupContains(g, tr, entId))
+                && g.GetAllEntityIds().Contains(entId))
                 return def;
         }
         return null;
-    }
-
-    private static bool GroupContains(Group g, Transaction tr, ObjectId target)
-    {
-        foreach (ObjectId id in g.GetAllEntityIds())
-        {
-            if (id == target) return true;
-            // Aangeklikte losse entiteit binnen een behouden legenda-blok.
-            if (tr.GetObject(id, OpenMode.ForRead) is BlockReference && id == target) return true;
-        }
-        return false;
     }
 
 }

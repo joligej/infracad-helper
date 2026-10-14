@@ -1,6 +1,9 @@
 namespace NlcsLegenda.Core;
 
-public sealed record NlcsLayerSource(string LogicalLayerName, string SourceLayerName, string SourceIdentity);
+public sealed record NlcsLayerSource(string LogicalLayerName, string SourceLayerName, string SourceIdentity)
+{
+    public string Netbeheerder { get; init; } = string.Empty;
+}
 
 public sealed class NlcsLayerName
 {
@@ -42,7 +45,9 @@ public sealed class NlcsLayerName
 
     public string RenderIdentity { get; init; } = string.Empty;
 
-    public NlcsLayerSource Source => new(LogicalLayerName, SourceLayerName, SourceIdentity);
+    public NlcsLayerSource Source => new(LogicalLayerName, SourceLayerName, SourceIdentity) { Netbeheerder = Netbeheerder };
+
+    public string Netbeheerder { get; init; } = string.Empty;
 
     public string GroupKey => $"{StatusCode}|{Discipline}|{Hoofdgroep}|{Element}";
 

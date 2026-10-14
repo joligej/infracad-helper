@@ -83,11 +83,11 @@ public static class LegendLayoutEngine
         double totalEntryHeight = 0.0;
         foreach (var entry in entries)
         {
-            var lines = TextWrap.Wrap(s.IncludeText ? entry.Description : string.Empty, maxChars);
+            var lines = TextWrap.Wrap(s.IncludeText ? entry.DisplayDescription : string.Empty, maxChars);
             if (lines.Count == 0)
                 lines = new List<string> { string.Empty };
             double textBlockH = measureTextHeight is not null && s.IncludeText
-                ? measureTextHeight(entry.Description, Math.Max(s.ToModel(textColMm), textH * 3))
+                ? measureTextHeight(entry.DisplayDescription, Math.Max(s.ToModel(textColMm), textH * 3))
                 : (lines.Count - 1) * lineHeight + textH;
             double rh = Math.Max(Math.Max(swatchH, textBlockH), minimumRowHeight?.Invoke(entry) ?? 0);
             entryLines.Add(lines);

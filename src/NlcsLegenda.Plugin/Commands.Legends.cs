@@ -254,7 +254,8 @@ public partial class Commands
         if (def is null) return;
         string id = def.Id;
         var working = def.Settings.Clone();
-        using var dialog = new SettingsDialog(working, $"Legenda: {def.Name}", BuildCompositionItems(db, working, id), CollectXrefNames(db));
+        using var dialog = new SettingsDialog(working, $"Legenda: {def.Name}", xrefNames: CollectXrefNames(db),
+            compositionSource: current => BuildCompositionItems(db, current, id));
         dialog.ApplyRequested += (_, _) => ApplySettingsAndRebuild(ed, db, id, working);
         if (AcWindows.ShowModalDialog(dialog) == WinForms.DialogResult.OK)
             ApplySettingsAndRebuild(ed, db, id, working);

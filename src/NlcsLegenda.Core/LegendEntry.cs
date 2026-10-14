@@ -18,6 +18,11 @@ public sealed class LegendEntry
 
     public required string Description { get; init; }
 
+    public IReadOnlyList<string> Netbeheerders { get; init; } = Array.Empty<string>();
+
+    public string DisplayDescription => Netbeheerders.Count == 0 ? Description
+        : Description + " (" + string.Join(", ", Netbeheerders) + ")";
+
     public DescriptionSource DescriptionSource { get; init; } = DescriptionSource.Catalogus;
 
     // Blanco regel: bewust leeg (geen bron, geen hoeveelheid, leeg swatchvak). De renderer en

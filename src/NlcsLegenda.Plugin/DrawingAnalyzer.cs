@@ -75,6 +75,7 @@ public static class DrawingAnalyzer
         public readonly HashSet<string> CustomSourceLayers = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<ObjectId> Excluded = new();
         public LayerTable? Layers;
+        public readonly KlicSourceMetadata Klic = new();
     }
 
     // Veiligheidslimiet tegen ontspoorde recursie; echte cycli worden met een pad-set
@@ -213,8 +214,12 @@ public static class DrawingAnalyzer
         if (c.Excluded.Contains(ent.ObjectId))
             return;
 
-        if (!settings.IncludeInvisibleLayers && (!ent.Visible || !IsVisible(ent.Layer, tr, c)))
-            return;
+        if (!settings.IncludeInvisibleLayers)
+        {
+            if (!ent.Visible) return;
+            bool inheritsVisibleLayer = inheritedLayerStyle is not null && LayerNaming.LocalName(ent.Layer) == "0";
+            if (!inheritsVisibleLayer && !IsVisible(ent.Layer, tr, c)) return;
+        }
         var layerStyle = EntityLayerStyle(ent, tr, inheritedLayerStyle);
         var effectiveStyle = EntityStyle(ent, tr, inheritedStyle, layerStyle);
         Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle);
@@ -253,7 +258,7 @@ public static class DrawingAnalyzer
         else
         {
             if (!NlcsLayerParser.TryParse(layerName, out parsed)) return;
-            parsed = CopyLayer(parsed, sourceXref);
+            parsed = CopyLayer(parsed, sourceXref, ElementProperties.IsKlic(parsed.Discipline, parsed.Hoofdgroep) ? c.Klic.Provider(ent) : string.Empty);
             if (!settings.IsIncluded(parsed))
             {
                 c.ExcludedNlcs.Add(parsed.LocalName);
@@ -287,7 +292,7 @@ public static class DrawingAnalyzer
             { InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceScale = parsed.Scale, TargetScale = settings.Scale };
         }
         string appearance = SampleSignature(style, hatch, symbol);
-        string key = parsed.GroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
+        string key = parsed.GroupKey + "\u0001" + parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
         (rule is null ? c.NlcsSourceLayers : c.CustomSourceLayers).Add(layerName);
         c.Parsed[key] = parsed;
         c.NlcsRawKeys.Add(key);
@@ -312,6 +317,13 @@ public static class DrawingAnalyzer
         }
     }
 
+    private static bool IsBlockPartVisible(Entity entity, LayerTableRecord layer)
+    {
+        if (!entity.Visible) return false;
+        if (LayerNaming.LocalName(layer.Name) == "0") return true;
+        return !layer.IsOff && !layer.IsFrozen;
+    }
+
     private static bool HasSymbolGeometry(ObjectId id, Transaction tr, bool includeInvisible, HashSet<ObjectId> path)
     {
         if (!path.Add(id)) return false;
@@ -321,7 +333,7 @@ public static class DrawingAnalyzer
                 if (tr.GetObject(child, OpenMode.ForRead) is Entity entity)
                 {
                     var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                    if (!includeInvisible && (!entity.Visible || layer.IsOff || layer.IsFrozen)) continue;
+                    if (!includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
                     if (entity is not BlockReference nested || HasSymbolGeometry(nested.BlockTableRecord, tr, includeInvisible, path)) return true;
                 }
             return false;
@@ -329,10 +341,10 @@ public static class DrawingAnalyzer
         finally { path.Remove(id); }
     }
 
-    private static NlcsLayerName CopyLayer(NlcsLayerName p, string source) => new()
+    private static NlcsLayerName CopyLayer(NlcsLayerName p, string source, string provider) => new()
     {
         Raw = p.Raw, LocalName = p.LocalName, IsXref = source.Length > 0,
-        XrefName = source, StatusCode = p.StatusCode, Status = p.Status,
+        XrefName = source, Netbeheerder = provider, StatusCode = p.StatusCode, Status = p.Status,
         Discipline = p.Discipline, Hoofdgroep = p.Hoofdgroep, Element = p.Element,
         TypeSuffix = p.TypeSuffix, DrawType = p.DrawType, Scale = p.Scale
     };
@@ -541,7 +553,7 @@ public static class DrawingAnalyzer
         c.Parsed.Clear(); c.Metrics.Clear(); c.Hatches.Clear(); c.SymbolSamples.Clear();
         c.Styles.Clear(); c.CustomDesc.Clear(); c.AttrOms.Clear(); c.NlcsRawKeys.Clear();
 
-        foreach (var logical in samples.GroupBy(x => x.Parsed.GroupKey).OrderBy(x => x.Key, StringComparer.Ordinal))
+        foreach (var logical in samples.GroupBy(x => x.Parsed.GroupKey + "\u0001" + x.Parsed.Netbeheerder.ToUpperInvariant()).OrderBy(x => x.Key, StringComparer.Ordinal))
         {
             var bundles = new List<(List<LayerSample> Layers, string Signature)>();
             foreach (var source in logical.GroupBy(x => x.Parsed.SourceIdentity, StringComparer.OrdinalIgnoreCase))
@@ -581,6 +593,7 @@ public static class DrawingAnalyzer
                     {
                         Raw = rep.Parsed.Raw, LocalName = clean, IsXref = rep.Parsed.IsXref, XrefName = rep.Parsed.XrefName,
                         SourceLayers = members.Select(x => x.Parsed.Source).Distinct().ToArray(),
+                        Netbeheerder = rep.Parsed.Netbeheerder,
                         StatusCode = rep.Parsed.StatusCode, Status = rep.Parsed.Status, Discipline = rep.Parsed.Discipline,
                         Hoofdgroep = rep.Parsed.Hoofdgroep, Element = rep.Parsed.Element, TypeSuffix = rep.Parsed.TypeSuffix,
                         DrawType = rep.Parsed.DrawType, Scale = rep.Parsed.Scale, RenderLayerName = key, RenderIdentity = renderClass.Key
@@ -641,7 +654,7 @@ public static class DrawingAnalyzer
                 if (tr.GetObject(id, OpenMode.ForRead) is Entity entity)
                 {
                     var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                    if (!includeInvisible && (!entity.Visible || layer.IsOff || layer.IsFrozen)) continue;
+                    if (!includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
                     entities.Add(SymbolEntitySignature(entity, host, tr, path, depth, parent, parentLayer, includeInvisible));
                 }
             entities.Sort(StringComparer.Ordinal);
