@@ -324,7 +324,7 @@ internal sealed class SettingsDialog : Form
             BoundCheck("Kolommen balanceren", () => _settings.BalanceColumns, v => _settings.BalanceColumns = v),
             NumRow("Max. hoogte (mm, 0 = uit):", () => _settings.MaxLegendHeightMm, v => _settings.MaxLegendHeightMm = v, 0, 10000, 1, 5)));
         root.Controls.Add(Group("Stijl en lagen",
-            TextRow("Tekststijl (leeg = huidige):", () => _settings.TextStyle, v => _settings.TextStyle = v, 180),
+            TextRow("Tekststijl (leeg = NLCS-ISO):", () => _settings.TextStyle, v => _settings.TextStyle = v, 180),
             TextRow("Kaderlaag:", () => _settings.FrameLayer, v => _settings.FrameLayer = v, 180),
             TextRow("Hulpkaders (niet plotten):", () => _settings.SwatchFrameLayer, v => _settings.SwatchFrameLayer = v, 180),
             TextRow("Tekstlaag omschrijvingen:", () => _settings.TextLayer, v => _settings.TextLayer = v, 180),
