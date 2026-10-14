@@ -1,12 +1,13 @@
 # Diagnostische commando's
 
-Deze commando's controleren de plugin in AutoCAD Core Console, ook vanuit de
+Tenzij anders vermeld controleren deze commando's de plugin in AutoCAD Core Console, ook vanuit de
 geïnstalleerde release. Gebruik ze uitsluitend op testtekeningen: sommige commando's
 maken objecten, legenda's en tijdelijke xrefs aan.
 
 | Commando | Doel |
 | --- | --- |
-| `NLCSLEGENDAHOOGTETEST` | Meet de getekende teksthoogtes na wijzigingen in omschrijving, kop en titel. |
+| `NLCSLEGENDARIBBONTEST` | Controleert de ribbon in de normale GUI-host en schrijft naar `NLCS_RIBBON_OUT`; niet voor Core Console. |
+| `NLCSLEGENDAHOOGTETEST` | Meet de getekende teksthoogtes voor omschrijving, kop en titel, ook bij een bestaande NLCS-ISO-stijl met vaste hoogte. |
 | `NLCSLEGENDAXREFSAVESETUP` / `NLCSLEGENDAXREFSAVEVERIFY` | Controleert xref-weergave vóór en na opslaan en opnieuw openen. |
 | `NLCSLEGENDAKLICTEST` / `NLCSLEGENDAKLICVERIFY` | Controleert ingebedde KLIC-tabellen, gelijke handles uit verschillende bronnen, geneste xrefs, uitsluitingen, 30 meter bronlengte, getekende netbeheerders en heropenen. |
 | `NLCSLEGENDAOVERVIEWTEST` / `NLCSLEGENDAOVERVIEWVERIFY` | Controleert handmatig ordenen, echte tekstposities, isolatie tussen legenda’s, rollback en bewaren na heropenen/bijwerken. |
@@ -24,7 +25,7 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDAPERFTEST` | Meet de analysetijd op een grote KLIC-tekening. |
 | `NLCSLEGENDATEMPLATEMETEN` | Meet de maatvoering (swatch, rijafstand, teksthoogtes) van een bestaande legenda. |
 | `NLCSLEGENDAUNDOSETUP` / `NLCSLEGENDAUNDORENAME` | Zetten een laaghernoem-/undo-regressie klaar en voeren die uit. |
-| `NLCSLEGENDAABCSETUP` / `NLCSLEGENDAABCVERIFY` | Bouwen drie legenda's met verschillende bronnen (twee selecties + hele tekening) en config; na QSAVE/heropenen controleren ze bronnen, instellingen, global-isolatie, inhoudelijke vingerafdrukken, export- en viewport-isolatie en update-isolatie. |
+| `NLCSLEGENDAABCSETUP` / `NLCSLEGENDAABCVERIFY` | Bouwen drie legenda's met verschillende bronnen (twee selecties + hele tekening) en config; na QSAVE/heropenen controleren ze bronnen, instellingen, global-isolatie, inhoudelijke vingerafdrukken, export- en update-isolatie. |
 | `NLCSLEGENDAABCXREFSETUP` / `NLCSLEGENDAABCXREFVERIFY` | Koppelen twee synthetische xrefs en controleren na heropenen dat A alleen xref A meeneemt, B alleen xref B en C allebei. |
 | `NLCSLEGENDACONSUMERTEST` | Controleert dat zichtbare schakelaars (kader, swatchkader, schaalbalk, titel, opmerkingen, hoeveelheden, symbolen) de getekende geometrie veranderen. |
 | `NLCSLEGENDACUSTOMTEST` | Maakt geometrie op niet-NLCS-lagen en controleert dat gekoppelde eigen lagen gelijkwaardig meetellen (lengte/aantal/oppervlak, selectie, blok-identiteit). |
@@ -44,7 +45,7 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDASYSVARTEST` | Controleert vijftien systeemvariabelen na afzonderlijke analyse-, bouw-, update-, export- en foutpaden met FILEDIA=0 en 1. Test ook headless weigering van dialoogcommando's; dit voert geen interactieve dialogen uit. |
 | `NLCSLEGENDAEIGENXREFTEST` | Koppelt dezelfde eigen laagnaam in host (3 m) en twee xrefs (5 m en 11 m) en controleert dat Lokaal alleen de host telt (3), SpecifiekeXref alleen die xref (5), ElkeBron alle bronnen (19) en dat xref-uitsluiting geen regel oplevert. |
 | `NLCSLEGENDAEIGENZICHTBAARTEST` | Bevriest een eigen laag en een NLCS-laag en controleert dat beide gelijk reageren op "onzichtbare lagen meenemen". |
-| `NLCSLEGENDAVIEWPORTTEST` | Controleert viewport-plaatsing en -schaal rond de legenda. |
+| `NLCSLEGENDAVIEWPORTTEST` | Controleert veertien geplaatste viewports, met onafhankelijke referentiematen, schaal, marges en een gezamenlijke einduitslag. |
 | `NLCSLEGENDAXREFSETUP` / `NLCSLEGENDAXREFVERIFY` | Bouwen een xref-scenario en verifiëren de opname ervan. |
 | `NLCSLEGENDAXREFANALYSE` | Analyseert een tekening met echte xrefs en toont dat alleen de ingesloten xref zijn NLCS-elementen bijdraagt. |
 | `NLCSLEGENDACOMPOSITIONTEST` | Controleert de samenstellijst van een selectielegenda, uitsluiting van eigen geometrie en een verdwenen bronselectie. |

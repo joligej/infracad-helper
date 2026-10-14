@@ -268,7 +268,7 @@ public partial class Commands
         var db = doc.Database;
         try
         {
-            LegendSettings s = LoadGlobalDefaults();
+            var s = new LegendSettings { Scale = 200, TextStyle = string.Empty };
             s.TextHeightMm = 3.0; s.HeaderTextHeightMm = 4.0; s.TitleTextHeightMm = 6.0;
             s.IncludeGroupHeaders = true; s.IncludeHoofdgroepHeaders = true;
             double bodyH = s.ToModel(3.0), headH = s.ToModel(4.0), titleH = s.ToModel(6.0);
@@ -276,8 +276,16 @@ public partial class Commands
 
             var heights = new List<double>();
             int rows;
+            bool fixedStyleOk;
             using (var tr = db.TransactionManager.StartTransaction())
             {
+                var styles = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForWrite);
+                using var createdStyle = styles.Has("NLCS-ISO") ? null
+                    : new TextStyleTableRecord { Name = "NLCS-ISO", FileName = "txt.shx" };
+                var styleId = createdStyle is null ? styles["NLCS-ISO"] : styles.Add(createdStyle);
+                if (createdStyle is not null) tr.AddNewlyCreatedDBObject(createdStyle, true);
+                var fixedStyle = (TextStyleTableRecord)tr.GetObject(styleId, OpenMode.ForWrite);
+                fixedStyle.TextSize = 37;
                 var reg = LegendStore.Load(db, tr);
                 var def = IsoDef(reg, s); reg.Add(def);
                 BuildManagedLegend(db, tr, reg, def, out rows, out _);
@@ -301,6 +309,7 @@ public partial class Commands
                         foreach (ObjectId cid in r) Walk(cid, depth + 1);
                 }
                 foreach (ObjectId id in g.GetAllEntityIds()) Walk(id, 0);
+                fixedStyleOk = Math.Abs(fixedStyle.TextSize - 37) < 1e-9;
                 tr.Commit();
             }
             PurgePending(db);
@@ -310,6 +319,7 @@ public partial class Commands
             bool headOk = heights.Any(h => Near(h, headH));
             bool titleOk = heights.Any(h => Near(h, titleH));
             bool noDefaults = !heights.Any(h => Near(h, defBodyH) || Near(h, defTitleH));
+            ed.WriteMessage($"\nHOOGTE vaste tekststijl: behouden={fixedStyleOk}; MText volgt eigen hoogte -> {(fixedStyleOk && bodyOk && headOk && titleOk && noDefaults ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nHOOGTE: body={bodyH:0.###}({bodyOk}) kop={headH:0.###}({headOk}) titel={titleH:0.###}({titleOk}) geen-default({noDefaults}) -> {(bodyOk && headOk && titleOk && noDefaults ? "OK" : "FAIL")}");
         }
         catch (System.Exception ex) { ed.WriteMessage($"\nHOOGTE error: {ex.Message}"); }
