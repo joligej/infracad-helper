@@ -81,7 +81,7 @@ public partial class Commands
             }
             doc.Editor.WriteMessage("\nTEMPLATECONTRACT DWT-meetpunten, lege hoststijl, notities en schaalbalk op 1:200/500/1000 -> OK");
         }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nTEMPLATECONTRACT FAIL: {ex}"); }
+        catch (System.Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or Autodesk.AutoCAD.Runtime.Exception) { doc.Editor.WriteMessage($"\nTEMPLATECONTRACT FAIL: {ex}"); }
     }
 
     [CommandMethod("NLCSLEGENDASCALEVARIANTTEST", CommandFlags.Modal)]
@@ -89,7 +89,7 @@ public partial class Commands
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
-        var path = Path.Combine(Path.GetDirectoryName(db.Filename)!, "scale-variant-source.dwg");
+        var path = Path.Join(Path.GetDirectoryName(db.Filename)!, "scale-variant-source.dwg");
         try
         {
             using (var source = new Database(true, true))
@@ -100,7 +100,7 @@ public partial class Commands
                     var bt = (BlockTable)tr.GetObject(source.BlockTableId, OpenMode.ForWrite);
                     var def = new BlockTableRecord { Name = "SCALE_VARIANT_CIRCLE" };
                     var defId = bt.Add(def); tr.AddNewlyCreatedDBObject(def, true);
-                    var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 2);
+                    using var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 2);
                     def.AppendEntity(circle); tr.AddNewlyCreatedDBObject(circle, true);
                     var layers = (LayerTable)tr.GetObject(source.LayerTableId, OpenMode.ForWrite);
                     var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(source), OpenMode.ForWrite);
@@ -108,11 +108,11 @@ public partial class Commands
                     {
                         var sl = new LayerTableRecord { Name = $"N-WE-IE-SCALE_SYMBOL-S-{scale}" };
                         var sid = layers.Add(sl); tr.AddNewlyCreatedDBObject(sl, true);
-                        var br = new BlockReference(new Point3d(scale, 0, 0), defId) { LayerId = sid, ScaleFactors = new Scale3d(scale / 1000d) };
+                        using var br = new BlockReference(new Point3d(scale, 0, 0), defId) { LayerId = sid, ScaleFactors = new Scale3d(scale / 1000d) };
                         ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
                         var hl = new LayerTableRecord { Name = $"N-WE-VH-SCALE_HATCH-A-{scale}" };
                         var hid = layers.Add(hl); tr.AddNewlyCreatedDBObject(hl, true);
-                        var hatch = new Hatch { LayerId = hid };
+                        using var hatch = new Hatch { LayerId = hid };
                         hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31");
                         ms.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
                         hatch.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline,
@@ -130,7 +130,7 @@ public partial class Commands
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var br = new BlockReference(Point3d.Origin, xref); ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
+                using var br = new BlockReference(Point3d.Origin, xref); ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
                 tr.Commit();
             }
             foreach (double scale in new[] { 200d, 500d, 1000d })
@@ -152,7 +152,7 @@ public partial class Commands
             if (hash != Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)))) throw new InvalidOperationException("Bron gewijzigd.");
             doc.Editor.WriteMessage("\nSCALEVARIANT xref 1:200/500 naar 1:200/500/1000: symbool 4mm, patroon 1mm, bron ongewijzigd -> OK");
         }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nSCALEVARIANT FAIL: {ex}"); }
+        catch (System.Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or Autodesk.AutoCAD.Runtime.Exception) { doc.Editor.WriteMessage($"\nSCALEVARIANT FAIL: {ex}"); }
     }
 
     [CommandMethod("NLCSLEGENDALIVETARGETTEST", CommandFlags.Modal)]
@@ -169,7 +169,7 @@ public partial class Commands
                 ObjectId Add(string name)
                 {
                     var def = new LegendDefinition { Name = name, GroupName = LegendRegistry.NewGroupName() };
-                    var line = new Line(Point3d.Origin, new Point3d(5, 0, 0));
+                    using var line = new Line(Point3d.Origin, new Point3d(5, 0, 0));
                     var id = ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                     LegendManagement.AddToGroup(db, tr, def.GroupName, new[] { id });
                     registry.Add(def); return id;
@@ -179,7 +179,7 @@ public partial class Commands
             }
             doc.Editor.WriteMessage("\nLIVETARGET twee legenda's aangemaakt");
         }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nLIVETARGET FAIL: {ex}"); }
+        catch (System.Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or Autodesk.AutoCAD.Runtime.Exception) { doc.Editor.WriteMessage($"\nLIVETARGET FAIL: {ex}"); }
     }
     [CommandMethod("NLCSLEGENDALIVETARGETERASE", CommandFlags.Modal)]
     public void NlcsLegendaLiveTargetErase()
@@ -201,7 +201,7 @@ public partial class Commands
                 throw new InvalidOperationException("Eén zichtbare legenda wordt niet automatisch gekozen.");
             doc.Editor.WriteMessage("\nLIVETARGET wissen: alleen A gekozen -> OK");
         }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nLIVETARGET FAIL: {ex}"); }
+        catch (System.Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or Autodesk.AutoCAD.Runtime.Exception) { doc.Editor.WriteMessage($"\nLIVETARGET FAIL: {ex}"); }
     }
 
     [CommandMethod("NLCSLEGENDALIVETARGETVERIFY", CommandFlags.Modal)]
@@ -218,7 +218,7 @@ public partial class Commands
             tr.Commit();
             doc.Editor.WriteMessage("\nLIVETARGET UNDO: A/B bereikbaar; metadata behouden -> OK");
         }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nLIVETARGET FAIL: {ex}"); }
+        catch (System.Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or Autodesk.AutoCAD.Runtime.Exception) { doc.Editor.WriteMessage($"\nLIVETARGET FAIL: {ex}"); }
     }
 
 }

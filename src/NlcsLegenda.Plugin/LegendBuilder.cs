@@ -55,9 +55,10 @@ public static class LegendBuilder
         // vergroot zijn rij/kolom; zijn formaat wordt niet naar een vakje vervormd.
         var symbols = new Dictionary<LegendEntry, PreparedSymbol>();
         if (s.InsertSymbolBlocks)
-            foreach (var entry in analysis.Entries)
+            foreach (var entry in analysis.Entries.Where(e => e.SymbolLayer is not null && e.SymbolBlockName is not null))
             {
-                if (entry.SymbolLayer is not { } layer || entry.SymbolBlockName is not { } name) continue;
+                string layer = entry.SymbolLayer!;
+                string name = entry.SymbolBlockName!;
                 string renderLayer;
                 if (analysis.LayerStyles.TryGetValue(layer, out var display))
                     renderLayer = EnsureStyledLayer(tr, db, layer, display);
@@ -68,8 +69,11 @@ public static class LegendBuilder
                     throw new InvalidOperationException($"Symbool '{entry.Description}': {reason}");
                 var bounds = new Extents3d();
                 foreach (var id in ids)
-                    if (TryEntityExtents((Entity)tr.GetObject(id, OpenMode.ForRead), out var lo, out var hi))
-                        bounds.AddExtents(new Extents3d(lo, hi));
+                {
+                    if (!TryEntityExtents((Entity)tr.GetObject(id, OpenMode.ForRead), out var lo, out var hi))
+                        throw new InvalidOperationException($"Symbool '{entry.Description}' heeft een onderdeel zonder meetbare afmetingen.");
+                    bounds.AddExtents(new Extents3d(lo, hi));
+                }
                 symbols.Add(entry, new PreparedSymbol(ids, bounds.MaxPoint.X - bounds.MinPoint.X, bounds.MaxPoint.Y - bounds.MinPoint.Y));
             }
         double sampleColumnWidth = Math.Max(swatchW, symbols.Values.Select(v => v.Width).DefaultIfEmpty(0).Max());
@@ -474,7 +478,7 @@ public static class LegendBuilder
                 using var ids = new ObjectIdCollection(primitives.ToArray());
                 local.AssumeOwnershipOf(ids);
                 foreach (var id in primitives) ((Entity)tr.GetObject(id, OpenMode.ForWrite)).Layer = layer;
-                var reference = new BlockReference(Point3d.Origin, localId) { Layer = layer };
+                using var reference = new BlockReference(Point3d.Origin, localId) { Layer = layer };
                 reference.BlockTransform = transform;
                 var referenceId = btr.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true);
                 created.Add(referenceId);
@@ -1146,9 +1150,9 @@ public static class LegendBuilder
         // hoststijl zelfstandig aan; het huidige STANDARD-font is geen templatekeuze.
         string font;
         try { font = HostApplicationServices.Current.FindFile("NLCS-ISO.ttf", db, FindFileHint.FontFile); }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception ex)
         {
-            throw new InvalidOperationException("Lettertype NLCS-ISO.ttf ontbreekt. Installeer het NLCS-lettertype of kies een beschikbare tekststijl bij Instellingen.");
+            throw new InvalidOperationException("Lettertype NLCS-ISO.ttf ontbreekt. Installeer het NLCS-lettertype of kies een beschikbare tekststijl bij Instellingen.", ex);
         }
         tst.UpgradeOpen();
         var created = new TextStyleTableRecord { Name = "NLCS-ISO", FileName = font, TextSize = 0, XScale = 1 };
