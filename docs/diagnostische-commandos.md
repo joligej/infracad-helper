@@ -10,6 +10,7 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDASCALEVARIANTTEST` | Controleert symbolen en arceringen uit xrefs met verschillende NLCS-schaalvarianten. |
 | `NLCSLEGENDAREALSIZETEST` | Controleert grote ongelijk geschaalde xref-symbolen, samenvoeging en vrije rij-/tekstruimte; plaatst daarna een legenda voor heropen- en herhaaltests. |
 | `NLCSLEGENDALIVETARGETTEST` / `NLCSLEGENDALIVETARGETERASE` / `NLCSLEGENDALIVETARGETVERIFY` | Controleert twee legenda's, wissen van één, direct kiezen van de overblijvende en herstel na echte AutoCAD Undo. |
+| `NLCSLEGENDALIVEEMPTYTEST` | Wist alle legendageometrie; controleert bronexport van 5 meter en behoud van Undo-metadata. |
 | `NLCSLEGENDATEST` | Bouwt headless een legenda en rapporteert eventuele renderissues. |
 | `NLCSLEGENDABATCHTEST` | Draait de batch-uittrekstaat headless op een map. |
 | `NLCSLEGENDADESCTEST` | Controleert de omschrijvingsbron-resolutie per regel. |

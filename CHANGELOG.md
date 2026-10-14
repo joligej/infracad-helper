@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.29.11 - 2026-10-14
+
+- Overzicht, export, elementcontrole en viewportkeuze tellen alleen aanwezige
+  legenda's. Na het wissen van alle legenda's werkt de bronexport weer en meldt
+  Bijwerken dat er geen legenda is. De opgeslagen gegevens blijven intact voor Undo.
+
 ## 1.29.10 - 2026-10-14
 
 - Instellingen openen direct bij één aanwezige legenda. Gewiste legenda's tellen

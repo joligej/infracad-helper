@@ -479,7 +479,7 @@ public partial class Commands
             LegendRegistry registry;
             using (var tr0 = db.TransactionManager.StartTransaction())
             {
-                registry = LegendStore.Load(db, tr0);
+                registry = LegendManagement.ActiveRegistry(db, tr0, LegendStore.Load(db, tr0));
                 tr0.Commit();
             }
 

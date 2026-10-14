@@ -199,6 +199,7 @@ public partial class Commands
             }
             if (!ResolveMutationTarget(doc.Editor, db, out var target) || target.IsGlobal || target.ContextLabel != "Legenda: A")
                 throw new InvalidOperationException("Eén zichtbare legenda wordt niet automatisch gekozen.");
+            NlcsLegendaInfo();
             doc.Editor.WriteMessage("\nLIVETARGET wissen: alleen A gekozen -> OK");
         }
         catch (System.Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or Autodesk.AutoCAD.Runtime.Exception) { doc.Editor.WriteMessage($"\nLIVETARGET FAIL: {ex}"); }
@@ -219,6 +220,48 @@ public partial class Commands
             doc.Editor.WriteMessage("\nLIVETARGET UNDO: A/B bereikbaar; metadata behouden -> OK");
         }
         catch (System.Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or Autodesk.AutoCAD.Runtime.Exception) { doc.Editor.WriteMessage($"\nLIVETARGET FAIL: {ex}"); }
+    }
+
+
+    [CommandMethod("NLCSLEGENDALIVEEMPTYTEST", CommandFlags.Modal)]
+    public void NlcsLegendaLiveEmptyTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        var db = doc.Database;
+        try
+        {
+            NlcsLegendaLiveTargetTest();
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var registry = LegendStore.Load(db, tr);
+                foreach (var id in LegendManagement.CollectManagedIds(db, tr, registry))
+                    ((Entity)tr.GetObject(id, OpenMode.ForWrite)).Erase();
+                var layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                using var layer = new LayerTableRecord { Name = "B-WE-VH-LIVEEMPTY-G" };
+                var layerId = layers.Add(layer); tr.AddNewlyCreatedDBObject(layer, true);
+                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                using var line = new Line(Point3d.Origin, new Point3d(5, 0, 0)) { LayerId = layerId };
+                ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
+                tr.Commit();
+            }
+            var path = Path.Join(Path.GetDirectoryName(db.Filename)!, Path.GetFileNameWithoutExtension(db.Filename) + "_NLCS-legenda.json");
+            if (File.Exists(path)) throw new InvalidOperationException("Exportbestand bestaat al voor de proef.");
+            NlcsLegendaInfo();
+            NlcsLegendaUpdate();
+            NlcsLegendaExport();
+            if (!File.Exists(path)) throw new InvalidOperationException("Geen export nadat alle legenda's gewist zijn.");
+            using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            if (json.RootElement.GetArrayLength() != 1 || json.RootElement[0].GetProperty("lengteM").GetDouble() != 5)
+                throw new InvalidOperationException("Export zonder aanwezige legenda bevat niet de bronlijn van 5 meter.");
+            using var verify = db.TransactionManager.StartTransaction();
+            var stored = LegendStore.Load(db, verify);
+            if (stored.Legends.Count != 2 || LegendManagement.ActiveRegistry(db, verify, stored).Legends.Count != 0)
+                throw new InvalidOperationException("Overzicht of export heeft Undo-metadata gewijzigd.");
+            verify.Commit();
+            doc.Editor.WriteMessage("\nLIVEEMPTY geen actieve legenda: bronexport 5m, metadata behouden -> OK");
+        }
+        catch (System.Exception ex) when (ex is InvalidOperationException or IOException or ArgumentException or Autodesk.AutoCAD.Runtime.Exception or System.Text.Json.JsonException)
+        { doc.Editor.WriteMessage($"\nLIVEEMPTY FAIL: {ex}"); }
     }
 
 }
