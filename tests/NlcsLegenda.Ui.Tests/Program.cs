@@ -66,10 +66,10 @@ internal static class Program
         using var form = new SettingsDialog(settings, "Templateherstel");
         OpenOffscreen(form);
         Descendants(form).OfType<Button>().Single(b => b.Text == "TAUW-opmaak herstellen").PerformClick();
-        Check(settings.Columns == 0 && settings.MaxRowsPerColumn == 30 && settings.MaxLegendHeightMm == 0,
+        Check(settings.Columns == 0 && settings.MaxRowsPerColumn == 30 && Math.Abs(settings.MaxLegendHeightMm) < 1e-10,
             "Templateherstel herstelt de kolomindeling");
-        Check(settings.LineSpacingFactor == 0.624, "Templateherstel bewaart de exacte DWT-regelafstand");
-        Check(settings.Scale == 500 && settings.RemarksText == "Eigen notitie", "Templateherstel bewaart schaal en eigen tekst");
+        Check(Math.Abs(settings.LineSpacingFactor - 0.624) < 1e-10, "Templateherstel bewaart de exacte DWT-regelafstand");
+        Check(Math.Abs(settings.Scale - 500) < 1e-10 && settings.RemarksText == "Eigen notitie", "Templateherstel bewaart schaal en eigen tekst");
         var tabs = Descendants(form).OfType<TabControl>().Single();
         tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(p => p.Text == "Maten");
         Application.DoEvents();
