@@ -8,24 +8,46 @@ internal sealed class KlicSourceMetadata : IDisposable
 {
     private readonly Dictionary<Database, Source> _sources = new();
     private readonly KlicOptions _options;
-    public KlicSourceMetadata(KlicOptions options) => _options = options;
+    private readonly Database _database;
+    private readonly Transaction _transaction;
+
+    public KlicSourceMetadata(KlicOptions options, Database database, Transaction transaction)
+    {
+        _options = options;
+        _database = database;
+        _transaction = transaction;
+    }
 
     public KlicObjectData Read(Entity entity, string xref)
     {
         var database = entity.ObjectId.OriginalDatabase;
+        var ownerTransaction = database == _database ? _transaction : null;
         if (!_sources.TryGetValue(database, out var source))
-            _sources.Add(database, source = new Source(database));
+            _sources.Add(database, source = new Source(database, ownerTransaction));
         string handle = entity.ObjectId.NonForwardedHandle.ToString();
         if (!source.Objects.TryGetValue(handle, out var data))
         {
             var records = source.Embedded.GetValueOrDefault(handle)?.ToList() ?? new List<KlicRecord>();
             var issues = new List<string>();
-            // Een gewone geneste transactie respecteert nog niet opgeslagen wijzigingen
-            // van de aanroeper. OpenClose kan bij het sluiten een verse hatch-contour verliezen.
-            using var tr = database.TransactionManager.StartTransaction();
-            // Een doorgestuurde xref-ID kan naar de host wijzen. Lees de echte bronhandle.
-            var original = (Entity)tr.GetObject(database.GetObjectId(false, entity.ObjectId.NonForwardedHandle, 0), OpenMode.ForRead);
-            source.Attached.Read(original, tr, records, issues);
+            void ReadAttached(Transaction tr)
+            {
+                // Een doorgestuurde xref-ID kan naar de host wijzen. Lees de echte bronhandle.
+                var original = (Entity)tr.GetObject(database.GetObjectId(false, entity.ObjectId.NonForwardedHandle, 0), OpenMode.ForRead);
+                source.Attached.Read(original, tr, records, issues);
+            }
+            if (ownerTransaction is not null)
+            {
+                // De actieve tekening kan nog niet opgeslagen objectwijzigingen bevatten.
+                // OpenClose mag die objecten niet opnieuw openen en zelfstandig sluiten.
+                ReadAttached(ownerTransaction);
+            }
+            else
+            {
+                // De xref is een afzonderlijke, alleen-lezen database. Houd daarvoor
+                // geen gewone transactie open naast de transactie van de hosttekening.
+                using var tr = database.TransactionManager.StartOpenCloseTransaction();
+                ReadAttached(tr);
+            }
             data = new KlicObjectData(database.Filename ?? "", handle, "", records, issues, _options.PreferredSource);
             source.Objects.Add(handle, data);
         }
@@ -42,9 +64,17 @@ internal sealed class KlicSourceMetadata : IDisposable
         public readonly IReadOnlyDictionary<string, IReadOnlyList<KlicRecord>> Embedded;
         public readonly Dictionary<string, KlicObjectData> Objects = new(StringComparer.OrdinalIgnoreCase);
         public readonly KlicAttachedData Attached;
-        public Source(Database db)
+        public Source(Database db, Transaction? ownerTransaction)
         {
-            try { Embedded = ReadEmbedded(db); }
+            try
+            {
+                if (ownerTransaction is not null) Embedded = ReadEmbedded(db, ownerTransaction);
+                else
+                {
+                    using var tr = db.TransactionManager.StartOpenCloseTransaction();
+                    Embedded = ReadEmbedded(db, tr);
+                }
+            }
             catch (Exception ex) when (ex is InvalidDataException or System.Xml.XmlException)
             {
                 throw new InvalidOperationException("KLIC-gegevens kunnen niet betrouwbaar worden gelezen. Controleer de InfraCAD-brongegevens.", ex);
@@ -53,9 +83,8 @@ internal sealed class KlicSourceMetadata : IDisposable
         }
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyList<KlicRecord>> ReadEmbedded(Database source)
+    private static IReadOnlyDictionary<string, IReadOnlyList<KlicRecord>> ReadEmbedded(Database source, Transaction tr)
     {
-        using var tr = source.TransactionManager.StartTransaction();
         var dictionary = (DBDictionary)tr.GetObject(source.NamedObjectsDictionaryId, OpenMode.ForRead);
         foreach (var key in new[] { "INFRACAD_MAP_DATA", "TABLES" })
         {

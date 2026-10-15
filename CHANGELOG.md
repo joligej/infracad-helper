@@ -12,8 +12,9 @@
 - De standaardopmaak blijft NLCS-ISO gebruiken als een bestaande hoststijl met die
   naam afwijkt. Bestaande tekststijlen blijven intact; een expliciet gekozen, ontbrekende
   stijl wordt gemeld in plaats van stil vervangen.
-- Metadata lezen gebruikt een gewone geneste transactie. De eerdere OpenClose-transactie
-  kon een nog niet opgeslagen arceercontour laten verdwijnen tijdens de analyse.
+- Metadata uit de actieve tekening wordt in de bestaande transactie gelezen. De
+  eerdere OpenClose-transactie kon een nog niet opgeslagen arceercontour laten
+  verdwijnen. Xref-metadata houdt zijn afzonderlijke, korte leestoegang.
 - Extra CAD-acceptatie vergelijkt tekst, stijl, posities op drie schalen en een
   meerregelige omschrijving rechtstreeks met de lokale referentie-DWT.
 
