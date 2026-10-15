@@ -100,11 +100,9 @@ public partial class Commands
         var tagged = entities.Where(e => LegendManagement.ReadRow(e) is not null).ToArray();
         if (tagged.OfType<MText>().Count() != 2 || tagged.Length < 4)
             errors.Add("Tekstkeuze verliest de koppeling met de bronregel.");
-        foreach (var row in tagged.Select(e => LegendManagement.ReadRow(e)!.Value))
-        {
-            if (row.Element != "CUSTOMIZATION" || row.Hoofdgroep is not ("VH" or "IE"))
-                errors.Add("Tekstkeuze verwijst naar een verkeerde bronregel.");
-        }
+        if (tagged.Select(e => LegendManagement.ReadRow(e)!.Value)
+            .Any(row => row.Element != "CUSTOMIZATION" || row.Hoofdgroep is not ("VH" or "IE")))
+            errors.Add("Tekstkeuze verwijst naar een verkeerde bronregel.");
         if (update && !definition.Settings.ExplodeOnPlace)
         {
             definition.Settings.ExplodeOnPlace = true;
