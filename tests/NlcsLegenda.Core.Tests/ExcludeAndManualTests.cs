@@ -181,4 +181,31 @@ public class ExcludeAndManualTests
         Assert.Single(entries);
         Assert.DoesNotContain(entries, e => e.Description == "Ongeldige laagnaam");
     }
+
+    [Fact]
+    public void ManualRowsFollowStatusFiltersAndCustomStatusOverrides()
+    {
+        var manual = new ManualEntry { Layer = "EIGEN", Description = "Eigen kabel", Status = NlcsStatus.Bestaand };
+        var settings = new LegendSettings { ManualEntries = new() { manual } };
+        settings.IncludedStatuses.Remove(NlcsStatus.Bestaand);
+        Assert.Empty(LegendGrouping.Build(Array.Empty<NlcsLayerName>(), settings));
+        settings.CustomStatuses.Add(new CustomStatus { Name = "Nutsvoorziening",
+            Members = new() { LegendSettings.EntryKey(manual.ToLegendEntry()) } });
+        Assert.Equal("Nutsvoorziening", Assert.Single(LegendGrouping.Build(Array.Empty<NlcsLayerName>(), settings)).CustomStatusName);
+        settings.CustomStatuses.Clear();
+        settings.IncludedStatuses.Add(NlcsStatus.Bestaand);
+        Assert.Single(LegendGrouping.Build(Array.Empty<NlcsLayerName>(), settings));
+    }
+
+    [Fact]
+    public void GroupingDoesNotRemoveSeparateManualSwatches()
+    {
+        var settings = new LegendSettings { ManualEntries = new() {
+            new() { Layer = "ROOD", Description = "Eigen kabel" },
+            new() { Layer = "BLAUW", Description = "Eigen kabel" } } };
+        settings.MergedDimensions.Add(GroupDimension.Nummer);
+        var entries = LegendGrouping.Build(Array.Empty<NlcsLayerName>(), settings);
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(new[] { "BLAUW", "ROOD" }, entries.Select(e => e.PrimaryLayer).Order());
+    }
 }

@@ -137,4 +137,17 @@ public class LayoutAdvancedTests
 
         Assert.Equal("Natuursteen", entries[0].Description); // grootste hoeveelheid eerst
     }
+
+    [Fact]
+    public void FixedColumnsRemainAvailableAfterOneVeryTallRow()
+    {
+        var entries = Enumerable.Range(0, 4)
+            .Select(i => Entry(NlcsStatus.Nieuw, "VH", $"E{i}")).ToArray();
+        var settings = new LegendSettings { Scale = 1000, IncludeTitle = false,
+            IncludeGroupHeaders = false, Columns = 3 };
+        var layout = LegendLayoutEngine.Compute(entries, settings,
+            (text, _) => text == "E0" ? 100 : 5);
+        Assert.Equal(3, layout.Columns);
+        Assert.Equal(new[] { 0, 1, 2 }, layout.Items.Select(i => i.Column).Distinct());
+    }
 }

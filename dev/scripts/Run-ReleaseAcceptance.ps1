@@ -14,7 +14,7 @@ param(
     [string]$TemplatePath,
     [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('sources','xrefchoices','klic','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('sources','xrefchoices','klic','partialklic','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -38,6 +38,7 @@ $specs=@{
  sources=@('NLCSLEGENDASOURCETEST','SOURCETEST gedeelde symbolen, xref-overrides en gewone omschrijvingen -> OK','NLCSLEGENDASOURCEVERIFY','SOURCETEST na heropenen -> OK')
  xrefchoices=@('NLCSLEGENDAXREFCHOICETEST','XREFCHOICE xref-inserts, opgeslagen keuzes en geneste KLIC-bronnen -> OK','NLCSLEGENDAXREFCHOICEVERIFY','XREFCHOICE na heropenen: bronkeuzes en KLIC-hoeveelheden -> OK')
  klic=@('NLCSLEGENDAKLICTEST','KLIC lokale en geneste xrefs: 4 netbeheerders, onbekend, 30m, samenvoegen en uitsluiten -> OK','NLCSLEGENDAKLICVERIFY','KLIC na heropenen: netbeheerders en 30m behouden -> OK')
+ partialklic=@('NLCSLEGENDAPARTIALKLICTEST','PARTIALKLIC lokaal en xref: ontbrekende gegevens zichtbaar, 8/16m behouden -> OK')
  overview=@('NLCSLEGENDAOVERVIEWTEST','OVERVIEW handmatige volgorde, echte geometrie, B-isolatie en rollback -> OK','NLCSLEGENDAOVERVIEWVERIFY','OVERVIEW na heropenen en bijwerken: C/B/A, B gelijk -> OK')
  realsize=@('NLCSLEGENDAREALSIZETEST','REALSIZE grote xref-symbolen: modelmaat, schaalvariant, samenvoeging en vrije tekstruimte -> OK')
  templatestyle=@('NLCSLEGENDATEMPLATESTYLETEST','TEMPLATESTYLE standaardfont, bestaande stijl behouden, eigen keuze en ontbrekende stijl -> OK')

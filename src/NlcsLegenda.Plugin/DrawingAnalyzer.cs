@@ -311,7 +311,7 @@ public static class DrawingAnalyzer
         string key = parsed.GroupKey + "\u0001" + parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + parsed.KlicGroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
         (rule is null ? c.NlcsSourceLayers : c.CustomSourceLayers).Add(layerName);
         c.Parsed[key] = parsed;
-        if (metadata.HasData || metadata.ReadIssues.Count > 0)
+        if (metadata.HasData || metadata.ReadIssues.Count > 0 || ElementProperties.IsKlic(parsed.Discipline, parsed.Hoofdgroep))
         {
             if (!c.KlicObjects.TryGetValue(key, out var objects)) c.KlicObjects.Add(key, objects = new());
             objects.Add(metadata);

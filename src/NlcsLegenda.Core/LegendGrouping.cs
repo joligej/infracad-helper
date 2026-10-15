@@ -105,6 +105,8 @@ public static class LegendGrouping
             if (!settings.IsDrawTypeIncluded(manual.Type)) continue;
             var basic = manual.ToLegendEntry();
             var custom = settings.FindCustomStatus(LegendSettings.EntryKey(basic))?.Name;
+            if (custom is null && !settings.IncludedStatuses.Contains(manual.Status))
+                continue;
             entries.Add(custom is null ? basic : manual.ToLegendEntry(custom));
         }
 
@@ -159,8 +161,8 @@ public static class LegendGrouping
 
         // Blanco regels nooit samenvoegen: elke blanco is een losse invulregel met eigen
         // identiteit, ook als meerdere dezelfde tekst hebben. Ze gaan buiten de merge om mee.
-        var blanks = entries.Where(e => e.IsBlank).ToList();
-        var mergeable = blanks.Count == 0 ? entries : entries.Where(e => !e.IsBlank).ToList();
+        var separate = entries.Where(e => e.IsBlank || e.DescriptionSource == DescriptionSource.Handmatig).ToList();
+        var mergeable = separate.Count == 0 ? entries : entries.Except(separate).ToList();
 
         string KeyOf(LegendEntry e)
         {
@@ -196,7 +198,7 @@ public static class LegendGrouping
             if (group.Count > 1)
                 merged[i] = Combine(group);
         }
-        merged.AddRange(blanks);
+        merged.AddRange(separate);
         return merged;
     }
 

@@ -116,7 +116,7 @@ public static class LegendLayoutEngine
         }
         else if (s.Columns > 0)
         {
-            columnsNeeded = s.Columns;
+            columnsNeeded = Math.Min(s.Columns, Math.Max(1, entries.Count));
             columnBudget = totalEntryHeight / columnsNeeded;
             maxRowsCap = int.MaxValue;
         }
@@ -175,8 +175,9 @@ public static class LegendLayoutEngine
             }
 
             bool columnBroke = false;
+            bool reserveColumns = columnsNeeded != int.MaxValue && entries.Count - i <= columnsNeeded - col - 1;
             bool budgetReached = rows >= 1 && col < columnsNeeded - 1
-                && colHeight + entryHeights[i] * 0.5 >= columnBudget;
+                && (reserveColumns || colHeight + entryHeights[i] * 0.5 >= columnBudget);
             double extraHeader = needStatusHeader ? headerBand + (rows > 0 ? statusGap : 0) : 0;
             if (s.IncludeHoofdgroepHeaders && !entry.IsBlank
                 && !string.Equals(curHoofd, entry.Hoofdgroep, StringComparison.OrdinalIgnoreCase))

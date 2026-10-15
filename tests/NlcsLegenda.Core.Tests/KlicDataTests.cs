@@ -163,4 +163,15 @@ public class KlicDataTests
         var data = KlicMetadata.ReadRecords(new[] { bytes.ToArray() });
         Assert.Equal(2, data["AB"].Count); Assert.Equal("0.11", data["AB"][1].Values["DiameterM"]);
     }
+
+    [Fact]
+    public void MissingMetadataInAMixedRowRemainsVisible()
+    {
+        var known = Data("A", Record(KlicSource.InfraCAD, ("Materiaal", "PE")));
+        var missing = Data("B");
+        var failed = Data("C") with { ReadIssues = new[] { "Object Data kon niet worden gelezen" } };
+        Assert.Equal("Niet opgegeven; PE", KlicSummary.Field(new[] { known, missing }, "Materiaal"));
+        Assert.Equal("Niet opgegeven; PE", KlicSummary.Field(new[] { known, failed }, "Materiaal"));
+        Assert.Equal("", KlicSummary.Field(new[] { missing }, "Materiaal"));
+    }
 }

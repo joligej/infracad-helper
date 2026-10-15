@@ -104,8 +104,8 @@ public static class KlicSummary
 
     public static string Field(IEnumerable<KlicObjectData> objects, string key)
     {
-        var data = objects.Where(o => o.HasData).ToArray();
-        if (data.Length == 0) return "";
+        var data = objects.ToArray();
+        if (!data.Any(o => o.HasData)) return "";
         return string.Join("; ", data.SelectMany(o => o.Values(key) is { Count: > 0 } values ? values : new[] { "" })
             .Select(v => KlicFields.Format(key, v)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase));
     }
