@@ -53,16 +53,18 @@ public static class LegendBuilder
         // werkelijke symboolhoogte reserveren vóór de indeling
         using var imports = new SymbolImportSession(db, tr);
         var symbols = new Dictionary<LegendEntry, PreparedSymbol>();
+        if (s.InsertSymbolBlocks && analysis.Entries.Any(e => e.IsManual && e.SymbolLayer is not null && e.SymbolBlockName is null))
+            throw new InvalidOperationException("Vul bij iedere eigen symboolregel een bloknaam in.");
         if (s.InsertSymbolBlocks)
             foreach (var entry in analysis.Entries.Where(e => e.SymbolLayer is not null && e.SymbolBlockName is not null))
             {
                 string layer = entry.SymbolLayer!;
                 string name = entry.SymbolBlockName!;
                 string renderLayer;
-                if (analysis.LayerStyles.TryGetValue(layer, out var display))
+                if (!entry.IsManual && analysis.LayerStyles.TryGetValue(layer, out var display))
                     renderLayer = EnsureStyledLayer(tr, db, layer, display);
                 else { EnsureLayer(tr, db, layer, 7); renderLayer = layer; }
-                analysis.SymbolSamples.TryGetValue(layer, out var sample);
+                var sample = entry.IsManual ? null : analysis.SymbolSamples.GetValueOrDefault(layer);
                 if (!TryInsertSymbol(btr, tr, db, imports, name, renderLayer, sample?.Transform ?? SymbolTransform.Identity,
                     sample, 0, 0, s.ModelUnitsPerPaperMm, s.IncludeInvisibleLayers, out var ids, out var reason))
                     throw new InvalidOperationException($"Symbool '{entry.Description}': {reason}");
@@ -89,14 +91,31 @@ public static class LegendBuilder
         double MeasureHeadingHeight(string text, double height)
         {
             using var heading = new MText();
-            heading.SetDatabaseDefaults(db);
+            SetLegendDefaults(heading, db);
             heading.TextStyleId = styleId;
             heading.TextHeight = height;
             heading.Contents = "\\L" + MTextFormat.Escape(text) + "\\l";
             return heading.ActualHeight;
         }
+        double extraHeight = 0;
+        if (s.MaxLegendHeightMm > 0)
+        {
+            // notities en schaalbalk meenemen in de beschikbare hoogte
+            var existing = btr.Cast<ObjectId>().ToHashSet();
+            var emptyLayout = new LegendLayout { Items = Array.Empty<LegendPlacement>(), Columns = 1,
+                MinX = 0, MaxX = colWidth, MinY = 0, MaxY = 0 };
+            extraHeight = -DrawBelowLegend(btr, tr, s, analysis, emptyLayout, textH, styleId).bottomY;
+            foreach (var id in btr.Cast<ObjectId>().Where(id => !existing.Contains(id)).ToArray())
+                ((Entity)tr.GetObject(id, OpenMode.ForWrite)).Erase();
+            extraHeight += s.DrawBorder ? 2 * margin : 0;
+            layoutSettings.MaxLegendHeightMm -= extraHeight / s.ModelUnitsPerPaperMm;
+            if (layoutSettings.MaxLegendHeightMm <= 0)
+                throw new InvalidOperationException("De maximale hoogte is te klein voor de opmerkingen en schaalbalk. Vergroot de hoogte of zet deze op 0.");
+        }
         var layout = LegendLayoutEngine.Compute(analysis.Entries, layoutSettings, MeasureTextHeight,
             entry => symbols.TryGetValue(entry, out var symbol) ? symbol.Height : 0, MeasureHeadingHeight);
+        if (s.MaxLegendHeightMm > 0 && layout.Height + extraHeight > s.ToModel(s.MaxLegendHeightMm) + 1e-8)
+            throw new InvalidOperationException("Een regel past niet binnen de maximale legendahoogte. Vergroot de hoogte of zet deze op 0.");
         foreach (var item in layout.Items)
         {
             switch (item.Kind)
@@ -138,10 +157,10 @@ public static class LegendBuilder
         if (s.DrawBorder)
         {
             double borderRight = Math.Max(layout.MaxX, rightX);
-            var border = MakeRectangle(
+            var border = MakeRectangle(btr.Database,
                 layout.MinX - margin, bottomY - margin,
                 (borderRight - layout.MinX) + 2 * margin, (layout.MaxY - bottomY) + 2 * margin, s.FrameLayer);
-            btr.AppendEntity(border);
+            AppendEntity(btr, border);
             tr.AddNewlyCreatedDBObject(border, true);
         }
 
@@ -223,15 +242,15 @@ public static class LegendBuilder
         double barBottom = top - barH - s.ToModel(1.0) - labelH;
         double barWidth = segMeters * segments;
 
-        var frame = MakeRectangle(left, barBottom, barWidth, barH, s.FrameLayer);
-        btr.AppendEntity(frame);
+        var frame = MakeRectangle(btr.Database, left, barBottom, barWidth, barH, s.FrameLayer);
+        AppendEntity(btr, frame);
         tr.AddNewlyCreatedDBObject(frame, true);
 
         for (int i = 0; i < segments; i++)
         {
             double x0 = left + i * segMeters;
-            var seg = MakeRectangle(x0, barBottom + (i % 2 == 0 ? barH / 2 : 0), segMeters, barH / 2, s.FrameLayer);
-            var segId = btr.AppendEntity(seg);
+            var seg = MakeRectangle(btr.Database, x0, barBottom + (i % 2 == 0 ? barH / 2 : 0), segMeters, barH / 2, s.FrameLayer);
+            var segId = AppendEntity(btr, seg);
             tr.AddNewlyCreatedDBObject(seg, true);
             AddSolidFill(btr, tr, segId, s.FrameLayer);
         }
@@ -265,7 +284,7 @@ public static class LegendBuilder
         }
 
         var mt = new MText();
-        mt.SetDatabaseDefaults();
+        SetLegendDefaults(mt, btr.Database);
         mt.Layer = s.TextLayer;
         if (!styleId.IsNull)
             mt.TextStyleId = styleId;
@@ -276,7 +295,7 @@ public static class LegendBuilder
         // alinea-inspringing ten opzichte van de teksthoogte
         mt.Contents = (s.RemarksText.StartsWith("-\t", StringComparison.Ordinal) ? "\\pxi-2,l2;" : string.Empty)
             + MTextFormat.Escape(s.RemarksText);
-        btr.AppendEntity(mt);
+        AppendEntity(btr, mt);
         tr.AddNewlyCreatedDBObject(mt, true);
 
         return y - mt.ActualHeight;
@@ -299,7 +318,7 @@ public static class LegendBuilder
         {
             if (renderLayers.ContainsKey(lyr))
                 continue;
-            if (analysis.LayerStyles.TryGetValue(lyr, out var style))
+            if (!entry.IsManual && analysis.LayerStyles.TryGetValue(lyr, out var style))
                 renderLayers[lyr] = EnsureStyledLayer(tr, db, lyr, style);
             else
             {
@@ -311,15 +330,15 @@ public static class LegendBuilder
         // tekenvolgorde: vlak, vulling, arcering, lijn, symbool
         if (entry.VlakLayer is { } vlakLayer)
         {
-            var area = MakeRectangle(x, bottom, swatchW, swatchH, renderLayers[vlakLayer]);
-            rowEntities.Add(btr.AppendEntity(area));
+            var area = MakeRectangle(btr.Database, x, bottom, swatchW, swatchH, renderLayers[vlakLayer]);
+            rowEntities.Add(AppendEntity(btr, area));
             tr.AddNewlyCreatedDBObject(area, true);
         }
 
         if (entry.FillLayer is { } fillLayer)
         {
-            var fillBoundary = MakeRectangle(x, bottom, swatchW, swatchH, renderLayers[fillLayer]);
-            var fillId = btr.AppendEntity(fillBoundary);
+            var fillBoundary = MakeRectangle(btr.Database, x, bottom, swatchW, swatchH, renderLayers[fillLayer]);
+            var fillId = AppendEntity(btr, fillBoundary);
             tr.AddNewlyCreatedDBObject(fillBoundary, true);
             rowEntities.Add(fillId);
             rowEntities.Add(AddSolidFill(btr, tr, fillId, renderLayers[fillLayer]));
@@ -327,7 +346,12 @@ public static class LegendBuilder
 
         if (entry.HatchLayer is { } hatchLayer)
         {
-            analysis.HatchSamples.TryGetValue(hatchLayer, out var sample);
+            var pattern = entry.ManualHatchPattern ?? "SOLID";
+            var sample = entry.IsManual ? new HatchSample {
+                PatternName = pattern, PatternType = HatchPatternType.PreDefined,
+                Transparency = new TransparencyValue(TransparencyMethod.ByLayer, 255),
+                IsSolid = pattern.Equals("SOLID", StringComparison.OrdinalIgnoreCase)
+            } : analysis.HatchSamples.GetValueOrDefault(hatchLayer);
             rowEntities.Add(AddHatch(btr, tr, x, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample,
                 s.HatchScaleFactor * (sample?.ScaleForLegend(s.Scale) ?? 1)));
         }
@@ -335,10 +359,11 @@ public static class LegendBuilder
         if (entry.GeometryLayer is { } geoLayer)
         {
             var line = new Polyline();
+            SetLegendDefaults(line, db);
             line.AddVertexAt(0, new Point2d(x, midY), 0, 0, 0);
             line.AddVertexAt(1, new Point2d(x + swatchW, midY), 0, 0, 0);
             line.Layer = renderLayers[geoLayer];
-            rowEntities.Add(btr.AppendEntity(line));
+            rowEntities.Add(AppendEntity(btr, line));
             tr.AddNewlyCreatedDBObject(line, true);
         }
 
@@ -357,7 +382,7 @@ public static class LegendBuilder
             if (tr.GetObject(id, OpenMode.ForWrite) is not Entity entity)
                 continue;
             foreach (var rendered in renderLayers)
-                if (entity.Layer == rendered.Value && analysis.LayerStyles.TryGetValue(rendered.Key, out var style))
+                if (!entry.IsManual && entity.Layer == rendered.Value && analysis.LayerStyles.TryGetValue(rendered.Key, out var style))
                 {
                     if (rendered.Key != entry.SymbolLayer)
                     {
@@ -373,8 +398,8 @@ public static class LegendBuilder
         if (s.DrawSwatchFrame)
         {
             double frameHeight = Math.Max(swatchH, prepared?.Height ?? 0);
-            var frame = MakeRectangle(x, midY - frameHeight / 2, sampleColumnWidth, frameHeight, s.SwatchFrameLayer);
-            btr.AppendEntity(frame);
+            var frame = MakeRectangle(btr.Database, x, midY - frameHeight / 2, sampleColumnWidth, frameHeight, s.SwatchFrameLayer);
+            AppendEntity(btr, frame);
             tr.AddNewlyCreatedDBObject(frame, true);
         }
 
@@ -390,7 +415,7 @@ public static class LegendBuilder
             mt.Attachment = AttachmentPoint.TopLeft;
             mt.Location = new Point3d(x + sampleColumnWidth + textGap + TextBearing(tr, styleId, textH),
                 midY + Math.Max(textH * (1 - TemplateDefaults.TextBaselineOffsetRatio), mt.ActualHeight / 2), 0);
-            btr.AppendEntity(mt);
+            rowEntities.Add(AppendEntity(btr, mt));
             tr.AddNewlyCreatedDBObject(mt, true);
         }
 
@@ -399,17 +424,19 @@ public static class LegendBuilder
             var quantity = entry.QuantityText(s.QuantityDecimals, s.UnitArea, s.UnitLength, s.UnitCount);
             if (!string.IsNullOrEmpty(quantity))
             {
-                AddTextRight(btr, tr, quantity,
+                var quantityText = AddTextRight(btr, tr, quantity,
                     new Point3d(x + colWidth, midY - textH * 0.5, 0), textH, s.TextLayer, styleId);
+                rowEntities.Add(quantityText.ObjectId);
             }
         }
+        LegendManagement.TagRow(db, tr, rowEntities, entry);
     }
 
     private static MText CreateDescription(Database db, LegendSettings s, ObjectId styleId,
         string text, double width)
     {
         var mt = new MText();
-        mt.SetDatabaseDefaults(db);
+        SetLegendDefaults(mt, db);
         mt.Layer = s.TextLayer;
         mt.TextStyleId = styleId;
         mt.TextHeight = s.ToModel(s.TextHeightMm);
@@ -472,9 +499,11 @@ public static class LegendBuilder
                 using var ids = new ObjectIdCollection(primitives.ToArray());
                 local.AssumeOwnershipOf(ids);
                 foreach (var id in primitives) ((Entity)tr.GetObject(id, OpenMode.ForWrite)).Layer = layer;
-                using var reference = new BlockReference(Point3d.Origin, localId) { Layer = layer };
+                using var reference = new BlockReference(Point3d.Origin, localId);
+                SetLegendDefaults(reference, db);
+                reference.Layer = layer;
                 reference.BlockTransform = transform;
-                var referenceId = btr.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true);
+                var referenceId = AppendEntity(btr, reference); tr.AddNewlyCreatedDBObject(reference, true);
                 created.Add(referenceId);
                 primitives = new List<ObjectId> { referenceId };
             }
@@ -698,8 +727,10 @@ public static class LegendBuilder
     {
         var result = new List<ObjectId>();
         ok = false;
-        using var probe = new BlockReference(Point3d.Origin, defId) { Layer = layer };
-        btr.AppendEntity(probe);
+        using var probe = new BlockReference(Point3d.Origin, defId);
+        SetLegendDefaults(probe, db);
+        probe.Layer = layer;
+        AppendEntity(btr, probe);
         created.Add(probe.ObjectId);
         tr.AddNewlyCreatedDBObject(probe, true);
         var insertionLayer = sample?.InsertionLayerStyle ?? DrawingAnalyzer.EntityLayerStyle(probe, tr);
@@ -731,7 +762,7 @@ public static class LegendBuilder
                     var pieceStyle = DrawingAnalyzer.EntityStyle(piece, tr, parentStyle, pieceLayerStyle);
                     if (piece.Layer == "0") piece.LayerId = reference.LayerId;
                     ApplyEntityStyle(piece, pieceStyle, tr, db);
-                    btr.AppendEntity(piece);
+                    AppendEntity(btr, piece);
                     created.Add(piece.ObjectId);
                     tr.AddNewlyCreatedDBObject(piece, true);
                     queue.Enqueue((piece.ObjectId, pieceLayerStyle));
@@ -812,9 +843,29 @@ public static class LegendBuilder
         }
     }
 
-    private static Polyline MakeRectangle(double x, double yBottom, double w, double h, string layer)
+    internal static ObjectId AppendEntity(BlockTableRecord btr, Entity entity)
+    {
+        // cad vervangt bylayer-transparantie bij toevoegen
+        var transparency = entity.Transparency;
+        var id = btr.AppendEntity(entity);
+        entity.Transparency = transparency;
+        return id;
+    }
+
+    internal static void SetLegendDefaults(Entity entity, Database db)
+    {
+        entity.SetDatabaseDefaults(db);
+        entity.Color = Color.FromColorIndex(ColorMethod.ByLayer, 256);
+        entity.LineWeight = LineWeight.ByLayer;
+        entity.Transparency = new Transparency(TransparencyMethod.ByLayer);
+        entity.LinetypeId = db.ByLayerLinetype;
+        entity.LinetypeScale = 1;
+    }
+
+    private static Polyline MakeRectangle(Database db, double x, double yBottom, double w, double h, string layer)
     {
         var pl = new Polyline();
+        SetLegendDefaults(pl, db);
         pl.AddVertexAt(0, new Point2d(x, yBottom), 0, 0, 0);
         pl.AddVertexAt(1, new Point2d(x + w, yBottom), 0, 0, 0);
         pl.AddVertexAt(2, new Point2d(x + w, yBottom + h), 0, 0, 0);
@@ -872,7 +923,7 @@ public static class LegendBuilder
         if (Math.Abs(obliqueDeg) > 1e-6)
             prefix += $"\\Q{obliqueDeg.ToString("0.###", inv)};";
         mt.Contents = prefix + MTextFormat.Escape(dbt.TextString);
-        btr.AppendEntity(mt);
+        AppendEntity(btr, mt);
         tr.AddNewlyCreatedDBObject(mt, true);
         dbt.Erase();
         return mt;
@@ -902,7 +953,7 @@ public static class LegendBuilder
         AttachmentPoint attach, double height, string layer, ObjectId styleId, bool underline = false)
     {
         var mt = new MText();
-        mt.SetDatabaseDefaults();
+        SetLegendDefaults(mt, btr.Database);
         mt.Layer = layer;
         if (!styleId.IsNull)
             mt.TextStyleId = styleId;
@@ -911,7 +962,7 @@ public static class LegendBuilder
         mt.Width = 0.0;
         mt.Location = anchor;
         mt.Contents = underline ? "\\L" + MTextFormat.Escape(text) + "\\l" : MTextFormat.Escape(text);
-        btr.AppendEntity(mt);
+        AppendEntity(btr, mt);
         tr.AddNewlyCreatedDBObject(mt, true);
         return mt;
     }
@@ -928,11 +979,11 @@ public static class LegendBuilder
             AttachmentPoint.TopLeft, height, layer, styleId, underline);
     }
 
-    private static void AddTextRight(
+    private static MText AddTextRight(
         BlockTableRecord btr, Transaction tr, string text, Point3d alignPoint,
         double height, string layer, ObjectId styleId)
     {
-        AddMText(btr, tr, text, new Point3d(alignPoint.X, alignPoint.Y + height / 2.0, alignPoint.Z),
+        return AddMText(btr, tr, text, new Point3d(alignPoint.X, alignPoint.Y + height / 2.0, alignPoint.Z),
             AttachmentPoint.MiddleRight, height, layer, styleId);
     }
 
@@ -950,10 +1001,10 @@ public static class LegendBuilder
         var hatch = new Hatch();
         try
         {
-            hatch.SetDatabaseDefaults();
+            SetLegendDefaults(hatch, btr.Database);
             hatch.Layer = layer;
             hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
-            btr.AppendEntity(hatch);
+            AppendEntity(btr, hatch);
             tr.AddNewlyCreatedDBObject(hatch, true);
             hatch.Associative = false;
             using (var loop = new ObjectIdCollection { boundaryId })
@@ -978,7 +1029,7 @@ public static class LegendBuilder
         var hatch = new Hatch();
         try
         {
-            hatch.SetDatabaseDefaults();
+            SetLegendDefaults(hatch, btr.Database);
             hatch.Layer = layer;
             var patternName = sample?.PatternName ?? "SOLID";
             var patternType = sample?.PatternType ?? HatchPatternType.PreDefined;
@@ -1002,7 +1053,7 @@ public static class LegendBuilder
                 hatch.Transparency = sample.Transparency.ToAutoCadValue();
             }
 
-            btr.AppendEntity(hatch);
+            AppendEntity(btr, hatch);
             tr.AddNewlyCreatedDBObject(hatch, true);
             hatch.Associative = false;
             var pts = new Point2dCollection
@@ -1161,7 +1212,7 @@ public static class LegendBuilder
         {
             var requested = FindHostStyle(name);
             if (!requested.IsNull) return requested;
-            throw new InvalidOperationException($"Tekststijl '{name}' ontbreekt in deze tekening. Kies een bestaande stijl of laat de tekststijl leeg voor de TAUW-opmaak.");
+            throw new InvalidOperationException($"Tekststijl '{name}' ontbreekt in deze tekening. Kies een bestaande stijl of laat de tekststijl leeg voor de templateopmaak.");
         }
 
         // afwijkende gedeelde stijl behouden; eigen correcte stijl gebruiken

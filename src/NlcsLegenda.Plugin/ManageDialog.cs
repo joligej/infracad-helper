@@ -34,12 +34,16 @@ public sealed class ManualRow
     public string Status { get; set; } = "Nieuw";
 
     public string Patroon { get; set; } = string.Empty;
+
+    public string Blok { get; set; } = string.Empty;
+
+    public string Hoofdgroep { get; set; } = "HM";
 }
 
 internal sealed class LegendManageDialog : LegendDialog
 {
     private static readonly string[] TypeNames = { "Lijn", "Vlak", "Arcering", "Vulling", "Symbool" };
-    private static readonly string[] StatusNames = { "Nieuw", "Bestaand", "Vervallen", "Tijdelijk", "Revisie" };
+    private static readonly string[] StatusNames = { "Nieuw", "Bestaand", "Vervallen", "Tijdelijk", "Revisie", "Overig" };
 
     private readonly TriStateTree _tree;
     private readonly TextBox _filter;
@@ -144,6 +148,8 @@ internal sealed class LegendManageDialog : LegendDialog
                 continue;
             if (!hasLayer || !hasText)
                 return "Vul bij elke eigen regel zowel een laag als een omschrijving in.";
+            if (row.Type == "Symbool" && string.IsNullOrWhiteSpace(row.Blok))
+                return "Vul bij elke eigen symboolregel een bloknaam in.";
             if (!LayerNaming.IsValid(row.Laag))
                 return $"\"{row.Laag.Trim()}\" is geen geldige laagnaam.";
         }
@@ -168,6 +174,8 @@ internal sealed class LegendManageDialog : LegendDialog
                     Type = ToDrawType(row.Type),
                     Description = row.Omschrijving.Trim(),
                     Status = ToStatus(row.Status),
+                    Hoofdgroep = row.Hoofdgroep,
+                    SymbolBlock = string.IsNullOrWhiteSpace(row.Blok) ? null : row.Blok.Trim(),
                     HatchPattern = string.IsNullOrWhiteSpace(row.Patroon) ? null : row.Patroon.Trim()
                 });
             }
@@ -198,6 +206,10 @@ internal sealed class LegendManageDialog : LegendDialog
         { DataPropertyName = nameof(ManualRow.Status), HeaderText = "Status", FillWeight = 16, DataSource = StatusNames.Clone(), FlatStyle = FlatStyle.Flat });
         grid.Columns.Add(new DataGridViewTextBoxColumn
         { DataPropertyName = nameof(ManualRow.Patroon), HeaderText = "Patroon", FillWeight = 14 });
+        grid.Columns.Add(new DataGridViewTextBoxColumn
+        { DataPropertyName = nameof(ManualRow.Blok), HeaderText = "Blok", FillWeight = 18 });
+        foreach (DataGridViewColumn column in grid.Columns)
+            column.MinimumWidth = column.DataPropertyName == nameof(ManualRow.Omschrijving) ? 150 : 90;
         grid.DataError += (_, e) => e.ThrowException = false;
         return grid;
     }
@@ -214,7 +226,9 @@ internal sealed class LegendManageDialog : LegendDialog
             Type = FromDrawType(m.Type),
             Omschrijving = m.Description,
             Status = m.Status.DisplayName(),
-            Patroon = m.HatchPattern ?? string.Empty
+            Patroon = m.HatchPattern ?? string.Empty,
+            Blok = m.SymbolBlock ?? string.Empty,
+            Hoofdgroep = m.Hoofdgroep
         }).ToList());
         _grid.DataSource = _rows;
     }
@@ -253,6 +267,7 @@ internal sealed class LegendManageDialog : LegendDialog
         "Vervallen" => NlcsStatus.Vervallen,
         "Tijdelijk" => NlcsStatus.Tijdelijk,
         "Revisie" => NlcsStatus.Revisie,
+        "Overig" => NlcsStatus.Overig,
         _ => NlcsStatus.Nieuw
     };
 }

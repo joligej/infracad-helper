@@ -8,6 +8,20 @@ public sealed class CustomStatus
 
     public bool IsValid => !string.IsNullOrWhiteSpace(Name);
 
+    public static bool Assign(IReadOnlyList<CustomStatus> statuses, CustomStatus target, string key)
+    {
+        bool changed = false;
+        foreach (var status in statuses)
+            if (!ReferenceEquals(status, target))
+                changed |= status.Members.RemoveAll(m => string.Equals(m, key, StringComparison.OrdinalIgnoreCase)) > 0;
+        if (!target.Members.Contains(key, StringComparer.OrdinalIgnoreCase))
+        {
+            target.Members.Add(key);
+            changed = true;
+        }
+        return changed;
+    }
+
     public CustomStatus Clone() => new()
     {
         Name = Name,

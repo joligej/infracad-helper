@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.31.4 - 2026-10-15
+
+- Legenda’s volgen hun eigen kleur, lijndikte, lijntype en transparantie, ook als de actieve tekeninstellingen afwijken.
+- Eigen arceringen en symbolen behouden hun gekozen voorbeeld, ook op een gedeelde bronlaag. Samenstellen bewaart bloknamen, hoofdgroepen en status Overig.
+- Een aangeklikte legendaregel verwijst bij tekstbewerking naar de juiste inhoud en legenda, ook na heropenen of exploderen. Oudere legenda’s eerst bijwerken.
+- Batchexport leest xrefs; gewone export en viewports gebruiken de instellingen van de gekozen legenda zonder eerst algemene instellingen te laden.
+- CSV volgt het gekozen aantal decimalen. KLIC-vensters bewaren de gekozen veldvolgorde.
+- Toewijzen aan een andere eigen status verplaatst de regel. De maximale legendahoogte telt de titel, opmerkingen en schaalbalk mee. Annuleren van een bronselectie bewaart de eerdere selectie.
+
 ## 1.31.3 - 2026-10-15
 
 - Handmatige regels volgen het statusfilter. Een eigen status blijft een expliciete uitzondering.
@@ -15,10 +24,10 @@
 
 ## 1.31.2 - 2026-10-15
 
-- Meerregelige omschrijvingen volgen nu de gemeten regelafstand uit de TAUW-template
+- Meerregelige omschrijvingen volgen nu de gemeten regelafstand uit de referentietemplate
   (0,624). De eerdere factor 1,35 gaf te veel witruimte en hogere regels.
 - Automatische sortering zet Bestaand vóór Nieuw, zoals in de voorbeelden.
-- TAUW-opmaak herstellen zet ook kolomindeling, koppen en voorbeeldweergave terug.
+- Templateopmaak herstellen zet ook kolomindeling, koppen en voorbeeldweergave terug.
   Eigen teksten, schaal, bronkeuzes en handmatige volgorde blijven behouden.
 - Grote statuskoppen en kleine kopafstanden kunnen de titel of vorige groep niet
   meer overlappen. Ook opmerkingen blijven vrij van hun kop bij een kleine afstand.
@@ -32,7 +41,7 @@
   meerregelige omschrijving rechtstreeks met de lokale referentie-DWT.
 
 Voor een bestaande legenda met oude opmaak: Instellingen → Legenda →
-TAUW-opmaak herstellen. Persoonlijke instellingen worden niet automatisch vervangen.
+Templateopmaak herstellen. Persoonlijke instellingen worden niet automatisch vervangen.
 
 ## 1.31.1 - 2026-10-15
 

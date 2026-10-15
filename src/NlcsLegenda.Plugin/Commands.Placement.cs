@@ -18,7 +18,7 @@ public partial class Commands
             foreach (DBObject piece in pieces)
                 if (piece is Entity entity)
                 {
-                    ids.Add(ms.AppendEntity(entity));
+                    ids.Add(LegendBuilder.AppendEntity(ms, entity));
                     tr.AddNewlyCreatedDBObject(entity, true);
                 }
         }

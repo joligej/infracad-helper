@@ -20,6 +20,8 @@ internal static class Program
             CheckOverview();
             CheckKlic(args.FirstOrDefault());
             CheckNestedEditors();
+            CheckCustomizationRoundtrip();
+            CheckStatusReassignment();
             Func<Form>[] factories = {
                 () => new XrefInclusionDialog(new[] { "Een lange xrefnaam met veel informatie.dwg" }, new()),
                 () => new CustomStatusDialog(new[] { new CustomStatus { Name = "Eigen status" } }, new[] { ("key", "Voorbeeldregel") }),
@@ -59,13 +61,50 @@ internal static class Program
         return Errors.Count == 0 ? 0 : 1;
     }
 
+    private static void CheckStatusReassignment()
+    {
+        using var dialog = new CustomStatusDialog(new[] {
+            new CustomStatus { Name = "Fase 1", Members = new() { "regel" } },
+            new CustomStatus { Name = "Fase 2" } }, new[] { ("regel", "Waterleiding") });
+        OpenOffscreen(dialog);
+        Descendants(dialog).OfType<ListBox>().Single(c => c is not CheckedListBox).SelectedIndex = 1;
+        Descendants(dialog).OfType<CheckedListBox>().Single().SetItemChecked(0, true);
+        Check(dialog.Result[0].Members.Count == 0 && dialog.Result[1].Members.SequenceEqual(new[] { "regel" }),
+            "Toewijzen aan een andere status verplaatst de regel");
+        dialog.Close();
+    }
+
+    private static void CheckCustomizationRoundtrip()
+    {
+        var settings = new LegendSettings { ManualEntries = new() {
+            new() { Layer = "EIGEN", Type = NlcsDrawType.Symbool, SymbolBlock = "PUT", Description = "Put", Hoofdgroep = "RI", Status = NlcsStatus.Overig },
+            new() { Layer = "EIGEN", Type = NlcsDrawType.Arcering, HatchPattern = "ANSI31", Description = "Vlak", Hoofdgroep = "VH" } } };
+        using (var dialog = new LegendManageDialog(Array.Empty<EntryCheckItem>(), settings))
+        {
+            OpenOffscreen(dialog);
+            var actual = dialog.ManualEntries;
+            Check(actual[0].SymbolBlock == "PUT", "Samenstellen behoudt het eigen symboolblok");
+            Check(actual[0].Hoofdgroep == "RI" && actual[1].Hoofdgroep == "VH", "Samenstellen behoudt eigen hoofdgroepen");
+            Check(actual[0].Status == NlcsStatus.Overig, "Samenstellen behoudt status Overig");
+            Check(actual[1].HatchPattern == "ANSI31", "Samenstellen behoudt eigen arceringspatroon");
+            dialog.Close();
+        }
+        var options = new KlicOptions { Columns = new() { "Materiaal", "Thema" }, DescriptionFields = new() { "DiameterM", "Materiaal" } };
+        using var klic = new KlicOptionsDialog(options);
+        OpenOffscreen(klic);
+        klic.DialogResult = DialogResult.OK;
+        klic.Close();
+        Check(klic.Result.Columns.SequenceEqual(options.Columns), "KLIC-venster behoudt kolomvolgorde zonder wijziging");
+        Check(klic.Result.DescriptionFields.SequenceEqual(options.DescriptionFields), "KLIC-venster behoudt volgorde van omschrijvingsvelden");
+    }
+
     private static void CheckTemplateReset()
     {
         var settings = new LegendSettings { Columns = 7, MaxRowsPerColumn = 2, MaxLegendHeightMm = 12,
             LineSpacingFactor = 1.35, Scale = 500, RemarksText = "Eigen notitie" };
         using var form = new SettingsDialog(settings, "Templateherstel");
         OpenOffscreen(form);
-        Descendants(form).OfType<Button>().Single(b => b.Text == "TAUW-opmaak herstellen").PerformClick();
+        Descendants(form).OfType<Button>().Single(b => b.Text == "Templateopmaak herstellen").PerformClick();
         Check(settings.Columns == 0 && settings.MaxRowsPerColumn == 30 && Math.Abs(settings.MaxLegendHeightMm) < 1e-10,
             "Templateherstel herstelt de kolomindeling");
         Check(Math.Abs(settings.LineSpacingFactor - 0.624) < 1e-10, "Templateherstel bewaart de exacte DWT-regelafstand");

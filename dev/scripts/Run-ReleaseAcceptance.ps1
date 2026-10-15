@@ -9,7 +9,7 @@ param(
     [string]$TemplatePath,
     [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('sources','xrefchoices','klic','partialklic','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -34,6 +34,11 @@ $specs=@{
  xrefchoices=@('NLCSLEGENDAXREFCHOICETEST','XREFCHOICE xref-inserts, opgeslagen keuzes en geneste KLIC-bronnen -> OK','NLCSLEGENDAXREFCHOICEVERIFY','XREFCHOICE na heropenen: bronkeuzes en KLIC-hoeveelheden -> OK')
  klic=@('NLCSLEGENDAKLICTEST','KLIC lokale en geneste xrefs: 4 netbeheerders, onbekend, 30m, samenvoegen en uitsluiten -> OK','NLCSLEGENDAKLICVERIFY','KLIC na heropenen: netbeheerders en 30m behouden -> OK')
  partialklic=@('NLCSLEGENDAPARTIALKLICTEST','PARTIALKLIC lokaal en xref: ontbrekende gegevens zichtbaar, 8/16m behouden -> OK')
+ exportisolation=@('NLCSLEGENDAEXPORTISOLATIONTEST','EXPORTISOLATION opgeslagen legenda exporteert met onleesbare globale instellingen -> OK')
+ heightlimit=@('NLCSLEGENDAHEIGHTLIMITTEST','HEIGHTLIMIT koppen, notities, schaalbalk en kader binnen 100/120mm op drie schalen -> OK')
+ drawingdefaults=@('NLCSLEGENDADRAWINGDEFAULTSTEST','DRAWINGDEFAULTS legenda volgt eigen lagen; actieve tekeninstellingen behouden -> OK')
+ batchxref=@('NLCSLEGENDABATCHXREFTEST','BATCHXREF relatieve geneste xref 30m, uitgesloten en ontladen 0m, bestanden ongewijzigd -> OK')
+ customization=@('NLCSLEGENDACUSTOMIZATIONTEST','CUSTOMIZATION eigen arceringen en symbolen onafhankelijk van dezelfde bronlaag -> OK','NLCSLEGENDACUSTOMIZATIONVERIFY','CUSTOMIZATION na heropenen en bijwerken: eigen voorbeelden behouden -> OK')
  overview=@('NLCSLEGENDAOVERVIEWTEST','OVERVIEW handmatige volgorde, echte geometrie, B-isolatie en rollback -> OK','NLCSLEGENDAOVERVIEWVERIFY','OVERVIEW na heropenen en bijwerken: C/B/A, B gelijk -> OK')
  realsize=@('NLCSLEGENDAREALSIZETEST','REALSIZE grote xref-symbolen: modelmaat, schaalvariant, samenvoeging en vrije tekstruimte -> OK')
  templatestyle=@('NLCSLEGENDATEMPLATESTYLETEST','TEMPLATESTYLE standaardfont, bestaande stijl behouden, eigen keuze en ontbrekende stijl -> OK')
@@ -148,7 +153,7 @@ foreach($case in $Cases){
  if($case -eq 'livetarget'){$expected+="1 legenda('s) in deze tekening:"}
  if($case -eq 'liveempty'){$expected+='Geen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.'}
  Run-Case $case $drawing $specs[$case][0] $expected
- if($case -in @('sources','xrefchoices','klic','overview','abclocal','abcxref','oldreopen')){
+ if($case -in @('sources','xrefchoices','klic','customization','overview','abclocal','abcxref','oldreopen')){
   $expected=@($specs[$case][3])
   Run-Case "$case-verify" $drawing $specs[$case][2] $expected
  }

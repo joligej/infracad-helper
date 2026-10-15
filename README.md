@@ -27,7 +27,7 @@ Je kunt meerdere legenda's naast elkaar in één tekening hebben, bijvoorbeeld �
 hele tekening en aparte legenda's voor deelgebieden. Elke legenda onthoudt zijn eigen
 bron (hele tekening of selectie) en zijn eigen instellingen. `NLCSLEGENDABEHEER` toont de
 legenda's en laat je ze bijwerken, hernoemen, opzoeken (zoomen) en verwijderen. In
-hetzelfde venster pas je per gekozen legenda de instellingen aan (de legenda wordt daarna
+hetzelfde commando pas je per gekozen legenda de instellingen aan (de legenda wordt daarna
 in dezelfde bewerking opnieuw opgebouwd), neem je de instellingen over van een andere
 legenda, dupliceer je een legenda, wijzig je de bronselectie of zet je de opmaak van die
 legenda als globale standaard voor nieuwe legenda's.
@@ -56,7 +56,7 @@ Het instellingenvenster bundelt alles in tabbladen: naast schaal, inhoud, opmaak
 hoeveelheden en schaalbalk zitten daar ook de per-xref keuze, de eigen statussen inclusief
 ledentoewijzing en de omschrijvingen. De losse commando's blijven als snelkoppeling bestaan.
 De omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`, en `NLCSLEGENDATEKST` past de
-tekst van één aangeklikt element aan. Een nieuwe legenda wordt standaard als één blok
+tekst van één aangeklikte bron- of legendaregel aan. Werk een oudere legenda eerst bij om de tekstkoppeling toe te voegen. Eigen regels bewerk je via Samenstellen. Een nieuwe legenda wordt standaard als één blok
 geplaatst; met *Exploderen bij plaatsen* kies je losse entiteiten.
 
 Weet je niet zeker waarom een element niet in de legenda staat? `NLCSLEGENDAELEMENT` laat
@@ -72,7 +72,7 @@ De standaard statuskoppen zijn "Nieuwe situatie:", "Bestaande situatie:", "Verva
 
 Onder de legenda staan standaard de tekeningnotities, een schaalbalk en de schaaltekst.
 De schaalbalk heeft vier segmenten van elk 10 mm op papier, met afwisselende halve
-vullingen. Teksten en onderdelen kun je aanpassen of uitzetten. In het opmerkingenvenster
+vullingen. De maximale hoogte onder Kolommen geldt voor de hele legenda, inclusief deze onderdelen en een eventueel kader. Past één regel niet, vergroot dan de hoogte of zet deze op 0. Teksten en onderdelen kun je aanpassen of uitzetten. In het opmerkingenvenster
 kies je tussen tekeningnotities en de KLIC-waarschuwing.
 
 De legenda is bedoeld voor modelruimte in meters. Papiermaten worden eenmaal met de
@@ -82,7 +82,7 @@ De hulpkaders zijn in modelruimte zichtbaar en worden niet geplot; een buitenkad
 standaard uit. Een lege tekststijl kiest `NLCS-ISO` met lettertype `NLCS-ISO.ttf`. Ontbreekt dat lettertype, installeer
 het of kies in Instellingen een bestaande tekststijl.
 
-Bestaande legenda's houden hun opgeslagen instellingen. Kies **Opmaak → template** om
+Bestaande legenda's houden hun opgeslagen instellingen. Kies **Instellingen → Legenda → Templateopmaak herstellen** om
 de maatvoering bij te werken. Eigen teksten, bronnen, filters en de gekozen schaal blijven
 behouden. De standaardmaatvoering staat in [Maatvoering](docs/template-maatvoering.md).
 
@@ -95,7 +95,7 @@ Niet elke NLCS-laag hoeft in de legenda. Met `NLCSLEGENDAUITVINKEN` klik je een
 element aan om die regel weg te laten (of weer terug te zetten). Heb je een eigen laag
 die er juist wél bij hoort, dan maak je met `NLCSLEGENDATOEVOEGEN` een regel aan: je
 kiest het type (lijn, vlak, arcering, vlakvulling of symbool), de laag en de
-omschrijving. In `NLCSLEGENDABEHEER` staat dit bij elkaar in één venster. Het uitvinken
+omschrijving. In `NLCSLEGENDASAMENSTELLEN` staat dit bij elkaar in één venster. Het uitvinken
 en de eigen regels horen bij de globale standaard of bij één legenda.
 
 ### Overzicht en eigen volgorde
@@ -243,13 +243,9 @@ De installer zet de plugin per gebruiker neer in `%APPDATA%\Autodesk\Application
 en bevat één bestand dat voor 2025, 2026 én 2027 werkt. Start Civil 3D of AutoCAD daarna
 opnieuw.
 
-De installer is self-signed ondertekend als `joligej`. Die handtekening laat zien dat
-het bestand na ondertekening niet is gewijzigd; hij zegt niets over een door een externe
-autoriteit geverifieerde identiteit. Windows toont pas een vertrouwde uitgever als je het
-meegeleverde `joligej-codesign.cer` zelf importeert. Doe dat alleen als je dit certificaat
-vertrouwt: een certificaat in *Vertrouwde basiscertificeringsinstanties* geldt voor je hele
-gebruikersprofiel. Zonder import werkt de installer gewoon, maar staat er "onbekende
-uitgever". Een download controleer je met `SHA256SUMS.txt` bij de release.
+De MSI is ondertekend met een zelfondertekend certificaat van `joligej`; Windows kan
+daarom een onbekende uitgever melden. Controleer de download met `SHA256SUMS.txt`
+bij de release.
 
 **Handmatig (zip).** Download `NlcsLegenda-2027-vX.Y.Z.zip` (of de 2025-/2026-variant),
 pak de map `NlcsLegenda.bundle` uit in `%APPDATA%\Autodesk\ApplicationPlugins\` en start

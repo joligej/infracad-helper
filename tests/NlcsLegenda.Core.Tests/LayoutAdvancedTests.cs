@@ -17,6 +17,17 @@ public class LayoutAdvancedTests
     };
 
     [Fact]
+    public void HeightLimitIncludesTitleAndGroupHeaders()
+    {
+        var entries = Enumerable.Range(0, 12).Select(i => Entry(NlcsStatus.Bestaand, "VH", $"E{i}")).ToArray();
+        var settings = new LegendSettings { Scale = 1000, MaxLegendHeightMm = 30,
+            IncludeTitle = true, IncludeGroupHeaders = true, IncludeHoofdgroepHeaders = true };
+        var layout = LegendLayoutEngine.Compute(entries, settings);
+        Assert.True(layout.Height <= settings.ToModel(settings.MaxLegendHeightMm) + 1e-9,
+            $"Legenda inclusief koppen is {layout.Height} hoog, maximaal {settings.MaxLegendHeightMm}.");
+    }
+
+    [Fact]
     public void MaxLegendHeight_StartsNewColumn()
     {
         var entries = Enumerable.Range(0, 10)

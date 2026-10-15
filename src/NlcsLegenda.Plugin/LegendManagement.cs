@@ -196,6 +196,32 @@ internal static class LegendManagement
         return list;
     }
 
+    private const string RowApplication = "NLCS_LEGENDA_ROW";
+
+    public static void TagRow(Database db, Transaction tr, IEnumerable<ObjectId> ids, NlcsLegenda.Core.LegendEntry entry)
+    {
+        if (entry.IsBlank || entry.IsManual || entry.DescriptionSource == NlcsLegenda.Core.DescriptionSource.EigenKoppeling) return;
+        var apps = (RegAppTable)tr.GetObject(db.RegAppTableId, OpenMode.ForRead);
+        if (!apps.Has(RowApplication))
+        {
+            apps.UpgradeOpen();
+            var app = new RegAppTableRecord { Name = RowApplication };
+            apps.Add(app);
+            tr.AddNewlyCreatedDBObject(app, true);
+        }
+        using var data = new ResultBuffer(new TypedValue(1001, RowApplication),
+            new TypedValue(1000, entry.Hoofdgroep), new TypedValue(1000, entry.Element));
+        foreach (var id in ids) ((Entity)tr.GetObject(id, OpenMode.ForWrite)).XData = data;
+    }
+
+    public static (string Hoofdgroep, string Element)? ReadRow(Entity entity)
+    {
+        using var data = entity.GetXDataForApplication(RowApplication);
+        var values = data?.AsArray();
+        return values is { Length: 3 } && values[1].Value is string group && values[2].Value is string element
+            ? (group, element) : null;
+    }
+
     public static LegendDefinition? FindLegendForEntity(
         Database db, Transaction tr, LegendRegistry registry, ObjectId entId)
     {

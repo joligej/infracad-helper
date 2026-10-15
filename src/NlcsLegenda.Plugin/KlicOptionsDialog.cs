@@ -40,8 +40,13 @@ internal sealed class KlicOptionsDialog : LegendDialog
         FormClosing += (_, _) =>
         {
             if (DialogResult != DialogResult.OK) return;
-            List<string> Keys(CheckedListBox list) => list.CheckedItems.Cast<KlicField>().Select(f => f.Key).ToList();
-            Result = new KlicOptions { Columns = Keys(columns), DescriptionFields = Keys(description), GroupFields = Keys(groups), PreferredSource = (KlicSource)source.SelectedIndex };
+            List<string> Keys(CheckedListBox list, IReadOnlyList<string> previous)
+            {
+                var selected = list.CheckedItems.Cast<KlicField>().Select(f => f.Key).ToList();
+                return previous.Where(selected.Contains).Concat(selected).Distinct().ToList();
+            }
+            Result = new KlicOptions { Columns = Keys(columns, Result.Columns), DescriptionFields = Keys(description, Result.DescriptionFields),
+                GroupFields = Keys(groups, Result.GroupFields), PreferredSource = (KlicSource)source.SelectedIndex };
         };
         Controls.Add(tabs); Controls.Add(buttons);
     }

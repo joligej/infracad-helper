@@ -126,7 +126,8 @@ public partial class Commands
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
                 var br = new BlockReference(Point3d.Origin, btrId);
-                ms.AppendEntity(br);
+                LegendBuilder.SetLegendDefaults(br, db);
+                LegendBuilder.AppendEntity(ms, br);
                 tr.AddNewlyCreatedDBObject(br, true);
 
                 var jig = new LegendJig(br);
@@ -222,8 +223,6 @@ public partial class Commands
 
         try
         {
-            var settings = LoadGlobalDefaults();
-
             LegendRegistry registry;
             using (var trReg = db.TransactionManager.StartTransaction())
             {
@@ -240,8 +239,9 @@ public partial class Commands
                     ed.WriteMessage("\nGeannuleerd.");
                     return;
                 }
-                settings = target.Settings;
             }
+
+            var settings = target?.Settings ?? LoadGlobalDefaults();
 
             IReadOnlyList<LegendEntry> entries;
             string suffix = "NLCS-legenda";
@@ -416,8 +416,6 @@ public partial class Commands
                 return;
             }
 
-            var settings = LoadGlobalDefaults();
-
             // doelkeuze vóór de transactie
             LegendRegistry registry;
             using (var trReg = db.TransactionManager.StartTransaction())
@@ -435,8 +433,11 @@ public partial class Commands
                     ed.WriteMessage("\nGeannuleerd.");
                     return;
                 }
-                settings = target.Settings;
             }
+
+            var settings = target?.Settings ?? LoadGlobalDefaults();
+            if (!double.IsFinite(settings.Scale) || settings.Scale <= 0)
+                throw new InvalidOperationException("De schaal moet groter zijn dan nul.");
 
             Point3d min, max;
             using (var trExt = db.TransactionManager.StartTransaction())
@@ -833,6 +834,7 @@ public partial class Commands
             peo.AllowNone = false;
             var per = ed.GetEntity(peo);
             string layerName;
+            string? pickedBlock = null;
             if (per.Status == PromptStatus.Keyword && per.StringResult == "Typen")
             {
                 var pso = new PromptStringOptions("\nLaagnaam:") { AllowSpaces = true };
@@ -847,7 +849,10 @@ public partial class Commands
             else if (per.Status == PromptStatus.OK)
             {
                 using var tr = db.TransactionManager.StartTransaction();
-                layerName = ((Entity)tr.GetObject(per.ObjectId, OpenMode.ForRead)).Layer;
+                var picked = (Entity)tr.GetObject(per.ObjectId, OpenMode.ForRead);
+                layerName = picked.Layer;
+                if (picked is BlockReference block)
+                    pickedBlock = ((BlockTableRecord)tr.GetObject(block.BlockTableRecord, OpenMode.ForRead)).Name;
                 tr.Commit();
             }
             else
@@ -875,12 +880,13 @@ public partial class Commands
             }
 
             var status = PromptEntryStatus(ed);
+            if (status is null) return;
             var manual = new ManualEntry
             {
                 Layer = layerName,
                 Type = type.Value,
                 Description = dres.StringResult.Trim(),
-                Status = status
+                Status = status.Value
             };
 
             if (type == NlcsDrawType.Arcering)
@@ -888,8 +894,24 @@ public partial class Commands
                 var pp = new PromptStringOptions("\nArceerpatroon <SOLID>:")
                 { AllowSpaces = false, DefaultValue = "SOLID", UseDefaultValue = true };
                 var pr = ed.GetString(pp);
-                if (pr.Status == PromptStatus.OK && !string.IsNullOrWhiteSpace(pr.StringResult))
+                if (pr.Status != PromptStatus.OK) return;
+                if (!string.IsNullOrWhiteSpace(pr.StringResult))
                     manual.HatchPattern = pr.StringResult.Trim();
+            }
+
+            if (type == NlcsDrawType.Symbool)
+            {
+                var prompt = new PromptStringOptions("\nBloknaam:") { AllowSpaces = true };
+                if (pickedBlock is not null) { prompt.DefaultValue = pickedBlock; prompt.UseDefaultValue = true; }
+                var result = ed.GetString(prompt);
+                if (result.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(result.StringResult)) return;
+                using var tr = db.TransactionManager.StartTransaction();
+                var blocks = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+                string name = result.StringResult.Trim();
+                if (!blocks.Has(name) || ((BlockTableRecord)tr.GetObject(blocks[name], OpenMode.ForRead)).IsLayout)
+                { ed.WriteMessage($"\nSymboolblok '{name}' bestaat niet in deze tekening."); return; }
+                manual.SymbolBlock = name;
+                tr.Commit();
             }
 
             if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
@@ -908,9 +930,9 @@ public partial class Commands
     {
         var pko = new PromptKeywordOptions("\nType");
         pko.Keywords.Add("Lijn");
-        pko.Keywords.Add("Vlak", "VLAk", "VLAk");
+        pko.Keywords.Add("Vlak");
         pko.Keywords.Add("Arcering");
-        pko.Keywords.Add("Vulling", "VULling", "VULling");
+        pko.Keywords.Add("Vulling");
         pko.Keywords.Add("Symbool");
         pko.Keywords.Default = "Lijn";
         pko.AllowNone = true;
@@ -927,7 +949,7 @@ public partial class Commands
         };
     }
 
-    private static NlcsStatus PromptEntryStatus(Editor ed)
+    private static NlcsStatus? PromptEntryStatus(Editor ed)
     {
         var pko = new PromptKeywordOptions("\nStatus");
         pko.Keywords.Add("Nieuw");
@@ -939,7 +961,7 @@ public partial class Commands
         pko.AllowNone = true;
         var res = ed.GetKeywords(pko);
         if (res.Status != PromptStatus.OK)
-            return NlcsStatus.Nieuw;
+            return null;
         return res.StringResult switch
         {
             "Bestaand" => NlcsStatus.Bestaand,
@@ -1416,10 +1438,10 @@ public partial class Commands
             switch (res.StringResult)
             {
                 case "Toewijzen":
-                    changed |= AssignByPick(ed, db, status, add: true);
+                    changed |= AssignByPick(ed, db, settings, status, add: true);
                     break;
                 case "Losmaken":
-                    changed |= AssignByPick(ed, db, status, add: false);
+                    changed |= AssignByPick(ed, db, settings, status, add: false);
                     break;
                 case "Handmatig":
                     changed |= AssignManualEntry(ed, settings, status);
@@ -1433,7 +1455,7 @@ public partial class Commands
         return changed;
     }
 
-    private static bool AssignByPick(Editor ed, Database db, CustomStatus status, bool add)
+    private static bool AssignByPick(Editor ed, Database db, LegendSettings settings, CustomStatus status, bool add)
     {
         bool changed = false;
         while (true)
@@ -1463,14 +1485,13 @@ public partial class Commands
             var key = LegendSettings.EntryKey(layer!);
             if (add)
             {
-                if (status.Members.Contains(key, StringComparer.OrdinalIgnoreCase))
-                    ed.WriteMessage($"\n  (al toegewezen) {key}");
-                else
+                if (CustomStatus.Assign(settings.CustomStatuses, status, key))
                 {
-                    status.Members.Add(key);
                     changed = true;
                     ed.WriteMessage($"\n  + {key}");
                 }
+                else
+                    ed.WriteMessage($"\n  (al toegewezen) {key}");
             }
             else
             {
@@ -1521,7 +1542,7 @@ public partial class Commands
             {
                 var key = LegendSettings.EntryKey(manuals[n - 1].ToLegendEntry());
                 if (status.Members.RemoveAll(m => string.Equals(m, key, StringComparison.OrdinalIgnoreCase)) == 0)
-                    status.Members.Add(key);
+                    CustomStatus.Assign(settings.CustomStatuses, status, key);
                 changed = true;
             }
         }
@@ -1574,10 +1595,9 @@ public partial class Commands
 
         try
         {
-            var peo = new PromptEntityOptions(
+            var peo = new PromptNestedEntityOptions(
                 "\nSelecteer een NLCS-object of legenda-onderdeel om de tekst aan te passen");
-            peo.SetRejectMessage("\nGeen geldig object.");
-            var per = ed.GetEntity(peo);
+            var per = ed.GetNestedEntity(peo);
             if (per.Status != PromptStatus.OK)
             {
                 ed.WriteMessage("\nGeannuleerd.");
@@ -1585,28 +1605,53 @@ public partial class Commands
             }
 
             string layerName;
+            (string Hoofdgroep, string Element)? row;
+            using (var sourceTransaction = per.ObjectId.Database.TransactionManager.StartTransaction())
+            {
+                var entity = (Entity)sourceTransaction.GetObject(per.ObjectId, OpenMode.ForRead);
+                layerName = entity.Layer;
+                row = LegendManagement.ReadRow(entity);
+            }
+            LegendDefinition? selectedLegend;
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                layerName = ((Entity)tr.GetObject(per.ObjectId, OpenMode.ForRead)).Layer;
-                tr.Commit();
+                var registry = LegendManagement.ActiveRegistry(db, tr, LegendStore.Load(db, tr));
+                if (row is null)
+                    foreach (var id in per.GetContainers().Where(id => id.Database == db))
+                    {
+                        row = LegendManagement.ReadRow((Entity)tr.GetObject(id, OpenMode.ForRead));
+                        if (row is not null) break;
+                    }
+                selectedLegend = per.GetContainers().Append(per.ObjectId).Where(id => id.Database == db)
+                    .Select(id => LegendManagement.FindLegendForEntity(db, tr, registry, id)).FirstOrDefault(d => d is not null);
             }
-
-            if (!NlcsLayerParser.TryParse(layerName, out var layer))
+            if (selectedLegend is not null && row is null)
             {
-                ed.WriteMessage($"\n\"{layerName}\" is geen NLCS-laag.");
+                ed.WriteMessage("\nKies een bronregel of werk de legenda eerst bij. Eigen regels bewerk je via Samenstellen.");
                 return;
             }
-
-            var key = $"{layer.Hoofdgroep}|{layer.Element.ToUpperInvariant()}";
-
-            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
+            if (row is null)
+            {
+                if (!NlcsLayerParser.TryParse(layerName, out var parsed))
+                {
+                    ed.WriteMessage($"\n\"{layerName}\" is geen NLCS-laag.");
+                    return;
+                }
+                row = (parsed.Hoofdgroep, parsed.Element);
+            }
+            string hoofdgroep = row.Value.Hoofdgroep;
+            string element = row.Value.Element;
+            var key = $"{hoofdgroep}|{element.ToUpperInvariant()}";
+            MutationTarget target;
+            if (selectedLegend is not null) target = MutationTarget.ForLegend(selectedLegend);
+            else if (!ResolveMutationTarget(ed, db, out target)) { ed.WriteMessage("\nGeannuleerd."); return; }
 
             var def = DescriptionCatalog.Default();
             def.Elementen.TryGetValue(key, out var defaultEntry);
             var fallback = new DescriptionEntry
             {
-                Algemeen = defaultEntry?.Algemeen ?? StandardTexts.HoofdgroepName(layer.Hoofdgroep),
-                Specifiek = defaultEntry?.Specifiek ?? StandardTexts.Humanize(layer.Element)
+                Algemeen = defaultEntry?.Algemeen ?? StandardTexts.HoofdgroepName(hoofdgroep),
+                Specifiek = defaultEntry?.Specifiek ?? StandardTexts.Humanize(element)
             };
 
             DescriptionEntry current;
@@ -1854,7 +1899,8 @@ public partial class Commands
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
                 var br = new BlockReference(insert, btrId);
-                ms.AppendEntity(br);
+                LegendBuilder.SetLegendDefaults(br, db);
+                LegendBuilder.AppendEntity(ms, br);
                 tr.AddNewlyCreatedDBObject(br, true);
 
                 var def = new LegendDefinition
@@ -4177,7 +4223,7 @@ public partial class Commands
                 case "Volgorde": PromptSortMode(ed, s); break;
                 case "Filteren": PromptStatusFilter(ed, s); break;
                 case "Elementsoorten": PromptDrawTypeFilter(ed, s); break;
-                case "Uitkiezen": selection = PromptSelection(ed); break;
+                case "Uitkiezen": selection = PromptSelection(ed) ?? selection; break;
                 case "Instellingen": EditSettingsDialog(ed, s); break;
                 case "Beschrijvingen": EditDescriptionsDialog(ed, s); break;
                 case "Plaatsen": return true;
@@ -4253,9 +4299,9 @@ public partial class Commands
                 all.Select(t => $"{t.DisplayName()}:{(s.IsDrawTypeIncluded(t) ? "aan" : "uit")}"));
             var pko = new PromptKeywordOptions($"\nElementsoorten [{state}] (kies om te wisselen)");
             pko.Keywords.Add("Geometrie");
-            pko.Keywords.Add("Vlakken", "VLAkken", "VLAkken");
+            pko.Keywords.Add("Vlakken", "Vlakken", "Vlakken");
             pko.Keywords.Add("Arceringen");
-            pko.Keywords.Add("Vlakvullingen", "VULlingen", "VULlingen");
+            pko.Keywords.Add("Vlakvullingen", "Vullingen", "Vullingen");
             pko.Keywords.Add("Symbolen");
             pko.Keywords.Add("Klaar");
             pko.Keywords.Default = "Klaar";

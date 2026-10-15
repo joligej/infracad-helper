@@ -40,7 +40,7 @@ controleert daarnaast de formele status- en elementcodes en hun combinaties.
   schaal worden samengevoegd als de zichtbare weergave gelijk is. Verschillende
   kleuren, arceringen of symbolen krijgen afzonderlijke regels. Zo horen `...-G` (lijn) en `...-A` (arcering) van
   hetzelfde element bij één swatch.
-- Sortering op status: **Nieuw -> Bestaand -> Vervallen -> Tijdelijk -> Revisie**,
+- Sortering op status: **Bestaand -> Nieuw -> Vervallen -> Tijdelijk -> Revisie**,
   daarbinnen op hoofdgroep en element.
 - Lagen met status `X` en hoofdgroep `AL` (tekenblad/kader) worden standaard
   uitgesloten van de legenda (configureerbaar).

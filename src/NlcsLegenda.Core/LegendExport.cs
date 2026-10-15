@@ -66,8 +66,8 @@ public static class LegendExport
             Csv(SourceLabel(e.DescriptionSource)),
             Csv(types),
             e.Metric.Count.ToString(Inv),
-            e.Metric.Length.ToString("0.##", Inv),
-            e.Metric.Area.ToString("0.##", Inv),
+            e.Metric.Length.ToString("F" + fmt[1..], Inv),
+            e.Metric.Area.ToString("F" + fmt[1..], Inv),
             Csv(QuantityValue(e, fmt, nl)),
             Csv(QuantityUnit(e, unitArea, unitLength, unitCount)),
             Csv(string.Join("; ", e.Netbeheerders))

@@ -39,6 +39,8 @@ internal static class BatchExport
         {
             using var db = new Database(buildDefaultDrawing: false, noDocument: true);
             db.ReadDwgFile(path, FileShare.Read, allowCPConversion: true, password: null);
+            db.CloseInput(true);
+            db.ResolveXrefs(useThreadEngine: false, doNewOnly: false);
             using var tr = db.TransactionManager.StartTransaction();
             var registry = LegendStore.Load(db, tr);
             var excluded = LegendManagement.CollectManagedIds(db, tr, registry);

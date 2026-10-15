@@ -110,22 +110,6 @@ public static class DrawingAnalyzer
         foreach (var kv in c.AttrOms)
             attrDesc[kv.Key] = kv.Value.OrderByDescending(x => x.Value).ThenBy(x => x.Key, StringComparer.Ordinal).First().Key;
 
-        foreach (var manual in settings.ManualEntries)
-        {
-            if (!manual.IsValid || manual.Type != NlcsDrawType.Arcering)
-                continue;
-            var layer = manual.Layer.Trim();
-            if (c.Hatches.ContainsKey(layer))
-                continue;
-            var pattern = string.IsNullOrWhiteSpace(manual.HatchPattern) ? "SOLID" : manual.HatchPattern!.Trim();
-            c.Hatches[layer] = new HatchSample
-            {
-                PatternName = pattern,
-                PatternType = HatchPatternType.PreDefined,
-                IsSolid = pattern.Equals("SOLID", StringComparison.OrdinalIgnoreCase)
-            };
-        }
-
         var renderIds = c.Styles.ToDictionary(kv => kv.Key, kv => StyleSignature(kv.Value), StringComparer.OrdinalIgnoreCase);
 
         string RenderId(string name)

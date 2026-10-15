@@ -181,7 +181,7 @@ public static class LegendLayoutEngine
                 && !string.Equals(curHoofd, entry.Hoofdgroep, StringComparison.OrdinalIgnoreCase))
                 extraHeader += subHeaderBand;
             bool heightExceeded = rows >= 1 && maxColHeight < double.MaxValue
-                && colTop - y + extraHeader + entryHeights[i] > maxColHeight;
+                && -y + extraHeader + entryHeights[i] > maxColHeight;
             if (rows >= maxRowsCap || budgetReached || heightExceeded)
             {
                 col++;
