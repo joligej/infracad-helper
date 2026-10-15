@@ -91,7 +91,7 @@ public static class DrawingAnalyzer
         Action<double, double>? reportTimings = null)
     {
         var timer = reportTimings is null ? null : System.Diagnostics.Stopwatch.StartNew();
-        using var klic = new KlicSourceMetadata(settings.Klic);
+        using var klic = new KlicSourceMetadata(settings.Klic, db, tr);
         var c = new Collector { Klic = klic };
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (excludedIds is { Count: > 0 })

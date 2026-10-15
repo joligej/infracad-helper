@@ -23,7 +23,7 @@ public class LegendaOpmaakTests
         Assert.Equal(24.0, TemplateDefaults.SwatchWidthMm);
         Assert.Equal(5.0, TemplateDefaults.SwatchHeightMm);
         Assert.Equal(6.3099, TemplateDefaults.RowPitchMm);
-        Assert.Equal(1.35, TemplateDefaults.LineSpacingFactor);
+        Assert.Equal(0.624, TemplateDefaults.LineSpacingFactor);
     }
 
     [Fact]

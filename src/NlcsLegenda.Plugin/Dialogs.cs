@@ -465,7 +465,7 @@ internal sealed class SettingsDialog : LegendDialog
             NumRow("Breedte voorbeeldvak:", () => _settings.SwatchWidthMm, v => _settings.SwatchWidthMm = v, 1, 200, 1, 0.5M),
             NumRow("Hoogte voorbeeldvak:", () => _settings.SwatchHeightMm, v => _settings.SwatchHeightMm = v, 1, 200, 1, 0.5M),
             NumRow("Regelafstand:", () => _settings.RowPitchMm, v => _settings.RowPitchMm = v, 1, 100, 4, 0.1M),
-            NumRow("Regelhoogte-factor tekst:", () => _settings.LineSpacingFactor, v => _settings.LineSpacingFactor = v, 0.25M, 4, 2, 0.05M),
+            NumRow("Regelhoogte-factor tekst:", () => _settings.LineSpacingFactor, v => _settings.LineSpacingFactor = v, 0.25M, 4, 3, 0.01M),
             NumRow("Breedte opmerkingen:", () => _settings.RemarksWidthMm, v => _settings.RemarksWidthMm = v, 1, 500, 4, 1),
             NumRow("Afstand voorbeeld-tekst:", () => _settings.TextGapMm, v => _settings.TextGapMm = v, 0, 50, 4, 0.5M),
             NumRow("Teksthoogte omschrijving:", () => _settings.TextHeightMm, v => _settings.TextHeightMm = v, 0.5M, 50, 2, 0.1M),

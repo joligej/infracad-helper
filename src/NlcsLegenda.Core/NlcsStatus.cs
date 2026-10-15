@@ -39,8 +39,8 @@ public static class NlcsStatusExtensions
 
     public static int SortOrder(this NlcsStatus status) => status switch
     {
-        NlcsStatus.Nieuw => 0,
-        NlcsStatus.Bestaand => 1,
+        NlcsStatus.Bestaand => 0,
+        NlcsStatus.Nieuw => 1,
         NlcsStatus.Vervallen => 2,
         NlcsStatus.Tijdelijk => 3,
         NlcsStatus.Revisie => 4,

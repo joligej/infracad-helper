@@ -540,6 +540,15 @@ public sealed class LegendSettings
         QuantityColumnWidthMm = d.QuantityColumnWidthMm;
         BorderMarginMm = d.BorderMarginMm;
         RemarksWidthMm = d.RemarksWidthMm;
+        Columns = d.Columns;
+        MaxRowsPerColumn = d.MaxRowsPerColumn;
+        BalanceColumns = d.BalanceColumns;
+        MaxLegendHeightMm = d.MaxLegendHeightMm;
+        IncludeGroupHeaders = d.IncludeGroupHeaders;
+        IncludeHoofdgroepHeaders = d.IncludeHoofdgroepHeaders;
+        IncludeQuantities = d.IncludeQuantities;
+        IncludeTotalsRow = d.IncludeTotalsRow;
+        InsertSymbolBlocks = d.InsertSymbolBlocks;
         ScaleBarSegments = d.ScaleBarSegments;
         ScaleBarSegmentMeters = d.ScaleBarSegmentMeters;
         ScaleBarHeightMm = d.ScaleBarHeightMm;

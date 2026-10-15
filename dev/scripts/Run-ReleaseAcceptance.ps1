@@ -12,8 +12,9 @@ param(
     [ValidateSet('2025','2026','2027')][string]$AcadVersion='2025',
     [string]$PluginPath,
     [string]$TemplatePath,
+    [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('sources','xrefchoices','klic','overview','realsize','templatecontract','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('sources','xrefchoices','klic','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -39,6 +40,8 @@ $specs=@{
  klic=@('NLCSLEGENDAKLICTEST','KLIC lokale en geneste xrefs: 4 netbeheerders, onbekend, 30m, samenvoegen en uitsluiten -> OK','NLCSLEGENDAKLICVERIFY','KLIC na heropenen: netbeheerders en 30m behouden -> OK')
  overview=@('NLCSLEGENDAOVERVIEWTEST','OVERVIEW handmatige volgorde, echte geometrie, B-isolatie en rollback -> OK','NLCSLEGENDAOVERVIEWVERIFY','OVERVIEW na heropenen en bijwerken: C/B/A, B gelijk -> OK')
  realsize=@('NLCSLEGENDAREALSIZETEST','REALSIZE grote xref-symbolen: modelmaat, schaalvariant, samenvoeging en vrije tekstruimte -> OK')
+ templatestyle=@('NLCSLEGENDATEMPLATESTYLETEST','TEMPLATESTYLE standaardfont, bestaande stijl behouden, eigen keuze en ontbrekende stijl -> OK')
+ templatefile=@('NLCSLEGENDATEMPLATEFILETEST','TEMPLATEFILE echte DWT: tekst, stijl, posities op drie schalen en meerregelige omschrijving -> OK')
  templatecontract=@('NLCSLEGENDATEMPLATECONTRACTTEST','TEMPLATECONTRACT DWT-meetpunten, lege hoststijl, notities en schaalbalk op 1:200/500/1000 -> OK')
  scalevariant=@('NLCSLEGENDASCALEVARIANTTEST','SCALEVARIANT xref 1:200/500 naar 1:200/500/1000: symbool 4mm, patroon 1mm, bron ongewijzigd -> OK')
  livetarget=@("NLCSLEGENDALIVETARGETTEST`nNLCSLEGENDALIVETARGETERASE`n_.U`nNLCSLEGENDALIVETARGETVERIFY",'LIVETARGET UNDO: A/B bereikbaar; metadata behouden -> OK')
@@ -96,6 +99,10 @@ foreach($case in $Cases){
   if($command.StartsWith('NLCS') -and !$sourceText.Contains('[CommandMethod("'+$command+'"')){throw "Onbekend testcommando: $command"}
  }
 }
+if('templatefile' -in $Cases){
+ if(!$ReferenceTemplatePath -or !(Test-Path -LiteralPath $ReferenceTemplatePath -PathType Leaf)){throw 'templatefile vereist -ReferenceTemplatePath met de originele DWT.'}
+ $ReferenceTemplatePath=(Resolve-Path -LiteralPath $ReferenceTemplatePath).Path
+}
 $results=[Collections.Generic.List[object]]::new()
 function Run-Case([string]$Name,[string]$Drawing,[string]$Commands,[string[]]$Expected){
  $dir=Split-Path $Drawing
@@ -116,7 +123,7 @@ _.QUIT
 _Y
 "@ | Set-Content -LiteralPath $script -Encoding ascii
  $raw=Join-Path $dir "$Name.raw.log"
- $run=Invoke-NlcsCoreConsole -Executable $core -Drawing $Drawing -Script $script -Log $raw -Isolated:$Isolated
+ $run=Invoke-NlcsCoreConsole -Executable $core -Drawing $Drawing -Script $script -Log $raw -Isolated:$Isolated -Environment @{NLCS_TEMPLATE_REFERENCE=$ReferenceTemplatePath}
  $exitCode=$run.ExitCode
  $log=(Get-Content -LiteralPath $raw -Raw) -replace "`0",''
  $log | Set-Content -LiteralPath (Join-Path $dir "$Name.log") -Encoding utf8

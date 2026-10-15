@@ -36,8 +36,8 @@ public class LegendGroupingTests
             "N-WE-VH-OPENVERHARDING_TEGEL-G",
             "B-WE-VH-KANTOPSLUITING_TROTTOIRBAND-G");
 
-        Assert.Equal(NlcsStatus.Nieuw, entries[0].Status);
-        Assert.Equal(NlcsStatus.Bestaand, entries[1].Status);
+        Assert.Equal(NlcsStatus.Bestaand, entries[0].Status);
+        Assert.Equal(NlcsStatus.Nieuw, entries[1].Status);
         Assert.Equal(NlcsStatus.Vervallen, entries[2].Status);
     }
 
