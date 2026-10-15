@@ -7,9 +7,6 @@ public enum TriState
     Partial
 }
 
-// Groepsboom voor het samenstellen: elke regel hoort bij een groep (bijv. KLIC-soort "Data").
-// Een groep kan in één klik aan/uit; de groepsstatus (aan/uit/gedeeltelijk) volgt uit de
-// kinderen. Puur datamodel zodat de tri-state-logica los van WinForms testbaar is.
 public sealed class CompositionTree
 {
     private readonly HashSet<string> _unlistedExclusions = new(StringComparer.OrdinalIgnoreCase);
@@ -39,9 +36,6 @@ public sealed class CompositionTree
 
     public List<Group> Groups { get; } = new();
 
-    // Bouwt de boom uit (key, label, groepslabel)-items; volgorde blijft behouden binnen een
-    // groep, groepen verschijnen in eerste-voorkomen-volgorde. Een regel staat uit als de
-    // sleutel in 'excluded' zit.
     public static CompositionTree Build(
         IEnumerable<(string Key, string Label, string Group)> items, ISet<string> excluded)
     {
@@ -85,8 +79,7 @@ public sealed class CompositionTree
 
     public IEnumerable<Leaf> AllLeaves() => Groups.SelectMany(g => g.Leaves);
 
-    // Bewaar ook uitsluitingen van tijdelijk ontbrekende bronnen. Alleen zichtbare regels
-    // kunnen hier opnieuw worden aangevinkt; afwezigheid is geen verzoek om herstel.
+    // uitsluitingen van tijdelijk ontbrekende bronnen behouden
     public HashSet<string> ExcludedKeys()
     {
         var set = new HashSet<string>(_unlistedExclusions, StringComparer.OrdinalIgnoreCase);
@@ -96,8 +89,6 @@ public sealed class CompositionTree
         return set;
     }
 
-    // Groepen met minstens één regel waarvan label of groepsnaam de filtertekst bevat.
-    // Lege filter geeft alles. Alleen voor weergave; de include-status verandert niet.
     public IEnumerable<Group> Filter(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))

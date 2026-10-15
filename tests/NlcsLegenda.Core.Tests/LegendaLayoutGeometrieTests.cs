@@ -4,8 +4,6 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Bronvrije geometrietest van de legenda-layout: pint rij-afstand, kolomorigin en titelpositie
-// vast zodat de opmaak niet stilletjes verschuift. Geen lokale bestanden of maten nodig.
 public class LegendaLayoutGeometrieTests
 {
     private static List<NlcsLayerName> Parse(params string[] layers)

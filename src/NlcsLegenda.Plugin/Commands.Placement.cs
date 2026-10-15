@@ -41,7 +41,6 @@ public partial class Commands
         }
         else
         {
-            // Als blok behouden: op de kaderlaag zetten zodat viewport het terugvindt.
             br.Layer = s.FrameLayer;
             ids = new List<ObjectId> { br.ObjectId };
         }
@@ -96,7 +95,6 @@ public partial class Commands
         }
         catch
         {
-            // Ongeldige extents: val terug op de oorsprong.
         }
         return Point3d.Origin;
     }
@@ -115,21 +113,16 @@ public partial class Commands
         }
         catch
         {
-            // Tijdelijk blok kon niet worden verwijderd; niet kritiek.
         }
     }
 
-    // Verwijdert ongebruikte legenda-blokdefinities (NLCS_LEGENDA_*). Bij een update wordt de oude
-    // blokreferentie gewist; de bijbehorende blokdefinitie (met de oude tekst) blijft anders als
-    // verweesde definitie achter. Alleen definities zonder referenties worden gewist.
     private static void PurgeOrphanLegendBlocks(Database db)
     {
         try
         {
             using var tr = db.TransactionManager.StartTransaction();
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
-            // Na het wissen van een buitenblok kunnen zijn eigen symbooldefinities
-            // pas in de volgende doorgang verweesd zijn.
+            // geneste definities pas na het buitenblok opruimen
             while (true)
             {
                 var orphans = new List<ObjectId>();
@@ -147,7 +140,6 @@ public partial class Commands
         }
         catch
         {
-            // Opruimen van verweesde definities is niet kritiek.
         }
     }
 }

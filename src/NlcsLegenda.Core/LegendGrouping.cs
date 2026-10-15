@@ -19,8 +19,7 @@ public static class LegendGrouping
         Func<string, string?>? symbolRenderIdentity = null,
         Func<string, IReadOnlyList<KlicObjectData>>? klicObjects = null)
     {
-        // Per-legenda omschrijvingen liggen bovenop de (globale) catalogus. Dit is de enige plek
-        // waar ze worden toegepast, zodat elke aanroeper dezelfde effectieve teksten krijgt.
+        // eigen legendateksten boven de catalogus
         var descriptions = catalog ?? DescriptionCatalog.Default();
         if (settings.DescriptionOverrides.Elementen.Count > 0)
         {
@@ -33,7 +32,7 @@ public static class LegendGrouping
         {
             if (!settings.IsIncluded(layer)) continue;
             if (!SwatchTypes.Contains(layer.DrawType)) continue;
-            // Uitgeschakelde elementsoorten tellen ook niet mee voor hoeveelheden.
+            // uitgeschakelde soorten ook buiten de hoeveelheden
             if (!settings.IsDrawTypeIncluded(layer.DrawType)) continue;
 
             var splitKey = layer.GroupKey + "\u0001" + layer.Netbeheerder.ToUpperInvariant() + "\u0001" + layer.KlicGroupKey + "\u0001" + layer.RenderIdentity;
@@ -105,6 +104,8 @@ public static class LegendGrouping
             if (!settings.IsDrawTypeIncluded(manual.Type)) continue;
             var basic = manual.ToLegendEntry();
             var custom = settings.FindCustomStatus(LegendSettings.EntryKey(basic))?.Name;
+            if (custom is null && !settings.IncludedStatuses.Contains(manual.Status))
+                continue;
             entries.Add(custom is null ? basic : manual.ToLegendEntry(custom));
         }
 
@@ -112,8 +113,6 @@ public static class LegendGrouping
         {
             var basic = blank.ToLegendEntry();
             var custom = settings.FindCustomStatus(LegendSettings.EntryKey(basic))?.Name;
-            // Statusfilter geldt ook voor blanco's: een uitgeschakelde (standaard) status verbergt
-            // de regel, net als bij bronregels. Een eigen status plaatst de regel in zijn band.
             if (custom is null && !settings.IncludedStatuses.Contains(blank.Status))
                 continue;
             entries.Add(custom is null ? basic : blank.ToLegendEntry(custom));
@@ -122,8 +121,6 @@ public static class LegendGrouping
         return Sort(Merge(entries, settings), settings);
     }
 
-    // Visuele identiteit: per elementsoort de bronlaag-look (kleur/linetype/lineweight) plus
-    // symbool. Lege identiteit als er geen laag-info beschikbaar is (dan nooit samenvoegen).
     private static string RenderId(
         Dictionary<NlcsDrawType, string> byType, Func<string, string?>? renderIdentity, string? block,
         Func<string, string?>? symbolRenderIdentity)
@@ -147,26 +144,20 @@ public static class LegendGrouping
         return string.Join(";", parts);
     }
 
-    // KLIC-groepering: voegt regels samen die alleen verschillen in een eigenschap die op
-    // "samenvoegen" staat. Met "gelijke statussen samenvoegen" vallen ook verschillende
-    // statussen samen, maar alleen bij identieke render-identiteit. Hoeveelheden tellen op,
-    // de eerste regel levert de weergave, bronleden blijven bewaard. Omkeerbaar.
     private static List<LegendEntry> Merge(List<LegendEntry> entries, LegendSettings settings)
     {
         bool mergeStatus = settings.MergeIdenticalStatuses;
         if (settings.MergedDimensions.Count == 0 && !mergeStatus)
             return entries;
 
-        // Blanco regels nooit samenvoegen: elke blanco is een losse invulregel met eigen
-        // identiteit, ook als meerdere dezelfde tekst hebben. Ze gaan buiten de merge om mee.
-        var blanks = entries.Where(e => e.IsBlank).ToList();
-        var mergeable = blanks.Count == 0 ? entries : entries.Where(e => !e.IsBlank).ToList();
+        // blanco en handmatige regels buiten de samenvoeging
+        var separate = entries.Where(e => e.IsBlank || e.DescriptionSource == DescriptionSource.Handmatig).ToList();
+        var mergeable = separate.Count == 0 ? entries : entries.Except(separate).ToList();
 
         string KeyOf(LegendEntry e)
         {
             var props = ElementProperties.From(e.Element, e.Netbeheerders.FirstOrDefault() ?? "");
-            // Bij statussamenvoeging vervangt de render-identiteit de status in de sleutel,
-            // zodat alleen visueel identieke regels over statussen heen samenvallen.
+            // statussen alleen samenvoegen bij gelijk uiterlijk
             var statusPart = mergeStatus && e.RenderIdentity.Length > 0
                 ? "R:" + e.RenderIdentity
                 : e.StatusGroupId;
@@ -196,7 +187,7 @@ public static class LegendGrouping
             if (group.Count > 1)
                 merged[i] = Combine(group);
         }
-        merged.AddRange(blanks);
+        merged.AddRange(separate);
         return merged;
     }
 
@@ -238,7 +229,6 @@ public static class LegendGrouping
             automatic.SortMode = LegendSortMode.Status;
             return LegendOrder.Apply(Sort(entries, automatic), settings.ManualEntryOrder);
         }
-        // Eigen statussen komen als eigen sorteerband na de vaste NLCS-statussen.
         var ordered = entries
             .OrderBy(e => StatusBand(e, settings))
             .ThenBy(e => e.Status.SortOrder());
@@ -278,13 +268,7 @@ public static class LegendGrouping
         Func<string, string?>? layerDescription, DescriptionCatalog catalog,
         Func<string, DescriptionSource?>? descriptionSourceOf, out DescriptionSource source)
     {
-        // Precedence (één model voor NLCS én eigen bronnen):
-        //   1. per-legenda omschrijvingsoverride (expliciet door de gebruiker gezet);
-        //   2. basis: eigen-koppeling of laagbeschrijving uit de tekening;
-        //   3. effectieve catalogus;
-        //   4. nette laagnaam.
-        // Zo kan een eigen-bronomschrijving ("Datakabel") net als NLCS via de normale override
-        // worden gewijzigd ("Glasvezelkabel"), zonder apart custom-tekstmodel.
+        // tekstvolgorde: eigen tekst, bron, catalogus, nette laagnaam
         if (settings.DescriptionOverrides.Elementen.Count > 0)
         {
             var overridden = settings.DescriptionOverrides.Describe(
@@ -303,12 +287,8 @@ public static class LegendGrouping
                 var desc = layerDescription(layer.EffectiveRenderLayerName);
                 if (string.IsNullOrWhiteSpace(desc))
                     continue;
-                // KLIC-symbolen dragen soms lege attribuut-tags als omschrijving mee; die
-                // slaan we over en vallen terug op de catalogus/laagnaam.
                 if (settings.SuppressKlicPlaceholders && PlaceholderText.IsGeneric(desc))
                     continue;
-                // Een eigen-laagkoppeling levert de tekst uit de regel (niet uit de tekening);
-                // dan is EigenKoppeling de juiste herkomst in plaats van laagbeschrijving.
                 source = descriptionSourceOf?.Invoke(layer.EffectiveRenderLayerName) ?? DescriptionSource.Laagbeschrijving;
                 if (source == DescriptionSource.Laagbeschrijving)
                 {

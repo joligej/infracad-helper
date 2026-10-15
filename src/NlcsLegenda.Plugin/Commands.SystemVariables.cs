@@ -17,7 +17,6 @@ public partial class Commands
         name => name, name => AcApp.GetSystemVariable(name)
             ?? throw new InvalidOperationException($"Systeemvariabele {name} is niet leesbaar."));
 
-    // Alleen voor de diagnostiek: ook bij een mislukte proef blijven de oorspronkelijke typen/waarden intact.
     private static void RestoreSystemVariables(Dictionary<string, object> values)
     {
         var failures = new List<string>();

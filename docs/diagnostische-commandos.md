@@ -10,6 +10,7 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDAHOOGTETEST` | Meet de getekende teksthoogtes voor omschrijving, kop en titel, ook bij een bestaande NLCS-ISO-stijl met vaste hoogte. |
 | `NLCSLEGENDAXREFSAVESETUP` / `NLCSLEGENDAXREFSAVEVERIFY` | Controleert xref-weergave vóór en na opslaan en opnieuw openen. |
 | `NLCSLEGENDAKLICTEST` / `NLCSLEGENDAKLICVERIFY` | Controleert ingebedde KLIC-tabellen, gelijke handles uit verschillende bronnen, geneste xrefs, uitsluitingen, 30 meter bronlengte, getekende netbeheerders, materiaal/diameter-groepering, handmatige volgorde en heropenen. |
+| `NLCSLEGENDAPARTIALKLICTEST` | Controleert gedeeltelijk ontbrekende KLIC-metadata in lokale en xref-regels, de getekende melding en 8/16 meter bronlengte. |
 | `NLCSLEGENDAOVERVIEWTEST` / `NLCSLEGENDAOVERVIEWVERIFY` | Controleert handmatig ordenen, echte tekstposities, isolatie tussen legenda’s, rollback en bewaren na heropenen/bijwerken. |
 | `NLCSLEGENDATEMPLATECONTRACTTEST` | Vergelijkt meetpunten, font, hulplagen, opmerkingen en schaalbalk op 1:200/500/1000. |
 | `NLCSLEGENDASCALEVARIANTTEST` | Controleert symbolen en arceringen uit xrefs met verschillende NLCS-schaalvarianten. |

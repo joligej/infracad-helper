@@ -62,7 +62,7 @@ public static class KlicFields
     }
 }
 
-// Alleen waarden: geen AutoCAD-objecten of transacties buiten de leesfase bewaren.
+// alleen waarden bewaren, geen cad-objecten of transacties
 public sealed record KlicObjectData(string Drawing, string Handle, string Xref,
     IReadOnlyList<KlicRecord> Records, IReadOnlyList<string> ReadIssues, KlicSource PreferredSource)
 {
@@ -104,8 +104,8 @@ public static class KlicSummary
 
     public static string Field(IEnumerable<KlicObjectData> objects, string key)
     {
-        var data = objects.Where(o => o.HasData).ToArray();
-        if (data.Length == 0) return "";
+        var data = objects.ToArray();
+        if (!data.Any(o => o.HasData)) return "";
         return string.Join("; ", data.SelectMany(o => o.Values(key) is { Count: > 0 } values ? values : new[] { "" })
             .Select(v => KlicFields.Format(key, v)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase));
     }

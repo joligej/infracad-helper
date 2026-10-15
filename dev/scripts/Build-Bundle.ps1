@@ -1,21 +1,6 @@
 <#
-.SYNOPSIS
-    Bouwt de plugin in Release en zet een Autodesk-bundle klaar in artifacts/,
-    klaar om te kopieren naar %APPDATA%\Autodesk\ApplicationPlugins\.
-
-.DESCRIPTION
-    AutoCAD 2025 en 2026 draaien op .NET 8, AutoCAD 2027 op .NET 10. Het script kiest
-    de juiste doel-framework en de juiste versie-eis (R25.0/R25.1/R26.0) in het
-    bundle-manifest.
-
-.EXAMPLE
-    ./Build-Bundle.ps1 -AcadVersion 2025
-
-.EXAMPLE
-    ./Build-Bundle.ps1 -AcadVersion 2026
-
-.EXAMPLE
-    ./Build-Bundle.ps1 -AcadVersion 2027
+.synopsis
+    releasebundel voor de gekozen autocad-versie
 #>
 [CmdletBinding()]
 param(
@@ -27,7 +12,6 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $pluginProj = Join-Path $repoRoot "src\NlcsLegenda.Plugin\NlcsLegenda.Plugin.csproj"
 
-# Versie uit de centrale Directory.Build.props: die is leidend voor de DLL's en het manifest.
 $version = ([regex]::Match((Get-Content (Join-Path $repoRoot "Directory.Build.props") -Raw),
     '<VersionPrefix>([^<]+)</VersionPrefix>')).Groups[1].Value
 if (-not $version) { throw "Kon de versie niet uit Directory.Build.props lezen." }
@@ -56,7 +40,6 @@ if (Test-Path -LiteralPath $outBundle) {
 }
 New-Item -ItemType Directory -Force -Path $outContents | Out-Null
 
-# Manifest overnemen en de versie-eis passend maken voor de doelversie.
 $manifest = Get-Content (Join-Path $repoRoot "deploy\NlcsLegenda.bundle\PackageContents.xml") -Raw
 $manifest = $manifest -replace 'AppVersion="[^"]*"', "AppVersion=`"$version`""
 $manifest = $manifest -replace 'SeriesMin="[^"]*"', "SeriesMin=`"$series`""

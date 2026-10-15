@@ -56,12 +56,9 @@ public class TextWrapAndReflowTests
         var singleSecond = single.Items.Last(i => i.Kind == LegendItemKind.Entry);
         var multiSecond = multi.Items.Last(i => i.Kind == LegendItemKind.Entry);
 
-        // De tweede regel schuift verder naar beneden als de eerste meerregelig is.
         Assert.True(multiSecond.YTop < singleSecond.YTop);
-        // De meerregelige regel krijgt drie tekstregels toebedeeld.
         var multiFirst = multi.Items.First(i => i.Kind == LegendItemKind.Entry);
         Assert.Equal(3, multiFirst.Lines.Count);
-        // En reserveert meer hoogte dan een enkele regel (voorkomt overlap).
         var singleFirst = single.Items.First(i => i.Kind == LegendItemKind.Entry);
         Assert.True(multiFirst.RowHeight > singleFirst.RowHeight);
     }
@@ -69,7 +66,6 @@ public class TextWrapAndReflowTests
     [Fact]
     public void Columns_BalanceByHeight_NotJustCount()
     {
-        // Eén hoge (meerregelige) entry plus vier korte, verdeeld over 2 vaste kolommen.
         var entries = new[]
         {
             Entry("A", "R1\nR2\nR3\nR4\nR5"),
@@ -84,7 +80,6 @@ public class TextWrapAndReflowTests
         Assert.Equal(2, layout.Columns);
 
         int col0 = layout.Items.Count(i => i.Kind == LegendItemKind.Entry && i.Column == 0);
-        // Op regelaantal zou het 3/2 zijn; op hoogte staat de hoge entry vrijwel alleen.
         Assert.True(col0 < 3, $"kolom 0 zou op hoogte < 3 entries moeten hebben, was {col0}");
     }
 }
@@ -166,7 +161,6 @@ public class SettingsSerializationTests
         s.ToonVervallen = false;
         var back = LegendSettings.FromJson(s.ToJson());
 
-        // Alleen IncludedStatuses persisteert; de afgeleide toggles volgen daaruit.
         Assert.DoesNotContain(NlcsStatus.Vervallen, back.IncludedStatuses);
         Assert.False(back.ToonVervallen);
         Assert.DoesNotContain("toonVervallen", s.ToJson(), StringComparison.OrdinalIgnoreCase);

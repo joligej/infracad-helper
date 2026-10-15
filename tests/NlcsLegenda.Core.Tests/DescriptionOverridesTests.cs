@@ -3,8 +3,6 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Per-legenda omschrijvingen: overrides horen bij de legenda-snapshot, zijn onafhankelijk per
-// legenda en overleven serialisatie. Kritieke-staat parsing faalt hard op kapotte JSON.
 public class DescriptionOverridesTests
 {
     [Fact]

@@ -5,14 +5,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <!--
-      Targetframework per AutoCAD-doelversie. 2027 is .NET 10. Voor 2025/2026 bouwen we
-      bewust .NET 8: dat laadt zowel op de oudere .NET 8-hosts (2025 t/m Update 1.3,
-      2026 t/m Update 1.1) als op de nieuwere .NET 10-hosts (2025.1.4+, 2026.1.2+) via
-      roll-forward, en geeft zo de breedste compatibiliteit. De bundel kan per
-      AutoCAD-serie maar één component kiezen (R25.0 geldt voor elke 2025-update), dus
-      één framework per hoofdversie.
-    -->
+    <!-- net8 voor oudere 2025/2026-hosts; net10 voor 2027 -->
     <TargetFramework Condition="'$(AcadVersion)' == '2027'">net10.0-windows</TargetFramework>
     <TargetFramework Condition="'$(TargetFramework)' == ''">net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -23,24 +16,20 @@
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <!-- Voor het ribbonpaneel (Autodesk.Windows is WPF-gebaseerd). -->
+
     <UseWPF>true</UseWPF>
-    <!-- Voor de instellingen- en omschrijvingenvensters (WinForms). -->
+
     <UseWindowsForms>true</UseWindowsForms>
-    <!-- AutoCAD/Civil3D-DLL's worden door de host geladen; niet mee kopieren. -->
+    <!-- cad-bibliotheken door de host geladen -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
-    <!-- Bouwen van de Windows-TFM toestaan op niet-Windows build-agents. -->
+
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
-  <!--
-    Doelversie 2025 (standaard). Overrulebaar met: dotnet build -p:AcadVersion=2027
-    Standaard gebruiken lokale builds en CI dezelfde officiele AutoCAD.NET NuGet-referenties.
-    Alleen met UseNuGetAcad=false worden lokale hostassemblies gebruikt.
-  -->
+
   <PropertyGroup>
     <AcadDir Condition="'$(AcadDir)' == ''">C:\Program Files\Autodesk\AutoCAD $(AcadVersion)</AcadDir>
-    <!-- Vaste referenties blijven compatibel wanneer een lokale AutoCAD-update het runtimeframework verhoogt. -->
+    <!-- vaste referenties ondanks lokale runtime-updates -->
     <UseNuGetAcad Condition="'$(UseNuGetAcad)' == ''">true</UseNuGetAcad>
     <AcadNetVersion Condition="'$(AcadNetVersion)' == '' and '$(AcadVersion)' == '2025'">25.0.1</AcadNetVersion>
     <AcadNetVersion Condition="'$(AcadNetVersion)' == '' and '$(AcadVersion)' == '2026'">25.1.0</AcadNetVersion>
@@ -48,12 +37,12 @@
     <AcadNetVersion Condition="'$(AcadNetVersion)' == ''">25.0.1</AcadNetVersion>
   </PropertyGroup>
 
-  <!-- Optie A: NuGet-referentieassemblies (build-agents, geen AutoCAD nodig). -->
+
   <ItemGroup Condition="'$(UseNuGetAcad)' == 'true'">
     <PackageReference Include="AutoCAD.NET" Version="$(AcadNetVersion)" />
   </ItemGroup>
 
-  <!-- Optie B: lokaal geinstalleerde AutoCAD-DLL's. -->
+
   <ItemGroup Condition="'$(UseNuGetAcad)' != 'true'">
     <Reference Include="accoremgd">
       <HintPath>$(AcadDir)\accoremgd.dll</HintPath>

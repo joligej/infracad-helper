@@ -2,8 +2,6 @@ namespace NlcsLegenda.Core;
 
 public static class ScaleBarMath
 {
-    // Kiest een "ronde" segmentlengte (1/2/2.5/5 x macht van 10) die dicht bij de gevraagde
-    // waarde ligt, zodat de schaalbalk op hele meters aftikt in plaats van op een rare maat.
     public static double NiceStep(double value)
     {
         if (value <= 0)

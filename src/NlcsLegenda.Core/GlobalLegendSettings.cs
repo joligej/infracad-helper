@@ -1,7 +1,5 @@
 namespace NlcsLegenda.Core;
 
-// Instellingen en omschrijvingen vormen samen de globale standaard. Een profiel krijgt
-// een volledige snapshot; in de globale bestanden wordt iedere tekst maar eenmaal bewaard.
 public static class GlobalLegendSettings
 {
     public static LegendSettings Load(string directory)
@@ -14,8 +12,7 @@ public static class GlobalLegendSettings
         var descriptions = new DescriptionCatalog();
         if (File.Exists(descriptionsPath) && !DescriptionCatalog.TryParse(File.ReadAllText(descriptionsPath), out descriptions))
             throw new InvalidDataException("De globale omschrijvingen zijn onleesbaar.");
-        // Bestaande versies konden profielteksten ook in settings.json opslaan. Behoud
-        // die voorrang bij het lezen; bij opslaan gaan alle teksten naar het tekstbestand.
+        // voorrang van oude profielteksten behouden bij migratie
         descriptions.MergeFrom(settings.DescriptionOverrides);
         settings.DescriptionOverrides = descriptions.Clone();
         return settings;
@@ -44,7 +41,7 @@ public static class GlobalLegendSettings
         var replaced = new List<string>();
         try
         {
-            // Schrijf beide bestanden volledig voordat een bestaand bestand wordt vervangen.
+            // beide bestanden voorbereiden vóór vervanging
             foreach (var item in contents)
             {
                 string temp = item.Key + "." + Guid.NewGuid().ToString("N") + ".tmp";

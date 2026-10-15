@@ -15,7 +15,6 @@ public sealed class BatchDrawingResult
     public string? Error { get; init; }
 }
 
-// Side-database analyseert DWG's zonder ze in de editor te openen of op te slaan.
 
 internal static class BatchExport
 {
@@ -41,11 +40,10 @@ internal static class BatchExport
             using var db = new Database(buildDefaultDrawing: false, noDocument: true);
             db.ReadDwgFile(path, FileShare.Read, allowCPConversion: true, password: null);
             using var tr = db.TransactionManager.StartTransaction();
-            // Beheerde legenda's in de bron-DWG tellen niet mee als brondata.
             var registry = LegendStore.Load(db, tr);
             var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
             var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: catalog, excludedIds: excluded);
-            // Blanco regels zijn legenda-layout, geen brondata; ze horen niet in een uittrekstaat.
+            // blanco invulregels buiten de bronexport
             var entries = analysis.Entries.Where(e => !e.IsBlank).ToList();
             tr.Commit();
             return new BatchDrawingResult { Drawing = name, Path = path, Entries = entries };

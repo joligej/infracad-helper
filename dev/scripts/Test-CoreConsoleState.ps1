@@ -42,6 +42,6 @@ try {
     "STATE PASS: $count herstelcontroles; PowerShell-syntax gecontroleerd."
 }
 finally {
-    # Alleen de zojuist gemaakte lege testsleutel; geen gebruikersprofiel of recursieve verwijdering.
+    # uitsluitend de eigen lege testsleutel verwijderen
     if (Test-Path -LiteralPath $testKey) { Remove-Item -LiteralPath $testKey -Force }
 }

@@ -75,8 +75,6 @@ public class DescriptionSourceTests
     [Fact]
     public void CustomRuleDescription_HasEigenKoppelingSource()
     {
-        // De omschrijving van een eigen-laagregel komt uit de config, niet uit de tekening;
-        // de herkomst moet daarom EigenKoppeling zijn, niet Laagbeschrijving.
         var rule = new CustomLayerRule
         {
             Layer = "Eigen kabels", Element = "Datakabel", Type = NlcsDrawType.Geometrie, Description = "Datakabel"
@@ -98,8 +96,6 @@ public class DescriptionSourceTests
     [Fact]
     public void CustomRuleDescription_CanBeOverriddenPerLegend()
     {
-        // Een per-legenda override moet de basisomschrijving van een eigen-laagregel kunnen
-        // vervangen, via hetzelfde model als NLCS (herkomst wordt dan Catalogus).
         var rule = new CustomLayerRule
         {
             Layer = "Eigen kabels", Element = "Datakabel", Hoofdgroep = "EI",

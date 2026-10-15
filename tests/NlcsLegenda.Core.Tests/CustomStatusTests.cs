@@ -33,7 +33,6 @@ public class CustomStatusTests
         Assert.Equal("Onder voorbehoud", assigned.CustomStatusName);
         Assert.Equal("Onder voorbehoud", assigned.StatusGroupId);
 
-        // De eigen status komt ná de vaste statussen: de verharding (Nieuw) staat vooraan.
         Assert.Equal("VH", entries[0].Hoofdgroep);
         Assert.Equal("RI", entries[^1].Hoofdgroep);
     }
@@ -42,11 +41,9 @@ public class CustomStatusTests
     public void CustomStatus_OverridesStatusFilter()
     {
         var settings = new LegendSettings();
-        // Vervallen staat uit.
         settings.IncludedStatuses.Remove(NlcsStatus.Vervallen);
         var vervallen = Parse("V-WE-RI-HWA_RIOOLLEIDING_PVC_160-G")[0];
 
-        // Zonder toewijzing valt de vervallen laag buiten de legenda.
         Assert.False(settings.IsIncluded(vervallen));
 
         settings.CustomStatuses.Add(new CustomStatus
@@ -55,7 +52,6 @@ public class CustomStatusTests
             Members = { LegendSettings.EntryKey(vervallen) }
         });
 
-        // De handmatige toewissing haalt hem alsnog binnen.
         Assert.True(settings.IsIncluded(vervallen));
         var entries = LegendGrouping.Build(new[] { vervallen }, settings, _ => null);
         Assert.Single(entries);
@@ -143,7 +139,6 @@ public class CustomStatusTests
         var entries = LegendGrouping.Build(new[] { a, b }, settings, _ => null);
         var customEntries = entries.Where(e => e.CustomStatusName is not null).ToList();
 
-        // "Later" is als eerste gedefinieerd en komt dus vóór "Eerder".
         Assert.Equal("Later", customEntries[0].CustomStatusName);
         Assert.Equal("Eerder", customEntries[^1].CustomStatusName);
     }

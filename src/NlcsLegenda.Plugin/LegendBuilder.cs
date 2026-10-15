@@ -9,9 +9,8 @@ namespace NlcsLegenda.Plugin;
 
 public static class LegendBuilder
 {
-    // Verhoudingen voor de opmaak (t.o.v. de bijbehorende teksthoogte of swatch-maat).
-    private const double SubHeaderHeightRatio = 1.0;    // hoofdgroepkop even hoog als de statuskop
-    private const double SubHeaderIndentRatio = 0.15;    // inspringing subkop in de swatch
+    private const double SubHeaderHeightRatio = 1.0;
+    private const double SubHeaderIndentRatio = 0.15;
 
     private sealed record PreparedSymbol(IReadOnlyList<ObjectId> Entities, double Width, double Height);
 
@@ -51,8 +50,7 @@ public static class LegendBuilder
         double margin = s.ToModel(s.BorderMarginMm);
         double colWidth = s.ToModel(s.ColumnWidthMm);
 
-        // Meet de werkelijk getekende symbolen vóór de indeling. Een groot symbool
-        // vergroot zijn rij/kolom; zijn formaat wordt niet naar een vakje vervormd.
+        // werkelijke symboolhoogte reserveren vóór de indeling
         using var imports = new SymbolImportSession(db, tr);
         var symbols = new Dictionary<LegendEntry, PreparedSymbol>();
         if (s.InsertSymbolBlocks)
@@ -216,7 +214,7 @@ public static class LegendBuilder
         int segments = Math.Max(1, s.ScaleBarSegments);
         double segMeters = s.ScaleBarSegmentMeters > 0
             ? s.ScaleBarSegmentMeters
-            : 10.0 * s.Scale / 1000.0; // elk segment is standaard 10 mm op papier
+            : 10.0 * s.Scale / 1000.0;
         if (segMeters <= 0)
             segMeters = 1.0;
 
@@ -275,7 +273,7 @@ public static class LegendBuilder
         mt.Width = Math.Max(widthModel, textH * 4);
         mt.Attachment = AttachmentPoint.TopLeft;
         mt.Location = new Point3d(left + TextBearing(tr, styleId, textH), y, 0);
-        // De alinea-inspringing is relatief aan de teksthoogte, niet aan de DWG-schaal.
+        // alinea-inspringing ten opzichte van de teksthoogte
         mt.Contents = (s.RemarksText.StartsWith("-\t", StringComparison.Ordinal) ? "\\pxi-2,l2;" : string.Empty)
             + MTextFormat.Escape(s.RemarksText);
         btr.AppendEntity(mt);
@@ -310,12 +308,7 @@ public static class LegendBuilder
             }
         }
 
-        // Elke elementsoort rendert volgens zijn eigen semantiek en wordt van achter naar
-        // voren gestapeld: eerst vlak/vulling/arcering als achtergrond, dan de G-lijn als
-        // lijnsample, dan het symbool. Zo blijft een G altijd een lijn, ook als dezelfde
-        // entry daarnaast een arcering of vulling heeft.
-
-        // Vlak (GV): begrensd oppervlak, weergegeven als rechthoek op de bronlaag.
+        // tekenvolgorde: vlak, vulling, arcering, lijn, symbool
         if (entry.VlakLayer is { } vlakLayer)
         {
             var area = MakeRectangle(x, bottom, swatchW, swatchH, renderLayers[vlakLayer]);
@@ -323,7 +316,6 @@ public static class LegendBuilder
             tr.AddNewlyCreatedDBObject(area, true);
         }
 
-        // Vlakvulling (V): egale (SOLID) vulling van het vakje.
         if (entry.FillLayer is { } fillLayer)
         {
             var fillBoundary = MakeRectangle(x, bottom, swatchW, swatchH, renderLayers[fillLayer]);
@@ -333,7 +325,6 @@ public static class LegendBuilder
             rowEntities.Add(AddSolidFill(btr, tr, fillId, renderLayers[fillLayer]));
         }
 
-        // Arcering (A): het patroon uit de brontekening.
         if (entry.HatchLayer is { } hatchLayer)
         {
             analysis.HatchSamples.TryGetValue(hatchLayer, out var sample);
@@ -341,7 +332,6 @@ public static class LegendBuilder
                 s.HatchScaleFactor * (sample?.ScaleForLegend(s.Scale) ?? 1)));
         }
 
-        // Geometrie (G/GD/GS): horizontale lijn; de effectieve bronstijl wordt hieronder vastgezet.
         if (entry.GeometryLayer is { } geoLayer)
         {
             var line = new Polyline();
@@ -380,7 +370,6 @@ public static class LegendBuilder
                 }
         }
 
-        // Kader per swatch: alleen een zichtbaar vakje op de kaderlaag als de gebruiker dat wil.
         if (s.DrawSwatchFrame)
         {
             double frameHeight = Math.Max(swatchH, prepared?.Height ?? 0);
@@ -389,8 +378,6 @@ public static class LegendBuilder
             tr.AddNewlyCreatedDBObject(frame, true);
         }
 
-        // Omschrijving als MText met vaste breedte: AutoCAD breekt exact op de kolombreedte
-        // af (geen horizontale overloop) en de tekst wordt op het bandmidden gecentreerd.
         if (s.IncludeText && !string.IsNullOrWhiteSpace(entry.Description))
         {
             double textColWidth = colWidth - sampleColumnWidth - textGap - TextBearing(tr, styleId, textH)
@@ -399,7 +386,7 @@ public static class LegendBuilder
                 textColWidth = textH * 3;
 
             var mt = CreateDescription(db, s, styleId, entry.DisplayDescription, textColWidth);
-            // Gelijke basislijn voor woorden met en zonder onderlengte (g, j, p).
+            // gelijke basislijn met en zonder onderlengte
             mt.Attachment = AttachmentPoint.TopLeft;
             mt.Location = new Point3d(x + sampleColumnWidth + textGap + TextBearing(tr, styleId, textH),
                 midY + Math.Max(textH * (1 - TemplateDefaults.TextBaselineOffsetRatio), mt.ActualHeight / 2), 0);
@@ -453,7 +440,7 @@ public static class LegendBuilder
             }
             var defId = imports.Import(bt[blockName]);
 
-            // Explode-to-primitives voorkomt dat annotatieve blokschaal de swatch opblaast.
+            // annotatieve vergroting voorkomen door het symbool te ontleden
             primitives = ExplodeToPrimitives(btr, tr, db, layer, defId, created, includeInvisible, sample, out var probeOk);
             if (!probeOk || primitives.Count == 0)
             {
@@ -479,9 +466,6 @@ public static class LegendBuilder
                 && Math.Abs(sourceTransform.XAxis.DotProduct(sourceTransform.YAxis)) < 1e-9;
             if (!uniformInXy)
             {
-                // Bewaar de exacte niet-uniforme bloktransformatie op een nieuwe,
-                // niet-annotatieve hostdefinitie. De bronafhankelijkheden en DBText
-                // zijn hierboven al verwijderd; geen losse curve wordt benaderd.
                 bt.UpgradeOpen();
                 var local = new BlockTableRecord { Name = "NLCS_LEGENDA_SYMBOL_" + Guid.NewGuid().ToString("N") };
                 var localId = bt.Add(local); tr.AddNewlyCreatedDBObject(local, true);
@@ -519,8 +503,7 @@ public static class LegendBuilder
                 return false;
             }
 
-            // Een broninsert is al in modelmaten. Alleen een expliciete NLCS-
-            // schaalvariant wordt naar de gekozen legendaschaal omgerekend.
+            // modelmaat behouden, behalve bij een expliciete nlcs-schaalvariant
             double fit = sample is null ? modelPerPaperMm
                 : sample.SourceScale is > 0 ? modelPerPaperMm * 1000 / sample.SourceScale.Value : 1;
 
@@ -585,8 +568,7 @@ public static class LegendBuilder
         }
     }
 
-    // Bronkopieën bestaan alleen tijdens deze BuildBlock-aanroep. Geen cache over
-    // tekeningwijzigingen heen; iedere nieuwe legenda controleert de bronversie opnieuw.
+    // bronkopieën alleen hergebruiken binnen één bouwactie
     private sealed class SymbolImportSession(Database host, Transaction tr) : IDisposable
     {
         private readonly Dictionary<(Database, string), SymbolSnapshot> _sources = new();
@@ -613,7 +595,6 @@ public static class LegendBuilder
             foreach (IdPair pair in mapping)
                 if (pair.IsCloned && pair.Value.ObjectClass.IsDerivedFrom(Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(BlockTableRecord))))
                     _importedBlocks.Add(pair.Value);
-            // Xref-laagoverrides uit de host gelden ook voor onderdelen binnen het symbool.
             var hostLayers = (LayerTable)tr.GetObject(host.LayerTableId, OpenMode.ForRead);
             foreach (IdPair pair in mapping)
                 if (snapshot.OriginalLayers.TryGetValue(pair.Key, out var layerName) && layerName != "0" && hostLayers.Has(xrefPrefix + layerName))
@@ -671,8 +652,7 @@ public static class LegendBuilder
                 var blocks = (BlockTable)transaction.GetObject(Database.BlockTableId, OpenMode.ForRead);
                 foreach (ObjectId id in blocks)
                     Definitions.Add(((BlockTableRecord)transaction.GetObject(id, OpenMode.ForRead)).Name, id);
-                // Een tweede koppeling naar hetzelfde bestand kan andere laagoverrides
-                // hebben. Geef die een eigen namespace in de host.
+                // aparte bronruimte voor koppelingen met verschillende laaginstellingen
                 string identity = Database.FingerprintGuid + Database.VersionGuid + xrefPrefix;
                 string prefix = "NLCS_SRC_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
                     System.Text.Encoding.UTF8.GetBytes(identity)))[..20] + "_";
@@ -690,7 +670,6 @@ public static class LegendBuilder
                         if (record is LinetypeTableRecord && (record.Name.Equals("ByLayer", StringComparison.OrdinalIgnoreCase)
                             || record.Name.Equals("ByBlock", StringComparison.OrdinalIgnoreCase) || record.Name.Equals("Continuous", StringComparison.OrdinalIgnoreCase))) continue;
                         record.UpgradeOpen();
-                        // Handles zijn uniek binnen deze broninhoud, ook voor anonieme blokken.
                         record.Name = prefix + record.Handle;
                     }
                 var materials = (DBDictionary)transaction.GetObject(Database.MaterialDictionaryId, OpenMode.ForWrite);
@@ -830,7 +809,6 @@ public static class LegendBuilder
         }
         catch
         {
-            // Opruimen is 'best effort': als het object niet te wissen is, is dat niet erg.
         }
     }
 
@@ -846,10 +824,6 @@ public static class LegendBuilder
         return pl;
     }
 
-    // Zet een DBText uit een bronsymbool om naar een gelijkwaardige MText. De tekst wordt op zijn
-    // visuele midden geankerd (MiddleCenter, uit de extents — die verrekenen breedtefactor, oblique
-    // en rotatie) met dezelfde hoogte, rotatie, normaal, stijl en kleur. Breedtefactor en oblique
-    // die van de tekststijl afwijken gaan mee als inline-codes zodat niets stil verloren gaat.
     internal static MText SymbolTextToMText(BlockTableRecord btr, Transaction tr, DBText dbt)
     {
         Point3d anchor;
@@ -874,7 +848,7 @@ public static class LegendBuilder
         mt.LinetypeScale = dbt.LinetypeScale;
         mt.Transparency = dbt.Transparency;
         mt.MaterialId = dbt.MaterialId;
-        // Een xref-tekststijl-ID hoort bij de bron-database; alleen de naam mag de grens over.
+        // alleen de stijlnaam overnemen uit de brontekening
         if (!dbt.TextStyleId.IsNull)
         {
             var host = btr.Database;
@@ -923,9 +897,6 @@ public static class LegendBuilder
         return name;
     }
 
-    // Alle door de plugin getekende legendatekst is MText. DBText-baseline en MText-attachment
-    // hebben andere semantiek; daarom ankeren we op het verticale midden van de regel
-    // (baseline + hoogte/2) met een Middle*-attachment, zodat de tekst op dezelfde plek staat.
     private static MText AddMText(
         BlockTableRecord btr, Transaction tr, string text, Point3d anchor,
         AttachmentPoint attach, double height, string layer, ObjectId styleId, bool underline = false)
@@ -937,7 +908,7 @@ public static class LegendBuilder
             mt.TextStyleId = styleId;
         mt.TextHeight = height;
         mt.Attachment = attach;
-        mt.Width = 0.0; // geen vaste breedte: één regel, geen afbreken
+        mt.Width = 0.0;
         mt.Location = anchor;
         mt.Contents = underline ? "\\L" + MTextFormat.Escape(text) + "\\l" : MTextFormat.Escape(text);
         btr.AppendEntity(mt);
@@ -1057,8 +1028,7 @@ public static class LegendBuilder
         }
     }
 
-    // Een bestaande bronlaag blijft ongewijzigd. Bij afwijkend uiterlijk maken we een
-    // eigen laag; de uiteindelijke swatches dragen ook expliciete entiteiteigenschappen.
+    // eigen weergavelaag bij afwijkende stijl; bronlaag behouden
     private static string EnsureStyledLayer(Transaction tr, Database db, string name, LayerDisplayStyle style)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
@@ -1153,7 +1123,6 @@ public static class LegendBuilder
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (lt.Has(name))
         {
-            // Bestaande hulplijnlaag alsnog niet-plotbaar maken.
             if (!plottable)
             {
                 var existing = (LayerTableRecord)tr.GetObject(lt[name], OpenMode.ForRead);
@@ -1177,8 +1146,6 @@ public static class LegendBuilder
         tr.AddNewlyCreatedDBObject(ltr, true);
     }
 
-    // De NLCS-template schrijft tekststijl "NLCS-ISO" voor (font NLCS-ISO.ttf). Die krijgt
-    // voorrang boven een losse "bevat NLCS"-match; hoogtes zetten we zelf per tekst.
     private static ObjectId ResolveTextStyle(Transaction tr, Database db, string name)
     {
         var tst = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForRead);
@@ -1197,9 +1164,7 @@ public static class LegendBuilder
             throw new InvalidOperationException($"Tekststijl '{name}' ontbreekt in deze tekening. Kies een bestaande stijl of laat de tekststijl leeg voor de TAUW-opmaak.");
         }
 
-        // De naam alleen garandeert geen template-opmaak: in een bestaande DWG kan
-        // NLCS-ISO een ander font, een breedtefactor of schuine tekst bevatten.
-        // Laat die gedeelde stijl intact en gebruik dan een eigen correcte stijl.
+        // afwijkende gedeelde stijl behouden; eigen correcte stijl gebruiken
         string styleName = "NLCS-ISO";
         for (int suffix = 0; tst.Has(styleName); suffix++)
         {
@@ -1211,8 +1176,6 @@ public static class LegendBuilder
             styleName = "NLCS_LEGENDA_ISO" + (suffix == 0 ? string.Empty : "_" + suffix);
         }
 
-        // Een lege legenda-DWG heeft de tekststijl vaak alleen in de xref. Maak de
-        // hoststijl zelfstandig aan; het huidige STANDARD-font is geen templatekeuze.
         string font;
         try { font = HostApplicationServices.Current.FindFile("NLCS-ISO.ttf", db, FindFileHint.FontFile); }
         catch (Autodesk.AutoCAD.Runtime.Exception ex)

@@ -5,8 +5,7 @@ using System.Xml.Linq;
 
 namespace NlcsLegenda.Core;
 
-// InfraCAD Map bewaart KLIC-objectgegevens als gezipte XML-tabellen in de DWG.
-// Handles gelden uitsluitend binnen hun eigen bron-database.
+// gezipte xml-tabellen; handles alleen geldig binnen de brontekening
 public static class KlicMetadata
 {
     public const int MaxCompressedBytes = 64 * 1024 * 1024;

@@ -78,4 +78,19 @@ public class LegendOrderTests
         var a = new BlankEntry(); var b = a.CloneWithNewId();
         Assert.NotEqual(LegendOrder.Key(a.ToLegendEntry()), LegendOrder.Key(b.ToLegendEntry()));
     }
+
+    [Fact]
+    public void ManualRowsWithEqualDescriptionsKeepTheirOwnPositions()
+    {
+        var settings = new LegendSettings { SortMode = LegendSortMode.Handmatig,
+            ManualEntries = new() {
+                new() { Layer = "ROOD", Description = "Eigen kabel" },
+                new() { Layer = "BLAUW", Description = "Eigen kabel" } } };
+        var entries = LegendGrouping.Build(Array.Empty<NlcsLayerName>(), settings);
+        Assert.NotEqual(LegendOrder.Key(entries[0]), LegendOrder.Key(entries[1]));
+        settings.ManualEntryOrder = LegendOrder.Remember(Array.Empty<string>(), entries.Reverse());
+        var saved = LegendSettings.FromJson(settings.ToJson());
+        Assert.Equal(entries.Reverse().Select(e => e.PrimaryLayer),
+            LegendGrouping.Build(Array.Empty<NlcsLayerName>(), saved).Select(e => e.PrimaryLayer));
+    }
 }

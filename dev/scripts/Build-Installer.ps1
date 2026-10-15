@@ -1,23 +1,6 @@
 <#
-.SYNOPSIS
-    Bouwt een per-user MSI-installer voor de NLCS Legenda-plugin.
-
-.DESCRIPTION
-    De installer bevat één gecombineerde bundle met per AutoCAD-/Civil 3D-versie de
-    bijbehorende build: net8 tegen de 2025-referenties (R25.0), net8 tegen de
-    2026-referenties (R25.1) en net10 voor 2027 (R26.0). AutoCAD kiest bij het laden
-    zelf de juiste. Elke versie krijgt zo dezelfde binary als de losse zip-bundle.
-    Er wordt per gebruiker geïnstalleerd in %APPDATA%\Autodesk\ApplicationPlugins, dus
-    zonder beheerdersrechten en op de plek die Windows voor die gebruiker oplost.
-
-    Geef -PfxPath (en -PfxPassword) mee om de MSI te ondertekenen. Zie
-    New-CodeSigningCertificate.ps1 voor een self-signed certificaat.
-
-.EXAMPLE
-    ./Build-Installer.ps1
-
-.EXAMPLE
-    ./Build-Installer.ps1 -PfxPath dev\signing\joligej.pfx -PfxPassword (Read-Host -AsSecureString)
+.synopsis
+    gebruikersinstaller voor 2025, 2026 en 2027, optioneel ondertekend
 #>
 [CmdletBinding()]
 param(
@@ -33,7 +16,6 @@ $pluginProj = Join-Path $repoRoot "src\NlcsLegenda.Plugin\NlcsLegenda.Plugin.csp
 $manifestSrc = Join-Path $repoRoot "deploy\NlcsLegenda.bundle\PackageContents.xml"
 $wxs = Join-Path $repoRoot "deploy\installer\Package.wxs"
 
-# Versie uit de centrale Directory.Build.props overnemen als die niet is opgegeven.
 if (-not $Version) {
     $Version = ([regex]::Match((Get-Content (Join-Path $repoRoot "Directory.Build.props") -Raw),
         '<VersionPrefix>([^<]+)</VersionPrefix>')).Groups[1].Value
@@ -45,8 +27,7 @@ if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
     throw "wix (WiX Toolset) niet gevonden. Installeer het met: dotnet tool install --global wix --version 5.0.2"
 }
 
-# 1) Alle doel-frameworks bouwen: net8 tegen de 2025- én 2026-referenties en net10 voor 2027.
-#    Zo krijgt elke AutoCAD-versie in de MSI dezelfde binary als de losse zip-bundle.
+# dezelfde versiebinaries in de installer en losse bundels
 Write-Host "==> Plugin bouwen (net8, AutoCAD 2025)..." -ForegroundColor Cyan
 dotnet build $pluginProj -c Release -p:AcadVersion=2025
 if ($LASTEXITCODE -ne 0) { throw "Pluginbuild 2025 mislukt; MSI-bouw gestopt." }
@@ -81,7 +62,6 @@ New-Item -ItemType Directory -Force -Path $net10Out | Out-Null
 Copy-Item (Join-Path $net10Bin "NlcsLegenda.dll") $net10Out
 Copy-Item (Join-Path $net10Bin "NlcsLegenda.Core.dll") $net10Out
 
-# 2) Manifest met drie componenten genereren; de commandolijst komt uit het bundle-manifest.
 [xml]$src = Get-Content $manifestSrc -Raw
 $commandsXml = $src.ApplicationPackage.Components.ComponentEntry.Commands.InnerXml
 $productCode = $src.ApplicationPackage.ProductCode
@@ -114,14 +94,12 @@ $(New-Component "R26.0-R26.0" "net10" ".NET 10")
 "@
 Set-Content -Path (Join-Path $stage "PackageContents.xml") -Value $manifest -Encoding UTF8
 
-# 4) MSI bouwen met WiX.
 $outDir = Join-Path $repoRoot "artifacts"
 $msi = Join-Path $outDir "NlcsLegenda-$Version.msi"
 Write-Host "==> MSI samenstellen met WiX..." -ForegroundColor Cyan
 wix build $wxs -arch x64 -d "Version=$Version" -d "BundleStage=$stage" -o $msi
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $msi)) { throw "MSI is niet gebouwd." }
 
-# 5) Optioneel ondertekenen.
 if ($PfxPath) {
     if (-not (Test-Path $PfxPath)) { throw "PFX niet gevonden: $PfxPath" }
     $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
@@ -137,10 +115,7 @@ if ($PfxPath) {
     & $signtool.FullName sign /fd SHA256 /f $PfxPath /p $plainPw /tr $TimestampUrl /td SHA256 $msi
     if ($LASTEXITCODE -ne 0) { throw "Ondertekenen mislukt." }
 
-    # 6) Handtekening verifieren tegen het publieke certificaat. De verwachte thumbprint komt uit
-    #    deploy/joligej-codesign.cer, zodat een certificaatrotatie niet in dit script hoeft. Het
-    #    certificaat is self-signed, dus de keten is niet publiek vertrouwd (Status UnknownError is
-    #    normaal); we eisen een aanwezige handtekening, de juiste signer en een ongewijzigd bestand.
+    # handtekening vergelijken met het meegeleverde openbare certificaat
     $cerPath = Join-Path $repoRoot "deploy\joligej-codesign.cer"
     if (-not (Test-Path $cerPath)) { throw "Publiek certificaat ontbreekt: $cerPath" }
     $expected = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cerPath)).Thumbprint

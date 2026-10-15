@@ -3,8 +3,6 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Toetst de aspectcodes uit de formele NLCS-beschrijving (hoofdstuk 5): geometrie, arcering,
-// vlakvulling en symbool, inclusief de doorsnede-/niet-zichtbaar-varianten.
 public class NlcsDrawTypeSuffixTests
 {
     [Theory]

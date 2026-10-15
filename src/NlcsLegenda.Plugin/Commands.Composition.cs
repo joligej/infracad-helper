@@ -5,8 +5,6 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    // De keuzelijst gebruikt dezelfde bron en omschrijving-snapshot als de gekozen legenda.
-    // Uitgevinkte bronregels blijven kiesbaar; reeds getekende legenda's zijn nooit bron.
     private static List<EntryCheckItem> BuildCompositionItems(
         Database db, LegendSettings settings, string? legendId = null)
     {

@@ -15,8 +15,7 @@ public partial class Commands
 {
     private enum UpdateResult { Updated, NoEntries, Failed }
 
-    // Bouwt één beheerde legenda opnieuw op basis van zijn scope en instellingen. Erase en
-    // opbouw gebeuren in dezelfde transactie: mislukt de opbouw, dan blijft de oude staan.
+    // wissen en opbouwen binnen dezelfde transactie
     private static UpdateResult BuildManagedLegend(
         Database db, Transaction tr, LegendRegistry registry, LegendDefinition def,
         out int rows, out string note)
@@ -24,7 +23,6 @@ public partial class Commands
         rows = 0;
         note = string.Empty;
 
-        // Bron bepalen op basis van scope; eigen legenda-geometrie uitsluiten.
         var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
         ObjectId[]? selection = null;
         if (def.Scope == LegendScope.Selection)
@@ -42,14 +40,11 @@ public partial class Commands
                 note = $"{missing} bronobject(en) ontbreken";
         }
 
-        // Beheerde legenda: ingebouwde catalogus + de eigen omschrijving-snapshot van de
-        // legenda (DescriptionOverrides). Niet de live globale standaard, zodat die een
-        // bestaande legenda niet meer verandert.
+        // eigen tekstkopie gebruiken, niet de gewijzigde globale standaard
         var analysis = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, DescriptionCatalog.Default(), excluded);
         if (analysis.Entries.Count == 0)
             return UpdateResult.NoEntries;
 
-        // Positie van de bestaande legenda vasthouden.
         bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out var topLeft, keepGroup: true);
 
         var btrId = LegendBuilder.BuildBlock(db, tr, analysis, def.Settings, out rows, out var issues);
@@ -71,7 +66,6 @@ public partial class Commands
         return UpdateResult.Updated;
     }
 
-    // Voegt een melding toe aan een bestaande note (puntkomma-gescheiden), leeg blijft leeg.
     private static string AppendNote(string note, string extra) =>
         string.IsNullOrEmpty(note) ? extra : $"{note}; {extra}";
 
@@ -163,7 +157,7 @@ public partial class Commands
             ids = LegendManagement.ActiveRegistry(db, tr, LegendStore.Load(db, tr)).Legends.Select(l => l.Id).ToList();
             tr.Commit();
         }
-        // Iedere legenda in een eigen transactie: één fout blokkeert de rest niet.
+        // afzonderlijke transacties per legenda
         foreach (var id in ids)
         {
             try
@@ -245,8 +239,6 @@ public partial class Commands
         tr.Commit();
     }
 
-    // Bewerkt de instellingen van precies één legenda (op LegendId) en bouwt die legenda
-    // atomair opnieuw op. Annuleren wijzigt niets; andere legenda's blijven ongemoeid.
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private void ManagerEditSettings(Editor ed, Database db, LegendRegistry registry)
     {
@@ -261,8 +253,6 @@ public partial class Commands
             ApplySettingsAndRebuild(ed, db, id, working);
     }
 
-    // Neemt alle per-legenda-instellingen over van een andere legenda (U2). Identiteit, naam,
-    // bron en positie van de doel-legenda blijven; de instellingen worden diep gekopieerd.
     private void ManagerCopySettings(Editor ed, Database db, LegendRegistry registry)
     {
         if (registry.Legends.Count < 2)
@@ -280,7 +270,6 @@ public partial class Commands
         ApplySettingsAndRebuild(ed, db, target.Id, source.Settings);
     }
 
-    // Bestaande legenda's veranderen niet mee.
     private void ManagerMakeGlobalDefault(Editor ed, Database db, LegendRegistry registry)
     {
         var def = PickLegendFromList(ed, registry, "als globale standaard gebruiken");
@@ -291,8 +280,6 @@ public partial class Commands
         ed.WriteMessage($"\nGlobale standaard bijgewerkt op basis van \"{def.Name}\" ({where}). Bestaande legenda's blijven ongewijzigd.");
     }
 
-    // Dupliceert een legenda: nieuwe identiteit, dezelfde instellingen/scope/bron, nieuwe
-    // plaatsing (U3). Geen gedeelde technische identiteit met het origineel.
     private void ManagerDuplicate(Editor ed, Database db, LegendRegistry registry)
     {
         var def = PickLegendFromList(ed, registry, "dupliceren");
@@ -325,7 +312,7 @@ public partial class Commands
                 tr.Commit();
                 ok = true;
             }
-            // Bij geen inhoud committen we niet: de toegevoegde registry-entry rolt terug.
+            // lege legenda: registratie terugdraaien
         }
         if (ok)
         {
@@ -338,8 +325,6 @@ public partial class Commands
         }
     }
 
-    // Past de bronselectie van een selectie-legenda aan: vervangen, toevoegen of verwijderen
-    // (U1). Legenda-eigen geometrie wordt geweigerd als bron; lege selectie wijzigt niets.
     private void ManagerEditSource(Editor ed, Database db, LegendRegistry registry)
     {
         var def = PickLegendFromList(ed, registry, "de bron aanpassen van");
@@ -417,8 +402,6 @@ public partial class Commands
         }
     }
 
-    // Past nieuwe instellingen toe op één legenda en bouwt die atomair opnieuw op. Bij een
-    // fout of lege inhoud blijft de oude legenda volledig bruikbaar.
     private void ApplySettingsAndRebuild(Editor ed, Database db, string id, LegendSettings newSettings)
     {
         try
@@ -451,10 +434,6 @@ public partial class Commands
         }
     }
 
-    // "Waarom ontbreekt dit?" (U5): diagnosticeert voor een gekozen legenda waarom een
-    // aangeklikt object wel of niet wordt opgenomen. Gebruikt exact dezelfde filterlogica
-    // als de analyse (ExplainExclusion + elementsoort- en zichtbaarheidsfilter).
-    // NLCSLEGENDAWAAROM blijft als alias bestaan voor wie het oude commando gewend is.
     [CommandMethod("NLCSLEGENDAELEMENT", CommandFlags.Modal)]
     [CommandMethod("NLCSLEGENDAWAAROM", CommandFlags.Modal)]
     public void NlcsLegendaElement()
@@ -507,7 +486,6 @@ public partial class Commands
                 : DiagnoseObject(db, tr, layer, settings, target, per.ObjectId, out localName);
             tr.Commit();
 
-            // Compacte, technische weergave.
             ed.WriteMessage($"\nElement: {layer}"
                 + (string.IsNullOrEmpty(localName) ? "" : $" ({localName})"));
             ed.WriteMessage($"\nLegenda: {name}");
@@ -528,16 +506,11 @@ public partial class Commands
         localName = string.Empty;
         var ent = tr.GetObject(entId, OpenMode.ForRead) as Entity;
 
-        // Gemeenschappelijke geschiktheid eerst: een onzichtbare laag telt nooit mee, of de laag
-        // nu NLCS is of een eigen koppeling heeft. Zelfde volgorde als de analyzer.
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (lt.Has(layerName) && tr.GetObject(lt[layerName], OpenMode.ForRead) is LayerTableRecord ltr
             && !settings.IncludeInvisibleLayers && (ltr.IsOff || ltr.IsFrozen))
             return "de laag staat uit of is bevroren (zet 'Onzichtbare lagen meenemen' aan om hem toch mee te nemen)";
 
-        // Expliciete eigen-laagkoppeling wint van NLCS-herkenning. Een rechtstreeks aangewezen
-        // object zit in de hoofdtekening (lege bron); SpecificXref-regels gelden daarom alleen
-        // voor objecten binnen de xref, niet voor een directe modelspace-selectie.
         var rule = settings.CustomLayerRules.FirstOrDefault(r =>
             ent is not null && r.Matches(layerName, string.Empty)
             && DrawingAnalyzer.EntityMatchesType(ent, r.Type)
@@ -573,13 +546,8 @@ public partial class Commands
         return settings.ExplainExclusion(parsed);
     }
 
-    // Naam van de omgevingsvariabele waarmee automatisering (per proces) een doel-legenda
-    // kiest zonder interactie: een legenda-id of een unieke naam.
     internal const string TargetEnvVar = "NLCSLEGENDA_TARGET";
 
-    // Kiest de doel-legenda voor update/viewport/export. Volgorde: expliciete env-var (headless
-    // automatisering) -> 0/1 legenda eenduidig -> meerdere: in de GUI klikken/lijst, in de Core
-    // Console veilig weigeren. In de Core Console wordt nooit GetEntity/een lijstprompt bereikt.
     private static LegendDefinition? ResolveTargetLegend(
         Editor ed, Database db, LegendRegistry registry, string actie)
     {
@@ -605,7 +573,6 @@ public partial class Commands
                 return target;
         }
 
-        // Meerdere legenda's: headless nooit interactief kiezen (native crash in accoreconsole).
         if (HostEnvironment.IsCoreConsole)
         {
             ed.WriteMessage(

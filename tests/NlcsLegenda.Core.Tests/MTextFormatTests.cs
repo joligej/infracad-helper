@@ -20,7 +20,6 @@ public class MTextFormatTests
     [Fact]
     public void Escape_BackslashBeforeBrace_OrderIsCorrect()
     {
-        // "\{" letterlijk: backslash -> "\\", daarna accolade -> "\{"  => "\\\{"
         Assert.Equal("\\\\\\{", MTextFormat.Escape("\\{"));
     }
 

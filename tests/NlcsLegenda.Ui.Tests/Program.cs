@@ -108,7 +108,6 @@ internal static class Program
         var settings = new LegendSettings();
         using var form = new SettingsDialog(settings, "Legenda: voorbeeld", new[] { new EntryCheckItem("key", "Data", "DATA") });
         OpenOffscreen(form);
-        // Vergroot ook het lettertype: een geometrische schaaltest alleen mist tekstafbreking.
         form.AutoScaleMode = AutoScaleMode.None;
         form.Scale(new SizeF(scale, scale));
         form.Font = new Font(form.Font.FontFamily, 9f * scale);

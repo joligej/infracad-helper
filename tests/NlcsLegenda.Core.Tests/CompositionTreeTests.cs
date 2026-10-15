@@ -86,7 +86,7 @@ public class CompositionTreeTests
     {
         var tree = Sample();
         tree.Groups[0].Leaves[1].Included = false;
-        _ = tree.Filter("Data").ToList();      // filteren mag selectie niet wissen
+        _ = tree.Filter("Data").ToList();
         _ = tree.Filter("Put").ToList();
         _ = tree.Filter(null).ToList();
         Assert.False(tree.Groups[0].Leaves[1].Included);
@@ -97,7 +97,7 @@ public class CompositionTreeTests
     public void ExclusionRoundTrip_RebuildsSameState()
     {
         var tree = Sample();
-        tree.SetGroup(tree.Groups[0], false);          // Data-groep uit
+        tree.SetGroup(tree.Groups[0], false);
         var excluded = tree.ExcludedKeys();
         Assert.Equal(3, excluded.Count);
 

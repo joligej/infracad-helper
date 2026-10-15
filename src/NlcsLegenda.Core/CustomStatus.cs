@@ -1,6 +1,5 @@
 namespace NlcsLegenda.Core;
 
-// Eigen statussen gebruiken entry-sleutels, zodat automatische en handmatige regels hetzelfde werken.
 public sealed class CustomStatus
 {
     public string Name { get; set; } = string.Empty;

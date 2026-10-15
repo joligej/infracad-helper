@@ -44,8 +44,6 @@ internal sealed class ButtonBar : TableLayoutPanel
         return button;
     }
 
-    // Knoppen groeien mee met hun tekst (DPI-/taal-onafhankelijk) met een nette ondergrens,
-    // zodat langere labels als "Opmaak → template" niet worden afgekapt.
     private static Button MakeButton(string text, DialogResult result) => new()
     {
         Text = text,
@@ -70,11 +68,6 @@ internal sealed class SettingsDialog : LegendDialog
 
     public event EventHandler? ApplyRequested;
 
-    // Bewerkt precies één instellingenobject (een werkkopie). De aanroeper bepaalt de scope
-    // (globale standaard of één specifieke legenda) en past het resultaat toe. Geef je de
-    // geanalyseerde entries mee, dan kan de gebruiker vanuit dit venster ook samenstellen
-    // (uitsluitingen + eigen regels) en eigen statussen leden toewijzen; de xref-namen voeden
-    // de per-xref keuze.
     public SettingsDialog(LegendSettings settings, string contextLabel,
         IReadOnlyList<EntryCheckItem>? composition = null, IReadOnlyList<string>? xrefNames = null,
         Func<LegendSettings, IReadOnlyList<EntryCheckItem>>? compositionSource = null)
@@ -153,7 +146,7 @@ internal sealed class SettingsDialog : LegendDialog
 
     public LegendSettings Settings => _settings;
 
-    // De guard voorkomt dat terugschrijven naar een control zijn eigen change-handler weer laat syncen.
+    // terugkoppeling tussen gekoppelde invoervelden voorkomen
     private void SyncAll()
     {
         if (_syncing) return;
@@ -166,7 +159,7 @@ internal sealed class SettingsDialog : LegendDialog
         decimal min, decimal max, int decimals = 1, decimal increment = 0.5M, int width = 90)
     {
         decimal start = ClampDecimal((decimal)get(), min, max);
-        // Buiten bereik opgeslagen waarde meteen gelijktrekken, anders tonen UI en opslag iets anders.
+        // weergave en opgeslagen waarde gelijk houden
         if (start != (decimal)get()) set((double)start);
         var n = new NumericUpDown
         {
@@ -217,7 +210,6 @@ internal sealed class SettingsDialog : LegendDialog
     private static decimal ClampDecimal(decimal value, decimal min, decimal max)
         => value < min ? min : value > max ? max : value;
 
-    // SyncAll houdt een tweede vakje voor dezelfde setting (bijv. op Algemeen) gelijk.
     private CheckBox BoundCheck(string text, Func<bool> get, Action<bool> set)
     {
         var cb = new CheckBox { Text = text, Checked = get(), AutoSize = true, Margin = new Padding(3, 3, 12, 3) };
@@ -480,7 +472,6 @@ internal sealed class SettingsDialog : LegendDialog
         return page;
     }
 
-    // Dezelfde CustomStatus.Members (entry-keys) als NLCSLEGENDASTATUS.
     private void EditStatusMembers()
     {
         var available = new List<(string Key, string Label)>();
@@ -507,7 +498,6 @@ internal sealed class SettingsDialog : LegendDialog
         }
     }
 
-    // Dezelfde XrefInclusion als NLCSLEGENDAXREFS.
     private void EditXrefInclusion()
     {
         if (_xrefNames.Count == 0)
@@ -524,7 +514,6 @@ internal sealed class SettingsDialog : LegendDialog
         }
     }
 
-    // Hetzelfde DescriptionOverrides-model als het losse commando.
     private void EditDescriptions()
     {
         var effective = DescriptionCatalog.Default();
@@ -539,7 +528,6 @@ internal sealed class SettingsDialog : LegendDialog
         if (dlg.ShowDialog(this) == DialogResult.OK) Apply();
     }
 
-    // Eigen (niet-NLCS) bronlagen koppelen. Werkt op een kopie; alleen OK schrijft terug.
     private void EditCustomLayers()
     {
         using var dlg = new CustomLayerDialog(_settings.CustomLayerRules);
@@ -573,7 +561,6 @@ internal sealed class SettingsDialog : LegendDialog
         }
     }
 
-    // Dezelfde boom-editor als het losse commando, op de werkkopie.
     private IReadOnlyList<EntryCheckItem>? CompositionItems()
     {
         try { return _compositionSource?.Invoke(_settings) ?? _composition ?? Array.Empty<EntryCheckItem>(); }
@@ -628,8 +615,6 @@ internal sealed class SettingsDialog : LegendDialog
     }
 }
 
-// Begint bij de effectieve keuze (IsXrefIncluded, inclusief default-fallback) en geeft bij OK een
-// expliciete map terug.
 internal sealed class XrefInclusionDialog : LegendDialog
 {
     private readonly CheckedListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true, CheckOnClick = true };
@@ -685,7 +670,6 @@ internal sealed class XrefInclusionDialog : LegendDialog
     }
 }
 
-// Werkt op een diepe kopie; leden zijn entry-keys (zelfde model als NLCSLEGENDASTATUS).
 internal sealed class CustomStatusDialog : LegendDialog
 {
     private readonly List<CustomStatus> _statuses;
@@ -758,8 +742,11 @@ internal sealed class CustomStatusDialog : LegendDialog
         Controls.Add(split);
         Controls.Add(buttons);
 
-        // De splitter pas instellen als het venster een breedte heeft (anders gooit WinForms).
-        Load += (_, _) => { try { split.SplitterDistance = 220; } catch { /* standaardverdeling */ } };
+        Load += (_, _) =>
+        {
+            try { split.SplitterDistance = 220; }
+            catch (ArgumentException) { /* standaardverdeling bij te weinig ruimte */ }
+        };
 
         ReloadStatuses(_statuses.Count > 0 ? 0 : -1);
     }
@@ -847,8 +834,6 @@ internal sealed class CustomStatusDialog : LegendDialog
     }
 }
 
-// Meerregelige editor voor de opmerkingen: Enter maakt een nieuwe regel, met scrollbar en
-// gewone klembord-ondersteuning. Regeleindes en lege regels blijven exact behouden.
 internal sealed class RemarksEditDialog : LegendDialog
 {
     private readonly TextBox _title;
@@ -904,7 +889,7 @@ internal sealed class RemarksEditDialog : LegendDialog
         CancelButton = buttons.Cancel;
         buttons.AddExtra("Tekeningnotities").Click += (_, _) => _body.Text = StandardTexts.DrawingRemarks.Replace("\n", Environment.NewLine);
         buttons.AddExtra("KLIC-waarschuwing").Click += (_, _) => _body.Text = StandardTexts.KlicDisclaimer;
-        // Enter in het meerregelige veld hoort een regeleinde te maken, niet OK te drukken.
+        // enter voor een nieuwe regel, niet voor opslaan
         buttons.Ok.Click += (_, _) => DialogResult = DialogResult.OK;
 
         Controls.Add(layout);
@@ -913,7 +898,7 @@ internal sealed class RemarksEditDialog : LegendDialog
 
     public string RemarksTitle => _title.Text.Trim();
 
-    // Body niet trimmen op regelniveau: bewuste lege regels en inspringing blijven staan.
+    // lege regels en inspringing behouden
     public string RemarksText => _body.Text.Replace("\r\n", "\n");
 }
 
@@ -1026,7 +1011,6 @@ internal sealed class DescriptionsDialog : LegendDialog
 
     private static void MultilineKeyDown(object? sender, KeyEventArgs e)
     {
-        // Shift+Enter voegt een regeleinde toe; gewone Enter bevestigt de cel.
         if (e.KeyCode == Keys.Enter && e.Shift && sender is TextBox tb)
         {
             int pos = tb.SelectionStart;
@@ -1137,9 +1121,6 @@ internal sealed class TextEditDialog : LegendDialog
     };
 }
 
-// Beheert de blanco (statische, bewust lege) legendaregels: toevoegen, bewerken (tekst + status),
-// verwijderen en dupliceren. Werkt op een diepe kopie; de aanroeper neemt het resultaat alleen bij
-// OK over. Elke regel houdt zijn eigen identiteit, ook bij dupliceren met dezelfde tekst.
 internal sealed class BlankEntryDialog : LegendDialog
 {
     private readonly List<BlankEntry> _items;
@@ -1205,7 +1186,6 @@ internal sealed class BlankEntryDialog : LegendDialog
             _list.SelectedIndex = select;
     }
 
-    // Bewerkt tekst en status van één blanco regel. True bij OK.
     private bool EditItem(BlankEntry item)
     {
         using var dlg = new LegendDialog
@@ -1246,8 +1226,6 @@ internal sealed class BlankEntryDialog : LegendDialog
     }
 }
 
-// Beheert de eigen-laagkoppelingen: een lijst met toevoegen/bewerken/verwijderen. Werkt op een
-// diepe kopie; de aanroeper neemt het resultaat alleen bij OK over.
 internal sealed class CustomLayerDialog : LegendDialog
 {
     private readonly List<CustomLayerRule> _rules;
@@ -1309,7 +1287,6 @@ internal sealed class CustomLayerDialog : LegendDialog
             _list.SelectedIndex = select;
     }
 
-    // Bewerkt één regel in een subvenster. Geeft de regel terug bij OK, anders null.
     private CustomLayerRule? EditRule(CustomLayerRule rule, int editingIndex = -1)
     {
         using var dlg = new LegendDialog

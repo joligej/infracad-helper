@@ -1,14 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Autodesk-bundle­manifest voor automatisch laden van de NLCS Legenda-plugin.
-  Plaats de map "NlcsLegenda.bundle" (met dit bestand en een submap Contents met
-  NlcsLegenda.dll + NlcsLegenda.Core.dll) in:
-    %APPDATA%\Autodesk\ApplicationPlugins\
-  SeriesMin/SeriesMax R25.0 = AutoCAD/Civil 3D 2025, R25.1 = 2026, R26.0 = 2027.
-  Build-Bundle.ps1 zet de juiste waarde per doelversie.
--->
+
 <ApplicationPackage SchemaVersion="1.0"
-                    AppVersion="1.31.2"
+                    AppVersion="1.31.3"
                     ProductCode="{4C4B0F1A-6C1E-4C7E-9E3A-1F2A3B4C5D6E}"
                     Name="NLCS Legenda"
                     Description="Automatische NLCS-legendagenerator"

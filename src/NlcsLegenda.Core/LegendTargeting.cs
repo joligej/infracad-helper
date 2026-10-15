@@ -1,15 +1,12 @@
 namespace NlcsLegenda.Core;
 
-// Uitkomst van de automatische doelbepaling voor een beheerde legenda.
 public enum TargetResolution
 {
-    None,       // geen legenda
-    Single,     // precies één; eenduidig doel
-    Ambiguous   // meerdere; vereist een expliciete keuze
+    None,
+    Single,
+    Ambiguous
 }
 
-// Pure, host-onafhankelijke doelresolutie. De GUI-kant (klikken/lijst) en de headless kant
-// (expliciete id/naam) bouwen hier allebei op, zodat er één beslissingslogica is.
 public static class LegendTargeting
 {
     public static TargetResolution ResolveAuto(LegendRegistry registry, out LegendDefinition? target)
@@ -29,8 +26,6 @@ public static class LegendTargeting
         return TargetResolution.Single;
     }
 
-    // Niet-interactief op een expliciete id of unieke naam. Een dubbele naam faalt met reden,
-    // zodat automatisering nooit stil de verkeerde legenda bewerkt.
     public static bool TryResolveByToken(
         LegendRegistry registry, string? token, out LegendDefinition? target, out string error)
     {

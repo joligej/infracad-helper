@@ -5,9 +5,6 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Sluit de wiring-keten voor de collectie-instellingen: elke persistente collectie moet een
-// JSON-roundtrip overleven en bij Clone onafhankelijk zijn. De reflectie-completenesscheck dwingt
-// af dat een nieuwe collectie hier wordt opgenomen.
 public class CollectionWiringTests
 {
     private static readonly HashSet<string> Covered = new()

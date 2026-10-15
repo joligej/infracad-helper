@@ -8,7 +8,7 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
 
     public LayerDisplayStyle? InsertionLayerStyle { get; init; }
 
-    // Zonder expliciete schaalvariant blijft de broninsert op zijn modelmaat.
+    // bronmaat behouden zonder expliciete schaalvariant
     public int? SourceScale { get; init; }
 
     public double TargetScale { get; init; } = 1000;

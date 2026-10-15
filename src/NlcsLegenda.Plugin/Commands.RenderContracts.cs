@@ -29,8 +29,6 @@ public partial class Commands
                 dash.SetDashLengthAt(0, 0.6); dash.SetDashLengthAt(1, -0.4);
                 var dashId = linetypes.Add(dash); tr.AddNewlyCreatedDBObject(dash, true);
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                // 2+2 identiek; overige verschillen uitsluitend in transparantie, lijndikte,
-                // lijntype en lijntypeschaal. De vaste verwachte lengtes zijn 4,3,4,5,6.
                 double[] lengths = { 2, 2, 3, 4, 5, 6 };
                 for (int i = 0; i < lengths.Length; i++)
                 {
@@ -133,7 +131,6 @@ public partial class Commands
                         using var hatch = new Hatch();
                         hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
                         block.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
-                        // Gelijke bounding box en patroon, maar verschillende contouren.
                         var points = new Point2dCollection { new(0, 0), new(5, 0), new(i == 3 ? 0 : 5, 5) };
                         hatch.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline, points, new DoubleCollection { 0, 0, 0 });
                         hatch.EvaluateHatch(true);

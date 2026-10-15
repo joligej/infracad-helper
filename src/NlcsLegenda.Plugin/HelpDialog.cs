@@ -3,8 +3,6 @@ using System.Windows.Forms;
 
 namespace NlcsLegenda.Plugin;
 
-// Eenvoudig helpvenster: links de onderwerpen, rechts de tekst. Werkt zonder internet; de tekst
-// staat in de plugin zelf. Alleen basisuitleg voor dagelijks gebruik, geen volledige handleiding.
 internal sealed class HelpDialog : LegendDialog
 {
     private static readonly (string Title, string Body)[] Topics =

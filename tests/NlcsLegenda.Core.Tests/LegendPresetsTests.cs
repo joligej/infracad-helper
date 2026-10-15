@@ -100,7 +100,6 @@ public class LegendPresetsTests : IDisposable
     [Fact]
     public void Save_ReservedName_RoundTrips()
     {
-        // Een profiel met een gereserveerde naam moet gewoon opslaan en terugladen.
         LegendPresets.Save(_dir, "CON", new LegendSettings { Scale = 300 });
         Assert.Equal(300, LegendPresets.Load(_dir, "CON")!.Scale);
     }
@@ -121,7 +120,6 @@ public class LegendPresetsTests : IDisposable
         LegendPresets.Export(_dir, "Bron", shared);
         Assert.True(File.Exists(shared));
 
-        // Importeren in een verse map (andere "computer").
         var other = Path.Combine(_dir, "andere");
         Assert.True(LegendPresets.TryImport(other, shared, "Overgenomen", out var error));
         Assert.Equal(string.Empty, error);
@@ -142,7 +140,6 @@ public class LegendPresetsTests : IDisposable
         Assert.False(LegendPresets.TryImport(_dir, bad, "Bestaand", out var error));
         Assert.NotEqual(string.Empty, error);
 
-        // Het bestaande profiel is niet overschreven.
         Assert.Equal(100, LegendPresets.Load(_dir, "Bestaand")!.Scale);
     }
 
@@ -160,8 +157,6 @@ public class LegendPresetsTests : IDisposable
             () => LegendPresets.Export(_dir, "bestaatniet", Path.Combine(_dir, "uit.json")));
     }
 
-    // Een preset is configuratie, geen instance-identiteit. Het opgeslagen bestand mag geen
-    // LegendId/groupname/source handles/insertion point bevatten.
     [Fact]
     public void Preset_File_HasNoInstanceIdentity()
     {
@@ -175,30 +170,24 @@ public class LegendPresetsTests : IDisposable
             Assert.DoesNotContain(forbidden, json);
     }
 
-    // De vier doel-combinaties lopen via dezelfde snapshot + CopyFrom. Globaal->legenda en
-    // legenda A->legenda B delen daarna geen enkele mutable collectie (deep copy).
     [Fact]
     public void Preset_SaveFromLegendA_LoadToLegendB_IsIndependentSnapshot()
     {
-        // "Legenda A" met eigen inhoud; opslaan als preset = snapshot van A's instellingen.
         var legendA = new LegendSettings { Scale = 500, Title = "A" };
         legendA.ExcludedEntries.Add("N|WE|RI|RIOOL");
         legendA.CustomStatuses.Add(new CustomStatus { Name = "A-status", Members = { "x" } });
         LegendPresets.Save(_dir, "VanA", legendA);
 
-        // Laden en toepassen op "legenda B" via CopyFrom (zoals ApplyTargetSettings doet).
         var preset = LegendPresets.Load(_dir, "VanA");
         Assert.NotNull(preset);
         var legendB = new LegendSettings { Scale = 100, Title = "B" };
         legendB.CopyFrom(preset!);
 
-        // B heeft nu A's configuratie.
         Assert.Equal(500, legendB.Scale);
         Assert.Equal("A", legendB.Title);
         Assert.Contains("n|we|ri|riool", legendB.ExcludedEntries);
         Assert.Single(legendB.CustomStatuses);
 
-        // En deelt daarna geen collectie-instance met de preset of met A.
         Assert.NotSame(preset!.ExcludedEntries, legendB.ExcludedEntries);
         Assert.NotSame(preset.CustomStatuses, legendB.CustomStatuses);
         preset.CustomStatuses[0].Members.Add("y");

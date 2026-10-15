@@ -37,7 +37,6 @@ public partial class Commands
                     if (Math.Abs(actual - expected) > tolerance) throw new InvalidOperationException($"{name}: {actual:R}, verwacht {expected:R}.");
                 }
                 if (rows != 4 || issues.Count != 0 || lines.Length != 4) throw new InvalidOperationException("Vier voorbeeldregels ontbreken.");
-                // Onafhankelijke meting van vier opeenvolgende lijnvoorbeelden.
                 double[] lineY = { -12.52588838, -18.83579787, -25.14570736, -31.45561685 };
                 for (int i = 0; i < 4; i++)
                 {
@@ -47,7 +46,6 @@ public partial class Commands
                 var texts = entities.OfType<MText>().ToArray();
                 var body = texts.Single(t => t.Text == "Geometrie");
                 Near(body.TextHeight * paper, 2.5, "T25");
-                // MText mist de linker zijruimte van DBText: 0,1 maal de teksthoogte.
                 Near(body.Location.X * paper - 0.25, 29.71881311, "Tekstkolom");
                 Near(body.Location.Y * paper + 5 - 2.5, -13.2356127, "Tekstbasislijn");
                 var title = texts.Single(t => t.Text == "LEGENDA");

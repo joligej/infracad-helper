@@ -2,10 +2,6 @@ using Autodesk.AutoCAD.DatabaseServices;
 
 namespace NlcsLegenda.Plugin;
 
-// Hernoemt een laag component-voor-component naar een nieuwe (NLCS-)naam. De eigenlijke rename
-// van de LayerTableRecord werkt door op alle entiteiten die naar die laag verwijzen; alleen bij
-// een naamsbotsing worden entiteiten expliciet naar de bestaande doellaag verplaatst. Alles
-// gebeurt in de transactie van de aanroeper: committen = toepassen, aborten = rollback.
 internal static class LayerRename
 {
     internal sealed class Plan
@@ -20,8 +16,6 @@ internal static class LayerRename
         public bool NoChange => string.Equals(Source, Target, System.StringComparison.Ordinal);
     }
 
-    // Bepaalt wat een rename zou doen zonder iets te wijzigen (dry-run). Weigert xref-
-    // afhankelijke lagen en lagen die niet bestaan.
     public static Plan Analyze(Database db, Transaction tr, string source, string target)
     {
         var plan = new Plan { Source = source, Target = target };
@@ -54,9 +48,6 @@ internal static class LayerRename
         return plan;
     }
 
-    // Voert de rename uit. Bij een botsing met een bestaande laag worden de entiteiten naar die
-    // laag verplaatst (merge) en wordt de bronlaag verwijderd als die daarna leeg en niet in
-    // gebruik is. Geeft false met reden als er niet veilig kan worden doorgegaan.
     public static bool Apply(Database db, Transaction tr, Plan plan, bool mergeIntoExisting, out string error)
     {
         error = string.Empty;
@@ -107,7 +98,7 @@ internal static class LayerRename
         }
         finally
         {
-            // De huidige bronlaag blijft bestaan en moet haar oorspronkelijke slot behouden.
+            // oorspronkelijk slot van de behouden bronlaag herstellen
             if (!srcLtr.IsErased) srcLtr.IsLocked = wasLocked;
         }
     }
@@ -133,7 +124,7 @@ internal static class LayerRename
                 if (tr.GetObject(entId, OpenMode.ForRead) is not Entity entity) continue;
                 if (string.Equals(entity.Layer, layer, StringComparison.OrdinalIgnoreCase))
                     yield return entId;
-                // Attribuutreferenties zijn kinderen van de insert en staan niet in de bloktabel.
+                // attributen apart van de bloktabel doorlopen
                 if (entity is BlockReference reference)
                     foreach (ObjectId attributeId in reference.AttributeCollection)
                         if (tr.GetObject(attributeId, OpenMode.ForRead) is Entity attribute

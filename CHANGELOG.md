@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.31.3 - 2026-10-15
+
+- Handmatige regels volgen het statusfilter. Een eigen status blijft een expliciete uitzondering.
+- Samenvoegen laat handmatige en blanco regels afzonderlijk staan; eigen voorbeelden verdwijnen niet meer.
+- Eigen regels met dezelfde omschrijving maar verschillende lagen, symbolen of arceringen behouden elk hun handmatige positie.
+- Een hoge regel of een groot symbool kan het gekozen vaste aantal kolommen niet meer verkleinen.
+- Ontbrekende metadata op kabel-/leidingobjecten blijft zichtbaar in een gemengde KLIC-regel,
+  bijvoorbeeld als “Niet opgegeven; PE”. Hoeveelheden en brongegevens blijven behouden.
+- Codecomments ingekort tot enkele Nederlandse woorden in kleine letters; overbodige toelichtingen verwijderd.
+- Gerichte foutafhandeling voor CAD-eigenschappen en vensterverdeling. Een niet te activeren viewport
+  en een niet op te slaan lintcontrole worden nu gemeld.
+- Vijf regressieproeven toegevoegd, plus een CAD-proef voor gedeeltelijke KLIC-metadata in lokale en xref-bronnen.
+
 ## 1.31.2 - 2026-10-15
 
 - Meerregelige omschrijvingen volgen nu de gemeten regelafstand uit de TAUW-template

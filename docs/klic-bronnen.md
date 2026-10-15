@@ -37,7 +37,10 @@ Sets, Object Data. Conflicten binnen dezelfde tabel blijven zichtbaar. Gelijknam
 in verschillende tabellen zijn op zichzelf geen bronconflict.
 
 Een groep met verschillende waarden toont alle varianten. Een ontbrekende waarde wordt
-niet aan andere objecten toegeschreven. DiameterM wordt van meter naar millimeter omgezet.
+niet aan andere objecten toegeschreven. Bevat een samengevoegde kabel-/leidingregel ook
+objecten zonder metadata, dan staat bijvoorbeeld **Niet opgegeven; PE** in het overzicht,
+de export en de gekozen legenda-omschrijving. Zonder metadata op alle objecten blijven
+de extra velden leeg. DiameterM wordt van meter naar millimeter omgezet.
 Nul of een negatieve waarde bij diameter, diepte, druk en spanning wordt als niet opgegeven
 getoond. **Standaarddiepte (niet gemeten)** blijft onderscheiden van **Opgegeven diepte**.
 De plugin controleert daarmee niet de werkelijke ligging in het terrein.
@@ -59,6 +62,9 @@ legenda's gelijk. De maatvoering en vormgeving volgen de bestaande legenda-inste
 Elke legenda bewaart haar eigen keuzes. In Overzicht kun je de volgorde op **Handmatig**
 zetten en regels verplaatsen. Bij een actief filter is verplaatsen uitgeschakeld. Bestaande
 regels behouden hun plaats bij bijwerken; nieuwe combinaties worden achteraan toegevoegd.
+Eigen regels met dezelfde omschrijving maar verschillende voorbeelden houden elk hun positie.
+Handmatige en blanco regels worden niet samengevoegd. Handmatige regels volgen het statusfilter;
+een toewijzing aan een eigen status heeft voorrang op dat filter.
 
 ## Symbolen en attributen
 

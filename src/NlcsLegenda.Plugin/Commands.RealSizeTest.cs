@@ -55,7 +55,6 @@ public partial class Commands
                 var settings = new LegendSettings { Scale = scale, IncludeXrefLayers = true, IncludeRemarks = false,
                     IncludeFooter = false, IncludeScaleBar = false };
                 var analysis = DrawingAnalyzer.Analyze(db, tr, settings);
-                // Op 1:200 zijn beide inserts gelijk. Op andere schalen verschilt alleen de expliciete variant.
                 int expectedRows = scale == 200 ? 1 : 2;
                 if (analysis.Entries.Count != expectedRows) throw new InvalidOperationException($"Verkeerd samengevoegd op 1:{scale}.");
                 var id = LegendBuilder.BuildBlock(db, tr, analysis, settings, out int rows, out var issues);

@@ -65,8 +65,6 @@ public class NlcsLayerParserTests
     [Fact]
     public void TryParse_NestedXref_UsesLastSegmentAsLocalName()
     {
-        // Een geneste xref levert host-gekwalificeerde lagen 'buiten|binnen|N-...';
-        // het deel na de laatste pijp is de NLCS-laag, de rest is de xref-naam.
         Assert.True(NlcsLayerParser.TryParse("BUITEN|BINNEN|N-WE-VH-GOOT-V", out var parsed));
         Assert.True(parsed!.IsXref);
         Assert.Equal("BUITEN|BINNEN", parsed.XrefName);
@@ -78,11 +76,11 @@ public class NlcsLayerParserTests
     }
 
     [Theory]
-    [InlineData("SIT-BS-INMETING-2D")]   // xref-laag, geen NLCS-opbouw
+    [InlineData("SIT-BS-INMETING-2D")]
     [InlineData("SIT-NW-ONTWERP")]
     [InlineData("Defpoints")]
     [InlineData("0")]
-    [InlineData("N-WE-VH")]              // te weinig velden
+    [InlineData("N-WE-VH")]
     [InlineData("")]
     [InlineData(null)]
     public void TryParse_NonNlcsLayers_ReturnsFalse(string? raw)
@@ -93,7 +91,6 @@ public class NlcsLayerParserTests
     [Fact]
     public void TryParse_LocalXrefNested_SameNlcsDifferentSource()
     {
-        // Lokaal, xref en genest leveren dezelfde NLCS-ontleding; alleen de bronidentiteit verschilt.
         NlcsLayerParser.TryParse("N-WE-VH-WEG-G", out var local);
         NlcsLayerParser.TryParse("BestandA|N-WE-VH-WEG-G", out var xref);
         NlcsLayerParser.TryParse("Buiten|Binnen|N-WE-VH-WEG-G", out var nested);

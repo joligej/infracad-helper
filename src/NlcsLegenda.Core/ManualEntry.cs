@@ -41,6 +41,9 @@ public sealed class ManualEntry
         DescriptionSource = DescriptionSource.Handmatig,
         LayersByType = new Dictionary<NlcsDrawType, string> { [Type] = Layer.Trim() },
         SymbolBlockName = string.IsNullOrWhiteSpace(SymbolBlock) ? null : SymbolBlock!.Trim(),
+        RenderIdentity = System.Text.Json.JsonSerializer.Serialize(new[] {
+            Type.ToString(), Layer.Trim().ToUpperInvariant(),
+            (SymbolBlock ?? "").Trim().ToUpperInvariant(), (HatchPattern ?? "").Trim().ToUpperInvariant() }),
         Metric = LayerMetric.Empty
     };
 

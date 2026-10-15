@@ -14,9 +14,6 @@ public sealed class AnalysisResult
     public IReadOnlyDictionary<string, SymbolSample> SymbolSamples { get; init; } =
         new Dictionary<string, SymbolSample>();
 
-    // Effectieve laag-look per renderlaag. Een xref-laag bestaat in
-    // de host als "xref|laag" en heeft daar de echte kleur; de swatch neemt die over zodat een
-    // legenda uit een xref-only kader niet in standaardwit verschijnt.
     public IReadOnlyDictionary<string, LayerDisplayStyle> LayerStyles { get; init; } =
         new Dictionary<string, LayerDisplayStyle>();
 
@@ -31,8 +28,6 @@ public sealed class AnalysisResult
     public int ExcludedNlcsLayerCount { get; init; }
 }
 
-// Wat een laag zichtbaar maakt in de legenda: effectieve kleur, linetype, lijndikte en transparantie.
-// Losse data (geen ObjectId's), zodat het veilig tussen bron-database en host-database reist.
 public sealed class LayerDisplayStyle
 {
     public required Autodesk.AutoCAD.Colors.Color Color { get; init; }
@@ -59,17 +54,11 @@ public static class DrawingAnalyzer
         public readonly Dictionary<string, LayerMetric> Metrics = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, SymbolSample> SymbolSamples = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<(ObjectId, string), string> SymbolDefinitionIdentities = new();
-        // Per laag de getelde OMSCHRIJVING-attribuutwaarden van KLIC-symbolen; de meest
-        // voorkomende niet-lege waarde is de echte omschrijving uit de tekening.
         public readonly Dictionary<string, Dictionary<string, int>> AttrOms =
             new(StringComparer.OrdinalIgnoreCase);
         public readonly HashSet<string> ExcludedNlcs = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, bool> Visible = new(StringComparer.OrdinalIgnoreCase);
-        // Omschrijving per eigen-laag-sleutel (komt uit de regel, niet uit de NLCS-catalogus).
         public readonly Dictionary<string, string> CustomDesc = new(StringComparer.OrdinalIgnoreCase);
-        // Standaard-NLCS-lagen per echte (bron-)laagnaam. Na de collectie worden ze op render-
-        // identiteit samengevoegd: dezelfde logische laag uit bronnen met gelijke weergave wordt
-        // één regel met opgetelde hoeveelheid, zichtbaar verschillende bronnen blijven apart.
         public readonly HashSet<string> NlcsRawKeys = new(StringComparer.OrdinalIgnoreCase);
         public readonly HashSet<string> NlcsSourceLayers = new(StringComparer.OrdinalIgnoreCase);
         public readonly HashSet<string> CustomSourceLayers = new(StringComparer.OrdinalIgnoreCase);
@@ -79,8 +68,6 @@ public static class DrawingAnalyzer
         public readonly Dictionary<string, List<KlicObjectData>> KlicObjects = new(StringComparer.OrdinalIgnoreCase);
     }
 
-    // Veiligheidslimiet tegen ontspoorde recursie; echte cycli worden met een pad-set
-    // afgevangen, dus deze grens hoeft niet laag te zijn.
     private const int MaxDepth = 16;
 
     public static AnalysisResult Analyze(
@@ -96,8 +83,7 @@ public static class DrawingAnalyzer
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (excludedIds is { Count: > 0 })
             c.Excluded = new HashSet<ObjectId>(excludedIds);
-        // Pad-set voor cyclusdetectie op blokdefinities: een blok dat meerdere keren is
-        // ingevoegd, wordt per instance geteld, maar een echte cyclus wordt gestopt.
+        // cycli stoppen, herhaalde invoegingen afzonderlijk tellen
         var path = new HashSet<ObjectId>();
 
         if (selection is not null)
@@ -112,9 +98,6 @@ public static class DrawingAnalyzer
             CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, sourceXref: string.Empty);
         }
 
-        // Dezelfde logische NLCS-laag uit meerdere bronnen: gelijke weergave valt samen (één regel,
-        // opgetelde hoeveelheid), zichtbaar verschillende weergave splitst (aparte regels met eigen
-        // hoeveelheid en swatchkleur). Geen first/last-wins.
         CoalesceNlcsSources(c);
 
         var parsedLayers = c.Parsed.Values
@@ -123,8 +106,6 @@ public static class DrawingAnalyzer
             .ThenBy(layer => layer.Raw, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var descriptions = ReadLayerDescriptions(db, tr, parsedLayers);
-        // De echte OMSCHRIJVING uit de KLIC-symboolattributen krijgt voorrang op de laag-
-        // beschrijving (die bij KLIC vaak de lege template "TYPE \ LABEL \ OMSCHRIJVING" is).
         var attrDesc = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var kv in c.AttrOms)
             attrDesc[kv.Key] = kv.Value.OrderByDescending(x => x.Value).ThenBy(x => x.Key, StringComparer.Ordinal).First().Key;
@@ -147,8 +128,6 @@ public static class DrawingAnalyzer
 
         var renderIds = c.Styles.ToDictionary(kv => kv.Key, kv => StyleSignature(kv.Value), StringComparer.OrdinalIgnoreCase);
 
-        // Render-identiteit per laag = laag-look, gesamplede arcering en de brontransformatie van
-        // het symbool. Alle samples bevatten alleen waarden; bron-ObjectIds blijven binnen analyse.
         string RenderId(string name)
         {
             if (c.SymbolSamples.ContainsKey(name)) return string.Empty;
@@ -157,8 +136,6 @@ public static class DrawingAnalyzer
             return (baseId ?? string.Empty) + "|" + hatch;
         }
 
-        // DescriptionOverrides worden in LegendGrouping.Build toegepast (één plek), dus hier
-        // alleen de basiscatalogus doorgeven.
         double analysisMilliseconds = timer?.Elapsed.TotalMilliseconds ?? 0;
         timer?.Restart();
         var entries = LegendGrouping.Build(
@@ -213,7 +190,6 @@ public static class DrawingAnalyzer
         Entity ent, Transaction tr, Collector c, LegendSettings settings,
         HashSet<ObjectId> path, int depth, Matrix3d transform, string sourceXref, LayerDisplayStyle? inheritedStyle = null, LayerDisplayStyle? inheritedLayerStyle = null)
     {
-        // Eigen legenda-geometrie telt nooit als bron.
         if (c.Excluded.Contains(ent.ObjectId))
             return;
 
@@ -228,8 +204,7 @@ public static class DrawingAnalyzer
         var block = ent as BlockReference;
         var definition = block is not null && !block.BlockTableRecord.IsNull
             ? tr.GetObject(block.BlockTableRecord, OpenMode.ForRead) as BlockTableRecord : null;
-        // De xref-insert is een broncontainer, geen lokaal legendasymbool. De laag
-        // waarop hij is ingevoegd mag een uitgeschakelde xref niet alsnog opnemen.
+        // xref-insert als broncontainer, ook op een symboollaag
         if (definition is not { IsFromExternalReference: true })
             Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle);
 
@@ -311,7 +286,7 @@ public static class DrawingAnalyzer
         string key = parsed.GroupKey + "\u0001" + parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + parsed.KlicGroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
         (rule is null ? c.NlcsSourceLayers : c.CustomSourceLayers).Add(layerName);
         c.Parsed[key] = parsed;
-        if (metadata.HasData || metadata.ReadIssues.Count > 0)
+        if (metadata.HasData || metadata.ReadIssues.Count > 0 || ElementProperties.IsKlic(parsed.Discipline, parsed.Hoofdgroep))
         {
             if (!c.KlicObjects.TryGetValue(key, out var objects)) c.KlicObjects.Add(key, objects = new());
             objects.Add(metadata);
@@ -438,9 +413,6 @@ public static class DrawingAnalyzer
         ColorSignature(style.Color), style.LinetypeIdentity, NumberSignature(style.LinetypeIdentity == "Continuous" ? 1 : style.LinetypeScale),
         style.LineWeight, style.Transparency.Signature);
 
-    // Leest de waarde van een attribuut (op tag) uit een blokreferentie; lege string als het
-    // attribuut ontbreekt. Constante attributen zitten niet in AttributeCollection en worden
-    // hier bewust overgeslagen (die dragen geen tekening-specifieke waarde).
     private static string ReadAttribute(BlockReference br, Transaction tr, string tag)
     {
         try
@@ -452,7 +424,7 @@ public static class DrawingAnalyzer
                     return att.TextString?.Trim() ?? string.Empty;
             }
         }
-        catch { /* beschadigde/niet-leesbare attributen overslaan */ }
+        catch (Autodesk.AutoCAD.Runtime.Exception) { return string.Empty; }
         return string.Empty;
     }
 
@@ -465,7 +437,6 @@ public static class DrawingAnalyzer
         switch (ent)
         {
             case Hatch h:
-                // Oppervlak meten in het bronvlak en daarna met de vlaktransformatie schalen.
                 area = ReadHatchArea(h) * AreaScale(transform, h.Normal);
                 break;
             case Curve curve:
@@ -476,8 +447,6 @@ public static class DrawingAnalyzer
                 }
                 else
                 {
-                    // Meet op een getransformeerde kopie, zodat rotatie/schaal uit een
-                    // blok-insertie correct in lengte en oppervlak doorwerken.
                     (length, area) = MeasureTransformed(curve, transform);
                 }
                 break;
@@ -485,7 +454,7 @@ public static class DrawingAnalyzer
 
         if (automatic)
         {
-            // Een G-contour levert lengte; zijn oppervlak mag een A-arcering niet verdubbelen.
+            // contourlengte zonder dubbeltelling van het arceringsoppervlak
             var type = c.Parsed[localLayer].DrawType;
             if (type == NlcsDrawType.Geometrie) area = 0;
             else if (type is NlcsDrawType.Vlak or NlcsDrawType.Arcering or NlcsDrawType.Vlakvulling) length = 0;
@@ -499,8 +468,7 @@ public static class DrawingAnalyzer
         catch (Autodesk.AutoCAD.Runtime.Exception ex) when (ex.ErrorStatus == Autodesk.AutoCAD.Runtime.ErrorStatus.NotApplicable
             && hatch.NumberOfLoops == 1)
         {
-            // Oudere tekeningen kunnen één gesloten contour als Default opslaan. Bepaal het
-            // oppervlak met dezelfde contour als buitenrand in een tijdelijk, los hatch-object.
+            // oude contourvlag herstellen op een tijdelijke arceringskopie
             var loop = hatch.GetLoopAt(0);
             using var measure = new Hatch();
             measure.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
@@ -524,9 +492,6 @@ public static class DrawingAnalyzer
         }
     }
 
-    // Zoekt de eerste eigen-laagregel die op dit object past (expliciete volgorde = deterministisch).
-    // Matcht op de lokale laagnaam (xref-prefix wordt gestript), de bron (scope), de elementsoort
-    // van de entiteit en een optioneel blokfilter.
     private static bool TryMatchCustomRule(
         Entity ent, Transaction tr, LegendSettings settings, string layerName, string sourceXref,
         out CustomLayerRule? rule, out NlcsLayerName? canonical)
@@ -549,8 +514,7 @@ public static class DrawingAnalyzer
         return false;
     }
 
-    // Broncompatibiliteit: een regel telt alleen objecten die bij de elementsoort passen, zodat
-    // een gemengde laag geen onzin oplevert (bijv. een blok dat als geometrielengte meetelt).
+    // alleen objecten van de gekozen elementsoort meetellen
     internal static bool EntityMatchesType(Entity ent, NlcsDrawType type) => type switch
     {
         NlcsDrawType.Symbool => ent is BlockReference,
@@ -603,7 +567,6 @@ public static class DrawingAnalyzer
                     var rep = members[0];
                     string clean = LayerNaming.LocalName(rep.Parsed.LocalName);
                     string key = partition == 0 ? clean : $"{clean} #{partition + 1}";
-                    // Eén eigen bronlaag kan meerdere elementsoorten of blokfilters bevatten.
                     if (c.Parsed.ContainsKey(key))
                     {
                         string identity = logical.Key + "|" + type.Key + "|" + renderClass.Key;
@@ -841,13 +804,10 @@ public static class DrawingAnalyzer
         Math.Round(number, 9, MidpointRounding.AwayFromZero)
             .ToString("0.#########", System.Globalization.CultureInfo.InvariantCulture);
 
-    // Zoals AddMetric, maar met een expliciete hoeveelheidsmodus. Auto gedraagt zich als NLCS;
-    // de andere modi tellen alleen de gekozen component zodat de legenda de juiste eenheid toont.
     private static void AddMetricMasked(Entity ent, string key, Collector c, Matrix3d transform, CustomQuantityMode mode)
     {
         if (mode == CustomQuantityMode.Geen)
         {
-            // Wel als element registreren (telt mee voor rendering), maar zonder hoeveelheid.
             if (!c.Metrics.ContainsKey(key)) c.Metrics[key] = LayerMetric.Empty;
             return;
         }
@@ -855,7 +815,6 @@ public static class DrawingAnalyzer
         AddMetric(ent, key, c, transform, automatic: mode == CustomQuantityMode.Auto);
         if (mode == CustomQuantityMode.Auto) return;
 
-        // De toegevoegde component maskeren naar de gekozen modus.
         var after = c.Metrics[key];
         var delta = after.Add(-before.Count, -before.Length, -before.Area);
         var masked = mode switch
@@ -883,7 +842,6 @@ public static class DrawingAnalyzer
         }
     }
 
-    // Oppervlak schaalt in het vlak van de arcering, onafhankelijk van de Z-schaal.
     private static double AreaScale(Matrix3d transform, Vector3d normal)
     {
         var x = normal.GetPerpendicularVector().GetNormal();

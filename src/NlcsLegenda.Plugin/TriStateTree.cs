@@ -4,9 +4,6 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-// TreeView met drie-standen-vinkjes voor het samenstellen: een groep kan in één klik aan of
-// uit, de groepsstand (aan/uit/gedeeltelijk) volgt uit de kinderen. WinForms-checkboxes zijn
-// maar twee standen, dus de derde stand (gedeeltelijk) tekenen we zelf via StateImageList.
 internal sealed class TriStateTree : TreeView
 {
     private CompositionTree _model = new();
@@ -91,8 +88,6 @@ internal sealed class TriStateTree : TreeView
         }
     }
 
-    // 0 = uit, 1 = aan, 2 = gedeeltelijk. Getekend met de systeem-checkbox-stijl zodat het
-    // meeschaalt met het thema.
     private static ImageList BuildStateImages()
     {
         var images = new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
@@ -114,7 +109,6 @@ internal sealed class TriStateTree : TreeView
         }
         catch
         {
-            // Zonder visual styles: eenvoudige vervanging zodat de boom bruikbaar blijft.
             g.DrawRectangle(Pens.Gray, 1, 1, 12, 12);
             if (state == System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal)
                 g.DrawString("x", SystemFonts.DefaultFont, Brushes.Black, 2, 0);

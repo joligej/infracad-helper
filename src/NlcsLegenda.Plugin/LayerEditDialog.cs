@@ -4,9 +4,6 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-// Bewerkt een NLCS-laagnaam component voor component, met live preview en validatie tegen de
-// formele NLCS-codes. De dialog kent de tekening niet; de aanroeper levert het aantal geraakte
-// entiteiten en een probe die vertelt of de doelnaam al bestaat (botsing/samenvoegen).
 internal sealed class LayerEditDialog : LegendDialog
 {
     private readonly NlcsLayerComponents _comp;
@@ -28,7 +25,6 @@ internal sealed class LayerEditDialog : LegendDialog
 
     public NlcsLayerComponents Result => _comp;
 
-    // True als bij een botsing met een bestaande laag moet worden samengevoegd.
     public bool MergeIntoExisting { get; private set; }
 
     public LayerEditDialog(

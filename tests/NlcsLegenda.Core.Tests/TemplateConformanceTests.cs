@@ -16,7 +16,6 @@ public class TemplateConformanceTests
         return list;
     }
 
-    // De kern van de render-bug (J/K): een G-lijn blijft een G-lijn, ook naast een arcering.
     [Fact]
     public void GeometryLayer_DoesNotFallBackToVlak()
     {
@@ -60,8 +59,6 @@ public class TemplateConformanceTests
         Assert.Equal(QuantityKind.Area, entry.QuantityType);
     }
 
-    // Template-conforme standaardwaarden: NLCS-standaardteksthoogtes, ExplodeOnPlace uit,
-    // en de echte NLCS-tekstlagen (-T25/-T50).
     [Fact]
     public void Defaults_MatchTemplateConventions()
     {
@@ -90,11 +87,9 @@ public class TemplateConformanceTests
 
         s.ResetFormattingToTemplate();
 
-        // Opmaak terug naar template.
         Assert.Equal(5.0, s.TitleTextHeightMm);
         Assert.Equal(24.0, s.SwatchWidthMm);
         Assert.False(s.ExplodeOnPlace);
-        // Inhoud/identiteit blijft.
         Assert.Equal(500, s.Scale);
         Assert.DoesNotContain(NlcsStatus.Vervallen, s.IncludedStatuses);
         Assert.Contains("RIO", s.ExcludedDisciplines);
@@ -118,8 +113,6 @@ public class TemplateConformanceTests
         Assert.Contains("discipline", s2.ExplainExclusion(layer!)!);
     }
 
-    // Viewport: de teruggerekende papier-mm marge moet exact de ingestelde marge zijn, en de
-    // schaal in beide richtingen 1:schaal (aspect ratio klopt).
     [Theory]
     [InlineData(100)]
     [InlineData(200)]

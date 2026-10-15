@@ -3,9 +3,6 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Eigen-laagregels moeten via dezelfde grouping-pipeline een gelijkwaardig LegendEntry opleveren
-// als NLCS-lagen: eigen omschrijving, status, type, en meerdere regels met dezelfde Element-sleutel
-// combineren tot één item.
 public class CustomLayerRuleTests
 {
     private static LegendEntry BuildSingle(CustomLayerRule rule, LayerMetric metric)
@@ -43,8 +40,6 @@ public class CustomLayerRuleTests
     [Fact]
     public void CustomRule_DefaultDisciplineHoofdgroep_AreNotExcludedByXxAl()
     {
-        // XX/AL staan standaard in de uitsluitingslijsten; een eigen regel (EI/EI) mag niet
-        // per ongeluk wegvallen.
         var settings = new LegendSettings();
         var rule = new CustomLayerRule { Layer = "Eigen laag", Element = "E", Type = NlcsDrawType.Geometrie, Description = "E" };
         Assert.True(settings.IsIncluded(rule.ToCanonical(string.Empty, rule.Layer)));
@@ -112,8 +107,6 @@ public class CustomLayerRuleTests
     [Fact]
     public void Matches_StripsXrefPrefix_FromDatabaseLayerName()
     {
-        // Een xref-afhankelijke laag heet in de host-database "xrefnaam|laag"; de regel matcht
-        // op de lokale laagnaam, niet op de volledige host-gekwalificeerde naam.
         var any = new CustomLayerRule { Layer = "Eigen kabels", Element = "E", Scope = CustomSourceScope.AnySource };
         Assert.True(any.Matches("XREFA|Eigen kabels", "XREFA"));
 
@@ -125,8 +118,6 @@ public class CustomLayerRuleTests
     [Fact]
     public void Matches_BlockFilter_DoesNotBypassScope()
     {
-        // Een blokfilter mag de bron-check niet kortsluiten: een SpecificXref-regel matcht nooit
-        // op de hoofdtekening, ook niet als er een bloknaam is ingevuld.
         var rule = new CustomLayerRule
         {
             Layer = "L", Element = "E", Scope = CustomSourceScope.SpecificXref, XrefName = "ref1", BlockName = "PUT"
@@ -151,8 +142,6 @@ public class CustomLayerRuleTests
     [Fact]
     public void ToCanonical_Raw_IsDatabaseLayerName_ForXref()
     {
-        // Raw voedt stijl-/beschrijvingslookups; voor een xref-laag moet dat de source-
-        // gekwalificeerde host-naam zijn, anders wordt de laagtabelrecord niet gevonden.
         var rule = new CustomLayerRule { Layer = "Eigen kabels", Element = "E", Scope = CustomSourceScope.SpecificXref, XrefName = "XREFA" };
         var canonical = rule.ToCanonical("XREFA", "XREFA|Eigen kabels");
         Assert.Equal("XREFA|Eigen kabels", canonical.Raw);

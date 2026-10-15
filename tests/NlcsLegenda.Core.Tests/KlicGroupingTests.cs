@@ -14,7 +14,6 @@ public class KlicGroupingTests
         return list;
     }
 
-    // Echte KL-elementnamen zoals ze in KLIC-tekeningen voorkomen.
     [Theory]
     [InlineData("DATA", "DATA", "", "", "")]
     [InlineData("DATA2", "DATA", "", "", "2")]
@@ -34,7 +33,6 @@ public class KlicGroupingTests
 
     private static LegendSettings KlicSettings()
     {
-        // KL valt standaard niet buiten; zorg dat niets KL wegfiltert.
         var s = new LegendSettings();
         s.ExcludedHoofdgroepen.Clear();
         s.ExcludedDisciplines.Clear();
@@ -90,11 +88,9 @@ public class KlicGroupingTests
         var layers = Parse("B-WE-KL-DATA-G", "B-WE-KL-DATA2-G", "B-WE-KL-ET_LS-G", "B-WE-KL-ET_MS-G");
         var s = KlicSettings();
 
-        // Alleen nummer: DATA+DATA2 samen, ET_LS en ET_MS apart -> 3.
         s.SamenvoegenNummer = true;
         Assert.Equal(3, LegendGrouping.Build(layers, s).Count);
 
-        // Uit -> terug naar 4 (omkeerbaar).
         s.SamenvoegenNummer = false;
         Assert.Equal(4, LegendGrouping.Build(layers, s).Count);
     }
@@ -125,7 +121,6 @@ public class KlicGroupingTests
         var clone = s.Clone();
         Assert.True(clone.SamenvoegenNummer);
         Assert.True(clone.SamenvoegenSpecificatie);
-        // Onafhankelijk: wijziging in kloon raakt origineel niet.
         clone.SamenvoegenNummer = false;
         Assert.True(s.SamenvoegenNummer);
     }
@@ -139,7 +134,6 @@ public class KlicGroupingTests
         Assert.True(back!.SamenvoegenNummer);
     }
 
-    // Statussamenvoeging: alleen bij identieke render-identiteit.
     [Fact]
     public void MergeStatuses_CombinesOnlyWhenRenderIdentical()
     {
@@ -147,11 +141,9 @@ public class KlicGroupingTests
         var s = KlicSettings();
         s.MergeIdenticalStatuses = true;
 
-        // Zelfde render -> samen tot één regel.
         var same = LegendGrouping.Build(layers, s, renderIdentity: _ => "kleur3");
         Assert.Single(same);
 
-        // Verschillende render per status -> apart.
         var diff = LegendGrouping.Build(layers, s,
             renderIdentity: l => l.StartsWith("N-") ? "groen" : "grijs");
         Assert.Equal(2, diff.Count);
@@ -172,7 +164,6 @@ public class KlicGroupingTests
         var layers = Parse("N-WE-KL-DATA-G", "B-WE-KL-DATA-G");
         var s = KlicSettings();
         s.MergeIdenticalStatuses = true;
-        // Geen render-identiteit beschikbaar -> veilig niet samenvoegen.
         Assert.Equal(2, LegendGrouping.Build(layers, s).Count);
     }
 }

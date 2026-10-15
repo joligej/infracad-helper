@@ -55,13 +55,13 @@ public class LegendRegistryTests
     public void NextDefaultName_IsDeterministicAfterRemoval()
     {
         var reg = new LegendRegistry();
-        reg.Add(MakeLegend(reg.NextDefaultName())); // Legenda 1
-        reg.Add(MakeLegend(reg.NextDefaultName())); // Legenda 2
-        reg.Add(MakeLegend(reg.NextDefaultName())); // Legenda 3
+        reg.Add(MakeLegend(reg.NextDefaultName()));
+        reg.Add(MakeLegend(reg.NextDefaultName()));
+        reg.Add(MakeLegend(reg.NextDefaultName()));
         Assert.Equal(new[] { "Legenda 1", "Legenda 2", "Legenda 3" }, reg.Legends.Select(l => l.Name));
 
-        reg.Remove(reg.Legends[1].Id); // verwijder Legenda 2
-        Assert.Equal("Legenda 2", reg.NextDefaultName()); // laagste vrije nummer
+        reg.Remove(reg.Legends[1].Id);
+        Assert.Equal("Legenda 2", reg.NextDefaultName());
     }
 
     [Fact]
@@ -74,10 +74,8 @@ public class LegendRegistryTests
         reg.Add(a);
         reg.Add(b);
 
-        // A's instelling verandert B niet.
         Assert.False(a.Settings.ToonSymbolen);
         Assert.True(b.Settings.ToonSymbolen);
-        // Delete A raakt B niet.
         reg.Remove(a.Id);
         Assert.Null(reg.FindById(a.Id));
         Assert.NotNull(reg.FindById(b.Id));

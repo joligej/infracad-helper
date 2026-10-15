@@ -60,7 +60,7 @@ public static class LegendLayoutEngine
     {
         double titleH = s.ToModel(s.TitleTextHeightMm);
         double headerH = s.ToModel(s.HeaderTextHeightMm);
-        double subHeaderH = headerH; // hoofdgroepkop even hoog als de statuskop
+        double subHeaderH = headerH;
         double swatchH = s.ToModel(s.SwatchHeightMm);
         double textH = s.ToModel(s.TextHeightMm);
         double lineHeight = textH * Math.Max(1.25, 5.0 / 3.0 * s.LineSpacingFactor);
@@ -74,18 +74,16 @@ public static class LegendLayoutEngine
         double headerBand = Math.Max(actualHeaderH + rowGap, headerH + s.ToModel(s.RowPitchMm) - swatchH / 2 - baselineOffset);
         double subHeaderBand = headerBand;
         double statusGap = Math.Max(0, swatchH / 2 + baselineOffset - headerH);
-        // Onderstreping en onderlengte tellen mee, ook bij grote eigen teksthoogtes.
+        // onderstreping en onderlengte meenemen in de kophoogte
         double titleBand = Math.Max(HeadingHeight(s.Title, titleH) + rowGap,
             titleH + s.ToModel(s.HeaderSpacingMm) - headerH);
         double colWidth = s.ToModel(s.ColumnWidthMm);
         double colGap = s.ToModel(s.ColumnGapMm);
 
-        // Ruime tekstbreedte-inschatting: liever iets te veel hoogte dan MText-overlap.
         double textColMm = s.ColumnWidthMm - s.SwatchWidthMm - s.TextGapMm
             - (s.IncludeQuantities ? s.QuantityColumnWidthMm : 0.0);
         int maxChars = Math.Max(8, (int)(textColMm / (s.TextHeightMm * 0.72)));
 
-        // Kolommen balanceren op geschatte teksthoogte, niet alleen op regelaantal.
         int maxRows = Math.Max(1, s.MaxRowsPerColumn);
         var entryLines = new List<List<string>>(entries.Count);
         var entryHeights = new List<double>(entries.Count);
@@ -116,7 +114,7 @@ public static class LegendLayoutEngine
         }
         else if (s.Columns > 0)
         {
-            columnsNeeded = s.Columns;
+            columnsNeeded = Math.Min(s.Columns, Math.Max(1, entries.Count));
             columnBudget = totalEntryHeight / columnsNeeded;
             maxRowsCap = int.MaxValue;
         }
@@ -175,8 +173,9 @@ public static class LegendLayoutEngine
             }
 
             bool columnBroke = false;
+            bool reserveColumns = columnsNeeded != int.MaxValue && entries.Count - i <= columnsNeeded - col - 1;
             bool budgetReached = rows >= 1 && col < columnsNeeded - 1
-                && colHeight + entryHeights[i] * 0.5 >= columnBudget;
+                && (reserveColumns || colHeight + entryHeights[i] * 0.5 >= columnBudget);
             double extraHeader = needStatusHeader ? headerBand + (rows > 0 ? statusGap : 0) : 0;
             if (s.IncludeHoofdgroepHeaders && !entry.IsBlank
                 && !string.Equals(curHoofd, entry.Hoofdgroep, StringComparison.OrdinalIgnoreCase))
@@ -205,8 +204,7 @@ public static class LegendLayoutEngine
                 y -= headerBand;
             }
 
-            // Blanco regels zijn hoofdgroep-neutraal: ze krijgen nooit een hoofdgroep-subkop en
-            // claimen ook geen hoofdgroep, zodat een volgende echte regel zijn eigen kop wel krijgt.
+            // blanco regels zonder hoofdgroep of subkop
             bool hoofdChanged = !entry.IsBlank
                 && !string.Equals(curHoofd, entry.Hoofdgroep, StringComparison.OrdinalIgnoreCase);
             bool needSubHeader = s.IncludeHoofdgroepHeaders && !entry.IsBlank && (hoofdChanged || columnBroke);

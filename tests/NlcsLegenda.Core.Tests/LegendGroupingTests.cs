@@ -97,8 +97,6 @@ public class LegendGroupingTests
     [Fact]
     public void SameLogicalLayer_DifferentRenderIdentity_SplitsIntoSeparateRows()
     {
-        // Zoals de analyse ze maakt bij bronnen met zichtbaar verschillende weergave: dezelfde
-        // logische NLCS-laag, maar twee render-partities. Build houdt ze als aparte regels.
         var a = WithRender("N-WE-VH-WEG-G", "N-WE-VH-WEG-G", "ACI:1");
         var b = WithRender("XREF|N-WE-VH-WEG-G", "N-WE-VH-WEG-G #2", "ACI:3");
 

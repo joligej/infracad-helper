@@ -17,7 +17,7 @@ public class PlaceholderTextTests
     [InlineData("Type betonstraatsteen 30x30", false)]
     [InlineData("Datakabel laagspanning", false)]
     [InlineData("Afsluiter \u00f8160", false)]
-    [InlineData("TYPE", false)]          // één token is te weinig
+    [InlineData("TYPE", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
     public void IsGeneric_DetectsOnlyPurePlaceholders(string? text, bool expected)
@@ -32,7 +32,6 @@ public class PlaceholderTextTests
         var s = new LegendSettings { SuppressKlicPlaceholders = true };
         s.ExcludedHoofdgroepen.Clear();
 
-        // Laagbeschrijving is een lege placeholder -> moet worden genegeerd.
         var entry = Assert.Single(LegendGrouping.Build(
             new[] { layer! }, s, layerDescription: _ => "TYPE \\ LABEL \\ OMSCHRIJVING"));
         Assert.NotEqual("TYPE \\ LABEL \\ OMSCHRIJVING", entry.Description);

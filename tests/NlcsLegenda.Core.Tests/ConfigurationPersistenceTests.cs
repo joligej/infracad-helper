@@ -3,8 +3,6 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Robuustheid van de config-datalaag: FromJson mag nooit crashen op kapotte of gedeeltelijke
-// data, en de registry roundtript stabiel en onafhankelijk per legenda.
 public class ConfigurationPersistenceTests
 {
     [Fact]
@@ -39,7 +37,6 @@ public class ConfigurationPersistenceTests
         Assert.Empty(back.Legends[0].Settings.ExcludedEntries);
         Assert.Contains("X", back.Legends[1].Settings.ExcludedEntries);
 
-        // Idempotent: nog een ronde verandert niets.
         Assert.True(LegendRegistry.TryParse(back.ToJson(), out var again, out _));
         Assert.Equal(json, again.ToJson());
     }

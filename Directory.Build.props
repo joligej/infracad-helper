@@ -1,13 +1,8 @@
 <Project>
 
-  <!--
-    Eén bron van waarheid voor de versie. Zowel NlcsLegenda.Core als NlcsLegenda.Plugin
-    erven dit, zodat de gebouwde DLL's dezelfde versie rapporteren als de release, het
-    bundle-manifest en de CHANGELOG. De release-workflow controleert dat de git-tag
-    hiermee overeenkomt.
-  -->
+  <!-- gedeelde versie voor dll, bundel en release -->
   <PropertyGroup>
-    <VersionPrefix>1.31.2</VersionPrefix>
+    <VersionPrefix>1.31.3</VersionPrefix>
     <Authors>joligej</Authors>
     <Company>infracad-helper</Company>
     <Product>NLCS Legenda</Product>

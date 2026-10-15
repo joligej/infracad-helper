@@ -20,14 +20,11 @@ public class ExcludeAndManualTests
         var settings = new LegendSettings { IncludeXrefLayers = false };
         NlcsLayerParser.TryParse("SIT-ARCERINGEN|N-WE-VH-OPENVERHARDING_TEGEL-A", out var lyr);
 
-        // Algemeen uit: xref-laag valt buiten de legenda.
         Assert.False(settings.IsIncluded(lyr!));
 
-        // Tekeningspecifiek deze xref aan: nu wel meegenomen.
         settings.XrefInclusion["SIT-ARCERINGEN"] = true;
         Assert.True(settings.IsIncluded(lyr!));
 
-        // Een andere xref volgt nog steeds de algemene schakelaar (uit).
         NlcsLayerParser.TryParse("ANDERE|N-WE-VH-OPENVERHARDING_TEGEL-A", out var other);
         Assert.False(settings.IsIncluded(other!));
     }
@@ -36,8 +33,6 @@ public class ExcludeAndManualTests
     public void XrefInclusion_NestedXref_FollowsTopLevelChoice()
     {
         var settings = new LegendSettings { IncludeXrefLayers = false };
-        // Een geneste xref-laag: 'boven|onder|N-...'. De gebruiker kan alleen de
-        // bovenliggende xref kiezen; die keuze bepaalt ook de geneste inhoud.
         NlcsLayerParser.TryParse("BOVEN|ONDER|N-WE-VH-OPENVERHARDING_TEGEL-A", out var nested);
         Assert.False(settings.IsIncluded(nested!));
 
@@ -45,7 +40,6 @@ public class ExcludeAndManualTests
         Assert.True(settings.IsIncluded(nested!));
         Assert.True(settings.IsXrefIncluded("BOVEN|ONDER"));
 
-        // De bovenliggende xref uitzetten sluit de geneste inhoud ook uit.
         settings.XrefInclusion["BOVEN"] = false;
         Assert.False(settings.IsXrefIncluded("BOVEN|ONDER"));
     }
@@ -61,7 +55,6 @@ public class ExcludeAndManualTests
         var before = LegendGrouping.Build(layers, settings, _ => null);
         Assert.Equal(2, before.Count);
 
-        // Vink de rioolleiding uit.
         settings.ExcludedEntries.Add(LegendSettings.EntryKey("N", "WE", "RI", "HWA_RIOOLLEIDING_PVC_160"));
         var after = LegendGrouping.Build(layers, settings, _ => null);
 
@@ -140,7 +133,6 @@ public class ExcludeAndManualTests
     [Fact]
     public void EntryKey_NonStandardStatusCode_LayerAndEntryMatch()
     {
-        // Statuscode "Q" valt onder Overig; laag- en entry-sleutel moeten identiek zijn.
         var settings = new LegendSettings();
         settings.IncludedStatuses.Add(NlcsStatus.Overig);
         var layer = Parse("Q-WE-VH-TESTELEMENT-A")[0];
@@ -180,5 +172,32 @@ public class ExcludeAndManualTests
 
         Assert.Single(entries);
         Assert.DoesNotContain(entries, e => e.Description == "Ongeldige laagnaam");
+    }
+
+    [Fact]
+    public void ManualRowsFollowStatusFiltersAndCustomStatusOverrides()
+    {
+        var manual = new ManualEntry { Layer = "EIGEN", Description = "Eigen kabel", Status = NlcsStatus.Bestaand };
+        var settings = new LegendSettings { ManualEntries = new() { manual } };
+        settings.IncludedStatuses.Remove(NlcsStatus.Bestaand);
+        Assert.Empty(LegendGrouping.Build(Array.Empty<NlcsLayerName>(), settings));
+        settings.CustomStatuses.Add(new CustomStatus { Name = "Nutsvoorziening",
+            Members = new() { LegendSettings.EntryKey(manual.ToLegendEntry()) } });
+        Assert.Equal("Nutsvoorziening", Assert.Single(LegendGrouping.Build(Array.Empty<NlcsLayerName>(), settings)).CustomStatusName);
+        settings.CustomStatuses.Clear();
+        settings.IncludedStatuses.Add(NlcsStatus.Bestaand);
+        Assert.Single(LegendGrouping.Build(Array.Empty<NlcsLayerName>(), settings));
+    }
+
+    [Fact]
+    public void GroupingDoesNotRemoveSeparateManualSwatches()
+    {
+        var settings = new LegendSettings { ManualEntries = new() {
+            new() { Layer = "ROOD", Description = "Eigen kabel" },
+            new() { Layer = "BLAUW", Description = "Eigen kabel" } } };
+        settings.MergedDimensions.Add(GroupDimension.Nummer);
+        var entries = LegendGrouping.Build(Array.Empty<NlcsLayerName>(), settings);
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(new[] { "BLAUW", "ROOD" }, entries.Select(e => e.PrimaryLayer).Order());
     }
 }

@@ -96,11 +96,10 @@ public static class LegendPresets
     private static string PathFor(string dir, string name) =>
         Path.Combine(dir, SafeFileName(name) + Extension);
 
-    // Vaste Windows-set; Path.GetInvalidFileNameChars() is platformafhankelijk.
+    // vaste windows-tekenset, ook buiten windows
     private static readonly char[] InvalidFileChars =
         { '<', '>', ':', '"', '/', '\\', '|', '?', '*' };
 
-    // Namen die Windows voor apparaten reserveert; ook met extensie onbruikbaar als bestand.
     private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "CON", "PRN", "AUX", "NUL",
@@ -117,7 +116,7 @@ public static class LegendPresets
         var safe = new string(chars).TrimEnd(' ', '.').Trim();
         if (safe.Length == 0)
             return "profiel";
-        // Windows blokkeert apparaatnamen ook mét extensie.
+        // apparaatnamen ook met extensie ongeldig
         var baseSegment = safe.Split('.')[0];
         if (ReservedNames.Contains(baseSegment))
             safe = "_" + safe;
