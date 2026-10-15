@@ -20,7 +20,9 @@ internal sealed class KlicSourceMetadata : IDisposable
         {
             var records = source.Embedded.GetValueOrDefault(handle)?.ToList() ?? new List<KlicRecord>();
             var issues = new List<string>();
-            using var tr = database.TransactionManager.StartOpenCloseTransaction();
+            // Een gewone geneste transactie respecteert nog niet opgeslagen wijzigingen
+            // van de aanroeper. OpenClose kan bij het sluiten een verse hatch-contour verliezen.
+            using var tr = database.TransactionManager.StartTransaction();
             // Een doorgestuurde xref-ID kan naar de host wijzen. Lees de echte bronhandle.
             var original = (Entity)tr.GetObject(database.GetObjectId(false, entity.ObjectId.NonForwardedHandle, 0), OpenMode.ForRead);
             source.Attached.Read(original, tr, records, issues);
@@ -53,7 +55,7 @@ internal sealed class KlicSourceMetadata : IDisposable
 
     private static IReadOnlyDictionary<string, IReadOnlyList<KlicRecord>> ReadEmbedded(Database source)
     {
-        using var tr = source.TransactionManager.StartOpenCloseTransaction();
+        using var tr = source.TransactionManager.StartTransaction();
         var dictionary = (DBDictionary)tr.GetObject(source.NamedObjectsDictionaryId, OpenMode.ForRead);
         foreach (var key in new[] { "INFRACAD_MAP_DATA", "TABLES" })
         {

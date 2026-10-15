@@ -37,6 +37,7 @@ public partial class Commands
         Check("onzichtbare symboolonderdelen", ReviewHiddenSymbolParts);
         Check("laag nul en ByBlock", ReviewSymbolInheritance);
         Check("gebruikersarcering", ReviewUserHatches);
+        Check("arcering met boogcontour", ReviewCurvedHatch);
         Check("getransformeerde arcering", (db, tr) => ReviewTransformedHatch(db, tr));
         Check("vlakke arcering met afwijkende Z-schaal", (db, tr) => ReviewTransformedHatch(db, tr, planar: true));
         Check("ongelijk geschaald arceringspatroon", (db, tr) =>
@@ -193,6 +194,19 @@ public partial class Commands
             .Where(e => e.Layer.Contains("REVIEWINHERIT", StringComparison.Ordinal)).ToList();
         if (rendered.Count != 2 || rendered.Count(e => e.ColorIndex == 1) != 1 || rendered.Count(e => e.ColorIndex == 3) != 1)
             throw new InvalidOperationException("ByLayer op laag 0 moet groen blijven; alleen ByBlock neemt rood over.");
+    }
+
+    private static void ReviewCurvedHatch(Database db, Transaction tr)
+    {
+        var layer = ReviewLayer(db, tr, "N-WE-VH-REVIEWCURVED-A");
+        using var hatch = new Hatch { LayerId = layer };
+        ReviewAppend(ReviewModel(db, tr), tr, hatch);
+        hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
+        hatch.AppendLoop(HatchLoopTypes.Polyline, new Point2dCollection { new(-2, 0), new(2, 0) }, new DoubleCollection { 1, 0 });
+        hatch.EvaluateHatch(true);
+        var entry = DrawingAnalyzer.Analyze(db, tr, new LegendSettings()).Entries.Single(e => e.Element == "REVIEWCURVED");
+        if (Math.Abs(entry.Metric.Area - 2 * Math.PI) > 1e-8)
+            throw new InvalidOperationException($"Halve cirkel: {entry.Metric.Area:R} m2, verwacht {2 * Math.PI:R}.");
     }
 
     private static void ReviewUserHatches(Database db, Transaction tr)
@@ -422,9 +436,14 @@ public partial class Commands
         hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
         hatch.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline, points, new DoubleCollection { 0, 0, 0, 0 });
         hatch.EvaluateHatch(true);
-        var entry = DrawingAnalyzer.Analyze(db, tr, new LegendSettings()).Entries.Single(e => e.Element == "REVIEWAREA");
-        if (Math.Abs(entry.Metric.Area - 25) > 1e-8 || Math.Abs(entry.Metric.Length - 20) > 1e-8)
-            throw new InvalidOperationException($"Contour en arcering: {entry.Metric.Area} m2 / {entry.Metric.Length} m; verwacht 25 / 20.");
+        for (int i = 0; i < 3; i++)
+        {
+            var entry = DrawingAnalyzer.Analyze(db, tr, new LegendSettings()).Entries.Single(e => e.Element == "REVIEWAREA");
+            if (Math.Abs(entry.Metric.Area - 25) > 1e-8 || Math.Abs(entry.Metric.Length - 20) > 1e-8)
+                throw new InvalidOperationException($"Contour en arcering: {entry.Metric.Area} m2 / {entry.Metric.Length} m; verwacht 25 / 20.");
+            if (hatch.NumberOfLoops != 1 || Math.Abs(hatch.Area - 25) > 1e-8 || outline.NumberOfVertices != 4)
+                throw new InvalidOperationException("Analyseren heeft nog niet opgeslagen brongeometrie gewijzigd.");
+        }
     }
 
     private static void ReviewMergedDescription(Database db, Transaction tr)

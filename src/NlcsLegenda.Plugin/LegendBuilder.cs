@@ -88,8 +88,17 @@ public static class LegendBuilder
             using var mt = CreateDescription(db, s, styleId, text, Math.Max(textH * 3, width - TextBearing(tr, styleId, textH)));
             return mt.ActualHeight;
         }
+        double MeasureHeadingHeight(string text, double height)
+        {
+            using var heading = new MText();
+            heading.SetDatabaseDefaults(db);
+            heading.TextStyleId = styleId;
+            heading.TextHeight = height;
+            heading.Contents = "\\L" + MTextFormat.Escape(text) + "\\l";
+            return heading.ActualHeight;
+        }
         var layout = LegendLayoutEngine.Compute(analysis.Entries, layoutSettings, MeasureTextHeight,
-            entry => symbols.TryGetValue(entry, out var symbol) ? symbol.Height : 0);
+            entry => symbols.TryGetValue(entry, out var symbol) ? symbol.Height : 0, MeasureHeadingHeight);
         foreach (var item in layout.Items)
         {
             switch (item.Kind)
@@ -252,8 +261,9 @@ public static class LegendBuilder
         {
             double titleH = s.ToModel(s.TitleTextHeightMm);
             y -= titleH;
-            AddText(btr, tr, s.RemarksTitle, new Point3d(left, y, 0), titleH, s.HeaderTextLayer, styleId, underline: true);
-            y -= s.ToModel(s.HeaderSpacingMm) - textH;
+            var heading = AddText(btr, tr, s.RemarksTitle, new Point3d(left, y, 0), titleH, s.HeaderTextLayer, styleId, underline: true);
+            y = Math.Min(y - (s.ToModel(s.HeaderSpacingMm) - textH),
+                heading.GeometricExtents.MinPoint.Y - textH * 0.3);
         }
 
         var mt = new MText();
@@ -939,11 +949,11 @@ public static class LegendBuilder
         => Path.GetFileName(((TextStyleTableRecord)tr.GetObject(styleId, OpenMode.ForRead)).FileName)
             .Equals("NLCS-ISO.ttf", StringComparison.OrdinalIgnoreCase) ? height * 0.1 : 0;
 
-    private static void AddText(
+    private static MText AddText(
         BlockTableRecord btr, Transaction tr, string text, Point3d pos,
         double height, string layer, ObjectId styleId, bool underline = false)
     {
-        AddMText(btr, tr, text, new Point3d(pos.X + TextBearing(tr, styleId, height), pos.Y + height, pos.Z),
+        return AddMText(btr, tr, text, new Point3d(pos.X + TextBearing(tr, styleId, height), pos.Y + height, pos.Z),
             AttachmentPoint.TopLeft, height, layer, styleId, underline);
     }
 
@@ -1180,13 +1190,26 @@ public static class LegendBuilder
             return !id.IsNull && id.Database == db ? id : ObjectId.Null;
         }
 
-        var requested = FindHostStyle(name);
-        if (!requested.IsNull)
-            return requested;
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            var requested = FindHostStyle(name);
+            if (!requested.IsNull) return requested;
+            throw new InvalidOperationException($"Tekststijl '{name}' ontbreekt in deze tekening. Kies een bestaande stijl of laat de tekststijl leeg voor de TAUW-opmaak.");
+        }
 
-        var nlcsIso = FindHostStyle("NLCS-ISO");
-        if (!nlcsIso.IsNull)
-            return nlcsIso;
+        // De naam alleen garandeert geen template-opmaak: in een bestaande DWG kan
+        // NLCS-ISO een ander font, een breedtefactor of schuine tekst bevatten.
+        // Laat die gedeelde stijl intact en gebruik dan een eigen correcte stijl.
+        string styleName = "NLCS-ISO";
+        for (int suffix = 0; tst.Has(styleName); suffix++)
+        {
+            var existing = (TextStyleTableRecord)tr.GetObject(tst[styleName], OpenMode.ForRead);
+            if (Path.GetFileName(existing.FileName).Equals("NLCS-ISO.ttf", StringComparison.OrdinalIgnoreCase)
+                && Math.Abs(existing.XScale - 1) < 1e-9 && Math.Abs(existing.ObliquingAngle) < 1e-9
+                && !existing.IsVertical && existing.FlagBits == 0)
+                return existing.ObjectId;
+            styleName = "NLCS_LEGENDA_ISO" + (suffix == 0 ? string.Empty : "_" + suffix);
+        }
 
         // Een lege legenda-DWG heeft de tekststijl vaak alleen in de xref. Maak de
         // hoststijl zelfstandig aan; het huidige STANDARD-font is geen templatekeuze.
@@ -1197,7 +1220,7 @@ public static class LegendBuilder
             throw new InvalidOperationException("Lettertype NLCS-ISO.ttf ontbreekt. Installeer het NLCS-lettertype of kies een beschikbare tekststijl bij Instellingen.", ex);
         }
         tst.UpgradeOpen();
-        var created = new TextStyleTableRecord { Name = "NLCS-ISO", FileName = font, TextSize = 0, XScale = 1 };
+        var created = new TextStyleTableRecord { Name = styleName, FileName = font, TextSize = 0, XScale = 1 };
         var createdId = tst.Add(created);
         tr.AddNewlyCreatedDBObject(created, true);
         return createdId;

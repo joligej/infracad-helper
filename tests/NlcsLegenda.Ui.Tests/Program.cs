@@ -15,6 +15,7 @@ internal static class Program
         {
             foreach (float scale in new[] { 1f, 1.25f, 1.5f, 2f })
                 CheckSettings(scale, args.FirstOrDefault());
+            CheckTemplateReset();
             CheckXrefControls();
             CheckOverview();
             CheckKlic(args.FirstOrDefault());
@@ -56,6 +57,25 @@ internal static class Program
         foreach(var error in Errors) Console.WriteLine("FAIL " + error);
         Console.WriteLine($"UI: {_checks} controles; {Errors.Count} fouten");
         return Errors.Count == 0 ? 0 : 1;
+    }
+
+    private static void CheckTemplateReset()
+    {
+        var settings = new LegendSettings { Columns = 7, MaxRowsPerColumn = 2, MaxLegendHeightMm = 12,
+            LineSpacingFactor = 1.35, Scale = 500, RemarksText = "Eigen notitie" };
+        using var form = new SettingsDialog(settings, "Templateherstel");
+        OpenOffscreen(form);
+        Descendants(form).OfType<Button>().Single(b => b.Text == "TAUW-opmaak herstellen").PerformClick();
+        Check(settings.Columns == 0 && settings.MaxRowsPerColumn == 30 && settings.MaxLegendHeightMm == 0,
+            "Templateherstel herstelt de kolomindeling");
+        Check(settings.LineSpacingFactor == 0.624, "Templateherstel bewaart de exacte DWT-regelafstand");
+        Check(settings.Scale == 500 && settings.RemarksText == "Eigen notitie", "Templateherstel bewaart schaal en eigen tekst");
+        var tabs = Descendants(form).OfType<TabControl>().Single();
+        tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(p => p.Text == "Maten");
+        Application.DoEvents();
+        Check(Descendants(tabs.SelectedTab!).OfType<NumericUpDown>().Any(n => n.Value == 0.624M && n.DecimalPlaces == 3),
+            "Maten toont regelafstand zonder afronden");
+        form.Close();
     }
 
     private static void CheckXrefControls()

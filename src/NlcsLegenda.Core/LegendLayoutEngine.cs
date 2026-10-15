@@ -55,19 +55,28 @@ public static class LegendLayoutEngine
 {
     public static LegendLayout Compute(IReadOnlyList<LegendEntry> entries, LegendSettings s,
         Func<string, double, double>? measureTextHeight = null,
-        Func<LegendEntry, double>? minimumRowHeight = null)
+        Func<LegendEntry, double>? minimumRowHeight = null,
+        Func<string, double, double>? measureHeadingHeight = null)
     {
         double titleH = s.ToModel(s.TitleTextHeightMm);
         double headerH = s.ToModel(s.HeaderTextHeightMm);
         double subHeaderH = headerH; // hoofdgroepkop even hoog als de statuskop
         double swatchH = s.ToModel(s.SwatchHeightMm);
         double textH = s.ToModel(s.TextHeightMm);
-        double lineHeight = textH * Math.Max(1.0, s.LineSpacingFactor);
+        double lineHeight = textH * Math.Max(1.25, 5.0 / 3.0 * s.LineSpacingFactor);
         double rowGap = Math.Max(s.ToModel(s.RowPitchMm - s.SwatchHeightMm), textH * 0.3);
         double baselineOffset = textH * TemplateDefaults.TextBaselineOffsetRatio;
-        double headerBand = Math.Max(headerH, headerH + s.ToModel(s.RowPitchMm) - swatchH / 2 - baselineOffset);
+        double HeadingHeight(string text, double height) => measureHeadingHeight?.Invoke(text, height) ?? height * 1.2;
+        var headerTexts = entries.Select(e => e.CustomStatusName ?? s.StatusLabel(e.Status));
+        if (s.IncludeHoofdgroepHeaders)
+            headerTexts = headerTexts.Concat(entries.Select(e => StandardTexts.HoofdgroepName(e.Hoofdgroep)));
+        double actualHeaderH = headerTexts.Distinct().Select(t => HeadingHeight(t, headerH)).DefaultIfEmpty(headerH).Max();
+        double headerBand = Math.Max(actualHeaderH + rowGap, headerH + s.ToModel(s.RowPitchMm) - swatchH / 2 - baselineOffset);
         double subHeaderBand = headerBand;
-        double titleBand = titleH + s.ToModel(s.HeaderSpacingMm) - headerH;
+        double statusGap = Math.Max(0, swatchH / 2 + baselineOffset - headerH);
+        // Onderstreping en onderlengte tellen mee, ook bij grote eigen teksthoogtes.
+        double titleBand = Math.Max(HeadingHeight(s.Title, titleH) + rowGap,
+            titleH + s.ToModel(s.HeaderSpacingMm) - headerH);
         double colWidth = s.ToModel(s.ColumnWidthMm);
         double colGap = s.ToModel(s.ColumnGapMm);
 
@@ -168,7 +177,7 @@ public static class LegendLayoutEngine
             bool columnBroke = false;
             bool budgetReached = rows >= 1 && col < columnsNeeded - 1
                 && colHeight + entryHeights[i] * 0.5 >= columnBudget;
-            double extraHeader = needStatusHeader ? headerBand + (rows > 0 ? swatchH / 2 + baselineOffset - headerH : 0) : 0;
+            double extraHeader = needStatusHeader ? headerBand + (rows > 0 ? statusGap : 0) : 0;
             if (s.IncludeHoofdgroepHeaders && !entry.IsBlank
                 && !string.Equals(curHoofd, entry.Hoofdgroep, StringComparison.OrdinalIgnoreCase))
                 extraHeader += subHeaderBand;
@@ -186,7 +195,7 @@ public static class LegendLayoutEngine
             if (needStatusHeader || (columnBroke && s.IncludeGroupHeaders))
             {
                 if (rows > 0)
-                    y -= swatchH / 2 + baselineOffset - headerH;
+                    y -= statusGap;
                 items.Add(new LegendPlacement
                 {
                     Kind = LegendItemKind.Header, X = ColX(col), YTop = y,

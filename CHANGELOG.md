@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.31.2 - 2026-10-15
+
+- Meerregelige omschrijvingen volgen nu de gemeten regelafstand uit de TAUW-template
+  (0,624). De eerdere factor 1,35 gaf te veel witruimte en hogere regels.
+- Automatische sortering zet Bestaand vóór Nieuw, zoals in de voorbeelden.
+- TAUW-opmaak herstellen zet ook kolomindeling, koppen en voorbeeldweergave terug.
+  Eigen teksten, schaal, bronkeuzes en handmatige volgorde blijven behouden.
+- Grote statuskoppen en kleine kopafstanden kunnen de titel of vorige groep niet
+  meer overlappen. Ook opmerkingen blijven vrij van hun kop bij een kleine afstand.
+- De standaardopmaak blijft NLCS-ISO gebruiken als een bestaande hoststijl met die
+  naam afwijkt. Bestaande tekststijlen blijven intact; een expliciet gekozen, ontbrekende
+  stijl wordt gemeld in plaats van stil vervangen.
+- Metadata lezen gebruikt een gewone geneste transactie. De eerdere OpenClose-transactie
+  kon een nog niet opgeslagen arceercontour laten verdwijnen tijdens de analyse.
+- Extra CAD-acceptatie vergelijkt tekst, stijl, posities op drie schalen en een
+  meerregelige omschrijving rechtstreeks met de lokale referentie-DWT.
+
+Voor een bestaande legenda met oude opmaak: Instellingen → Legenda →
+TAUW-opmaak herstellen. Persoonlijke instellingen worden niet automatisch vervangen.
+
 ## 1.31.1 - 2026-10-15
 
 - Xrefs aan- of uitzetten overschrijft eerdere uitzonderingen. Een gedeeltelijke keuze
