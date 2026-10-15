@@ -2,18 +2,11 @@ using System.Text.RegularExpressions;
 
 namespace NlcsLegenda.Core;
 
-// Ontleedt en stelt een NLCS-laagnaam samen uit zijn formele onderdelen, conform de Formele
-// Beschrijving NLCS (versie 5.0, par. 5.1): [STATUS]-DISCIPLINE-HOOFDGROEP-OBJECT[-SUBOBJECT..]-
-// ELEMENT[-SCHAAL]. Alleen de formeel vastgelegde STATUS- en ELEMENT-codes worden als geldig
-// gezien; voor DISCIPLINE/HOOFDGROEP/OBJECT geldt de vormregel (de volledige codelijsten staan
-// in de externe objectentabellen, niet in deze bron). Bewust zonder verzonnen componenten.
+// formele nlcs 5.0, paragraaf 5.1; overige codelijsten extern
 public sealed class NlcsLayerComponents
 {
-    // Formele STATUS-codes (par. 5.1.1). R gedraagt zich als N; X alleen met discipline XX + AL.
     public static readonly string[] StatusCodes = { "N", "B", "V", "T", "X", "R" };
 
-    // Formele ELEMENT-codes (par. 5.1.5). T** is Tekst met teksthoogte (bijv. T25), optioneel
-    // vlakvormend (T25V).
     public static readonly string[] ElementCodes =
     {
         "G", "GN", "GD", "GV", "A", "AD", "S", "SD", "SN", "SV", "O", "M", "V"
@@ -23,12 +16,12 @@ public sealed class NlcsLayerComponents
     private static readonly Regex TextElement = new(@"^T\d+V?$", RegexOptions.Compiled);
 
     public string Status { get; set; } = "N";
-    public string SubStatus { get; set; } = string.Empty;   // "", of 01-99
+    public string SubStatus { get; set; } = string.Empty;
     public string Discipline { get; set; } = string.Empty;
     public string Hoofdgroep { get; set; } = string.Empty;
-    public List<string> ObjectParts { get; set; } = new();  // OBJECT t/m SUBOBJECT
+    public List<string> ObjectParts { get; set; } = new();
     public string Element { get; set; } = "G";
-    public string Scale { get; set; } = string.Empty;       // "", of getal
+    public string Scale { get; set; } = string.Empty;
 
     public static bool TryParse(string raw, out NlcsLayerComponents comp, out string error)
     {
@@ -92,8 +85,6 @@ public sealed class NlcsLayerComponents
         return string.Join('-', parts);
     }
 
-    // Lijst met concrete problemen; leeg = geldig. Valideert STATUS/ELEMENT strikt tegen de
-    // formele codes en de bekende combinatieregels; overige velden op vorm.
     public IReadOnlyList<string> Validate()
     {
         var errors = new List<string>();
@@ -124,7 +115,7 @@ public sealed class NlcsLayerComponents
             System.Globalization.CultureInfo.InvariantCulture, out var scale) || scale <= 0))
             errors.Add("SCHAAL moet een positief geheel getal zijn.");
 
-        // Combinatieregels (par. 5.1.1/5.1.3): X hoort bij XX+AL en omgekeerd.
+        // status x uitsluitend met discipline xx en hoofdgroep al
         if (status == "X" && !(disc == "XX" && hoofd == "AL"))
             errors.Add("STATUS 'X' mag alleen met DISCIPLINE 'XX' en HOOFDGROEP 'AL'.");
         if (hoofd == "AL" && status != "X")

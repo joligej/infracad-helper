@@ -1,11 +1,6 @@
 <#
-.SYNOPSIS
-  Controleert de echte plugin in AutoCAD Core Console op afzonderlijke testtekeningen.
-.DESCRIPTION
-  Slaagt alleen bij de verwachte testmeldingen, ongewijzigde systeemvariabelen,
-  QSAVE met DBMOD=0 en afsluiting zonder fout. Bron-/templatebestanden blijven intact.
-  Met -Isolated gebruikt elke proef een tijdelijk eigen CAD-profiel.
-  Gebruik -PluginPath voor acceptatie van een publiek geïnstalleerde release.
+.synopsis
+    cad-acceptatie met bronbehoud en optioneel een geïsoleerd profiel
 #>
 [CmdletBinding()]
 param(
@@ -92,7 +87,7 @@ $specs=@{
  consumer=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDACONSUMERTEST",'CONSUMER: exploderen=')
  layout=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAOPMAAKMEETTEST`nNLCSLEGENDAVOLOPMAAKTEST",'VOLOPMAAK: totaal -> OK')
 }
-# Controleer testcommando's voor de eerste CAD-start; ongeldige scriptinvoer mag nooit doorlopen.
+# testcommando controleren vóór de eerste cad-start
 $sourceText=(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src/NlcsLegenda.Plugin') -Filter 'Commands*.cs' | Get-Content -Raw) -join "`n"
 foreach($case in $Cases){
  if(!$specs.ContainsKey($case)){throw "Onbekende test: $case"}

@@ -43,9 +43,8 @@ public class LegendLayoutEngineTests
 
         var layout = LegendLayoutEngine.Compute(entries, NoTitle(2));
 
-        Assert.Equal(3, layout.Columns); // 2 + 2 + 1
+        Assert.Equal(3, layout.Columns);
         Assert.Equal(5, layout.Items.Count(i => i.Kind == LegendItemKind.Entry));
-        // Kop wordt bovenaan elke kolom herhaald voor de doorlopende groep.
         Assert.Equal(3, layout.Items.Count(i => i.Kind == LegendItemKind.Header));
     }
 

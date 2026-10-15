@@ -116,7 +116,6 @@ public sealed class DescriptionCatalog
         }
         catch
         {
-            // Ongeldig bestand: negeren.
         }
         return new DescriptionCatalog();
     }

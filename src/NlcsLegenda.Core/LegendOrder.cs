@@ -4,8 +4,6 @@ namespace NlcsLegenda.Core;
 
 public static class LegendOrder
 {
-    // Teksten en bronpaden kunnen veranderen. Inhoud en weergave onderscheiden de regels,
-    // ook wanneer één laag meerdere kleuren bevat of meerdere KLIC-regels samenkomen.
     public static string Key(LegendEntry entry) => JsonSerializer.Serialize(new[]
     {
         LegendSettings.EntryKey(entry).ToUpperInvariant(),
@@ -23,8 +21,7 @@ public static class LegendOrder
         return entries.OrderBy(e => positions.GetValueOrDefault(Key(e), int.MaxValue)).ToList();
     }
 
-    // Een schaal- of kleurwijziging verandert de render-identiteit. Alleen bij een unieke
-    // inhoudelijke regel is de oude positie ondubbelzinnig; varianten blijven gescheiden.
+    // oude positie alleen hergebruiken bij een unieke inhoudelijke regel
     private static List<string> Align(IReadOnlyList<string> saved, IReadOnlyList<string> current)
     {
         string Logical(string key)

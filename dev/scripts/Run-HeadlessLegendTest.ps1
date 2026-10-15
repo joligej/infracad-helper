@@ -1,10 +1,6 @@
 <#
-.SYNOPSIS
-    Bouwt de plugin en controleert een legenda op een kopie van de opgegeven tekening.
-.DESCRIPTION
-    Gebruikt Core Console zonder andere CAD-sessies. Controleert procescode,
-    testresultaat, DLL-hash en systeemvariabelen binnen CAD en in het opgeslagen profiel.
-    De bron blijft ongewijzigd. Met -SaveResult blijft de gegenereerde DWG in de uitvoermap.
+.synopsis
+    legenda controleren op een bronkopie, inclusief profielherstel
 #>
 #requires -Version 7.4
 [CmdletBinding()]

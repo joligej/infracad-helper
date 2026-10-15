@@ -80,8 +80,6 @@ public class QuantityAndExportTests
     [Fact]
     public void QuantityText_SymbolWithLengthNoise_StaysCount()
     {
-        // Een symbool kan door geometrie in het blok wat "lengte" oppikken; toch moet de
-        // hoeveelheid in stuks blijven, niet in meters.
         var metrics = new Dictionary<string, LayerMetric>(StringComparer.OrdinalIgnoreCase)
         {
             ["N-WE-VW-VERKEERSTEKEN_BORD-S"] = new(5, 123, 0)
@@ -163,8 +161,6 @@ public class QuantityAndExportTests
         var entries = LegendGrouping.Build(Parse("N-WE-VH-OPENVERHARDING_TEGEL-G"), settings);
         var csv = LegendExport.ToCsv(entries);
 
-        // De cel begint met een apostrof, zodat Excel/Calc de tekst niet als formule uitvoert,
-        // ook wanneer er voorloopspaties vóór de formule staan.
         Assert.Contains("'" + dangerous, csv);
     }
 
@@ -195,7 +191,6 @@ public class QuantityAndExportTests
         Assert.StartsWith("Tekening;Status;", lines[0]);
         Assert.Contains(lines, l => l.StartsWith("ontwerp-A.dwg;"));
         Assert.Contains(lines, l => l.StartsWith("ontwerp-B.dwg;"));
-        // Kop + één regel per tekening.
         Assert.Equal(3, lines.Length);
     }
 

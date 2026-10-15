@@ -1,4 +1,3 @@
-# ---- Build output ----
 bin/
 obj/
 [Dd]ebug/
@@ -8,9 +7,7 @@ obj/
 .vs/
 artifacts/
 
-# ---- Referentiemateriaal en tekeningen (blijven altijd lokaal) ----
 relevante_bronnen/
-# CAD-bestanden nooit committen, waar ze ook staan.
 *.dwg
 *.dwt
 *.dws
@@ -22,22 +19,17 @@ relevante_bronnen/
 *.pkt
 *.bak
 
-# ---- Development scratch ----
 _dev_tmp/
 
-# ---- Codesign-materiaal (privésleutels nooit committen) ----
 dev/signing/
 *.pfx
 *.pfx.b64
 *.snk
 
-# ---- OS ----
 Thumbs.db
 Desktop.ini
 
-# Autodesk crash-/telemetrielogs (accoreconsole)
 ErrorReports/
 *.dmp
 
-# Tijdelijke AutoCAD- en testlogs blijven lokaal.
 *.log

@@ -65,8 +65,7 @@ public sealed class HatchSample
             && Math.Abs(a.DotProduct(b)) <= scale * scale * 1e-9;
         if (uniform)
         {
-            // Alleen het bronvlak bepaalt de patroonmaat. Een afwijkende Z-schaal kan
-            // AutoCAD anders de geometrie laten schalen zonder het patroon mee te schalen.
+            // patroonmaat uit het bronvlak, onafhankelijk van de z-schaal
             transform = Matrix3d.AlignCoordinateSystem(plane.PointOnPlane, u, v, normal,
                 plane.PointOnPlane.TransformBy(transform), a, b, a.CrossProduct(b).GetNormal() * scale);
         }

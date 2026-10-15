@@ -1,7 +1,7 @@
 #requires -Version 7.4
 
 function Get-NlcsProfileState {
-    # FILEDIA wordt als FileDialog bewaard. SysvarMonitor bevat alleen de gewenste waarde.
+    # filedia opgeslagen als filedialog; sysvarmonitor bevat alleen de gewenste waarde
     $root = 'HKCU:\Software\Autodesk\AutoCAD'
     if (!(Test-Path -LiteralPath $root)) { return }
     foreach ($series in Get-ChildItem -LiteralPath $root) {
@@ -127,7 +127,7 @@ function Invoke-NlcsCoreConsole {
         $logBefore | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$Log.logging-before.json" -Encoding utf8
         $work = Split-Path -Parent ([IO.Path]::GetFullPath($Script))
         $arguments = @('/i', ('"{0}"' -f $Drawing), '/s', ('"{0}"' -f $Script), '/l', 'en-US')
-        # Elke run kiest zijn doel zelf; een instelling uit de bovenliggende shell mag niet meeliften.
+        # geen doelkeuze erven uit de bovenliggende sessie
         $childEnvironment = @{ NLCSLEGENDA_TARGET = $null }
         foreach ($name in $Environment.Keys) { $childEnvironment[$name] = $Environment[$name] }
         $process = Start-Process -FilePath $Executable -ArgumentList $arguments -WorkingDirectory $work `
@@ -141,7 +141,7 @@ function Invoke-NlcsCoreConsole {
     catch { $failure = $_ }
     finally {
         try {
-            # Ook bij Ctrl+C/fouten eerst uitsluitend ons eigen proces stoppen en laten afsluiten.
+            # bij afbreken uitsluitend het eigen proces stoppen
             if ($null -ne $process) {
                 try {
                     if (!$process.HasExited) { $process.Kill(); $process.WaitForExit() }
@@ -160,8 +160,7 @@ function Invoke-NlcsCoreConsole {
                         throw "CAD is tijdens de test gestart; profielherstel is niet veilig. Beginwaarden: $Log.profile-before.json"
                     }
                     $restored = @(Restore-NlcsProfileState $changed)
-                    # Core Console bewaart zijn werkmap als logpad; dit is hostgedrag.
-                    # Zet dat pad en de logstand terug voordat testmappen worden verwijderd.
+                    # opgeslagen logpad en logstand herstellen vóór opruimen
                     Restore-NlcsProfileState $logChanged | Out-Null
                 }
             }
@@ -176,8 +175,7 @@ function Invoke-NlcsCoreConsole {
     [pscustomobject]@{ ExitCode = 0; Log = $Log; ProfileValuesChecked = @(@($before) + @($after) | ForEach-Object { $_.Path + '|' + $_.Name } | Select-Object -Unique).Count }
 }
 
-# Een eigen Core Console-profiel laat gelijktijdige CAD-sessies ongemoeid.
-# Alleen voor afzonderlijke testtekeningen; dit bewijst geen normale bundel-autoload.
+# eigen cad-profiel voor gelijktijdige tests; geen bewijs van normale autoload
 function Invoke-NlcsIsolatedConsole {
     param([string]$Executable, [string]$Drawing, [string]$Script, [string]$Log,
           [int]$TimeoutSeconds, [hashtable]$Environment)
@@ -206,6 +204,6 @@ function Invoke-NlcsIsolatedConsole {
             finally { $process.Dispose() }
         }
     }
-    # Geen normaal profiel uitlezen of terugzetten: dat kan bij de andere CAD-sessie horen.
+    # profiel van een andere cad-sessie ongemoeid laten
     [pscustomobject]@{ ExitCode=0; Log=$Log; ProfileValuesChecked=0; Isolated=$true; IsolationRoot=$profile }
 }

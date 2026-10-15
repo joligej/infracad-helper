@@ -13,7 +13,6 @@ public static class NlcsLayerParser
 
         var raw = rawLayerName.Trim();
 
-        // Xref-lagen: "xrefnaam|laagnaam" -> neem het deel na de laatste '|'.
         var isXref = raw.Contains('|');
         var local = LayerNaming.LocalName(raw);
         var xrefName = isXref ? raw[..raw.LastIndexOf('|')] : string.Empty;
@@ -45,8 +44,6 @@ public static class NlcsLayerParser
         var typeSuffix = parts[lastIndex];
         lastIndex--;
 
-        // Elementdelen zijn parts[3..lastIndex]; join met '-' voor het zeldzame geval
-        // dat een elementnaam zelf een koppelteken bevat.
         var element = string.Join('-', parts[3..(lastIndex + 1)]);
         if (string.IsNullOrEmpty(element))
             return false;

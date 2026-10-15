@@ -21,7 +21,6 @@ internal class LegendDialog : Form
     }
 }
 
-// Een verticale inhoudskolom met echte voorkeurshoogtes. De tabpagina verzorgt het scrollen.
 internal sealed class SettingsStack : TableLayoutPanel
 {
     public SettingsStack()

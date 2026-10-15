@@ -1,8 +1,5 @@
 namespace NlcsLegenda.Core;
 
-// Elementsoort afgeleid van het TYPE-suffix van een NLCS-laagnaam. Zie FromSuffix voor
-// de mapping. Vlakvulling (V) en Arcering (A) renderen allebei als hatch, maar zijn
-// bewust aparte soorten zodat de gebruiker ze los kan filteren.
 public enum NlcsDrawType
 {
     Geometrie,
@@ -20,12 +17,11 @@ public static class NlcsDrawTypeExtensions
     {
         var s = (suffix ?? string.Empty).Trim().ToUpperInvariant();
         if (s.Length == 0) return NlcsDrawType.Overig;
-        if (s == "A" || s == "AD") return NlcsDrawType.Arcering;          // AD = arcering in doorsnede
+        if (s == "A" || s == "AD") return NlcsDrawType.Arcering;
         if (s == "V") return NlcsDrawType.Vlakvulling;
-        if (s == "S" || s == "SD" || s == "SN" || s == "SV") return NlcsDrawType.Symbool; // symbool in doorsnede/niet zichtbaar/verticaal
+        if (s == "S" || s == "SD" || s == "SN" || s == "SV") return NlcsDrawType.Symbool;
         if (s == "GV") return NlcsDrawType.Vlak;
         if (s == "G" || s == "GD" || s == "GS") return NlcsDrawType.Geometrie;
-        // T gevolgd door een schaalgetal (T25/T35/T50) of enkel "T".
         if (s[0] == 'T' && (s.Length == 1 || s.Skip(1).All(char.IsDigit))) return NlcsDrawType.Tekst;
         return NlcsDrawType.Overig;
     }

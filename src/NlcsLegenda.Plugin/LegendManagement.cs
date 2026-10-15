@@ -4,12 +4,9 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-// Groep-, handle- en locator-helpers voor beheerde legenda's. Alles werkt op een bestaande
-// transactie zodat registry en geometrie samen committen.
 internal static class LegendManagement
 {
-    // Alleen legenda's met nog aanwezige geometrie doen mee aan gewone bediening.
-    // De opgeslagen registratie blijft intact: UNDO van ERASE herstelt ook de bediening.
+    // registratie behouden voor herstel via ongedaan maken
     public static LegendRegistry ActiveRegistry(Database db, Transaction tr, LegendRegistry registry)
     {
         var groups = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
@@ -22,8 +19,6 @@ internal static class LegendManagement
         };
     }
 
-    // Alle ObjectIds die bij een beheerde legenda horen. De analyse sluit deze uit, zodat
-    // geplaatste legenda's de brontelling niet beïnvloeden.
     public static HashSet<ObjectId> CollectManagedIds(Database db, Transaction tr, LegendRegistry registry)
     {
         var ids = new HashSet<ObjectId>();
@@ -36,7 +31,6 @@ internal static class LegendManagement
             foreach (ObjectId id in g.GetAllEntityIds())
             {
                 ids.Add(id);
-                // Als een behouden legenda-blok is geselecteerd, sluit ook zijn inhoud uit.
                 if (tr.GetObject(id, OpenMode.ForRead) is BlockReference br && !br.BlockTableRecord.IsNull)
                     AddBlockContents(br.BlockTableRecord, tr, ids, 0);
             }
@@ -80,11 +74,6 @@ internal static class LegendManagement
         group.Append(idc);
     }
 
-    // Wist de geometrie van een groep en geeft de huidige linksbovenhoek terug, zodat een
-    // update op dezelfde plek komt. Geeft false als er geen bruikbare geometrie was. Bij
-    // keepGroup blijft de groep zelf bestaan (voor een update die er meteen nieuwe geometrie in
-    // hangt); zo blijft de legenda betrouwbaar als beheerde groep herkend en raakt een oude
-    // blokreferentie niet verweesd buiten de groep (anders telt een volgende update die mee).
     public static bool TryEraseGroup(Database db, Transaction tr, string groupName, out Point3d topLeft, bool keepGroup = false)
     {
         topLeft = Point3d.Origin;
@@ -110,9 +99,7 @@ internal static class LegendManagement
         }
         if (keepGroup)
         {
-            // De groep zelf behouden; geëraste leden vallen vanzelf uit GetAllEntityIds, dus de
-            // groep bevat na de rebuild alleen de nieuwe geometrie. Niet erasen voorkomt dat de
-            // oude blokreferentie als verweesde (niet-beheerde) bron blijft staan.
+            // groep behouden tegen verweesde legenda-objecten bij bijwerken
         }
         else
         {
@@ -142,9 +129,7 @@ internal static class LegendManagement
         return any;
     }
 
-    // Extents van een entiteit bepalen. Eerst de native bounds; is die er niet (MText levert in
-    // de Core Console zonder graphics soms geen extents), dan voor een blokreferentie de inhoud
-    // meten en meetransformeren. Zo blijven extents ook headless gelijk.
+    // blokinhoud meten bij ontbrekende grafische grenzen
     public static bool TryGetEntityExtents(Transaction tr, Entity ent, out Extents3d extents)
         => TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out extents);
 
@@ -179,8 +164,6 @@ internal static class LegendManagement
         return true;
     }
 
-    // Resolvet opgeslagen Handles naar bestaande ObjectIds; ontbrekende handles worden
-    // geteld maar overgeslagen (geen crash door een verdwenen bronobject).
     public static ObjectId[] ResolveHandles(Database db, IEnumerable<string> handles, out int missing)
     {
         var result = new List<ObjectId>();
@@ -213,8 +196,6 @@ internal static class LegendManagement
         return list;
     }
 
-    // Vindt de beheerde legenda waartoe een aangeklikt object hoort, via group-lidmaatschap
-    // (de registry/group is de waarheid, niet een gekopieerde marker).
     public static LegendDefinition? FindLegendForEntity(
         Database db, Transaction tr, LegendRegistry registry, ObjectId entId)
     {

@@ -23,7 +23,6 @@ public static class TextWrap
             foreach (var word in paragraph.Split(' '))
             {
                 var piece = word;
-                // Woorden die op zichzelf te lang zijn, hard afbreken.
                 while (piece.Length > maxChars)
                 {
                     if (line.Length > 0)

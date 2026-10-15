@@ -36,16 +36,13 @@ public sealed class LegendEntry
 
     public DescriptionSource DescriptionSource { get; init; } = DescriptionSource.Catalogus;
 
-    // Blanco regel: bewust leeg (geen bron, geen hoeveelheid, leeg swatchvak). De renderer en
-    // export behandelen zo'n regel als statische invulregel, niet als ontbrekende bron.
     public bool IsBlank => DescriptionSource == DescriptionSource.Blanco;
 
     public Dictionary<NlcsDrawType, string> LayersByType { get; init; } = new();
 
     public IReadOnlyList<NlcsLayerSource> SourceLayers { get; init; } = System.Array.Empty<NlcsLayerSource>();
 
-    // Alleen de echte G/GD/GS-laag. GV valt hier bewust niet onder: een vlak rendert als
-    // rechthoek, een G-lijn altijd als lijn, ook als beide op dezelfde entry zitten.
+    // lijngeometrie apart van vlakcontouren
     public string? GeometryLayer =>
         LayersByType.TryGetValue(NlcsDrawType.Geometrie, out var g) ? g : null;
 
@@ -71,13 +68,8 @@ public sealed class LegendEntry
 
     public string? SymbolBlockName { get; init; }
 
-    // Visuele identiteit (kleur/linetype/lineweight/arcering/symbool) van de representatieve
-    // laag. Gebruikt om statussen alleen samen te voegen als ze er echt hetzelfde uitzien.
     public string RenderIdentity { get; init; } = string.Empty;
 
-    // Bij samenvoegen (KLIC-groepering): de oorspronkelijke elementnamen die in deze regel
-    // zijn samengenomen. Leeg als er niets is samengevoegd. Puur informatief/traceerbaar;
-    // de groepering zelf is een afgeleide weergave en volledig omkeerbaar.
     public IReadOnlyList<string> MergedMembers { get; init; } = System.Array.Empty<string>();
 
     public QuantityKind QuantityType
@@ -85,8 +77,7 @@ public sealed class LegendEntry
         get
         {
             if (IsArea && Metric.Area > 0) return QuantityKind.Area;
-            // Lengte alleen als er echt een lijn-/geometrie-element is; zo krijgt een
-            // symbool geen "meters" door bijvoorbeeld geometrie in het blok.
+            // geen lijnlengte uit de interne geometrie van een symbool
             if (GeometryLayer is not null && Metric.Length > 0) return QuantityKind.Length;
             if (Metric.Count > 0) return QuantityKind.Count;
             if (Metric.Length > 0) return QuantityKind.Length;

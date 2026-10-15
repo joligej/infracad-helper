@@ -6,10 +6,6 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    // Structurele controle van de werkbalk in een GUI-host: bestaat de tab NLCS Legenda en bevat
-    // hij de verwachte panels/knoppen? Schrijft het resultaat naar NLCS_RIBBON_OUT als die gezet
-    // is, zodat een GUI-start zonder NETLOAD automatisch te verifiëren valt. In accoreconsole is er
-    // geen ribbon; dan meldt het commando dat eerlijk.
     [CommandMethod("NLCSLEGENDARIBBONTEST", CommandFlags.Modal)]
     public void NlcsLegendaRibbonTest()
     {
@@ -22,7 +18,7 @@ public partial class Commands
         var outPath = System.Environment.GetEnvironmentVariable("NLCS_RIBBON_OUT");
         if (!string.IsNullOrWhiteSpace(outPath))
         {
-            try { File.WriteAllText(outPath, line + "\n"); } catch { /* verificatiehaak */ }
+            try { File.WriteAllText(outPath, line + "\n"); } catch {   }
         }
     }
 }

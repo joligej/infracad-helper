@@ -57,7 +57,6 @@ public partial class Commands
         var settings = new LegendSettings();
         void Check(string name, int rows, double length, int providers)
         {
-            // Ook de opgeslagen vorm moet dezelfde selectie opleveren.
             var saved = LegendSettings.FromJson(settings.ToJson());
             var result = DrawingAnalyzer.Analyze(db, tr, saved);
             if (result.Entries.Count != rows || Math.Abs(result.Entries.Sum(e => e.Metric.Length) - length) > 1e-8

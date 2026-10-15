@@ -3,9 +3,6 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Numeriek templatecontract: de layout is volledig in model-eenheden (mm * schaal / 1000),
-// dus teruggerekend naar papier-mm moet hij op elke schaal identiek zijn. Zo vangen we
-// zichtbare layoutregressies zonder een echte render/DWG nodig te hebben.
 public class LegendGeometryContractTests
 {
     private const string Base1 = "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN";
@@ -28,7 +25,6 @@ public class LegendGeometryContractTests
         var entries = Entries();
         double[] scales = { 100, 200, 500, 1000 };
 
-        // Referentie op 1:100, alles teruggerekend naar papier-mm.
         var reference = Reference(entries, 100);
 
         foreach (var scale in scales)
@@ -42,7 +38,6 @@ public class LegendGeometryContractTests
                 Assert.Equal(reference[i].x, ToPaperMm(layout.Items[i].X, scale), 3);
                 Assert.Equal(reference[i].y, ToPaperMm(layout.Items[i].YTop, scale), 3);
             }
-            // Totale breedte in papier-mm blijft gelijk aan de kolombreedte (1 kolom).
             Assert.Equal(143.0, ToPaperMm(layout.MaxX - layout.MinX, scale), 3);
         }
     }
@@ -66,7 +61,6 @@ public class LegendGeometryContractTests
         var title = layout.Items.First(i => i.Kind == LegendItemKind.Title);
         Assert.Equal(0.0, ToPaperMm(title.YTop, 200), 3);
 
-        // Eerste inhoud (kop of regel) begint onder de titelband: basislijnafstand 6,9257 mm tussen titel en eerste kop.
         var firstBelow = layout.Items.First(i => i.Kind != LegendItemKind.Title);
         Assert.Equal(-(5.0 + 6.9257 - 2.5), ToPaperMm(firstBelow.YTop, 200), 3);
     }
@@ -74,7 +68,6 @@ public class LegendGeometryContractTests
     [Fact]
     public void Columns_HaveTemplatePitchInPaperMm()
     {
-        // Genoeg regels forceren meerdere kolommen; kolomsprong = kolombreedte + tussenruimte.
         var layers = new List<NlcsLayerName>();
         for (int i = 0; i < 80; i++)
             if (NlcsLayerParser.TryParse($"N-WE-VH-ELEMENT{i:D3}_X-G", out var p))
@@ -88,6 +81,6 @@ public class LegendGeometryContractTests
         var col0 = layout.Items.Where(i => i.Column == 0).Select(i => ToPaperMm(i.X, 500)).Distinct().Single();
         var col1 = layout.Items.Where(i => i.Column == 1).Select(i => ToPaperMm(i.X, 500)).Distinct().Single();
         Assert.Equal(0.0, col0, 3);
-        Assert.Equal(143.0 + 10.0, col1 - col0, 3); // kolombreedte 143 + tussenruimte 10
+        Assert.Equal(143.0 + 10.0, col1 - col0, 3);
     }
 }

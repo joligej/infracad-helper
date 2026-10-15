@@ -1,24 +1,6 @@
 <#
-.SYNOPSIS
-    Draait een reeks NLCS Legenda-commando's headless via de AutoCAD Core Console en
-    controleert de resultaten. Bedoeld als lokale integratietest (vereist AutoCAD).
-
-.DESCRIPTION
-    De opgegeven tekening wordt eerst naar een tijdelijke map gekopieerd, zodat alle
-    resultaten (export-bestanden e.d.) daar terechtkomen en de bron ongemoeid blijft.
-
-    Twee scenario's:
-      1. Eén legenda: NLCSLEGENDATEST, NLCSLEGENDAINFO, NLCSLEGENDAEXPORT, NLCSLEGENDAUPDATE.
-      2. Crashregressie: twee beheerde legenda's. NLCSLEGENDAUPDATE moet headless veilig
-         weigeren (geen GetEntity/native crash), en met NLCSLEGENDA_TARGET de juiste
-         legenda bijwerken.
-
-    Elke run controleert de procescode, het eindresultaat en de systeemvariabelen,
-    inclusief de opgeslagen profielwaarden. Runs hebben een timeout en starten
-    alleen zonder andere CAD-processen. Foutlogs blijven in artifacts/integration.
-
-.EXAMPLE
-    ./Run-IntegrationTests.ps1 -Drawing "C:\pad\ontwerp.dwg" -AcadVersion 2027
+.synopsis
+    integratieproeven op kopieën van de opgegeven tekening
 #>
 [CmdletBinding()]
 param(
@@ -56,7 +38,7 @@ try {
         else { Write-Host "  [FOUT] $name" -ForegroundColor Red; $script:fail++ }
     }
 
-    # Elke run moet zijn eindmelding bereiken; een procescode 0 alleen is onvoldoende.
+    # eindmelding vereist naast procescode nul
     function Invoke-Accore($dwg, $scriptBody, $tag, $envTarget) {
         $scr = Join-Path $work "$tag.scr"
         $end = '(princ (strcat "\nINTEGRATION_SYSVARS=" (if (and (= __f (getvar "FILEDIA")) (= __o (getvar "SECURELOAD"))) "OK" "FAIL")))' + "`n" + '(princ "\nINTEGRATION_END\n")' + "`n_.QUIT`n_Y"
@@ -79,7 +61,6 @@ try {
 
     $load = "(setq __f (getvar `"FILEDIA`"))`n(setq __o (getvar `"SECURELOAD`"))(setvar `"SECURELOAD`" 0)`n(command `"_.NETLOAD`" `"$dllFwd`")(setvar `"SECURELOAD`" __o)"
 
-    # --- Scenario 1: één legenda ---
     Write-Host "==> Scenario 1: een legenda" -ForegroundColor Cyan
     $dwg1 = Join-Path $work "one.dwg"
     Copy-Item $Drawing $dwg1
@@ -102,7 +83,6 @@ try {
     Check "NLCSLEGENDAUPDATE werkt bij (1 legenda, auto)" ($r1.Out -match 'bijgewerkt')
     Check "Scenario 1 geen onafgevangen fout" (-not ($r1.Out -match 'Unhandled|FATAL ERROR'))
 
-    # --- Scenario 2: crashregressie met twee legenda's ---
     Write-Host "==> Scenario 2: twee legenda's (crashregressie)" -ForegroundColor Cyan
     $dwg2 = Join-Path $work "two.dwg"
     Copy-Item $Drawing $dwg2
@@ -111,14 +91,12 @@ try {
     $rMake = Invoke-Accore $dwg2 $make "make" $null
     Check "Twee legenda's geplaatst" (([regex]::Matches($rMake.Out, 'NLCSTEST placed rows=')).Count -ge 2)
 
-    # Gewone update: moet headless veilig weigeren, geen crash, exit 0, geen mutatie.
     $upd = "$load`nNLCSLEGENDAUPDATE`n_.QUIT`n"
     $rRefuse = Invoke-Accore $dwg2 $upd "refuse" $null
     Check "Twee legenda's: exitcode 0" ($rRefuse.Exit -eq 0)
     Check "Twee legenda's: veilige weigering" ($rRefuse.Out -match 'Meerdere legenda' -and $rRefuse.Out -match 'NLCSLEGENDA_TARGET')
     Check "Twee legenda's: geen GetEntity-crash" (-not ($rRefuse.Out -match 'Unhandled|FATAL ERROR|AccessViolation'))
 
-    # Niet-interactief: NLCSLEGENDA_TARGET wijst de juiste legenda aan.
     $rTarget = Invoke-Accore $dwg2 $upd "target" "Legenda 2"
     Check "Niet-interactief: exitcode 0" ($rTarget.Exit -eq 0)
     Check "Niet-interactief: juiste legenda bijgewerkt" ($rTarget.Out -match 'Legenda 2.*bijgewerkt')

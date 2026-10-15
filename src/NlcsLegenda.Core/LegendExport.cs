@@ -74,8 +74,6 @@ public static class LegendExport
         };
     }
 
-    // Blanco regels hebben geen bron, dus geen zinvolle discipline/hoofdgroep/element: in de
-    // export tonen we die neutraal (leeg) in plaats van de interne code (XX/HM/BLANCO_...).
     private static string ExportDiscipline(LegendEntry e) => e.IsBlank ? string.Empty : e.Discipline;
     private static string ExportHoofdgroep(LegendEntry e) => e.IsBlank ? string.Empty : e.Hoofdgroep;
     private static string ExportElement(LegendEntry e) => e.IsBlank ? string.Empty : e.Element;
@@ -177,7 +175,7 @@ public static class LegendExport
         if (string.IsNullOrEmpty(value))
             return string.Empty;
 
-        // Bescherm tegen CSV-formule-injectie in Excel/Calc.
+        // formules in spreadsheetcellen onschadelijk maken
         var text = value;
         var firstNonSpace = text.AsSpan().TrimStart();
         if (firstNonSpace.Length > 0 && (firstNonSpace[0] is '=' or '+' or '-' or '@'))

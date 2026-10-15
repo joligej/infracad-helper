@@ -122,7 +122,7 @@ public static class StandardTexts
         for (var i = 0; i < words.Length; i++)
         {
             var w = words[i];
-            // Behoud codes/afmetingen met cijfers en korte acroniemen (bijv. PVC, HWA, CAI).
+            // codes, maten en korte afkortingen behouden
             if (w.Any(char.IsDigit) || (w.Length <= 3 && w.All(char.IsUpper)))
                 continue;
             words[i] = ti.ToTitleCase(w.ToLowerInvariant());

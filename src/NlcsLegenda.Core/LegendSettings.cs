@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace NlcsLegenda.Core;
 
-// Maatvoering staat in papier-mm; ToModel rekent met de plotschaal naar modelmeters.
+// papiermillimeters naar modelmeters via de plotschaal
 public sealed class LegendSettings
 {
     public const int CurrentSchemaVersion = 1;
@@ -13,12 +13,10 @@ public sealed class LegendSettings
     [Browsable(false)]
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
-    // ---- Algemeen ----
 
     [Category("Algemeen"), DisplayName("Schaal (1:)"), Description("Plotschaal, bijvoorbeeld 200 voor 1:200.")]
     public double Scale { get; set; } = 200.0;
 
-    // ---- Teksten ----
 
     [Category("Teksten"), DisplayName("Titel tonen")]
     public bool IncludeTitle { get; set; } = true;
@@ -83,7 +81,6 @@ public sealed class LegendSettings
     [Category("Teksten"), DisplayName("Tekststijl"), Description("Naam van de AutoCAD-tekststijl (leeg = NLCS-ISO).")]
     public string TextStyle { get; set; } = string.Empty;
 
-    // ---- Koppen ----
 
     [Category("Koppen"), DisplayName("Statuskoppen tonen")]
     public bool IncludeGroupHeaders { get; set; } = true;
@@ -91,7 +88,6 @@ public sealed class LegendSettings
     [Category("Koppen"), DisplayName("Hoofdgroep-subkoppen tonen")]
     public bool IncludeHoofdgroepHeaders { get; set; } = false;
 
-    // ---- Opmerkingen ----
 
     [Category("Opmerkingen"), DisplayName("Opmerkingen tonen")]
     public bool IncludeRemarks { get; set; } = true;
@@ -102,7 +98,6 @@ public sealed class LegendSettings
     [Category("Opmerkingen"), DisplayName("Tekst")]
     public string RemarksText { get; set; } = StandardTexts.DrawingRemarks;
 
-    // ---- Weergave ----
 
     [Category("Weergave"), DisplayName("Kader rond legenda")]
     public bool DrawBorder { get; set; } = false;
@@ -134,7 +129,6 @@ public sealed class LegendSettings
     [Category("Weergave"), DisplayName("Xref-lagen meenemen")]
     public bool IncludeXrefLayers { get; set; } = false;
 
-    // ---- Groepering (KLIC) ----
 
     [Browsable(false)]
     public HashSet<GroupDimension> MergedDimensions { get; set; } = new();
@@ -185,7 +179,6 @@ public sealed class LegendSettings
      Description("Laat generieke 'TYPE \\ LABEL \\ OMSCHRIJVING'-placeholders uit KLIC-symbolen weg.")]
     public bool SuppressKlicPlaceholders { get; set; } = true;
 
-    // ---- Schaalbalk ----
 
     [Category("Schaalbalk"), DisplayName("Schaalbalk tonen")]
     public bool IncludeScaleBar { get; set; } = true;
@@ -199,7 +192,6 @@ public sealed class LegendSettings
     [Category("Schaalbalk"), DisplayName("Hoogte (mm)")]
     public double ScaleBarHeightMm { get; set; } = 2.0;
 
-    // ---- Viewport ----
 
     [Category("Viewport"), DisplayName("Viewport zelf tekenen")]
     public bool ViewportManual { get; set; } = false;
@@ -207,7 +199,6 @@ public sealed class LegendSettings
     [Category("Viewport"), DisplayName("Marge (mm)")]
     public double ViewportMarginMm { get; set; } = 5.0;
 
-    // ---- Kolommen ----
 
     [Category("Kolommen"), DisplayName("Vast aantal kolommen (0 = auto)")]
     public int Columns { get; set; } = 0;
@@ -221,7 +212,6 @@ public sealed class LegendSettings
     [Category("Kolommen"), DisplayName("Max. hoogte (mm, 0 = uit)")]
     public double MaxLegendHeightMm { get; set; } = 0.0;
 
-    // ---- Maatvoering (papier-mm) ----
 
     [Category("Maatvoering (mm)"), DisplayName("Swatch breedte")]
     public double SwatchWidthMm { get; set; } = TemplateDefaults.SwatchWidthMm;
@@ -265,7 +255,6 @@ public sealed class LegendSettings
     [Category("Maatvoering (mm)"), DisplayName("Kadermarge")]
     public double BorderMarginMm { get; set; } = TemplateDefaults.BorderMarginMm;
 
-    // ---- Lagen ----
 
     [Category("Lagen"), DisplayName("Kaderlaag")]
     public string FrameLayer { get; set; } = "X-XX-AL-LEGENDA_KADER-G";
@@ -279,9 +268,6 @@ public sealed class LegendSettings
     [Category("Lagen"), DisplayName("Tekstlaag koppen/titel")]
     public string HeaderTextLayer { get; set; } = "X-XX-AL-LEGENDA-T50";
 
-    // ---- Filters (niet in de GUI-grid; via commando's/JSON) ----
-
-    // ---- Statussen (in de GUI als aankruisvakjes; opgeslagen als IncludedStatuses) ----
 
     [Category("Statussen"), DisplayName("Nieuw"), JsonIgnore]
     public bool ToonNieuw { get => IncludedStatuses.Contains(NlcsStatus.Nieuw); set => SetStatus(NlcsStatus.Nieuw, value); }
@@ -313,7 +299,6 @@ public sealed class LegendSettings
         NlcsStatus.Tijdelijk, NlcsStatus.Revisie
     };
 
-    // ---- Elementsoorten (in de GUI als aankruisvakjes; opgeslagen als IncludedDrawTypes) ----
 
     [Category("Elementsoorten"), DisplayName("Geometrie / lijnen"), JsonIgnore]
     public bool ToonGeometrie
@@ -358,7 +343,6 @@ public sealed class LegendSettings
             IncludedDrawTypes.Remove(type);
     }
 
-    // Standaard alle swatch-soorten aan, zodat oude instellingen hetzelfde blijven.
     [Browsable(false)]
     public HashSet<NlcsDrawType> IncludedDrawTypes { get; set; } = new()
     {
@@ -384,9 +368,6 @@ public sealed class LegendSettings
     [Browsable(false)]
     public HashSet<string> ExcludedHoofdgroepen { get; set; } = new(StringComparer.OrdinalIgnoreCase) { "AL" };
 
-    // Per-legenda omschrijvingen: overschrijven de globale catalogus/standaard alleen voor
-    // deze legenda. Zo kunnen A en B in dezelfde tekening eigen teksten hebben. Leeg = volg
-    // de globale omschrijvingen.
     [Browsable(false)]
     public DescriptionCatalog DescriptionOverrides { get; set; } = new();
 
@@ -396,8 +377,6 @@ public sealed class LegendSettings
     [Browsable(false)]
     public List<ManualEntry> ManualEntries { get; set; } = new();
 
-    // Blanco (statische, bewust lege) legendaregels. Horen bij de legenda-inhoud, niet bij een
-    // bron; blijven dus bij update/opslaan/heropenen bestaan en worden per rebuild toegevoegd.
     [Browsable(false)]
     public List<BlankEntry> BlankEntries { get; set; } = new();
 
@@ -408,8 +387,6 @@ public sealed class LegendSettings
     [Browsable(false)]
     public List<CustomStatus> CustomStatuses { get; set; } = new();
 
-    // Expliciet gekoppelde eigen (niet-NLCS) bronlagen. Opt-in: alleen deze lagen tellen mee
-    // naast de automatisch herkende NLCS-lagen.
     [Browsable(false)]
     public List<CustomLayerRule> CustomLayerRules { get; set; } = new();
 
@@ -489,9 +466,7 @@ public sealed class LegendSettings
 
     public void CopyFrom(LegendSettings other)
     {
-        // Scalars via reflectie; mutable collecties expliciet deep-copyen zodat een
-        // legenda nooit een collectie-instance deelt met de globale defaults of een
-        // andere legenda.
+        // collecties afzonderlijk kopiëren voor onafhankelijke legenda’s
         foreach (var p in typeof(LegendSettings).GetProperties())
             if (p is { CanRead: true, CanWrite: true } && !IsCollectionProperty(p))
                 p.SetValue(this, p.GetValue(other));
@@ -512,7 +487,6 @@ public sealed class LegendSettings
         MergedDimensions = new HashSet<GroupDimension>(other.MergedDimensions);
     }
 
-    // Een volledig onafhankelijke kopie: geen enkele collectie-instance wordt gedeeld.
     public LegendSettings Clone()
     {
         var copy = new LegendSettings();
@@ -520,9 +494,7 @@ public sealed class LegendSettings
         return copy;
     }
 
-    // Zet alleen opmaak (maatvoering, tekst, lagen, swatch/symbool) terug naar de
-    // templatestandaard. Bron, filters, xrefs, custom statuses, exclusions, handmatige
-    // regels, labels/teksten, schaal en legenda-identiteit blijven ongemoeid.
+    // alleen opmaak herstellen; inhoud, bronnen en schaal behouden
     public void ResetFormattingToTemplate()
     {
         var d = new LegendSettings();
@@ -575,19 +547,14 @@ public sealed class LegendSettings
 
     public bool IsIncluded(NlcsLayerName layer) => ExplainExclusion(layer) is null;
 
-    // Geeft de reden waarom een laag buiten de legenda valt, of null als hij meetelt. Zo
-    // gebruiken filter en diagnose ("waarom ontbreekt dit?") exact dezelfde beslissing.
-    // De elementsoort- en zichtbaarheidsfilters zitten hier bewust niet in: die werken op
-    // entiteitsniveau, niet op de laagnaam.
     public string? ExplainExclusion(NlcsLayerName layer)
     {
         var key = EntryKey(layer);
-        // Uitvinken en een uitgeschakelde xref winnen altijd, ook van een eigen status.
+        // uitvinken en xref-uitsluiting vóór eigen status
         if (IsEntryExcluded(key)) return "de regel is handmatig uitgevinkt";
         if (layer.IsXref && !IsXrefIncluded(layer.XrefName))
             return $"xref '{layer.XrefName}' wordt niet meegenomen";
-        // Een handmatige toewijzing aan een eigen status haalt de laag door de
-        // status-/discipline-/hoofdgroepfilters heen: de gebruiker koos die regel bewust.
+        // eigen status boven status-, discipline- en hoofdgroepfilters
         if (FindCustomStatus(key) is not null) return null;
         if (!IncludedStatuses.Contains(layer.Status))
             return $"status '{layer.Status}' staat uit";
@@ -598,7 +565,6 @@ public sealed class LegendSettings
         return null;
     }
 
-    // Een uitgezette bovenliggende koppeling sluit ook alle inhoud daaronder uit.
     public bool IsXrefIncluded(string xrefName)
     {
         bool included = IncludeXrefLayers;
@@ -631,9 +597,7 @@ public sealed class LegendSettings
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
-    // System.Text.Json maakt bij deserialisatie ordinale HashSets/Dictionaries; de
-    // filters horen case-insensitive te blijven. Herstelt ook null-collecties uit
-    // handmatig bewerkte of oude JSON.
+    // ongevoeligheid voor hoofdletters herstellen na deserialisatie
     public LegendSettings Normalize()
     {
         if (SchemaVersion < 1 || SchemaVersion > CurrentSchemaVersion)
@@ -716,7 +680,6 @@ public sealed class LegendSettings
         }
         catch
         {
-            // Ongeldige configuratie: val terug op de standaardinstellingen.
         }
         return new LegendSettings();
     }

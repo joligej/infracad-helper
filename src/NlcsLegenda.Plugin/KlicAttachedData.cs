@@ -7,8 +7,6 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-// De AEC/Map-API is optioneel. Een gewone AutoCAD-installatie blijft bruikbaar;
-// onleesbare bronnen worden in het overzicht vermeld, niet als gecontroleerd beschouwd.
 internal sealed class KlicAttachedData : IDisposable
 {
     private readonly Database _database;
@@ -119,8 +117,7 @@ internal sealed class KlicAttachedData : IDisposable
                 assembly = Assembly.LoadFrom(file);
             }
             var application = assembly.GetType("Autodesk.Gis.Map.HostMapApplicationServices", true)!.GetProperty("Application")!.GetValue(null)!;
-            // Map-projecten horen bij geopende documenten. Gebruik nooit ActiveProject
-            // als vervanger: gelijke handles/tabelnamen kunnen bij een andere DWG horen.
+            // geen actief map-project gebruiken voor een andere brontekening
             if (!Autodesk.AutoCAD.ApplicationServices.Core.Application.DocumentManager.Cast<Autodesk.AutoCAD.ApplicationServices.Document>()
                 .Any(d => d.Database.UnmanagedObject == _database.UnmanagedObject))
             {

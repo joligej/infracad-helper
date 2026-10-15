@@ -5,7 +5,6 @@ using AcWindows = Autodesk.AutoCAD.ApplicationServices.Application;
 
 namespace NlcsLegenda.Plugin;
 
-// Alleen in de GUI: in headless AutoCAD is er geen ribbon.
 internal static class RibbonBuilder
 {
     private const string TabId = "NLCSLEGENDA_TAB";
@@ -17,8 +16,7 @@ internal static class RibbonBuilder
     {
         if (HostEnvironment.IsCoreConsole)
             return;
-        // Een werkruimte-wissel of CUI-herlaad bouwt het lint opnieuw op en gooit runtime-tabs weg.
-        // Daarom luisteren we naar WSCURRENT en zetten de tab zo nodig terug.
+        // lint herstellen na werkruimtewissel of herladen
         if (!_sysvarHooked)
         {
             AcWindows.SystemVariableChanged += OnSystemVariableChanged;
@@ -26,12 +24,10 @@ internal static class RibbonBuilder
         }
         if (TryBuild())
             return;
-        // Ribbon nog niet beschikbaar bij het laden: één keer op de Idle-lus wachten tot hij er is.
         AcWindows.Idle += OnIdle;
         _idleHooked = true;
     }
 
-    // Afmelden bij terminate zodat er geen handlers blijven hangen.
     public static void Shutdown()
     {
         if (_idleHooked)
@@ -46,7 +42,6 @@ internal static class RibbonBuilder
         }
     }
 
-    // Na een werkruimte-wissel (WSCURRENT) is onze tab weg; opnieuw opbouwen als hij ontbreekt.
     private static void OnSystemVariableChanged(object? sender,
         Autodesk.AutoCAD.ApplicationServices.SystemVariableChangedEventArgs e)
     {
@@ -66,7 +61,6 @@ internal static class RibbonBuilder
         }
     }
 
-    // Structurele beschrijving voor de GUI-diagnostic: is de tab aanwezig en met hoeveel knoppen?
     public static (bool Tab, int Panels, int Buttons, string Note) Describe()
     {
         if (HostEnvironment.IsCoreConsole)
@@ -93,7 +87,6 @@ internal static class RibbonBuilder
         }
         catch (System.Exception ex)
         {
-            // Nooit de Idle-lus laten crashen; zonder ribbon werkt de plugin via de commando's.
             _lastError = ex.Message;
             AcWindows.Idle -= OnIdle;
             _idleHooked = false;
@@ -144,7 +137,6 @@ internal static class RibbonBuilder
     {
         var source = new RibbonPanelSource { Title = title };
         tab.Panels.Add(new RibbonPanel { Source = source });
-        // Elke kolom heeft maximaal drie gelijke knoppen; de hoogte blijft binnen het lint.
         for (int start = 0; start < buttons.Length; start += 3)
         {
             var column = new RibbonRowPanel();
@@ -181,8 +173,6 @@ internal sealed class CommandRunner : ICommand
 
     public void Execute(object? parameter)
     {
-        // Bij een klik geeft AutoCAD de RibbonButton door; de commandotekst staat in
-        // CommandParameter. (Een rechtstreekse string ondersteunen we ook.)
         var command = parameter switch
         {
             RibbonButton button => button.CommandParameter as string,

@@ -3,12 +3,8 @@ using System.Text.Json.Serialization;
 
 namespace NlcsLegenda.Core;
 
-// De registry van beheerde legenda's van één tekening. Wordt als JSON in de DWG bewaard
-// onder een eigen NOD-root.
 public sealed class LegendRegistry
 {
-    // Alleen het huidige schema wordt gelezen. Andere versies blijven onaangeroerd.
-    // v2: omschrijvingen staan als onafhankelijke snapshot per legenda.
     public const int CurrentSchemaVersion = 2;
 
     [JsonRequired]
@@ -36,7 +32,6 @@ public sealed class LegendRegistry
         return found is not null && Legends.Remove(found);
     }
 
-    // Deterministische standaardnaam "Legenda N", waarbij N het laagste vrije nummer is.
     public string NextDefaultName()
     {
         var used = new HashSet<int>();
@@ -49,7 +44,6 @@ public sealed class LegendRegistry
         return $"Legenda {i}";
     }
 
-    // Een uniek group-naamsuffix; kort en zonder tekens die AutoCAD-groupnamen verbieden.
     public static string NewGroupName() => "NLCS-Legenda-" + Guid.NewGuid().ToString("N")[..12];
 
     public string ToJson() => JsonSerializer.Serialize(this, LegendSettings.JsonOptions);
@@ -72,8 +66,7 @@ public sealed class LegendRegistry
         }
     }
 
-    // Strikt lezen: geeft false bij ongeldige JSON of een niet-ondersteunde
-    // schemaversie, zodat kritieke legenda-metadata nooit stil door defaults wordt vervangen.
+    // ongeldige metadata behouden, geen vervanging door standaardwaarden
     public static bool TryParse(string? json, out LegendRegistry registry, out string error)
     {
         registry = new LegendRegistry();

@@ -70,8 +70,6 @@ internal sealed class LegendManageDialog : LegendDialog
             Panel1MinSize = 120,
             Panel2MinSize = 120
         };
-        // De verdeling pas zetten als de werkelijke hoogte bekend is; in de constructor
-        // is het control nog klein, waardoor SplitterDistance zou worden bijgeknepen.
         Load += (_, _) =>
         {
             try
@@ -81,7 +79,7 @@ internal sealed class LegendManageDialog : LegendDialog
                     Math.Max(wanted, split.Panel1MinSize),
                     Math.Max(split.Height - split.Panel2MinSize - split.SplitterWidth, split.Panel1MinSize));
             }
-            catch { /* bij een extreem klein venster de standaardverdeling houden */ }
+            catch {   }
         };
 
         var topGroup = new GroupBox { Text = "NLCS-regels (vink uit wat je niet wilt)", Dock = DockStyle.Fill, Padding = new Padding(8) };
@@ -200,7 +198,6 @@ internal sealed class LegendManageDialog : LegendDialog
         { DataPropertyName = nameof(ManualRow.Status), HeaderText = "Status", FillWeight = 16, DataSource = StatusNames.Clone(), FlatStyle = FlatStyle.Flat });
         grid.Columns.Add(new DataGridViewTextBoxColumn
         { DataPropertyName = nameof(ManualRow.Patroon), HeaderText = "Patroon", FillWeight = 14 });
-        // Voorkom rode fouticoontjes bij lege combo-waarden in de invoerregel.
         grid.DataError += (_, e) => e.ThrowException = false;
         return grid;
     }

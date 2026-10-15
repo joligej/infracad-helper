@@ -6,9 +6,6 @@ using Xunit.Abstractions;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Bewaakt dat elke persistente instelling een plek in het instellingenvenster heeft (of bewust
-// intern is). De reflectie-check faalt zodra er een instelling bijkomt die hier niet staat, zodat
-// een nieuwe setting niet onzichtbaar in de UI kan verdwijnen.
 public class SettingsUiMapTests
 {
     private readonly ITestOutputHelper _out;
@@ -18,8 +15,6 @@ public class SettingsUiMapTests
 
     private sealed record Surface(string Tab, Binding Kind);
 
-    // Instelling -> waar de gebruiker hem bedient. Settings die bewust op twee tabs staan, hebben
-    // beide tabs in Tab; SyncAll houdt de controls gelijk.
     private static readonly Dictionary<string, Surface> Map = new()
     {
         [nameof(LegendSettings.SchemaVersion)] = new("(intern: schema)", Binding.Intern),
@@ -96,7 +91,6 @@ public class SettingsUiMapTests
         [nameof(LegendSettings.ColumnGapMm)] = new("Schaalbalk > Geavanceerd", Binding.Numeric),
         [nameof(LegendSettings.BorderMarginMm)] = new("Schaalbalk > Geavanceerd", Binding.Numeric),
 
-        // Collecties met een eigen (sub)venster.
         [nameof(LegendSettings.IncludedStatuses)] = new("Inhoud > Statussen", Binding.CheckBox),
         [nameof(LegendSettings.IncludedDrawTypes)] = new("Inhoud > Elementsoorten", Binding.CheckBox),
         [nameof(LegendSettings.MergedDimensions)] = new("Inhoud > KLIC-groepering", Binding.CheckBox),
@@ -108,8 +102,6 @@ public class SettingsUiMapTests
         [nameof(LegendSettings.XrefInclusion)] = new("Inhoud > Xrefs", Binding.Subdialog),
         [nameof(LegendSettings.DescriptionOverrides)] = new("Teksten > Omschrijvingen", Binding.Subdialog),
 
-        // Interne filters met een vaste, zinvolle standaard; bewust niet in de UI (XX = onbekend,
-        // AL = algemeen zijn vrijwel altijd ruis in een legenda). Testcommando's maken ze leeg.
         [nameof(LegendSettings.ExcludedDisciplines)] = new("(intern filter)", Binding.Intern),
         [nameof(LegendSettings.ExcludedHoofdgroepen)] = new("(intern filter)", Binding.Intern),
     };
@@ -151,7 +143,6 @@ public class SettingsUiMapTests
     [Fact]
     public void IntentionalDuplicates_AreMarkedOnTwoTabs()
     {
-        // Deze schakelaars staan bewust op twee tabbladen.
         foreach (var name in new[] { nameof(LegendSettings.IncludeText),
                  nameof(LegendSettings.DrawBorder), nameof(LegendSettings.IncludeScaleBar),
                  nameof(LegendSettings.IncludeQuantities) })

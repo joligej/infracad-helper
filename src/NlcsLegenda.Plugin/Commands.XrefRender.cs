@@ -11,16 +11,10 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-// Een xref-only kader (host zonder eigen NLCS-geometrie, alleen een xref) moet een volledig
-// gevulde en correct gekleurde legenda opleveren, via precies dezelfde bouw-/plaatsflow als de
-// gebruiker. Deze test bouwt een synthetische xref met een rode G-lijn en een groene arcering,
-// genereert de legenda en controleert de werkelijke swatchkleuren plus het uitblijven van
-// eWrongDatabase. Een rijtelling alleen is geen bewijs.
 public partial class Commands
 {
-    // Vaste laagnamen voor de synthetische xref-inhoud: een rode G-lijn en een groene A-arcering.
-    private const string XrefGLayer = "N-WE-VH-KANTVERHARDING-G";          // rood (ACI 1)
-    private const string XrefALayer = "N-WE-VH-VERHARDING_ASFALT_ZWART-A"; // groen (ACI 3)
+    private const string XrefGLayer = "N-WE-VH-KANTVERHARDING-G";
+    private const string XrefALayer = "N-WE-VH-VERHARDING_ASFALT_ZWART-A";
     private const string XrefSymbolLayer = "N-WE-RI-VWA_RIOOLPUT-S";
 
     private static void CreateXrefRenderDwg(string path)
@@ -34,8 +28,8 @@ public partial class Commands
             {
                 var lt = (LayerTable)tr.GetObject(xdb.LayerTableId, OpenMode.ForWrite);
                 ObjectId LayerC(string n, short ci) { var r = new LayerTableRecord { Name = n, Color = AcColor.Color.FromColorIndex(AcColor.ColorMethod.ByAci, ci) }; var id = lt.Add(r); tr.AddNewlyCreatedDBObject(r, true); return id; }
-                var gLayer = LayerC(XrefGLayer, 1);          // rood
-                var aLayer = LayerC(XrefALayer, 3); // groen
+                var gLayer = LayerC(XrefGLayer, 1);
+                var aLayer = LayerC(XrefALayer, 3);
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(xdb), OpenMode.ForWrite);
                 using var line = new Line(new Point3d(0, 0, 0), new Point3d(10, 0, 0)) { LayerId = gLayer };
                 ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
@@ -82,9 +76,6 @@ public partial class Commands
         finally { HostApplicationServices.WorkingDatabase = prev; }
     }
 
-    // Maakt een geneste xref-keten: een binnenbestand met de NLCS-inhoud en een buitenbestand dat
-    // het binnenbestand als xref bevat. Een host die het buitenbestand koppelt ziet de NLCS-lagen
-    // met een geneste prefix (OUTER|INNER|...), precies het scenario dat we moeten kunnen renderen.
     private static void CreateNestedXrefDwgs(string innerPath, string outerPath)
     {
         CreateXrefRenderDwg(innerPath);
@@ -117,8 +108,6 @@ public partial class Commands
         return br.ObjectId;
     }
 
-    // Exact dezelfde bouw-/plaatsflow als een normale gebruiker (analyse -> block -> insert ->
-    // group -> registry -> commit). Vangt databasefouten op zodat eWrongDatabase zichtbaar wordt.
     private static int BuildPlaceXrefLegend(
         Database db, LegendSettings settings, out string err, out string groupName, out ObjectId blockRecordId)
     {
@@ -509,10 +498,6 @@ public partial class Commands
         ed.WriteMessage($"\nXREF status totaal: {(allOk ? "OK" : "FAIL")}; fout={error}");
     }
 
-    // Geneste xref: een host die alleen een buiten-xref koppelt die zelf een binnen-xref met de
-    // NLCS-inhoud bevat. Controleert de werkelijke geneste laagnaam (meerdere | -segmenten), dat de
-    // NLCS-parsing door de nesting heen werkt, dat er geen eWrongDatabase optreedt en dat de
-    // swatchkleuren uit de diepste bron correct worden overgenomen.
     [CommandMethod("NLCSLEGENDAXREFNESTEDTEST", CommandFlags.Modal)]
     public void NlcsLegendaXrefNestedTest()
     {
@@ -545,8 +530,6 @@ public partial class Commands
             string gColor = ReadAci(db, XrefGLayer), aColor = ReadAci(db, XrefALayer);
 
             int segments = rawNested.Split('|').Length;
-            // AutoCAD representeert de geneste NLCS-laag met een xref-namespace-prefix; de parser
-            // neemt robuust het deel na de laatste '|'. De waargenomen diepte kan 2 of meer zijn.
             bool nestedNameOk = segments >= 2;
             bool parseOk = entryCount >= 2;
             bool noDbErr = err == "geen";
@@ -560,11 +543,6 @@ public partial class Commands
         catch (System.Exception ex) { ed.WriteMessage($"\nXREFNESTED fatale fout: {ex.GetType().Name}: {ex.Message}"); }
     }
 
-    // Save/reopen/update met een xref-only kader. SETUP koppelt de xref, bouwt en plaatst de
-    // legenda via het echte pad; na QSAVE + heropenen (xref vanaf schijf opnieuw geresolved)
-    // werkt VERIFY elke legenda bij met de normale updateflow en controleert dat er geen
-    // eWrongDatabase optreedt en dat de swatchkleuren behouden blijven. Dit dekt het scenario
-    // waarin heropende xref-ObjectId's anders zouden kunnen lekken.
     [CommandMethod("NLCSLEGENDAXREFSAVESETUP", CommandFlags.Modal)]
     public void NlcsLegendaXrefSaveSetup()
     {
@@ -615,9 +593,6 @@ public partial class Commands
         ed.WriteMessage($"\nXREFSAVE: totaal -> {(noDbErr && updOk && colorOk ? "OK" : "FAIL")}");
     }
 
-    // Eén logische NLCS-laag uit meerdere bronnen: gelijke weergave hoort samen te vallen (één
-    // regel, opgetelde hoeveelheid), verschillende weergave hoort te splitsen (aparte regels, eigen
-    // hoeveelheid). Sectie 11: A rood 5 m + B rood 7 m + C groen 3 m -> rood 12 m, groen 3 m, 2 regels.
     private static Database CreateXrefLineDatabase(string path, string layerName, short colorIndex, double lengthM,
         out ObjectId sourceLineId, LineWeight lineWeight = LineWeight.ByLineWeightDefault,
         string? symbolLayerName = null, string? symbolBlockName = null, string? symbolLabel = null,
@@ -979,9 +954,9 @@ public partial class Commands
             var a = Path.Join(dir, "split_a.dwg");
             var b = Path.Join(dir, "split_b.dwg");
             var cpath = Path.Join(dir, "split_c.dwg");
-            CreateXrefLineDwg(a, layer, 1, 5.0);    // rood 5 m
-            CreateXrefLineDwg(b, layer, 1, 7.0);    // rood 7 m
-            CreateXrefLineDwg(cpath, layer, 3, 3.0); // groen 3 m
+            CreateXrefLineDwg(a, layer, 1, 5.0);
+            CreateXrefLineDwg(b, layer, 1, 7.0);
+            CreateXrefLineDwg(cpath, layer, 3, 3.0);
             AttachAndInsert(db, a, "SPLITA");
             AttachAndInsert(db, b, "SPLITB");
             AttachAndInsert(db, cpath, "SPLITC");
@@ -1003,7 +978,6 @@ public partial class Commands
             ed.WriteMessage($"\nSPLIT: rood={red:0.#}(verw 12) groen={green:0.#}(verw 3) regels={rows.Count}(verw 2) export={exportOk} info={infoOk} -> {(rowsOk && redOk && greenOk && exportOk && infoOk ? "OK" : "FAIL")}");
             tr.Commit();
 
-            // De gebouwde legenda moet twee swatchlagen met de juiste kleur opleveren.
             int built = BuildPlaceXrefLegend(db, settings, out string err, out _, out _);
             string c1 = ReadAci(db, "N-WE-VH-WEG-G"), c2 = ReadAci(db, "N-WE-VH-WEG-G #2");
             bool noErr = err == "geen";
@@ -1013,9 +987,6 @@ public partial class Commands
         catch (System.Exception ex) { ed.WriteMessage($"\nSPLIT fatale fout: {ex.GetType().Name}: {ex.Message}"); }
     }
 
-    // Splitsen moet ook werken op een ander stijlverschil dan kleur (sectie 5). Twee bronnen met
-    // dezelfde logische laag en dezelfde kleur maar verschillende lijndikte horen apart te blijven;
-    // twee bronnen met een identieke lijndikte horen samen te vallen met opgetelde hoeveelheid.
     [CommandMethod("NLCSLEGENDAXREFSTYLETEST", CommandFlags.Modal)]
     public void NlcsLegendaXrefStyleTest()
     {
@@ -1029,9 +1000,9 @@ public partial class Commands
             var thin1 = Path.Join(dir, "style_thin1.dwg");
             var thin2 = Path.Join(dir, "style_thin2.dwg");
             var thick = Path.Join(dir, "style_thick.dwg");
-            CreateXrefLineDwg(thin1, layer, 1, 4.0, LineWeight.LineWeight025); // dun, 4 m
-            CreateXrefLineDwg(thin2, layer, 1, 6.0, LineWeight.LineWeight025); // dun, 6 m (gelijk uiterlijk)
-            CreateXrefLineDwg(thick, layer, 1, 2.0, LineWeight.LineWeight100); // dik, 2 m
+            CreateXrefLineDwg(thin1, layer, 1, 4.0, LineWeight.LineWeight025);
+            CreateXrefLineDwg(thin2, layer, 1, 6.0, LineWeight.LineWeight025);
+            CreateXrefLineDwg(thick, layer, 1, 2.0, LineWeight.LineWeight100);
             AttachAndInsert(db, thin1, "STYLETHIN1");
             AttachAndInsert(db, thin2, "STYLETHIN2");
             AttachAndInsert(db, thick, "STYLETHICK");
@@ -1045,7 +1016,6 @@ public partial class Commands
             ed.WriteMessage($"\nSTYLE: regels={rows.Count}");
             foreach (var e in rows)
                 ed.WriteMessage($"\nSTYLE: lengte={e.Metric.Length:0.#} laag={e.GeometryLayer}");
-            // Dunne bronnen (4+6=10 m) vallen samen; dikke (2 m) blijft apart -> 2 regels.
             bool rowsOk = rows.Count == 2;
             var thinRow = rows.SingleOrDefault(e => System.Math.Abs(e.Metric.Length - 10.0) < 0.01);
             var thickRow = rows.SingleOrDefault(e => System.Math.Abs(e.Metric.Length - 2.0) < 0.01);
@@ -1368,7 +1338,6 @@ public partial class Commands
             settings.ExplodeOnPlace = false;
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                // 5 x 5 m per patroon, xref schaal 2: precies 100 m2 per patroon.
                 ((BlockReference)tr.GetObject(hatchReference, OpenMode.ForWrite)).ScaleFactors = new Scale3d(2);
                 tr.Commit();
             }
@@ -1560,9 +1529,6 @@ public partial class Commands
         }
     }
 
-    // Exerciset de Enter/default-instellingenflow en exact dezelfde PlaceLegendAtPoint-methode
-    // als NLCSLEGENDA. De xref-bron blijft als afzonderlijke Database geladen; de ownership-walk
-    // controleert daarna elk geplaatst object, inclusief blokken, lagen, tekststijlen en hatches.
     [CommandMethod("NLCSLEGENDAXREFPLACEMENTTEST", CommandFlags.Modal)]
     public void NlcsLegendaXrefPlacementTest()
     {
@@ -1756,7 +1722,6 @@ public partial class Commands
                     && explodedOwnership.Members > 0 && explodedOwnership.Entities > 0
                     && explodedOwnership.MTexts > 0 && explodedOwnership.DbTexts == 0
                     && explodedText.dbText == 0 && explodedText.mText > 0;
-                // No commit: verify real exploded output while leaving the save/reopen fixture unchanged.
             }
             catch (System.Exception ex)
             {

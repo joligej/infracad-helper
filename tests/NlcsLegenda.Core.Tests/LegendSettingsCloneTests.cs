@@ -91,9 +91,6 @@ public class LegendSettingsCloneTests
         Assert.True(restored.DescriptionOverrides.Elementen.ContainsKey("vh|element"));
     }
 
-    // De instellingen-dialog bewerkt een werkkopie en past die bij Opslaan/Toepassen toe via
-    // CopyFrom. Dit borgt dat toepassen de doel-collecties volledig vervangt en dat bron en doel
-    // daarna geen enkele collectie-instance delen (annuleren laat het doel dus ongemoeid).
     [Fact]
     public void CopyFrom_VervangtInhoudCollectiesEnBlijftOnafhankelijk()
     {
@@ -111,7 +108,6 @@ public class LegendSettingsCloneTests
 
         target.CopyFrom(working);
 
-        // Doel is nu gelijk aan de werkkopie, niet gemengd met de oude inhoud.
         Assert.Equal(500, target.Scale);
         Assert.Contains("nieuw", target.ExcludedEntries);
         Assert.DoesNotContain("oud", target.ExcludedEntries);
@@ -122,7 +118,6 @@ public class LegendSettingsCloneTests
         Assert.True(target.XrefInclusion.ContainsKey("nieuw"));
         Assert.False(target.XrefInclusion.ContainsKey("oud"));
 
-        // Geen gedeelde instances: na toepassen blijft het doel los van de werkkopie.
         Assert.NotSame(working.ExcludedEntries, target.ExcludedEntries);
         Assert.NotSame(working.ManualEntries, target.ManualEntries);
         Assert.NotSame(working.ManualEntries[0], target.ManualEntries[0]);

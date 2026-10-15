@@ -3,9 +3,6 @@ using Xunit;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Pint de template-defaults op de gemeten referentiewaarden: op 1:200 is de omschrijving en de
-// statuskop 0,5 m = 2,5 mm (T25) en de titel 1,0 m = 5 mm (T50). Zo kan de opmaak niet stilletjes
-// afdrijven.
 public class TemplateDefaultsTests
 {
     [Fact]
@@ -46,8 +43,6 @@ public class TemplateDefaultsTests
         Assert.Equal(TemplateDefaults.ColumnWidthMm, s.ColumnWidthMm);
     }
 
-    // Teksthoogtes converteren schaal-afhankelijk naar modeleenheden: 2,5 mm op 1:200 = 0,5 m,
-    // de titel 5 mm = 1,0 m, precies wat in de referentie is gemeten.
     [Fact]
     public void ToModel_ScalesTextHeightLikeReference()
     {
@@ -56,8 +51,6 @@ public class TemplateDefaultsTests
         Assert.Equal(1.0, s.ToModel(s.TitleTextHeightMm), 3);
     }
 
-    // NLCS-ISO tekststijlen (font NLCS-ISO.ttf, breedtefactor 1,0): de T25/T50-codes geven op
-    // 1:200 teksthoogtes van 2,5 en 5 mm. De omschrijving is T25, de titel T50.
     [Theory]
     [InlineData(200, 0.5, 1.0)]
     [InlineData(1000, 2.5, 5.0)]
@@ -68,8 +61,6 @@ public class TemplateDefaultsTests
         Assert.Equal(expT50, s.ToModel(TemplateDefaults.TitleTextHeightMm), 3);
     }
 
-    // De voorbeeldconfiguratie in deploy/ mag niet van de productdefaults afdrijven: de opmaak
-    // die hij vastlegt moet gelijk zijn aan TemplateDefaults.
     [Fact]
     public void SampleConfig_MatchesTemplateDefaults()
     {

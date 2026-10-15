@@ -120,11 +120,10 @@ public class BlankEntryTests
         var entry = new BlankEntry().ToLegendEntry();
         var csv = LegendExport.ToCsv(new[] { entry });
         var row = csv.Split('\n').First(l => l.Contains("[blanco]"));
-        // Status;Discipline;Hoofdgroep;Element;Omschrijving;Herkomst;...
         var cols = row.Split(';');
-        Assert.Equal(string.Empty, cols[1]); // Discipline
-        Assert.Equal(string.Empty, cols[2]); // Hoofdgroep
-        Assert.Equal(string.Empty, cols[3]); // Element
+        Assert.Equal(string.Empty, cols[1]);
+        Assert.Equal(string.Empty, cols[2]);
+        Assert.Equal(string.Empty, cols[3]);
         Assert.DoesNotContain("BLANCO_", csv);
     }
 

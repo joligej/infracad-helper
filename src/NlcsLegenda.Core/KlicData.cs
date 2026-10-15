@@ -62,7 +62,7 @@ public static class KlicFields
     }
 }
 
-// Alleen waarden: geen AutoCAD-objecten of transacties buiten de leesfase bewaren.
+// alleen waarden bewaren, geen cad-objecten of transacties
 public sealed record KlicObjectData(string Drawing, string Handle, string Xref,
     IReadOnlyList<KlicRecord> Records, IReadOnlyList<string> ReadIssues, KlicSource PreferredSource)
 {

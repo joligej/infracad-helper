@@ -31,20 +31,18 @@ internal sealed class KlicSourceMetadata : IDisposable
             var issues = new List<string>();
             void ReadAttached(Transaction tr)
             {
-                // Een doorgestuurde xref-ID kan naar de host wijzen. Lees de echte bronhandle.
+                // oorspronkelijke bronhandle bij doorgestuurde xref-id’s
                 var original = (Entity)tr.GetObject(database.GetObjectId(false, entity.ObjectId.NonForwardedHandle, 0), OpenMode.ForRead);
                 source.Attached.Read(original, tr, records, issues);
             }
             if (ownerTransaction is not null)
             {
-                // De actieve tekening kan nog niet opgeslagen objectwijzigingen bevatten.
-                // OpenClose mag die objecten niet opnieuw openen en zelfstandig sluiten.
+                // bestaande transactie gebruiken voor nog niet opgeslagen objectwijzigingen
                 ReadAttached(ownerTransaction);
             }
             else
             {
-                // De xref is een afzonderlijke, alleen-lezen database. Houd daarvoor
-                // geen gewone transactie open naast de transactie van de hosttekening.
+                // korte leestransactie per xref-object, geen parallelle gewone transactie
                 using var tr = database.TransactionManager.StartOpenCloseTransaction();
                 ReadAttached(tr);
             }

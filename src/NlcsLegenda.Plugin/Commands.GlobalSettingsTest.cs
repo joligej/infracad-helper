@@ -7,7 +7,6 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    // Diagnostiek die de globale standaard tijdelijk wijzigt, bewaart beide bestanden.
     private sealed class GlobalSettingsSnapshot : IDisposable
     {
         private readonly bool _directoryExisted = Directory.Exists(ConfigDir);

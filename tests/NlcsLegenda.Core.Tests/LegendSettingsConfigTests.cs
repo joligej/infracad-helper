@@ -53,7 +53,7 @@ public class LegendSettingsConfigTests
     public void ToModel_ConvertsPaperMmByScale()
     {
         var s = new LegendSettings { Scale = 200 };
-        Assert.Equal(4.0, s.ToModel(20.0), 6); // 20 mm @ 1:200 = 4 m
-        Assert.Equal(0.5, s.ToModel(2.5), 6);  // 2.5 mm @ 1:200 = 0.5 m
+        Assert.Equal(4.0, s.ToModel(20.0), 6);
+        Assert.Equal(0.5, s.ToModel(2.5), 6);
     }
 }

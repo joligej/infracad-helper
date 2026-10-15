@@ -8,8 +8,6 @@ public partial class Commands
 {
     private enum MutationScope { GlobalDefaults, Legend }
 
-    // Waar een instelmutatie op landt: de globale standaard (voor nieuwe legenda's) of één
-    // bestaande legenda op LegendId.
     private sealed class MutationTarget
     {
         public MutationScope Scope { get; init; }
@@ -28,8 +26,6 @@ public partial class Commands
         };
     }
 
-    // Zonder legenda wordt de standaard bewerkt; één aanwezige legenda is eenduidig.
-    // De standaard blijft rechtstreeks bereikbaar via NLCSLEGENDASTANDAARD.
     private static bool ResolveMutationTarget(Editor ed, Database db, out MutationTarget target,
         string promptVerb = "Waarop toepassen", string pickVerb = "aanpassen")
     {
@@ -49,7 +45,6 @@ public partial class Commands
         return true;
     }
 
-    // Basisinstellingen voor het doel: de globale standaard of een kopie van de legenda-snapshot.
     private static LegendSettings GetTargetSettings(Database db, MutationTarget target)
     {
         if (target.IsGlobal)
@@ -62,9 +57,6 @@ public partial class Commands
         return clone;
     }
 
-    // Schrijft de bewerkte instellingen terug. Globaal: opslaan als standaard; bestaande
-    // legenda's blijven ongemoeid. Legenda: via de centrale rebuild-flow, zodat de echte
-    // legenda meeverandert in plaats van alleen een losse snapshot.
     private void ApplyTargetSettings(
         Editor ed, Database db, MutationTarget target, LegendSettings settings, string what)
     {

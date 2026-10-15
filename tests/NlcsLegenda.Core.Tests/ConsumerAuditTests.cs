@@ -6,17 +6,11 @@ using Xunit.Abstractions;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Dode-settings-audit: elke persistente user-facing scalar-instelling moet een benoemde consumer
-// hebben. De reflectie-check faalt zodra er een instelling bijkomt die hier niet geregistreerd is,
-// of als een registratie verwijst naar een verdwenen property. Het echte uitvoergedrag per
-// semantische groep wordt bewezen door de layout-, grouping-, quantity-, description- en
-// geometrie-tests; deze audit bewaakt de volledigheid van de bedrading.
 public class ConsumerAuditTests
 {
     private readonly ITestOutputHelper _out;
     public ConsumerAuditTests(ITestOutputHelper output) => _out = output;
 
-    // Instelling -> waar de waarde wordt verbruikt (consumer).
     private static readonly Dictionary<string, string> Consumers = new()
     {
         [nameof(LegendSettings.SchemaVersion)] = "LegendSettings.Normalize schemaversie",
@@ -119,8 +113,6 @@ public class ConsumerAuditTests
         Assert.True(stale.Count == 0, "Consumers voor verdwenen settings: " + string.Join(", ", stale));
     }
 
-    // De UI-wrappers voor statussen/elementsoorten/groepering schrijven naar gereserveerde
-    // collecties die wél geserialiseerd en verbruikt worden.
     [Fact]
     public void StatusAndDrawTypeToggles_WriteToConsumedCollections()
     {

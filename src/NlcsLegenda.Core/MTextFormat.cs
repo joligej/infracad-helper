@@ -2,9 +2,7 @@ namespace NlcsLegenda.Core;
 
 public static class MTextFormat
 {
-    // MText kent eigen besturingstekens: '\' leidt codes in, '{' en '}' groeperen opmaak
-    // en '\P' is een alinea-einde. Backslash moet als eerste, anders escapen we de accolades
-    // die we zelf toevoegen nog een keer dubbel.
+    // backslashes eerst escapen, vóór de toegevoegde opmaakcodes
     public static string Escape(string? text)
     {
         if (string.IsNullOrEmpty(text))

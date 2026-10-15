@@ -3,13 +3,11 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-// De registry van beheerde legenda's staat onder een eigen NOD-root. Alle lees/schrijf gaat
-// via een bestaande transactie, zodat metadata en geometrie samen committen.
+// metadata en geometrie binnen dezelfde transactie
 internal static class LegendStore
 {
     private const string RegistryRoot = "NLCSLEGENDA_REGISTRY";
     private const string RegistryKey = "REGISTRY";
-    // Ruim onder de 255-char Xrecord-tekstlimiet; splitst nooit midden in een surrogate pair.
     private const int ChunkSize = 200;
 
     public static LegendRegistry Load(Database db, Transaction tr)
@@ -22,7 +20,6 @@ internal static class LegendStore
         throw new NotSupportedException("Legenda-gegevens zijn onleesbaar of hebben een niet-ondersteunde versie.");
     }
 
-    // Leest de registry strikt: false bij ongeldige of niet-ondersteunde metadata.
     public static bool TryLoad(Database db, Transaction tr, out LegendRegistry registry, out string error)
     {
         var json = ReadRaw(db, tr);
@@ -39,7 +36,6 @@ internal static class LegendStore
 
     public static void Save(Database db, Transaction tr, LegendRegistry registry)
     {
-        // Onleesbare gegevens en onbekende schemaversies mogen niet worden overschreven.
         var existing = ReadRaw(db, tr);
         if (existing is not null && !LegendRegistry.TryParse(existing, out _, out var err))
             throw new NotSupportedException(
@@ -95,7 +91,7 @@ internal static class LegendStore
         while (i < json.Length)
         {
             int len = Math.Min(ChunkSize, json.Length - i);
-            // Splits nooit tussen een high/low surrogate.
+            // unicode-tekenparen bij elkaar houden
             if (i + len < json.Length && char.IsHighSurrogate(json[i + len - 1]))
                 len--;
             values.Add(new TypedValue((int)DxfCode.Text, json.Substring(i, len)));

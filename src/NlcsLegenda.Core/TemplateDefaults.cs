@@ -1,7 +1,6 @@
 namespace NlcsLegenda.Core;
 
-// Papiermaten uit de legenda-referentie; meetpunten en toleranties staan in
-// docs/template-maatvoering.md. Hulplijnen in de template zijn niet plotbaar.
+// papiermaten en toleranties: docs/template-maatvoering.md
 public static class TemplateDefaults
 {
     public const double SwatchWidthMm = 24.0;
@@ -11,9 +10,8 @@ public static class TemplateDefaults
     public const double TextHeightMm = 2.5;
     public const double HeaderTextHeightMm = 2.5;
     public const double TitleTextHeightMm = 5.0;
-    // Afstand tussen de basislijnen van titel en eerste statuskop.
     public const double HeaderSpacingMm = 6.9257;
-    // De basislijn van de omschrijving ligt 0,7097 mm onder het sample-midden.
+    // basislijn omschrijving: 0,7097 mm onder het voorbeeldmidden
     public const double TextBaselineOffsetRatio = 0.28388973;
     public const double ColumnWidthMm = 143.0;
     public const double ColumnGapMm = 10.0;

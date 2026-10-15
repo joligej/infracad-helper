@@ -1,24 +1,6 @@
 <#
-.SYNOPSIS
-    Maakt een self-signed codesign-certificaat (standaard CN=joligej) en exporteert het.
-
-.DESCRIPTION
-    Een self-signed certificaat geeft de installer een vaste, controleerbare uitgever en
-    bewijst dat het bestand niet is gewijzigd. Windows/SmartScreen "vertrouwt" het pas als
-    iemand het publieke .cer-bestand importeert in "Vertrouwde basiscertificeringsinstanties"
-    en "Vertrouwde uitgevers"; anders blijft de melding "onbekende uitgever" staan. Voor een
-    volledig vertrouwde handtekening is een certificaat van een echte CA (betaald) nodig.
-
-    Er worden drie bestanden weggeschreven:
-      - <naam>.pfx  : certificaat MET privésleutel (geheim; nooit committen)
-      - <naam>.cer  : alleen het publieke certificaat (mag je delen/committen)
-      - <naam>.pfx.b64 : de pfx als base64 voor een GitHub Actions-secret
-
-    Voor het ondertekenen in CI: zet de inhoud van .pfx.b64 als secret CODESIGN_PFX_BASE64
-    en het wachtwoord als CODESIGN_PFX_PASSWORD.
-
-.EXAMPLE
-    ./New-CodeSigningCertificate.ps1 -Password (Read-Host "Wachtwoord" -AsSecureString)
+.synopsis
+    zelfondertekend certificaat; privésleutel en base64 buiten git
 #>
 [CmdletBinding()]
 param(
@@ -50,7 +32,7 @@ Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $Password | Out-Null
 Export-Certificate -Cert $cert -FilePath $cer | Out-Null
 [IO.File]::WriteAllText($b64, [Convert]::ToBase64String([IO.File]::ReadAllBytes($pfx)))
 
-# De cert weer uit de gebruikersstore halen; we werken verder met de bestanden.
+# tijdelijk certificaat uit de gebruikersstore verwijderen
 Remove-Item ("Cert:\CurrentUser\My\" + $cert.Thumbprint) -ErrorAction SilentlyContinue
 
 Write-Host "==> Klaar." -ForegroundColor Green

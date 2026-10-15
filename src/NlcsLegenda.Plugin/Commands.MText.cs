@@ -8,8 +8,6 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    // Telt DBText en MText binnen een beheerde legenda-groep: de groep bevat óf een behouden
-    // blokreferentie (we dalen af in de blokdefinitie) óf losse geëxplodeerde entiteiten.
     private static (int dbText, int mText) CountTextInGroup(Database db, Transaction tr, string groupName)
     {
         int dbt = 0, mt = 0;
@@ -32,8 +30,6 @@ public partial class Commands
         return (dbt, mt);
     }
 
-    // Telt DBText in alle legenda-blokdefinities (NLCS_LEGENDA_*), ongeacht of ze nog gebruikt
-    // worden. Zo zien we of een update geen oude DBText-blokdefinitie laat rondslingeren.
     private static int CountDbTextInLegendBlocks(Database db, Transaction tr)
     {
         int dbt = 0;
@@ -48,8 +44,6 @@ public partial class Commands
         return dbt;
     }
 
-    // Maakt NLCS-bronlagen met geometrie zodat een legenda alle tekstcategorieën bevat: twee
-    // statussen (statuskop) en twee hoofdgroepen (subkop), met een lange omschrijving (wrapping).
     private static void EnsureMTextFixtureLayers(Database db, Transaction tr)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
@@ -91,10 +85,6 @@ public partial class Commands
         return s;
     }
 
-    // Zero-DBText op een echte host: bouwt een representatieve legenda met alle tekstcategorieën
-    // (titel, statuskop, hoofdgroepkop, omschrijving, wrapping, hoeveelheid, footer/datum,
-    // schaalbalk, opmerkingen, blanco) en controleert dat de gebouwde geometrie geen DBText bevat.
-    // Doet dit zowel voor een behouden blok als voor een geëxplodeerde legenda.
     [CommandMethod("NLCSLEGENDAMTEXTTEST", CommandFlags.Modal)]
     public void NlcsLegendaMTextTest()
     {
@@ -149,10 +139,6 @@ public partial class Commands
         }
     }
 
-    // Brede objectmatige opmaakcontrole van een gebouwde legenda op een echte tekening. Meet per
-    // tekstsoort de hoogte/attachment/laag, de swatch-afmetingen, lijnsamples, arceringen en
-    // symbolen, de tekstruimte en kolomorigins, en vergelijkt alles met de instellingen. Zo is de
-    // volledige opmaak gecontroleerd, niet alleen een paar getallen.
     [CommandMethod("NLCSLEGENDAVOLOPMAAKTEST", CommandFlags.Modal)]
     public void NlcsLegendaVolOpmaakTest()
     {
@@ -236,9 +222,6 @@ public partial class Commands
             ed.WriteMessage($"\nVOLOPMAAK layout: tekstruimte gemeten={bodyMinX - (swatchLeft + swW):0.###} verwacht={textGap:0.###} -> {(gapOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nVOLOPMAAK rendering: arceringen={hatches}(>0:{hatches > 0}) symbolen={symbolEnts}(>0:{symbolEnts > 0}) -> {(hatches > 0 && symbolEnts > 0 ? "OK" : "FAIL")}");
 
-            // MText verticale positie: Location.Y van een body-regel (MiddleLeft) is het verticale
-            // midden van de tekst en moet samenvallen met het verticale midden van de swatch op
-            // dezelfde rij. Rapporteer de kleinste afwijking in papier-mm.
             var swatchCentersY = frames.Where(f => Near(f.W, swW, 0.02) && Near(f.H, swH, 0.02)).Select(f => f.CY).ToList();
             var bodyCentersY = mt.Where(x => Near(x.H, bodyH) && x.A == AttachmentPoint.TopLeft && x.W > 0).Select(x => x.Y - Math.Max(x.H * (1 - 0.28388973), x.AH / 2)).ToList();
             double vertDev = double.MaxValue;
@@ -255,10 +238,6 @@ public partial class Commands
         catch (System.Exception ex) { ed.WriteMessage($"\nVOLOPMAAK error: {ex.Message}"); }
     }
 
-    // Bewijst dat de teksthoogten volledig instelbaar zijn: bouwt een legenda met niet-standaard
-    // body/kop/titel-hoogten en controleert dat de echte MText-hoogten precies die ingestelde
-    // waarden volgen (via ToModel), niet de productdefaults. Zo is gegarandeerd dat niets in de
-    // renderer een hoogte hardcodeert.
     [CommandMethod("NLCSLEGENDAHOOGTETEST", CommandFlags.Modal)]
     public void NlcsLegendaHoogteTest()
     {
@@ -298,8 +277,6 @@ public partial class Commands
                     if (depth > 8 || tr.GetObject(id, OpenMode.ForRead) is not Entity e) return;
                     if (e is MText m)
                     {
-                        // Alleen de structurele legenda-tekst telt mee; symbool-interne tekst houdt
-                        // bewust zijn eigen bronhoogte en staat op andere lagen.
                         if (string.Equals(m.Layer, s.TextLayer, System.StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(m.Layer, s.HeaderTextLayer, System.StringComparison.OrdinalIgnoreCase))
                             heights.Add(m.TextHeight);
@@ -325,10 +302,6 @@ public partial class Commands
         catch (System.Exception ex) { ed.WriteMessage($"\nHOOGTE error: {ex.Message}"); }
     }
 
-    // Volledige equivalentie van de symbooltekst-conversie: maakt DBText-gevallen met uiteenlopende
-    // uitlijning, breedtefactor, oblique, rotatie, normaal en Unicode, zet elk los om met de echte
-    // conversie en controleert dat hoogte, rotatie, normaal, stijl, positie (visueel midden) en de
-    // breedtefactor/oblique-codes behouden blijven. Geen bron-DWG-mutatie; werkt op een testblok.
     [CommandMethod("NLCSLEGENDASYMBOOLTEKST2TEST", CommandFlags.Modal)]
     public void NlcsLegendaSymboolTekst2Test()
     {
@@ -393,9 +366,6 @@ public partial class Commands
         catch (System.Exception ex) { ed.WriteMessage($"\nSYMFID error: {ex.Message}"); }
     }
 
-    // Zero-DBText met een bronsymbool dat intern DBText bevat. Bouwt een symboolblok met DBText,
-    // MText en een lijn, plaatst het op een NLCS-symboollaag en controleert dat de gebouwde legenda
-    // geen DBText bevat en dat de symbooltekst als MText is overgenomen (behouden én geëxplodeerd).
     [CommandMethod("NLCSLEGENDASYMBOOLTEKSTTEST", CommandFlags.Modal)]
     public void NlcsLegendaSymboolTekstTest()
     {
@@ -413,7 +383,6 @@ public partial class Commands
                 var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
                 if (!bt.Has("SYMTEKSTBLOK"))
                 {
-                    // Genest blok met eigen DBText (case I): moet ook worden omgezet.
                     var nest = new BlockTableRecord { Name = "SYMTEKSTNEST", Origin = Point3d.Origin };
                     bt.Add(nest); tr.AddNewlyCreatedDBObject(nest, true);
                     var nt = new DBText { TextString = nestMark, Height = 0.3, Position = new Point3d(0.2, 0.2, 0) };
@@ -472,7 +441,6 @@ public partial class Commands
         }
     }
 
-    // Verzamelt de MText-inhoud (contents) binnen een beheerde legenda-groep, blokken recursief.
     private static List<string> CollectMTextContents(Database db, Transaction tr, string groupName)
     {
         var result = new List<string>();
@@ -491,13 +459,10 @@ public partial class Commands
         return result;
     }
 
-    // Bouwt een blok dat een v1.27.x-legenda nabootst: tekst als DBText. Registreert het als
-    // beheerde legenda (behouden blok) zodat we het bijwerkpad vanaf oude output kunnen testen.
     private static (string id, string group, Point3d topLeft) SeedOldDbTextLegend(
         Database db, Transaction tr, LegendSettings s,
         LegendScope scope = LegendScope.WholeDrawing, List<string>? handles = null)
     {
-        // De lagen die de oude output gebruikte moeten bestaan voordat we er entiteiten op zetten.
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
         foreach (var n in new[] { s.HeaderTextLayer, s.TextLayer, s.FrameLayer })
             if (!string.IsNullOrEmpty(n) && !lt.Has(n))
@@ -551,10 +516,6 @@ public partial class Commands
         return (def.Id, def.GroupName, new Point3d(ext.MinPoint.X, ext.MaxPoint.Y, 0));
     }
 
-    // Breed bijwerkbewijs voor oude DBText-legenda's: dekt WholeDrawing, Selection (met echte
-    // bronhandles), een eigen bronlaag, blanco regels en xref-instellingen. Elke oude legenda
-    // wordt met de normale updateflow bijgewerkt; daarna moet id/groep/scope/bron/instellingen en
-    // plaats behouden zijn, de oude DBText weg, de nieuwe output MText-only en geen orphan-blok.
     [CommandMethod("NLCSLEGENDAOLDUPDATEBROADTEST", CommandFlags.Modal)]
     public void NlcsLegendaOldUpdateBroadTest()
     {
@@ -564,7 +525,6 @@ public partial class Commands
         var db = doc.Database;
         try
         {
-            // NLCS-bronlagen + een eigen (niet-NLCS) laag met geometrie; bronhandles voor selectie.
             var handles = new List<string>();
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -583,7 +543,6 @@ public partial class Commands
             }
             var selHandles = handles.Take(2).ToList();
 
-            // (naam, settings bouwen, scope, handles, extra-check op de bijgewerkte def)
             var scenarios = new (string Name, Func<LegendSettings> Make, LegendScope Scope, List<string>? Handles, Func<LegendDefinition, bool> Extra, string ExtraDesc)[]
             {
                 ("WholeDrawing", () => LoadGlobalDefaults(), LegendScope.WholeDrawing, null, _ => true, "n.v.t."),
@@ -634,7 +593,6 @@ public partial class Commands
                 ed.WriteMessage($"\nBREED {sc.Name}: DBText {dbtBefore}->{dbtAfter} MText={mtAfter} id/groep/scope={sameId}/{sameGroup}/{sameScope} pos={posOk} {sc.ExtraDesc}={extraOk} -> {(ok ? "OK" : "FAIL")}");
             }
 
-            // Geen orphan DBText-blokken, en alle legenda's bestaan nog naast elkaar (isolatie).
             int orphan, legendsLeft;
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -652,9 +610,6 @@ public partial class Commands
         }
     }
 
-    // Meet de opmaak van een door de plugin gebouwde legenda en vergelijkt met de instellingen:
-    // de MText-teksthoogtes moeten exact de ingestelde hoogtes zijn (geen schaalfactor) en de
-    // swatchbreedte moet kloppen. Zo is bewezen dat de DBText->MText-overstap de maat niet wijzigt.
     [CommandMethod("NLCSLEGENDAOPMAAKMEETTEST", CommandFlags.Modal)]
     public void NlcsLegendaOpmaakMeetTest()
     {
@@ -688,7 +643,7 @@ public partial class Commands
                     {
                         var ext = p.GeometricExtents;
                         double w = ext.MaxPoint.X - ext.MinPoint.X, h = ext.MaxPoint.Y - ext.MinPoint.Y;
-                        if (Math.Abs(w - swW) < 0.05 && h < swW) frameW = w; // swatchkader, niet het buitenkader
+                        if (Math.Abs(w - swW) < 0.05 && h < swW) frameW = w;
                     }
                     else if (e is BlockReference br && !br.BlockTableRecord.IsNull && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord r)
                         foreach (ObjectId cid in r) Walk(cid, depth + 1);
@@ -711,9 +666,6 @@ public partial class Commands
         catch (System.Exception ex) { ed.WriteMessage($"\nOPMAAK error: {ex.Message}"); }
     }
 
-    // Save/reopen van een oude DBText-legenda. SETUP maakt NLCS-content en een oude DBText-
-    // Selection-legenda; na QSAVE + heropenen werkt VERIFY die bij en controleert dat de oude
-    // tekst weg is, de output MText-only, de bronhandles exact behouden en de plaats gelijk.
     [CommandMethod("NLCSLEGENDAOLDREOPENSETUP", CommandFlags.Modal)]
     public void NlcsLegendaOldReopenSetup()
     {
@@ -785,8 +737,6 @@ public partial class Commands
         catch (System.Exception ex) { ed.WriteMessage($"\nHEROPEN verify error: {ex.Message}"); }
     }
 
-    // Bijwerken van een oude DBText-legenda zonder apart migratiecommando: NLCSLEGENDAUPDATE moet
-    // de oude tekst wissen, MText-only terugbouwen en identiteit/bron/instellingen/positie houden.
     [CommandMethod("NLCSLEGENDAOLDUPDATETEST", CommandFlags.Modal)]
     public void NlcsLegendaOldUpdateTest()
     {
@@ -834,8 +784,6 @@ public partial class Commands
             }
             PurgePending(db);
 
-            // Orphan-telling ná PurgePending: een normale NLCSLEGENDAUPDATE ruimt verweesde
-            // blokdefinities op dezelfde manier op.
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 orphan = CountDbTextInLegendBlocks(db, tr);

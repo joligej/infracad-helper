@@ -6,9 +6,6 @@ using Xunit.Abstractions;
 
 namespace NlcsLegenda.Core.Tests;
 
-// Geautomatiseerde wiring-audit: elke user-facing scalar-instelling moet een JSON-roundtrip
-// overleven (opslag + reload). Zo vangen we "dode" settings die wel in de UI staan maar niet
-// persistent zijn. De audit print tevens een matrix in de testoutput.
 public class WiringAuditTests
 {
     private readonly ITestOutputHelper _out;
@@ -46,7 +43,6 @@ public class WiringAuditTests
             .ToList();
 
         var s = new LegendSettings();
-        // Scale moet > 0 blijven; zet een geldige afwijkende waarde.
         s.Scale = 250;
         var expected = new Dictionary<string, object>();
         foreach (var p in props)

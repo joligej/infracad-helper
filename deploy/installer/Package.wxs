@@ -1,15 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Per-user MSI voor de NLCS Legenda-plugin. Installeert de bundle in
-  %APPDATA%\Autodesk\ApplicationPlugins\NlcsLegenda.bundle. Die map wordt op
-  installatiemoment door Windows opgelost (AppDataFolder), dus ook bij een
-  omgeleid of verplaatst gebruikersprofiel komt de bundle op de juiste plek.
-  Er is geen beheerder nodig; de installatie geldt voor de huidige gebruiker.
 
-  Bouwen via dev/scripts/Build-Installer.ps1, dat -d Version en -d BundleStage
-  meegeeft en een gecombineerde bundle klaarzet met per AutoCAD-versie de
-  bijbehorende build (net8 voor 2025 en 2026, net10 voor 2027).
--->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="NLCS Legenda"
            Manufacturer="joligej"

@@ -1,20 +1,14 @@
 namespace NlcsLegenda.Core;
 
-// Groepeerdimensie: een eigenschap van het element waarop legenda-regels samengevoegd kunnen
-// worden. Zet je een dimensie op "samenvoegen", dan telt die eigenschap niet meer mee voor de
-// groepering en vallen regels die alleen daarin verschillen samen.
 public enum GroupDimension
 {
-    Soort,         // basis, bijv. DATA, ET, GAS
-    Specificatie,  // spanning/druk: LS, MS, HS, HD, LD
-    Uitvoering,    // MANTELBUIS, HULPSTUK
-    Nummer,        // volgnummer, bijv. DATA2 -> 2
-    Netbeheerder   // oorspronkelijke organisatie uit KLIC-metadata
+    Soort,
+    Specificatie,
+    Uitvoering,
+    Nummer,
+    Netbeheerder
 }
 
-// Ontleedt een NLCS-elementnaam in groepeerbare eigenschappen. Vooral bedoeld voor de KL-
-// hoofdgroep (kabels en leidingen); voor andere elementen blijft alles onder Soort staan,
-// zodat samenvoegen die niet per ongeluk combineert.
 public sealed class ElementProperties
 {
     public static bool IsKlic(string discipline, string hoofdgroep) =>
@@ -50,7 +44,6 @@ public sealed class ElementProperties
         var tokens = e.Split('_', StringSplitOptions.RemoveEmptyEntries).ToList();
         if (tokens.Count >= 2)
         {
-            // Laatste token met evt. volgnummer losweken: "LS2" -> spec LS, nummer 2.
             var last = tokens[^1];
             var (word, num) = SplitTrailingDigits(last);
             if (Specificaties.Contains(word))
@@ -90,8 +83,6 @@ public sealed class ElementProperties
         _ => string.Empty
     };
 
-    // Sleutel van alle dimensies die NIET worden samengevoegd. Regels met dezelfde sleutel
-    // (en gelijke status/discipline/hoofdgroep) vallen samen.
     public string MergeKey(IReadOnlyCollection<GroupDimension> merged)
     {
         var parts = new List<string>(4);
@@ -104,7 +95,6 @@ public sealed class ElementProperties
     {
         int i = token.Length;
         while (i > 0 && char.IsDigit(token[i - 1])) i--;
-        // Alleen als er ook letters vooraf staan (anders is het geen "basis+nummer").
         return i > 0 && i < token.Length ? (token[..i], token[i..]) : (token, string.Empty);
     }
 }

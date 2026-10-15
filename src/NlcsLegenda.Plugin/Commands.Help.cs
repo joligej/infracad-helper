@@ -7,9 +7,6 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    // Eenvoudige ingebouwde help. Alleen in AutoCAD met venster; in de Core Console is er geen
-    // venster, dan melden we dat netjes zonder te crashen. De dialoog staat in een aparte methode
-    // zodat de WinForms-types headless niet geladen hoeven te worden.
     [CommandMethod("NLCSLEGENDAHELP", CommandFlags.Modal)]
     public void NlcsLegendaHelp()
     {

@@ -10,8 +10,7 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    // De privébron blijft buiten de repository. Deze aanvullende acceptatieproef leest
-    // de werkelijke DWT; een ontbrekende bron is een fout, nooit een geslaagde controle.
+    // privétemplate buiten git; ontbrekende bron betekent een mislukte proef
     [CommandMethod("NLCSLEGENDATEMPLATEFILETEST", CommandFlags.Modal)]
     public void NlcsLegendaTemplateFileTest()
     {
@@ -65,7 +64,6 @@ public partial class Commands
                 Near(actualStyle.XScale, sourceStyle.XScale, "Breedtefactor");
                 tr.Abort();
             }
-            // Gewone meerregelige omschrijvingen, zonder een lokale alinea-opmaakcode.
             var wrapping = model.Cast<ObjectId>().Select(id => sourceTr.GetObject(id, OpenMode.ForRead)).OfType<MText>()
                 .Where(t => t.Text.StartsWith("Scheidingsband 100/300x100mm", StringComparison.Ordinal) && Math.Abs(t.TextHeight - 0.5) < 1e-8).First();
             using (var tr = doc.Database.TransactionManager.StartTransaction())

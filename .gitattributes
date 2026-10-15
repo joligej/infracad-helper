@@ -1,10 +1,10 @@
-# Normaliseer regeleindes naar LF in de repository.
+# regeleindes in git
 * text=auto eol=lf
 
-# Windows-scripts houden CRLF.
+# windows-scripts met crlf
 *.ps1 text eol=crlf
 
-# Binaire bestanden.
+# binaire bestanden
 *.dll binary
 *.dwg binary
 *.dwt binary

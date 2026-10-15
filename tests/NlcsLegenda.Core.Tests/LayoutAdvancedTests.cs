@@ -19,8 +19,6 @@ public class LayoutAdvancedTests
     [Fact]
     public void MaxLegendHeight_StartsNewColumn()
     {
-        // 10 regels met een bekende regelhoogte; een lage maxhoogte moet meerdere
-        // kolommen forceren.
         var entries = Enumerable.Range(0, 10)
             .Select(i => Entry(NlcsStatus.Nieuw, "VH", $"E{i}")).ToArray();
         var settings = new LegendSettings
@@ -33,7 +31,6 @@ public class LayoutAdvancedTests
 
         Assert.True(layout.Columns > 1, "Verwacht meerdere kolommen door de maximale hoogte.");
         double maxColH = settings.ToModel(settings.MaxLegendHeightMm);
-        // Elke kolom (behalve met één regel) blijft binnen de maxhoogte.
         var byCol = layout.Items.Where(i => i.Kind == LegendItemKind.Entry).GroupBy(i => i.Column);
         foreach (var col in byCol)
         {
@@ -57,13 +54,13 @@ public class LayoutAdvancedTests
 
         var layout = LegendLayoutEngine.Compute(entries, settings);
 
-        Assert.Equal(2, layout.Columns); // ceil(5/4)=2 kolommen
+        Assert.Equal(2, layout.Columns);
         var perColumn = layout.Items
             .Where(i => i.Kind == LegendItemKind.Entry)
             .GroupBy(i => i.Column)
             .Select(g => g.Count())
             .ToList();
-        Assert.All(perColumn, c => Assert.True(c <= 3)); // gebalanceerd: max 3 per kolom
+        Assert.All(perColumn, c => Assert.True(c <= 3));
     }
 
     [Fact]
@@ -99,7 +96,7 @@ public class LayoutAdvancedTests
         var layout = LegendLayoutEngine.Compute(entries, settings);
 
         var subHeaders = layout.Items.Where(i => i.Kind == LegendItemKind.SubHeader).ToList();
-        Assert.Equal(2, subHeaders.Count); // VH en RI
+        Assert.Equal(2, subHeaders.Count);
     }
 
     [Fact]
@@ -108,8 +105,8 @@ public class LayoutAdvancedTests
         var parsed = new List<NlcsLayerName>();
         foreach (var l in new[]
                  {
-                     "N-WE-VH-OPENVERHARDING_TEGEL-G",       // "Betontegel"
-                     "N-WE-VH-OPENVERHARDING_NATUURSTEEN-G"  // "Natuursteen"
+                     "N-WE-VH-OPENVERHARDING_TEGEL-G",
+                     "N-WE-VH-OPENVERHARDING_NATUURSTEEN-G"
                  })
             if (NlcsLayerParser.TryParse(l, out var p)) parsed.Add(p!);
 
@@ -135,7 +132,7 @@ public class LayoutAdvancedTests
         var entries = LegendGrouping.Build(
             parsed, new LegendSettings { SortMode = LegendSortMode.Hoeveelheid }, null, metrics);
 
-        Assert.Equal("Natuursteen", entries[0].Description); // grootste hoeveelheid eerst
+        Assert.Equal("Natuursteen", entries[0].Description);
     }
 
     [Fact]

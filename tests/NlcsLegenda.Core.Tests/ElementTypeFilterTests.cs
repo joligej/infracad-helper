@@ -14,13 +14,12 @@ public class ElementTypeFilterTests
         return list;
     }
 
-    // Eén element met alle vier de tekentypen als aparte lagen.
     private static string[] AllTypeLayers() => new[]
     {
-        "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-G",   // geometrie
-        "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A",   // arcering
-        "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-V",   // vlakvulling
-        "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-S"    // symbool
+        "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-G",
+        "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A",
+        "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-V",
+        "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-S"
     };
 
     [Fact]
@@ -50,7 +49,6 @@ public class ElementTypeFilterTests
         var entries = LegendGrouping.Build(Parse(AllTypeLayers()), s);
         var e = Assert.Single(entries);
         Assert.False(e.LayersByType.ContainsKey(off));
-        // De overige typen blijven bestaan.
         foreach (var t in new[] { NlcsDrawType.Geometrie, NlcsDrawType.Arcering, NlcsDrawType.Vlakvulling, NlcsDrawType.Symbool })
             if (t != off)
                 Assert.True(e.LayersByType.ContainsKey(t));
@@ -113,7 +111,6 @@ public class ElementTypeFilterTests
         var entries = LegendGrouping.Build(
             Parse("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-G", "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-S"), s);
         var e = Assert.Single(entries);
-        // Geometrie is weg; het symbool wordt de representatie en de regel blijft geldig.
         Assert.False(e.LayersByType.ContainsKey(NlcsDrawType.Geometrie));
         Assert.True(e.LayersByType.ContainsKey(NlcsDrawType.Symbool));
     }
@@ -130,7 +127,6 @@ public class ElementTypeFilterTests
             [fill.LocalName] = new LayerMetric(0, 0, 500.0)
         };
 
-        // Met vlakvulling uit telt alleen de lengte van de lijn mee.
         s.ToonVlakvullingen = false;
         var entries = LegendGrouping.Build(new[] { line, fill }, s, _ => null, metrics);
         var e = Assert.Single(entries);
@@ -146,12 +142,12 @@ public class ElementTypeFilterTests
 
         var offA = new LegendSettings { ToonArceringen = false };
         var entriesNoA = LegendGrouping.Build(Parse(arcering, vulling), offA);
-        Assert.Single(entriesNoA);   // arcering weg, vulling blijft
+        Assert.Single(entriesNoA);
         Assert.Equal("GESLOTENVERHARDING_ASFALT", entriesNoA[0].Element);
 
         var offV = new LegendSettings { ToonVlakvullingen = false };
         var entriesNoV = LegendGrouping.Build(Parse(arcering, vulling), offV);
-        Assert.Single(entriesNoV);   // vulling weg, arcering blijft
+        Assert.Single(entriesNoV);
         Assert.Equal("TALUDARCERING_KORT", entriesNoV[0].Element);
     }
 
@@ -185,8 +181,6 @@ public class ElementTypeFilterTests
             Members = { LegendSettings.EntryKey(arcering) }
         });
 
-        // Ook al is de regel aan een eigen status toegewezen, de uitgeschakelde
-        // elementsoort verwijdert de enige representatie -> regel verdwijnt.
         var entries = LegendGrouping.Build(new[] { arcering }, s);
         Assert.Empty(entries);
     }
@@ -205,7 +199,6 @@ public class ElementTypeFilterTests
     [Fact]
     public void OldJson_WithoutNewFields_EnablesAllTypes()
     {
-        // Instellingen-JSON zoals vóór deze feature: geen includedDrawTypes.
         const string json = """
         { "scale": 200, "includedStatuses": ["Nieuw"] }
         """;

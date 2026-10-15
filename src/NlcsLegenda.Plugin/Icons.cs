@@ -36,7 +36,6 @@ internal static class RibbonIcons
         }
         catch
         {
-            // Zonder icoon toont de knop gewoon zijn tekst.
             return null;
         }
     }
@@ -119,7 +118,6 @@ internal static class RibbonIcons
                 break;
 
             case "NLCSLEGENDABEHEER":
-                // Lijst van legenda's: kleine kaders met een regel ernaast.
                 g.DrawRectangle(pen, 7 * s, 9 * s, 5 * s, 4 * s);
                 g.DrawLine(pen, 14 * s, 11 * s, 25 * s, 11 * s);
                 g.DrawRectangle(pen, 7 * s, 18 * s, 5 * s, 4 * s);
@@ -179,20 +177,17 @@ internal static class RibbonIcons
                 }
                 break;
             case "NLCSLEGENDAELEMENT":
-                // Vergrootglas: een object inspecteren.
                 g.DrawEllipse(pen, 9 * s, 8 * s, 10 * s, 10 * s);
                 g.DrawLine(pen, 17 * s, 16 * s, 23 * s, 22 * s);
                 break;
 
             case "NLCSLEGENDAHELP":
-                // Vraagteken, gecentreerd.
                 g.DrawArc(pen, 11 * s, 7 * s, 10 * s, 9 * s, 160, 250);
                 g.DrawLine(pen, 16 * s, 15 * s, 16 * s, 18 * s);
                 g.FillEllipse(fill, 16 * s - 1.5f * s, 22 * s - 1.5f * s, 3f * s, 3f * s);
                 break;
 
             case "NLCSLEGENDALAAGNAAM":
-                // Naamlabel: een laagnaam bewerken.
                 using (var path = new GraphicsPath())
                 {
                     path.AddLines(new[]
