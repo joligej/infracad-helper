@@ -18,7 +18,9 @@ public partial class Commands
         var outPath = System.Environment.GetEnvironmentVariable("NLCS_RIBBON_OUT");
         if (!string.IsNullOrWhiteSpace(outPath))
         {
-            try { File.WriteAllText(outPath, line + "\n"); } catch {   }
+            try { File.WriteAllText(outPath, line + "\n"); }
+            catch (System.Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            { ed?.WriteMessage($"\nRIBBON FAIL: controleresultaat niet opgeslagen: {ex.Message}"); }
         }
     }
 }

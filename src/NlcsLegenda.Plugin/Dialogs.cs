@@ -742,7 +742,11 @@ internal sealed class CustomStatusDialog : LegendDialog
         Controls.Add(split);
         Controls.Add(buttons);
 
-        Load += (_, _) => { try { split.SplitterDistance = 220; } catch {   } };
+        Load += (_, _) =>
+        {
+            try { split.SplitterDistance = 220; }
+            catch (ArgumentException) { /* standaardverdeling bij te weinig ruimte */ }
+        };
 
         ReloadStatuses(_statuses.Count > 0 ? 0 : -1);
     }

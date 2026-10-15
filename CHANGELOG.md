@@ -9,6 +9,8 @@
 - Ontbrekende metadata op kabel-/leidingobjecten blijft zichtbaar in een gemengde KLIC-regel,
   bijvoorbeeld als “Niet opgegeven; PE”. Hoeveelheden en brongegevens blijven behouden.
 - Codecomments ingekort tot enkele Nederlandse woorden in kleine letters; overbodige toelichtingen verwijderd.
+- Gerichte foutafhandeling voor CAD-eigenschappen en vensterverdeling. Een niet te activeren viewport
+  en een niet op te slaan lintcontrole worden nu gemeld.
 - Vijf regressieproeven toegevoegd, plus een CAD-proef voor gedeeltelijke KLIC-metadata in lokale en xref-bronnen.
 
 ## 1.31.2 - 2026-10-15

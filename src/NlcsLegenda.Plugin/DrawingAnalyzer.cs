@@ -424,7 +424,7 @@ public static class DrawingAnalyzer
                     return att.TextString?.Trim() ?? string.Empty;
             }
         }
-        catch {   }
+        catch (Autodesk.AutoCAD.Runtime.Exception) { return string.Empty; }
         return string.Empty;
     }
 

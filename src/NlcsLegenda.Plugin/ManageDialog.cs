@@ -79,7 +79,7 @@ internal sealed class LegendManageDialog : LegendDialog
                     Math.Max(wanted, split.Panel1MinSize),
                     Math.Max(split.Height - split.Panel2MinSize - split.SplitterWidth, split.Panel1MinSize));
             }
-            catch {   }
+            catch (ArgumentException) { /* standaardverdeling bij te weinig ruimte */ }
         };
 
         var topGroup = new GroupBox { Text = "NLCS-regels (vink uit wat je niet wilt)", Dock = DockStyle.Fill, Padding = new Padding(8) };

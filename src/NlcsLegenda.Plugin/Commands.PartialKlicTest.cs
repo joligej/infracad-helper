@@ -54,7 +54,8 @@ public partial class Commands
             CheckPartialKlic(host, 16);
             doc.Editor.WriteMessage("\nPARTIALKLIC lokaal en xref: ontbrekende gegevens zichtbaar, 8/16m behouden -> OK");
         }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nPARTIALKLIC FAIL: {ex}"); }
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException)
+        { doc.Editor.WriteMessage($"\nPARTIALKLIC FAIL: {ex}"); }
     }
 
     private static void CheckPartialKlic(Database db, double expectedLength)

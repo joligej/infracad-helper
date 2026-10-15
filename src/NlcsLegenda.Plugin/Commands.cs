@@ -538,7 +538,11 @@ public partial class Commands
                 vp.Height = vpH;
                 vp.ViewCenter = viewCenter;
                 vp.ViewHeight = vpH / paperPerModel;
-                try { vp.On = true; } catch {   }
+                try { vp.On = true; }
+                catch (Autodesk.AutoCAD.Runtime.Exception ex)
+                {
+                    ed.WriteMessage($"\nViewport geplaatst, maar niet geactiveerd: {ex.Message}");
+                }
                 vp.Locked = true;
 
                 tr.Commit();
@@ -1769,7 +1773,7 @@ public partial class Commands
             if (tr.GetObject(ltr.LinetypeObjectId, OpenMode.ForRead) is LinetypeTableRecord l)
                 lt = l.Name;
         }
-        catch {   }
+        catch (Autodesk.AutoCAD.Runtime.Exception) { lt = "lijntype niet leesbaar"; }
         var flags = new List<string>();
         if (!ltr.IsPlottable) flags.Add("niet-plotbaar");
         if (ltr.IsFrozen) flags.Add("bevroren");
@@ -3623,7 +3627,7 @@ public partial class Commands
                     {
                         double w = 0, h = 0;
                         try { var ext = br.GeometricExtents; w = ext.MaxPoint.X - ext.MinPoint.X; h = ext.MaxPoint.Y - ext.MinPoint.Y; }
-                        catch {   }
+                        catch (Autodesk.AutoCAD.Runtime.Exception) { continue; }
                         if (br.ScaleFactors.X > 0 && w > 0 && w < 12 && h < 12)
                             symbols.Add((br.Name, br.ScaleFactors.X, br.ScaleFactors.Y, br.Rotation, w, h));
                     }
