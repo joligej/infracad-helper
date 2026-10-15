@@ -4,6 +4,7 @@
 .DESCRIPTION
   Slaagt alleen bij de verwachte testmeldingen, ongewijzigde systeemvariabelen,
   QSAVE met DBMOD=0 en afsluiting zonder fout. Bron-/templatebestanden blijven intact.
+  Met -Isolated gebruikt elke proef een tijdelijk eigen CAD-profiel.
   Gebruik -PluginPath voor acceptatie van een publiek geïnstalleerde release.
 #>
 [CmdletBinding()]
@@ -12,8 +13,9 @@ param(
     [string]$PluginPath,
     [string]$TemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('klic','overview','realsize','templatecontract','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
-    [switch]$SkipReopen
+    [string[]]$Cases=@('sources','xrefchoices','klic','overview','realsize','templatecontract','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [switch]$SkipReopen,
+    [switch]$Isolated
 )
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'CoreConsole.ps1')
@@ -32,6 +34,8 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ sources=@('NLCSLEGENDASOURCETEST','SOURCETEST gedeelde symbolen, xref-overrides en gewone omschrijvingen -> OK','NLCSLEGENDASOURCEVERIFY','SOURCETEST na heropenen -> OK')
+ xrefchoices=@('NLCSLEGENDAXREFCHOICETEST','XREFCHOICE xref-inserts, opgeslagen keuzes en geneste KLIC-bronnen -> OK','NLCSLEGENDAXREFCHOICEVERIFY','XREFCHOICE na heropenen: bronkeuzes en KLIC-hoeveelheden -> OK')
  klic=@('NLCSLEGENDAKLICTEST','KLIC lokale en geneste xrefs: 4 netbeheerders, onbekend, 30m, samenvoegen en uitsluiten -> OK','NLCSLEGENDAKLICVERIFY','KLIC na heropenen: netbeheerders en 30m behouden -> OK')
  overview=@('NLCSLEGENDAOVERVIEWTEST','OVERVIEW handmatige volgorde, echte geometrie, B-isolatie en rollback -> OK','NLCSLEGENDAOVERVIEWVERIFY','OVERVIEW na heropenen en bijwerken: C/B/A, B gelijk -> OK')
  realsize=@('NLCSLEGENDAREALSIZETEST','REALSIZE grote xref-symbolen: modelmaat, schaalvariant, samenvoeging en vrije tekstruimte -> OK')
@@ -112,7 +116,7 @@ _.QUIT
 _Y
 "@ | Set-Content -LiteralPath $script -Encoding ascii
  $raw=Join-Path $dir "$Name.raw.log"
- $run=Invoke-NlcsCoreConsole -Executable $core -Drawing $Drawing -Script $script -Log $raw
+ $run=Invoke-NlcsCoreConsole -Executable $core -Drawing $Drawing -Script $script -Log $raw -Isolated:$Isolated
  $exitCode=$run.ExitCode
  $log=(Get-Content -LiteralPath $raw -Raw) -replace "`0",''
  $log | Set-Content -LiteralPath (Join-Path $dir "$Name.log") -Encoding utf8
@@ -125,7 +129,7 @@ _Y
  if($actual -match '(?im)^.*(?:->\s*FAIL|totaal:?\s*(?:->\s*)?FAIL|\bFAIL:|fatale fout|\berror:|\bfout:|Unknown command|Invalid option keyword|An error occurred during save|overgeslagen|GEEN VERSCHIL|host zonder NLCS-content|geen papier-layout).*$'){
   $failures.Add($Matches[0])
  }
- $result=[pscustomobject]@{Case=$Name;Passed=($failures.Count -eq 0);ExitCode=$exitCode;Failures=@($failures);Log=(Join-Path $dir "$Name.log");PluginHash=$pluginHash;ProfileValuesChecked=$run.ProfileValuesChecked}
+ $result=[pscustomobject]@{Case=$Name;Passed=($failures.Count -eq 0);ExitCode=$exitCode;Failures=@($failures);Log=(Join-Path $dir "$Name.log");PluginHash=$pluginHash;ProfileValuesChecked=$run.ProfileValuesChecked;Isolated=[bool]$Isolated}
  $results.Add($result)
  $results | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'results.json') -Encoding utf8
  Write-Output "$Name : $(if($result.Passed){'PASS'}else{'FAIL'})"
@@ -141,7 +145,7 @@ foreach($case in $Cases){
  if($case -eq 'livetarget'){$expected+="1 legenda('s) in deze tekening:"}
  if($case -eq 'liveempty'){$expected+='Geen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.'}
  Run-Case $case $drawing $specs[$case][0] $expected
- if($case -in @('klic','overview','abclocal','abcxref','oldreopen')){
+ if($case -in @('sources','xrefchoices','klic','overview','abclocal','abcxref','oldreopen')){
   $expected=@($specs[$case][3])
   Run-Case "$case-verify" $drawing $specs[$case][2] $expected
  }

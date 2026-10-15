@@ -13,8 +13,9 @@ internal static class Program
         Application.EnableVisualStyles();
         try
         {
-            foreach (float scale in new[] { 1f, 1.5f, 2f })
+            foreach (float scale in new[] { 1f, 1.25f, 1.5f, 2f })
                 CheckSettings(scale, args.FirstOrDefault());
+            CheckXrefControls();
             CheckOverview();
             CheckKlic(args.FirstOrDefault());
             CheckNestedEditors();
@@ -35,7 +36,7 @@ internal static class Program
                         new KlicRecord(KlicSource.InfraCAD, "KLIC_LeidingLijn", new Dictionary<string,string> { ["DiameterM"] = "0.11", ["Materiaal"] = "PE", ["Bijlage"] = "C:/voorbeeld/bijlage.pdf" }) },
                         new[] { "Object Data niet gecontroleerd in deze testhost." }, KlicSource.InfraCAD) } })
             };
-            foreach (var scale in new[] { 1f, 1.5f, 2f })
+            foreach (var scale in new[] { 1f, 1.25f, 1.5f, 2f })
             foreach (var factory in factories)
             {
                 using var form = factory();
@@ -57,6 +58,31 @@ internal static class Program
         return Errors.Count == 0 ? 0 : 1;
     }
 
+    private static void CheckXrefControls()
+    {
+        var settings = new LegendSettings { IncludeXrefLayers = false };
+        settings.XrefInclusion["KLIC"] = true;
+        using var form = new SettingsDialog(settings, "Test", xrefNames: new[] { "KLIC", "WEGEN" });
+        OpenOffscreen(form);
+        var tabs = Descendants(form).OfType<TabControl>().Single();
+        var navigation = Descendants(form).OfType<ListBox>().Single();
+        navigation.SelectedIndex = 1;
+        Application.DoEvents();
+        Check(tabs.SelectedIndex == 1, "Navigatie kiest bronnen");
+        Check(Descendants(form).OfType<CheckBox>().Count(c => c.Text == "Titel tonen") == 1, "Titelinstelling heeft een vaste plek");
+        var checkbox = Descendants(form).OfType<CheckBox>().Single(c => c.Text.StartsWith("Xrefs meenemen"));
+        Check(checkbox.CheckState == CheckState.Indeterminate, "Gemengde xref-keuze zichtbaar");
+        void Click() => typeof(CheckBox).GetMethod("OnClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(checkbox, new object[] { EventArgs.Empty });
+        Click();
+        Check(settings.IsXrefIncluded("KLIC") && settings.IsXrefIncluded("WEGEN"), "Algemeen aan overschrijft oude uitzondering");
+        Click();
+        Check(!settings.IsXrefIncluded("KLIC") && !settings.IsXrefIncluded("WEGEN"), "Algemeen uit overschrijft oude uitzondering");
+        Check(Descendants(form).OfType<Button>().Count(b => b.Text.StartsWith("Opmerkingen")) == 1, "Opmerkingen heeft een vaste plek");
+        Check(tabs.TabPages.Cast<TabPage>().Single(p => p.Text == "Schaalbalk").Controls.Cast<Control>().SelectMany(Descendants).OfType<NumericUpDown>().Count() == 3,
+            "Schaalbalk bevat alleen eigen maatvelden");
+        form.Close();
+    }
+
     private static void CheckSettings(float scale, string? output)
     {
         var settings = new LegendSettings();
@@ -68,7 +94,7 @@ internal static class Program
         form.Font = new Font(form.Font.FontFamily, 9f * scale);
         form.MinimumSize = new Size(560, 420);
         form.ClientSize = new Size(scale.Equals(1f) ? 720 : 900, 620);
-        var tabs = form.Controls.OfType<TabControl>().Single();
+        var tabs = Descendants(form).OfType<TabControl>().Single();
         foreach(TabPage page in tabs.TabPages)
         {
             tabs.SelectedTab = page;
@@ -86,12 +112,12 @@ internal static class Program
             }
             page.AutoScrollPosition = Point.Empty;
             CheckButtons(form);
-            if (output is not null && page.Text.StartsWith("Schaalbalk"))
+            if (output is not null)
             {
                 Directory.CreateDirectory(output);
                 using var bitmap = new Bitmap(form.Width, form.Height);
                 form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
-                bitmap.Save(Path.Join(output, $"settings-{scale:0.0}.png"));
+                bitmap.Save(Path.Join(output, $"settings-{tabs.SelectedIndex}-{scale:0.00}.png"));
             }
         }
         tabs.SelectedIndex = 1;
@@ -111,6 +137,8 @@ internal static class Program
         using var parent = new SettingsDialog(settings, "Test", compositionSource: _ => { loads++; return new[] { new EntryCheckItem("key", "Data", "DATA") }; });
         OpenOffscreen(parent);
         Check(loads == 0, "Instellingen analyseert pas bij openen Samenstellen");
+        Descendants(parent).OfType<TabControl>().Single().SelectedIndex = 1;
+        Application.DoEvents();
         InModal("NLCS Legenda – samenstellen", dialog =>
         {
             var grid = Descendants(dialog).OfType<DataGridView>().Single();
@@ -179,7 +207,7 @@ internal static class Program
             Check(rejected, "onbruikbaar bijlagepad geweigerd: " + path);
         }
         var original = new KlicOptions();
-        foreach (float scale in new[] { 1f, 1.5f, 2f })
+        foreach (float scale in new[] { 1f, 1.25f, 1.5f, 2f })
         {
             using var options = new KlicOptionsDialog(original);
             OpenOffscreen(options);

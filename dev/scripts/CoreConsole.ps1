@@ -101,8 +101,12 @@ function Invoke-NlcsCoreConsole {
         [Parameter(Mandatory)][string]$Script,
         [Parameter(Mandatory)][string]$Log,
         [ValidateRange(1, 1800)][int]$TimeoutSeconds = 300,
-        [hashtable]$Environment = @{}
+        [hashtable]$Environment = @{},
+        [switch]$Isolated
     )
+    if ($Isolated) {
+        return Invoke-NlcsIsolatedConsole -Executable $Executable -Drawing $Drawing -Script $Script -Log $Log -TimeoutSeconds $TimeoutSeconds -Environment $Environment
+    }
     $mutex = [Threading.Mutex]::new($false, 'Local\NlcsLegendaCoreConsole')
     $locked = $false
     $process = $null
@@ -170,4 +174,38 @@ function Invoke-NlcsCoreConsole {
     if ($failure) { throw $failure }
     if ($restored.Count -gt 0) { throw "De test lekte profielwaarden; exact hersteld: $($restored -join ', ')" }
     [pscustomobject]@{ ExitCode = 0; Log = $Log; ProfileValuesChecked = @(@($before) + @($after) | ForEach-Object { $_.Path + '|' + $_.Name } | Select-Object -Unique).Count }
+}
+
+# Een eigen Core Console-profiel laat gelijktijdige CAD-sessies ongemoeid.
+# Alleen voor afzonderlijke testtekeningen; dit bewijst geen normale bundel-autoload.
+function Invoke-NlcsIsolatedConsole {
+    param([string]$Executable, [string]$Drawing, [string]$Script, [string]$Log,
+          [int]$TimeoutSeconds, [hashtable]$Environment)
+    $work = Split-Path -Parent ([IO.Path]::GetFullPath($Script))
+    $id = 'nlcs-' + [Guid]::NewGuid().ToString('N')
+    $profile = Join-Path $work $id
+    New-Item -ItemType Directory -Path $profile | Out-Null
+    $wrapped = "$Log.isolated.scr"
+    '(princ (strcat "\nNLCS_ISOLATION=" (getvar "ROAMABLEROOTPREFIX")))' + "`n" + (Get-Content -LiteralPath $Script -Raw) |
+        Set-Content -LiteralPath $wrapped -Encoding ascii
+    $arguments = @('/i', ('"{0}"' -f $Drawing), '/s', ('"{0}"' -f $wrapped), '/l', 'en-US', '/isolate', $id, ('"{0}"' -f $profile))
+    $childEnvironment = @{ NLCSLEGENDA_TARGET = $null }
+    foreach ($name in $Environment.Keys) { $childEnvironment[$name] = $Environment[$name] }
+    $process = $null
+    try {
+        $process = Start-Process -FilePath $Executable -ArgumentList $arguments -WorkingDirectory $work `
+            -WindowStyle Hidden -PassThru -RedirectStandardOutput $Log -RedirectStandardError "$Log.stderr" -Environment $childEnvironment
+        if (!$process.WaitForExit($TimeoutSeconds * 1000)) { throw "Core Console overschrijdt $TimeoutSeconds seconden. Log: $Log" }
+        if ($process.ExitCode -ne 0) { throw "Core Console eindigt met procescode $($process.ExitCode). Log: $Log" }
+        $plain = (Get-Content -LiteralPath $Log -Raw).Replace([string][char]0, '')
+        if (!$plain.Contains('NLCS_ISOLATION=' + $profile)) { throw "Afzonderlijk CAD-profiel niet bevestigd. Log: $Log" }
+    }
+    finally {
+        if ($process) {
+            try { if (!$process.HasExited) { $process.Kill(); $process.WaitForExit() } }
+            finally { $process.Dispose() }
+        }
+    }
+    # Geen normaal profiel uitlezen of terugzetten: dat kan bij de andere CAD-sessie horen.
+    [pscustomobject]@{ ExitCode=0; Log=$Log; ProfileValuesChecked=0; Isolated=$true; IsolationRoot=$profile }
 }

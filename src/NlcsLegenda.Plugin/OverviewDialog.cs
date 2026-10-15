@@ -24,9 +24,15 @@ internal sealed class OverviewDialog : LegendDialog
     private readonly ComboBox _sort = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };
     private readonly DataGridView _grid = new()
     {
-        Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
-        MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, RowHeadersVisible = false,
-        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells
+        Dock = DockStyle.Fill,
+        ReadOnly = true,
+        AllowUserToAddRows = false,
+        AllowUserToDeleteRows = false,
+        MultiSelect = false,
+        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+        RowHeadersVisible = false,
+        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+        AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells
     };
     private readonly Label _summary = new() { AutoSize = true, Dock = DockStyle.Top, Padding = new Padding(8) };
     private readonly FlowLayoutPanel _moves = new() { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(6) };
@@ -36,6 +42,8 @@ internal sealed class OverviewDialog : LegendDialog
     private readonly TextBox _filter = new() { Width = 210, PlaceholderText = "Zoek waarde of tekst" };
     private readonly ComboBox _field = new() { Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _issuesOnly = new() { Text = "Alleen bronmeldingen", AutoSize = true };
+    private readonly Dictionary<LegendEntry, string[]> _rowValues = new();
+    private readonly Dictionary<(LegendEntry, string), string> _fieldValues = new();
     private bool _loading;
     private OverviewLegend Current => _legends[_legend.SelectedIndex];
 
@@ -68,10 +76,11 @@ internal sealed class OverviewDialog : LegendDialog
         ActionButton("KLIC-instellingen…", EditKlic);
         ActionButton("KLIC-details…", ShowKlicDetails);
         ActionButton("Exporteer lijst…", ExportVisible);
+        var filters = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 0, 8, 4) };
         _field.Items.Add("Alle zichtbare velden");
         _field.Items.AddRange(KlicFields.All.Cast<object>().ToArray());
         _field.SelectedIndex = 0;
-        tools.Controls.Add(_field); tools.Controls.Add(_filter); tools.Controls.Add(_issuesOnly);
+        filters.Controls.Add(_filter); filters.Controls.Add(_field); filters.Controls.Add(_issuesOnly);
         _filter.TextChanged += (_, _) => { if (!_loading) FillGrid(0); };
         _field.SelectedIndexChanged += (_, _) => { if (!_loading) FillGrid(0); };
         _issuesOnly.CheckedChanged += (_, _) => { if (!_loading) FillGrid(0); };
@@ -95,6 +104,7 @@ internal sealed class OverviewDialog : LegendDialog
         SizeChanged += (_, _) => _summary.MaximumSize = new Size(Math.Max(100, ClientSize.Width), 0);
         Controls.Add(_grid);
         Controls.Add(_summary);
+        Controls.Add(filters);
         Controls.Add(tools);
         Controls.Add(top);
         Controls.Add(_moves);
@@ -133,13 +143,22 @@ internal sealed class OverviewDialog : LegendDialog
         _grid.Columns.Clear();
         foreach (var name in new[] { "Status", "Omschrijving", "Netbeheerder", "Soort", "Hoeveelheid", "Bronlagen", "Samengevoegd" }
             .Concat(Current.Settings.Klic.Columns.Select(k => KlicFields.Find(k)!.Label)).Concat(new[] { "Broncontrole" }))
-            _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = name, MinimumWidth = 100, FillWeight = name == "Omschrijving" ? 240 : 120,
-                SortMode = DataGridViewColumnSortMode.NotSortable, DefaultCellStyle = { WrapMode = DataGridViewTriState.True } });
+            _grid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = name,
+                MinimumWidth = 100,
+                FillWeight = name == "Omschrijving" ? 240 : 120,
+                SortMode = DataGridViewColumnSortMode.NotSortable,
+                DefaultCellStyle = { WrapMode = DataGridViewTriState.True }
+            });
     }
 
     private void LoadEntries()
     {
         _entries = LegendGrouping.Sort(Current.Entries, Current.Settings);
+        _rowValues.Clear();
+        _fieldValues.Clear();
+        _moves.Visible = Current.Id.Length > 0 && Current.Settings.SortMode == LegendSortMode.Handmatig;
         _moves.Enabled = Current.Id.Length > 0 && Current.Settings.SortMode == LegendSortMode.Handmatig;
         _summary.Text = Current.Id.Length == 0
             ? $"{_entries.Count} regels in de tekening. Plaats eerst een legenda om de volgorde op te slaan."
@@ -154,14 +173,9 @@ internal sealed class OverviewDialog : LegendDialog
         _moves.Enabled = Current.Id.Length > 0 && Current.Settings.SortMode == LegendSortMode.Handmatig && _filter.Text.Length == 0 && !_issuesOnly.Checked;
         foreach (var entry in _entries)
         {
-            var issues = KlicSummary.Issues(entry.KlicObjects);
-            if (_issuesOnly.Checked && issues.Length == 0) continue;
-            var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, string.Join(", ", entry.Netbeheerders),
-                string.Join(", ", entry.LayersByType.Keys), entry.QuantityText(Current.Settings.QuantityDecimals, Current.Settings.UnitArea, Current.Settings.UnitLength, Current.Settings.UnitCount),
-                string.Join(Environment.NewLine, entry.SourceLayers.Select(s => s.SourceLayerName).Distinct()), string.Join(", ", entry.MergedMembers) };
-            values.AddRange(Current.Settings.Klic.Columns.Select(k => KlicSummary.Field(entry.KlicObjects, k)));
-            values.Add(issues);
-            string search = _field.SelectedItem is KlicField field ? KlicSummary.Field(entry.KlicObjects, field.Key) : string.Join(" ", values);
+            var values = RowValues(entry);
+            if (_issuesOnly.Checked && values[^1].Length == 0) continue;
+            string search = _field.SelectedItem is KlicField field ? FieldValue(entry, field.Key) : string.Join(" ", values);
             if (_filter.Text.Trim().Length > 0 && !search.Contains(_filter.Text.Trim(), StringComparison.CurrentCultureIgnoreCase)) continue;
             _visible.Add(entry);
             _grid.Rows.Add(values.Cast<object>().ToArray());
@@ -170,6 +184,27 @@ internal sealed class OverviewDialog : LegendDialog
             + (Current.Id.Length == 0 ? "Voorbeeld; instellingen worden niet opgeslagen." : "Wijzigingen gelden alleen voor deze legenda.")
             + (_filter.Text.Length > 0 || _issuesOnly.Checked ? " Filter geldt voor deze lijst en export; wis het filter om regels te verplaatsen." : "");
         if (_grid.Rows.Count > 0) _grid.CurrentCell = _grid.Rows[Math.Clamp(selected, 0, _grid.Rows.Count - 1)].Cells[1];
+    }
+
+    private string[] RowValues(LegendEntry entry)
+    {
+        if (_rowValues.TryGetValue(entry, out var cached)) return cached;
+        var issues = KlicSummary.Issues(entry.KlicObjects);
+        var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, string.Join(", ", entry.Netbeheerders),
+                string.Join(", ", entry.LayersByType.Keys), entry.QuantityText(Current.Settings.QuantityDecimals, Current.Settings.UnitArea, Current.Settings.UnitLength, Current.Settings.UnitCount),
+                string.Join(Environment.NewLine, entry.SourceLayers.Select(s => s.SourceLayerName).Distinct()), string.Join(", ", entry.MergedMembers) };
+        values.AddRange(Current.Settings.Klic.Columns.Select(k => KlicSummary.Field(entry.KlicObjects, k)));
+        values.Add(issues);
+        var result = values.ToArray();
+        _rowValues.Add(entry, result);
+        return result;
+    }
+
+    private string FieldValue(LegendEntry entry, string key)
+    {
+        if (!_fieldValues.TryGetValue((entry, key), out var value))
+            _fieldValues.Add((entry, key), value = KlicSummary.Field(entry.KlicObjects, key));
+        return value;
     }
 
     private void MoveEntry(int offset)

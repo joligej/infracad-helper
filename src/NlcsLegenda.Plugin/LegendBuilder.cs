@@ -53,6 +53,7 @@ public static class LegendBuilder
 
         // Meet de werkelijk getekende symbolen vóór de indeling. Een groot symbool
         // vergroot zijn rij/kolom; zijn formaat wordt niet naar een vakje vervormd.
+        using var imports = new SymbolImportSession(db, tr);
         var symbols = new Dictionary<LegendEntry, PreparedSymbol>();
         if (s.InsertSymbolBlocks)
             foreach (var entry in analysis.Entries.Where(e => e.SymbolLayer is not null && e.SymbolBlockName is not null))
@@ -64,7 +65,7 @@ public static class LegendBuilder
                     renderLayer = EnsureStyledLayer(tr, db, layer, display);
                 else { EnsureLayer(tr, db, layer, 7); renderLayer = layer; }
                 analysis.SymbolSamples.TryGetValue(layer, out var sample);
-                if (!TryInsertSymbol(btr, tr, db, name, renderLayer, sample?.Transform ?? SymbolTransform.Identity,
+                if (!TryInsertSymbol(btr, tr, db, imports, name, renderLayer, sample?.Transform ?? SymbolTransform.Identity,
                     sample, 0, 0, s.ModelUnitsPerPaperMm, s.IncludeInvisibleLayers, out var ids, out var reason))
                     throw new InvalidOperationException($"Symbool '{entry.Description}': {reason}");
                 var bounds = new Extents3d();
@@ -423,7 +424,7 @@ public static class LegendBuilder
     }
 
     private static bool TryInsertSymbol(
-        BlockTableRecord btr, Transaction tr, Database db, string blockName, string layer,
+        BlockTableRecord btr, Transaction tr, Database db, SymbolImportSession imports, string blockName, string layer,
         SymbolTransform sourceTransform, SymbolSample? sample,
         double centerX, double centerY, double modelPerPaperMm, bool includeInvisible,
         out IReadOnlyList<ObjectId> placed, out string failureReason)
@@ -432,7 +433,6 @@ public static class LegendBuilder
         placed = Array.Empty<ObjectId>();
         var primitives = new List<ObjectId>();
         var created = new List<ObjectId>();
-        var importedBlocks = new List<ObjectId>();
         try
         {
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
@@ -441,7 +441,7 @@ public static class LegendBuilder
                 failureReason = $"Symboolblok '{blockName}' ontbreekt in de hostdatabase.";
                 return false;
             }
-            var defId = ImportSymbolDefinition(db, tr, bt[blockName], importedBlocks);
+            var defId = imports.Import(bt[blockName]);
 
             // Explode-to-primitives voorkomt dat annotatieve blokschaal de swatch opblaast.
             primitives = ExplodeToPrimitives(btr, tr, db, layer, defId, created, includeInvisible, sample, out var probeOk);
@@ -535,14 +535,6 @@ public static class LegendBuilder
             failureReason = $"Symboolblok '{blockName}' kon niet worden weergegeven: {ex.Message}";
             return false;
         }
-        finally
-        {
-            for (int pass = 0; pass < importedBlocks.Count; pass++)
-                foreach (var imported in importedBlocks)
-                    if (!imported.IsErased && tr.GetObject(imported, OpenMode.ForWrite) is BlockTableRecord block
-                        && block.GetBlockReferenceIds(true, false).Count == 0)
-                        block.Erase();
-        }
     }
 
     private static void TransformPlanarSymbol(Entity entity, Matrix3d transform)
@@ -583,82 +575,132 @@ public static class LegendBuilder
         }
     }
 
-    private static ObjectId ImportSymbolDefinition(
-        Database host, Transaction tr, ObjectId definitionId, List<ObjectId> importedBlocks)
+    // Bronkopieën bestaan alleen tijdens deze BuildBlock-aanroep. Geen cache over
+    // tekeningwijzigingen heen; iedere nieuwe legenda controleert de bronversie opnieuw.
+    private sealed class SymbolImportSession(Database host, Transaction tr) : IDisposable
     {
-        var original = definitionId.OriginalDatabase;
-        if (original == host)
-            return definitionId;
+        private readonly Dictionary<(Database, string), SymbolSnapshot> _sources = new();
+        private readonly Dictionary<ObjectId, ObjectId> _definitions = new();
+        private readonly List<ObjectId> _importedBlocks = new();
 
-        var definition = (BlockTableRecord)tr.GetObject(definitionId, OpenMode.ForRead);
-        string localName = LayerNaming.LocalName(definition.Name);
-        using var source = OpenXrefSnapshot(original);
-        using var sourceTr = source.TransactionManager.StartTransaction();
-        var table = (BlockTable)sourceTr.GetObject(source.BlockTableId, OpenMode.ForRead);
-        if (!table.Has(localName))
-            throw new InvalidOperationException($"Symbooldefinitie '{localName}' ontbreekt in de bron.");
-        var sourceId = table[localName];
-        // Alleen de kopie wordt hernoemd. De geladen xref en het bronbestand blijven intact.
-        string sourceVersion = source.FingerprintGuid + source.VersionGuid;
-        string prefix = "NLCS_SRC_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(sourceVersion)))[..20] + "_";
-        var originalLayers = new Dictionary<ObjectId, string>();
-        foreach (var tableId in new[] { source.BlockTableId, source.LayerTableId, source.LinetypeTableId, source.TextStyleTableId })
-            foreach (ObjectId id in (SymbolTable)sourceTr.GetObject(tableId, OpenMode.ForRead))
-            {
-                var record = (SymbolTableRecord)sourceTr.GetObject(id, OpenMode.ForRead);
-                if (record is BlockTableRecord { IsLayout: true }) continue;
-                if (record is LayerTableRecord)
-                {
-                    originalLayers[id] = record.Name;
-                    if (record.Name == "0") continue;
-                }
-                if (record is LinetypeTableRecord && (record.Name.Equals("ByLayer", StringComparison.OrdinalIgnoreCase)
-                    || record.Name.Equals("ByBlock", StringComparison.OrdinalIgnoreCase) || record.Name.Equals("Continuous", StringComparison.OrdinalIgnoreCase))) continue;
-                record.UpgradeOpen();
-                // Handles zijn uniek binnen deze broninhoud, ook voor anonieme blokken.
-                record.Name = prefix + record.Handle;
-            }
-        var materials = (DBDictionary)sourceTr.GetObject(source.MaterialDictionaryId, OpenMode.ForWrite);
-        var materialEntries = new List<(string Key, ObjectId Value)>();
-        foreach (DBDictionaryEntry item in materials) materialEntries.Add((item.Key, item.Value));
-        foreach (var item in materialEntries)
+        public ObjectId Import(ObjectId definitionId)
         {
-            if (item.Key.Equals("ByLayer", StringComparison.OrdinalIgnoreCase) || item.Key.Equals("ByBlock", StringComparison.OrdinalIgnoreCase)
-                || item.Key.Equals("Global", StringComparison.OrdinalIgnoreCase)) continue;
-            string name = prefix + item.Value.Handle;
-            materials.SetName(item.Key, name);
-            ((Material)sourceTr.GetObject(item.Value, OpenMode.ForWrite)).Name = name;
-        }
-        using var ids = new ObjectIdCollection { sourceId };
-        using var mapping = new IdMapping();
-        source.WblockCloneObjects(ids, host.BlockTableId, mapping, DuplicateRecordCloning.Ignore, false);
-        foreach (IdPair pair in mapping)
-            if (pair.IsCloned && pair.Value.ObjectClass.IsDerivedFrom(Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(BlockTableRecord))))
-                importedBlocks.Add(pair.Value);
-        // Xref-laagoverrides uit de host gelden ook voor onderdelen binnen het symbool.
-        var hostLayers = (LayerTable)tr.GetObject(host.LayerTableId, OpenMode.ForRead);
-        int separator = definition.Name.LastIndexOf('|');
-        string xrefPrefix = separator >= 0 ? definition.Name[..(separator + 1)] : string.Empty;
-        foreach (IdPair pair in mapping)
-            if (originalLayers.TryGetValue(pair.Key, out var layerName) && layerName != "0" && hostLayers.Has(xrefPrefix + layerName))
-            {
-                var from = (LayerTableRecord)tr.GetObject(hostLayers[xrefPrefix + layerName], OpenMode.ForRead);
-                var to = (LayerTableRecord)tr.GetObject(pair.Value, OpenMode.ForWrite);
-                to.Color = from.Color; to.LineWeight = from.LineWeight; to.Transparency = from.Transparency;
-                to.IsOff = from.IsOff; to.IsFrozen = from.IsFrozen;
-                var lt = (LinetypeTableRecord)tr.GetObject(from.LinetypeObjectId, OpenMode.ForRead);
-                to.LinetypeObjectId = ResolveStyleLinetype(tr, host, new LayerDisplayStyle
+            var original = definitionId.OriginalDatabase;
+            if (original == host) return definitionId;
+            if (_definitions.TryGetValue(definitionId, out var cached)) return cached;
+            var definition = (BlockTableRecord)tr.GetObject(definitionId, OpenMode.ForRead);
+            int separator = definition.Name.LastIndexOf('|');
+            string xrefPrefix = separator >= 0 ? definition.Name[..(separator + 1)] : string.Empty;
+            var key = (original, xrefPrefix);
+            if (!_sources.TryGetValue(key, out var snapshot))
+                _sources.Add(key, snapshot = new SymbolSnapshot(original, xrefPrefix));
+            string localName = LayerNaming.LocalName(definition.Name);
+            if (!snapshot.Definitions.TryGetValue(localName, out var sourceId))
+                throw new InvalidOperationException($"Symbooldefinitie '{localName}' ontbreekt in de bron.");
+            using var ids = new ObjectIdCollection { sourceId };
+            using var mapping = new IdMapping();
+            snapshot.Database.WblockCloneObjects(ids, host.BlockTableId, mapping, DuplicateRecordCloning.Ignore, false);
+            foreach (IdPair pair in mapping)
+                if (pair.IsCloned && pair.Value.ObjectClass.IsDerivedFrom(Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(BlockTableRecord))))
+                    _importedBlocks.Add(pair.Value);
+            // Xref-laagoverrides uit de host gelden ook voor onderdelen binnen het symbool.
+            var hostLayers = (LayerTable)tr.GetObject(host.LayerTableId, OpenMode.ForRead);
+            foreach (IdPair pair in mapping)
+                if (snapshot.OriginalLayers.TryGetValue(pair.Key, out var layerName) && layerName != "0" && hostLayers.Has(xrefPrefix + layerName))
                 {
-                    Color = from.Color, Linetype = lt.Name,
-                    LinetypeIdentity = DrawingAnalyzer.LinetypeSignature(from.LinetypeObjectId, tr)
-                });
+                    var from = (LayerTableRecord)tr.GetObject(hostLayers[xrefPrefix + layerName], OpenMode.ForRead);
+                    var to = (LayerTableRecord)tr.GetObject(pair.Value, OpenMode.ForWrite);
+                    to.Color = from.Color; to.LineWeight = from.LineWeight; to.Transparency = from.Transparency;
+                    to.IsOff = from.IsOff; to.IsFrozen = from.IsFrozen;
+                    var lt = (LinetypeTableRecord)tr.GetObject(from.LinetypeObjectId, OpenMode.ForRead);
+                    to.LinetypeObjectId = ResolveStyleLinetype(tr, host, new LayerDisplayStyle
+                    {
+                        Color = from.Color,
+                        Linetype = lt.Name,
+                        LinetypeIdentity = DrawingAnalyzer.LinetypeSignature(from.LinetypeObjectId, tr)
+                    });
+                }
+            var mapped = mapping[sourceId];
+            if (mapped.Value.IsNull || mapped.Value.Database != host)
+                throw new InvalidOperationException("Het symbool is niet naar de hostdatabase gekopieerd.");
+
+            _definitions.Add(definitionId, mapped.Value);
+            return mapped.Value;
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                for (int pass = 0; pass < _importedBlocks.Count; pass++)
+                {
+                    bool erased = false;
+                    foreach (var imported in _importedBlocks)
+                        if (!imported.IsErased && tr.GetObject(imported, OpenMode.ForWrite) is BlockTableRecord block
+                            && block.GetBlockReferenceIds(true, false).Count == 0)
+                        { block.Erase(); erased = true; }
+                    if (!erased) break;
+                }
             }
-        var mapped = mapping[sourceId];
-        if (!mapped.IsCloned || mapped.Value.IsNull || mapped.Value.Database != host)
-            throw new InvalidOperationException("Het symbool is niet naar de hostdatabase gekopieerd.");
-        sourceTr.Commit();
-        return mapped.Value;
+            finally { foreach (var source in _sources.Values) source.Dispose(); }
+        }
+    }
+
+    private sealed class SymbolSnapshot : IDisposable
+    {
+        public Database Database { get; }
+        public Dictionary<string, ObjectId> Definitions { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<ObjectId, string> OriginalLayers { get; }
+
+        public SymbolSnapshot(Database loaded, string xrefPrefix)
+        {
+            Database = OpenXrefSnapshot(loaded);
+            try
+            {
+                using var transaction = Database.TransactionManager.StartTransaction();
+                var blocks = (BlockTable)transaction.GetObject(Database.BlockTableId, OpenMode.ForRead);
+                foreach (ObjectId id in blocks)
+                    Definitions.Add(((BlockTableRecord)transaction.GetObject(id, OpenMode.ForRead)).Name, id);
+                // Een tweede koppeling naar hetzelfde bestand kan andere laagoverrides
+                // hebben. Geef die een eigen namespace in de host.
+                string identity = Database.FingerprintGuid + Database.VersionGuid + xrefPrefix;
+                string prefix = "NLCS_SRC_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(identity)))[..20] + "_";
+                var originalLayers = new Dictionary<ObjectId, string>();
+                foreach (var tableId in new[] { Database.BlockTableId, Database.LayerTableId, Database.LinetypeTableId, Database.TextStyleTableId })
+                    foreach (ObjectId id in (SymbolTable)transaction.GetObject(tableId, OpenMode.ForRead))
+                    {
+                        var record = (SymbolTableRecord)transaction.GetObject(id, OpenMode.ForRead);
+                        if (record is BlockTableRecord { IsLayout: true }) continue;
+                        if (record is LayerTableRecord)
+                        {
+                            originalLayers[id] = record.Name;
+                            if (record.Name == "0") continue;
+                        }
+                        if (record is LinetypeTableRecord && (record.Name.Equals("ByLayer", StringComparison.OrdinalIgnoreCase)
+                            || record.Name.Equals("ByBlock", StringComparison.OrdinalIgnoreCase) || record.Name.Equals("Continuous", StringComparison.OrdinalIgnoreCase))) continue;
+                        record.UpgradeOpen();
+                        // Handles zijn uniek binnen deze broninhoud, ook voor anonieme blokken.
+                        record.Name = prefix + record.Handle;
+                    }
+                var materials = (DBDictionary)transaction.GetObject(Database.MaterialDictionaryId, OpenMode.ForWrite);
+                var materialEntries = new List<(string Key, ObjectId Value)>();
+                foreach (DBDictionaryEntry item in materials) materialEntries.Add((item.Key, item.Value));
+                foreach (var item in materialEntries)
+                {
+                    if (item.Key.Equals("ByLayer", StringComparison.OrdinalIgnoreCase) || item.Key.Equals("ByBlock", StringComparison.OrdinalIgnoreCase)
+                        || item.Key.Equals("Global", StringComparison.OrdinalIgnoreCase)) continue;
+                    string name = prefix + item.Value.Handle;
+                    materials.SetName(item.Key, name);
+                    ((Material)transaction.GetObject(item.Value, OpenMode.ForWrite)).Name = name;
+                }
+
+                OriginalLayers = originalLayers;
+                transaction.Commit();
+            }
+            catch { Database.Dispose(); throw; }
+        }
+        public void Dispose() => Database.Dispose();
     }
 
     private static List<ObjectId> ExplodeToPrimitives(

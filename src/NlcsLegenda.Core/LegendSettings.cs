@@ -589,18 +589,24 @@ public sealed class LegendSettings
         return null;
     }
 
-    // Bij geneste xrefs bepaalt de bovenste xref de keuze uit de instellingen.
+    // Een uitgezette bovenliggende koppeling sluit ook alle inhoud daaronder uit.
     public bool IsXrefIncluded(string xrefName)
     {
-        if (string.IsNullOrEmpty(xrefName))
-            return IncludeXrefLayers;
-        if (XrefInclusion.TryGetValue(xrefName, out var exact))
-            return exact;
-        var topLevel = xrefName.Split('|')[0];
-        if (!string.Equals(topLevel, xrefName, StringComparison.Ordinal)
-            && XrefInclusion.TryGetValue(topLevel, out var top))
-            return top;
-        return IncludeXrefLayers;
+        bool included = IncludeXrefLayers;
+        string prefix = string.Empty;
+        foreach (var part in xrefName.Split('|', StringSplitOptions.RemoveEmptyEntries))
+        {
+            prefix = prefix.Length == 0 ? part : prefix + "|" + part;
+            if (XrefInclusion.TryGetValue(prefix, out var choice)) included = choice;
+            if (!included) return false;
+        }
+        return included;
+    }
+
+    public void SetAllXrefs(bool included)
+    {
+        IncludeXrefLayers = included;
+        XrefInclusion.Clear();
     }
 
     [JsonIgnore, Browsable(false)]

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.31.1 - 2026-10-15
+
+- Xrefs aan- of uitzetten overschrijft eerdere uitzonderingen. Een gedeeltelijke keuze
+  is zichtbaar in Instellingen. Ook bij het maken van een nieuwe legenda is de xref-lijst beschikbaar.
+- Een xref op een NLCS-symboollaag wordt niet meer als los symbool opgenomen wanneer
+  die bron is uitgesloten. Een uitgeschakelde bovenliggende xref sluit ook de geneste inhoud uit.
+- Symboolimport leest elke bron per koppeling eenmaal tijdens het opbouwen van een legenda.
+  Op de lokale KLIC-proef met 306 regels daalde de tekentijd van 112 naar 2,6 seconden;
+  de bronanalyse duurde ongeveer 4 seconden. Snelheid hangt af van tekening en computer.
+  Bronversies, aparte laagoverrides en gedeelde symboolonderdelen blijven gecontroleerd.
+- Technische laagomschrijvingen zoals `NLCS-basis`, herhaalde laagnamen en alleen `KLIC`
+  verdringen de gewone benaming niet meer. Expliciete eigen omschrijvingen blijven leidend.
+- Instellingen heeft een vaste onderdelennavigatie, één plek per optie en afzonderlijke
+  pagina's voor schaalbalk en afmetingen. Overzicht scheidt filters van acties en toont
+  verplaatsknoppen alleen bij handmatige volgorde. Filteren hergebruikt de geladen KLIC-waarden.
+- De releaseproeven kunnen met `-Isolated` op afzonderlijke testtekeningen naast een
+  andere CAD-opdracht draaien, zonder diens opgeslagen CAD-profiel terug te zetten.
+
 ## 1.31.0 - 2026-10-14
 
 - Overzicht toont instelbare KLIC-kolommen, een zoekfilter en een filter voor bronmeldingen.

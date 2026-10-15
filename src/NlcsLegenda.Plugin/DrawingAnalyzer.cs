@@ -104,12 +104,12 @@ public static class DrawingAnalyzer
         {
             foreach (var id in selection)
                 if (tr.GetObject(id, OpenMode.ForRead) is Entity ent)
-                    Process(ent, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false, sourceXref: string.Empty);
+                    Process(ent, tr, c, settings, path, 0, Matrix3d.Identity, sourceXref: string.Empty);
         }
         else
         {
             var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
-            CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, insideIncludedXref: false, sourceXref: string.Empty);
+            CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, sourceXref: string.Empty);
         }
 
         // Dezelfde logische NLCS-laag uit meerdere bronnen: gelijke weergave valt samen (één regel,
@@ -196,7 +196,7 @@ public static class DrawingAnalyzer
 
     private static void CollectFromBlock(
         ObjectId btrId, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref, string sourceXref, LayerDisplayStyle? inheritedStyle = null, LayerDisplayStyle? inheritedLayerStyle = null)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, string sourceXref, LayerDisplayStyle? inheritedStyle = null, LayerDisplayStyle? inheritedLayerStyle = null)
     {
         if (depth > MaxDepth) throw new InvalidOperationException("Te diep geneste blokken; analyse afgebroken om onvolledige hoeveelheden te voorkomen.");
         if (!path.Add(btrId)) return;
@@ -204,14 +204,14 @@ public static class DrawingAnalyzer
         var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
         foreach (ObjectId id in btr)
             if (tr.GetObject(id, OpenMode.ForRead) is Entity ent)
-                Process(ent, tr, c, settings, path, depth, transform, insideIncludedXref, sourceXref, inheritedStyle, inheritedLayerStyle);
+                Process(ent, tr, c, settings, path, depth, transform, sourceXref, inheritedStyle, inheritedLayerStyle);
 
         path.Remove(btrId);
     }
 
     private static void Process(
         Entity ent, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> path, int depth, Matrix3d transform, bool insideIncludedXref, string sourceXref, LayerDisplayStyle? inheritedStyle = null, LayerDisplayStyle? inheritedLayerStyle = null)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, string sourceXref, LayerDisplayStyle? inheritedStyle = null, LayerDisplayStyle? inheritedLayerStyle = null)
     {
         // Eigen legenda-geometrie telt nooit als bron.
         if (c.Excluded.Contains(ent.ObjectId))
@@ -225,7 +225,13 @@ public static class DrawingAnalyzer
         }
         var layerStyle = EntityLayerStyle(ent, tr, inheritedLayerStyle);
         var effectiveStyle = EntityStyle(ent, tr, inheritedStyle, layerStyle);
-        Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle);
+        var block = ent as BlockReference;
+        var definition = block is not null && !block.BlockTableRecord.IsNull
+            ? tr.GetObject(block.BlockTableRecord, OpenMode.ForRead) as BlockTableRecord : null;
+        // De xref-insert is een broncontainer, geen lokaal legendasymbool. De laag
+        // waarop hij is ingevoegd mag een uitgeschakelde xref niet alsnog opnemen.
+        if (definition is not { IsFromExternalReference: true })
+            Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle);
 
         if (ent is BlockReference br && !br.BlockTableRecord.IsNull)
         {
@@ -235,14 +241,14 @@ public static class DrawingAnalyzer
                 var nested = transform * br.BlockTransform;
                 if (def.IsFromExternalReference)
                 {
-                    bool included = insideIncludedXref || settings.IsXrefIncluded(def.Name);
-                    if (included)
-                        CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref: true,
-                            sourceXref: string.IsNullOrEmpty(sourceXref) ? def.Name : sourceXref + "|" + LayerNaming.LocalName(def.Name), inheritedStyle: effectiveStyle, inheritedLayerStyle: layerStyle);
+                    string childSource = string.IsNullOrEmpty(sourceXref) ? def.Name : sourceXref + "|" + LayerNaming.LocalName(def.Name);
+                    if (settings.IsXrefIncluded(childSource))
+                        CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested,
+                            sourceXref: childSource, inheritedStyle: effectiveStyle, inheritedLayerStyle: layerStyle);
                 }
                 else
                 {
-                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, insideIncludedXref, sourceXref, effectiveStyle, layerStyle);
+                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, sourceXref, effectiveStyle, layerStyle);
                 }
             }
         }
@@ -947,7 +953,9 @@ public static class DrawingAnalyzer
                 if (!lt.Has(source)) continue;
                 var record = (LayerTableRecord)tr.GetObject(lt[source], OpenMode.ForRead);
                 if (string.IsNullOrWhiteSpace(record.Description)) continue;
-                result[layer.EffectiveRenderLayerName] = record.Description.Trim();
+                var description = LayerDescription.Clean(record.Description, layer);
+                if (description is null) continue;
+                result[layer.EffectiveRenderLayerName] = description;
                 break;
             }
         }

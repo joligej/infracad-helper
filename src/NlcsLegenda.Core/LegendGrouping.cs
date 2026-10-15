@@ -310,6 +310,11 @@ public static class LegendGrouping
                 // Een eigen-laagkoppeling levert de tekst uit de regel (niet uit de tekening);
                 // dan is EigenKoppeling de juiste herkomst in plaats van laagbeschrijving.
                 source = descriptionSourceOf?.Invoke(layer.EffectiveRenderLayerName) ?? DescriptionSource.Laagbeschrijving;
+                if (source == DescriptionSource.Laagbeschrijving)
+                {
+                    desc = LayerDescription.Clean(desc, layer);
+                    if (desc is null) continue;
+                }
                 return desc.Trim();
             }
         }

@@ -87,7 +87,7 @@ internal sealed class SettingsDialog : LegendDialog
         Text = "NLCS Legenda \u2013 instellingen";
         Font = SystemFonts.MessageBoxFont;
         ClientSize = new Size(720, 680);
-        MinimumSize = new Size(560, 420);
+        MinimumSize = new Size(640, 420);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         ShowInTaskbar = false;
@@ -104,13 +104,36 @@ internal sealed class SettingsDialog : LegendDialog
             Font = new Font(SystemFonts.MessageBoxFont!, FontStyle.Bold)
         };
 
-        var tabs = new TabControl { Dock = DockStyle.Fill, Multiline = true };
+        var tabs = new TabControl { Dock = DockStyle.Fill, Appearance = TabAppearance.FlatButtons,
+            SizeMode = TabSizeMode.Fixed, ItemSize = new Size(0, 1), TabStop = false };
         tabs.TabPages.Add(BuildAlgemeenTab());
         tabs.TabPages.Add(BuildInhoudTab());
         tabs.TabPages.Add(BuildOpmaakTab());
         tabs.TabPages.Add(BuildTekstenTab());
         tabs.TabPages.Add(BuildHoeveelhedenTab());
         tabs.TabPages.Add(BuildSchaalbalkTab());
+        tabs.TabPages.Add(BuildMatenTab());
+        var navigation = new ListBox { Dock = DockStyle.Fill, BorderStyle = BorderStyle.None,
+            IntegralHeight = false, DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 32, AccessibleName = "Onderdeel" };
+        navigation.Items.AddRange(tabs.TabPages.Cast<TabPage>().Select(p => (object)p.Text).ToArray());
+        navigation.DrawItem += (_, e) =>
+        {
+            if (e.Index < 0) return;
+            e.DrawBackground();
+            TextRenderer.DrawText(e.Graphics, navigation.Items[e.Index].ToString(), e.Font,
+                Rectangle.Inflate(e.Bounds, -10, 0), e.ForeColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            e.DrawFocusRectangle();
+        };
+        navigation.SelectedIndexChanged += (_, _) => tabs.SelectedIndex = navigation.SelectedIndex;
+        tabs.SelectedIndexChanged += (_, _) => navigation.SelectedIndex = tabs.SelectedIndex;
+        navigation.SelectedIndex = 0;
+        var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(8) };
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145));
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        content.Controls.Add(navigation, 0, 0);
+        content.Controls.Add(tabs, 1, 0);
 
         var buttons = new ButtonBar(withApply: true);
         buttons.Apply!.Click += (_, _) =>
@@ -118,23 +141,12 @@ internal sealed class SettingsDialog : LegendDialog
             if (ValidateScale())
                 ApplyRequested?.Invoke(this, EventArgs.Empty);
         };
-        var remarks = buttons.AddExtra("Opmerkingen\u2026");
-        remarks.Click += (_, _) => EditRemarks();
-        if (_composition is not null || _compositionSource is not null)
-        {
-            var samenstellen = buttons.AddExtra("Samenstellen\u2026");
-            samenstellen.Click += (_, _) => EditComposition();
-        }
-        var resetFormat = buttons.AddExtra("Opmaak \u2192 template");
-        resetFormat.Click += (_, _) => { _settings.ResetFormattingToTemplate(); RefreshGrids(); };
-        var reset = buttons.AddExtra("Standaardwaarden");
-        reset.Click += (_, _) => { ResetToDefaults(_settings); RefreshGrids(); };
         AcceptButton = buttons.Ok;
         CancelButton = buttons.Cancel;
 
         FormClosing += OnFormClosing;
 
-        Controls.Add(tabs);
+        Controls.Add(content);
         Controls.Add(buttons);
         Controls.Add(header);
     }
@@ -214,6 +226,24 @@ internal sealed class SettingsDialog : LegendDialog
         return cb;
     }
 
+    private CheckBox XrefChoice()
+    {
+        var control = new CheckBox { Text = "Xrefs meenemen", AutoSize = true, ThreeState = true, AutoCheck = false };
+        void Refresh()
+        {
+            var choices = _xrefNames.Count > 0
+                ? _xrefNames.Select(_settings.IsXrefIncluded).ToArray()
+                : new[] { _settings.IncludeXrefLayers }.Concat(_settings.XrefInclusion.Values).ToArray();
+            control.CheckState = choices.All(v => v) ? CheckState.Checked
+                : choices.All(v => !v) ? CheckState.Unchecked : CheckState.Indeterminate;
+            control.Text = control.CheckState == CheckState.Indeterminate ? "Xrefs meenemen (gedeeltelijk)" : "Xrefs meenemen";
+        }
+        control.Click += (_, _) => { _settings.SetAllXrefs(control.CheckState != CheckState.Checked); SyncAll(); };
+        _resync.Add(Refresh);
+        Refresh();
+        return control;
+    }
+
     private static GroupBox Group(string title, params Control[] controls)
     {
         var flow = new SettingsStack { Padding = new Padding(6) };
@@ -225,7 +255,7 @@ internal sealed class SettingsDialog : LegendDialog
 
     private TabPage BuildAlgemeenTab()
     {
-        var page = new TabPage("Algemeen") { Padding = new Padding(10), AutoScroll = true };
+        var page = new TabPage("Legenda") { Padding = new Padding(10), AutoScroll = true };
         var root = new SettingsStack();
 
         var scale = new NumericUpDown { Minimum = 1, Maximum = 1_000_000, Value = (decimal)Math.Clamp(_settings.Scale, 1, 1_000_000), Width = 100 };
@@ -240,21 +270,34 @@ internal sealed class SettingsDialog : LegendDialog
 
         root.Controls.Add(LabeledRow("Schaal 1:", scale));
         root.Controls.Add(LabeledRow("Titel:", title));
-        root.Controls.Add(LabeledRow("Viewportmarge (mm):", margin));
-        root.Controls.Add(Group("Weergave",
-            BoundCheck("Titel tonen", () => _settings.IncludeTitle, v => _settings.IncludeTitle = v),
-            BoundCheck("Tekst naast de vakjes tonen", () => _settings.IncludeText, v => _settings.IncludeText = v),
-            BoundCheck("Kader rond legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
-            BoundCheck("Schaalbalk tonen", () => _settings.IncludeScaleBar, v => _settings.IncludeScaleBar = v),
-            BoundCheck("Hoeveelheden tonen", () => _settings.IncludeQuantities, v => _settings.IncludeQuantities = v)));
+        root.Controls.Add(BoundCheck("Titel tonen", () => _settings.IncludeTitle, v => _settings.IncludeTitle = v));
+        root.Controls.Add(Group("Viewport",
+            BoundCheck("Viewport zelf tekenen", () => _settings.ViewportManual, v => _settings.ViewportManual = v),
+            LabeledRow("Marge (mm):", margin)));
+        var resetFormat = new Button { Text = "TAUW-opmaak herstellen", AutoSize = true };
+        resetFormat.Click += (_, _) => { _settings.ResetFormattingToTemplate(); RefreshGrids(); };
+        var resetAll = new Button { Text = "Alle instellingen herstellen", AutoSize = true };
+        resetAll.Click += (_, _) => { ResetToDefaults(_settings); RefreshGrids(); };
+        var defaults = Group("Standaardinstellingen");
+        defaults.Controls[0].Controls.Add(resetFormat);
+        defaults.Controls[0].Controls.Add(resetAll);
+        root.Controls.Add(defaults);
         page.Controls.Add(root);
         return page;
     }
 
     private TabPage BuildInhoudTab()
     {
-        var page = new TabPage("Inhoud") { Padding = new Padding(10), AutoScroll = true };
+        var page = new TabPage("Bronnen en inhoud") { Padding = new Padding(10), AutoScroll = true };
         var root = new SettingsStack();
+
+        var xrefs = new Button { Text = "Xrefs\u2026", AutoSize = true };
+        xrefs.Click += (_, _) => EditXrefInclusion();
+        var sources = Group("Bronnen",
+            BoundCheck("Onzichtbare (bevroren/uit) lagen meenemen", () => _settings.IncludeInvisibleLayers, v => _settings.IncludeInvisibleLayers = v),
+            XrefChoice());
+        sources.Controls[0].Controls.Add(xrefs);
+        root.Controls.Add(sources);
 
         var klic = new Button { Text = "KLIC-velden en groepering…", AutoSize = true, Padding = new Padding(6, 3, 6, 3) };
         klic.Click += (_, _) =>
@@ -262,7 +305,6 @@ internal sealed class SettingsDialog : LegendDialog
             using var dialog = new KlicOptionsDialog(_settings.Klic);
             if (dialog.ShowDialog(this) == DialogResult.OK) _settings.Klic = dialog.Result;
         };
-        root.Controls.Add(klic);
         root.Controls.Add(Group("Elementsoorten",
             BoundCheck("Geometrie / lijnen", () => _settings.ToonGeometrie, v => _settings.ToonGeometrie = v),
             BoundCheck("Vlakken", () => _settings.ToonVlakken, v => _settings.ToonVlakken = v),
@@ -282,10 +324,8 @@ internal sealed class SettingsDialog : LegendDialog
             BoundCheck("Uitvoering samenvoegen", () => _settings.SamenvoegenUitvoering, v => _settings.SamenvoegenUitvoering = v),
             BoundCheck("Netbeheerder samenvoegen", () => _settings.MergedDimensions.Contains(GroupDimension.Netbeheerder), v => { if (v) _settings.MergedDimensions.Add(GroupDimension.Netbeheerder); else _settings.MergedDimensions.Remove(GroupDimension.Netbeheerder); }),
             BoundCheck("Volgnummer samenvoegen", () => _settings.SamenvoegenNummer, v => _settings.SamenvoegenNummer = v),
-            BoundCheck("KLIC-placeholdertekst weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v)));
-        root.Controls.Add(Group("Lagen",
-            BoundCheck("Onzichtbare (bevroren/uit) lagen meenemen", () => _settings.IncludeInvisibleLayers, v => _settings.IncludeInvisibleLayers = v),
-            BoundCheck("Xref-lagen meenemen", () => _settings.IncludeXrefLayers, v => _settings.IncludeXrefLayers = v)));
+            BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v), klic));
+
 
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Padding = new Padding(3) };
         if (_composition is not null || _compositionSource is not null)
@@ -297,9 +337,6 @@ internal sealed class SettingsDialog : LegendDialog
         var statussen = new Button { Text = "Eigen statussen\u2026", AutoSize = true };
         statussen.Click += (_, _) => EditStatusMembers();
         actions.Controls.Add(statussen);
-        var xrefs = new Button { Text = "Xrefs\u2026", AutoSize = true };
-        xrefs.Click += (_, _) => EditXrefInclusion();
-        actions.Controls.Add(xrefs);
         var eigenLagen = new Button { Text = "Eigen lagen\u2026", AutoSize = true };
         eigenLagen.Click += (_, _) => EditCustomLayers();
         actions.Controls.Add(eigenLagen);
@@ -329,7 +366,7 @@ internal sealed class SettingsDialog : LegendDialog
 
         root.Controls.Add(Group("Weergave",
             BoundCheck("Kader rond legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
-            BoundCheck("Kader per swatch", () => _settings.DrawSwatchFrame, v => _settings.DrawSwatchFrame = v),
+            BoundCheck("Kader per voorbeeldvak", () => _settings.DrawSwatchFrame, v => _settings.DrawSwatchFrame = v),
             BoundCheck("Symboolblokken invoegen", () => _settings.InsertSymbolBlocks, v => _settings.InsertSymbolBlocks = v),
             BoundCheck("Exploderen bij plaatsen", () => _settings.ExplodeOnPlace, v => _settings.ExplodeOnPlace = v)));
         root.Controls.Add(ComboRow("Sortering:", () => _settings.SortMode, v => _settings.SortMode = v));
@@ -408,7 +445,7 @@ internal sealed class SettingsDialog : LegendDialog
 
     private TabPage BuildSchaalbalkTab()
     {
-        var page = new TabPage("Schaalbalk / Extra") { Padding = new Padding(10), AutoScroll = true };
+        var page = new TabPage("Schaalbalk") { Padding = new Padding(10), AutoScroll = true };
         var root = new SettingsStack();
 
         root.Controls.Add(Group("Schaalbalk",
@@ -416,15 +453,21 @@ internal sealed class SettingsDialog : LegendDialog
             IntRow("Aantal segmenten:", () => _settings.ScaleBarSegments, v => _settings.ScaleBarSegments = v, 1, 50),
             NumRow("Meters per segment (0 = auto):", () => _settings.ScaleBarSegmentMeters, v => _settings.ScaleBarSegmentMeters = v, 0, 10000, 2, 1),
             NumRow("Hoogte (mm):", () => _settings.ScaleBarHeightMm, v => _settings.ScaleBarHeightMm = v, 0.5M, 50, 1, 0.5M)));
-        root.Controls.Add(Group("Viewport",
-            BoundCheck("Viewport zelf tekenen", () => _settings.ViewportManual, v => _settings.ViewportManual = v)));
-        root.Controls.Add(Group("Geavanceerd \u2013 maatvoering (mm)",
-            NumRow("Swatch breedte:", () => _settings.SwatchWidthMm, v => _settings.SwatchWidthMm = v, 1, 200, 1, 0.5M),
-            NumRow("Swatch hoogte:", () => _settings.SwatchHeightMm, v => _settings.SwatchHeightMm = v, 1, 200, 1, 0.5M),
+        page.Controls.Add(root);
+        return page;
+    }
+
+    private TabPage BuildMatenTab()
+    {
+        var page = new TabPage("Maten") { Padding = new Padding(10), AutoScroll = true };
+        var root = new SettingsStack();
+        root.Controls.Add(Group("Afmetingen op papier (mm)",
+            NumRow("Breedte voorbeeldvak:", () => _settings.SwatchWidthMm, v => _settings.SwatchWidthMm = v, 1, 200, 1, 0.5M),
+            NumRow("Hoogte voorbeeldvak:", () => _settings.SwatchHeightMm, v => _settings.SwatchHeightMm = v, 1, 200, 1, 0.5M),
             NumRow("Regelafstand:", () => _settings.RowPitchMm, v => _settings.RowPitchMm = v, 1, 100, 4, 0.1M),
             NumRow("Regelhoogte-factor tekst:", () => _settings.LineSpacingFactor, v => _settings.LineSpacingFactor = v, 0.25M, 4, 2, 0.05M),
             NumRow("Breedte opmerkingen:", () => _settings.RemarksWidthMm, v => _settings.RemarksWidthMm = v, 1, 500, 4, 1),
-            NumRow("Ruimte swatch-tekst:", () => _settings.TextGapMm, v => _settings.TextGapMm = v, 0, 50, 4, 0.5M),
+            NumRow("Afstand voorbeeld-tekst:", () => _settings.TextGapMm, v => _settings.TextGapMm = v, 0, 50, 4, 0.5M),
             NumRow("Teksthoogte omschrijving:", () => _settings.TextHeightMm, v => _settings.TextHeightMm = v, 0.5M, 50, 2, 0.1M),
             NumRow("Teksthoogte kopregel:", () => _settings.HeaderTextHeightMm, v => _settings.HeaderTextHeightMm = v, 0.5M, 50, 2, 0.1M),
             NumRow("Teksthoogte titel:", () => _settings.TitleTextHeightMm, v => _settings.TitleTextHeightMm = v, 0.5M, 50, 2, 0.1M),
