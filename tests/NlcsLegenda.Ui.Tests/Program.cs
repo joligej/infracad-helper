@@ -69,6 +69,7 @@ internal static class Program
         navigation.SelectedIndex = 1;
         Application.DoEvents();
         Check(tabs.SelectedIndex == 1, "Navigatie kiest bronnen");
+        Check(Descendants(form).OfType<CheckBox>().Count(c => c.Text == "Titel tonen") == 1, "Titelinstelling heeft een vaste plek");
         var checkbox = Descendants(form).OfType<CheckBox>().Single(c => c.Text.StartsWith("Xrefs meenemen"));
         Check(checkbox.CheckState == CheckState.Indeterminate, "Gemengde xref-keuze zichtbaar");
         void Click() => typeof(CheckBox).GetMethod("OnClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(checkbox, new object[] { EventArgs.Empty });

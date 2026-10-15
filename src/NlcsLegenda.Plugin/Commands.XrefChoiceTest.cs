@@ -29,7 +29,7 @@ public partial class Commands
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
-                var record = new LayerTableRecord { Name = "N-WE-KL-KOPPELING-S" };
+                using var record = new LayerTableRecord { Name = "N-WE-KL-KOPPELING-S" };
                 var layer = layers.Add(record);
                 tr.AddNewlyCreatedDBObject(record, true);
                 var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);

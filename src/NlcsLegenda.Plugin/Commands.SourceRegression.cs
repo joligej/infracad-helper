@@ -24,18 +24,18 @@ public partial class Commands
                     var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(source), OpenMode.ForWrite);
                     var detail = ReviewLayer(source, tr, "DETAIL");
                     var table = (BlockTable)tr.GetObject(source.BlockTableId, OpenMode.ForWrite);
-                    var inner = new BlockTableRecord { Name = "INNER" };
+                    using var inner = new BlockTableRecord { Name = "INNER" };
                     var innerId = table.Add(inner); tr.AddNewlyCreatedDBObject(inner, true);
-                    var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 1) { LayerId = detail };
+                    using var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 1) { LayerId = detail };
                     inner.AppendEntity(circle); tr.AddNewlyCreatedDBObject(circle, true);
-                    var outer = new BlockTableRecord { Name = "OUTER" };
+                    using var outer = new BlockTableRecord { Name = "OUTER" };
                     var outerId = table.Add(outer); tr.AddNewlyCreatedDBObject(outer, true);
-                    var nested = new BlockReference(Point3d.Origin, innerId);
+                    using var nested = new BlockReference(Point3d.Origin, innerId);
                     outer.AppendEntity(nested); tr.AddNewlyCreatedDBObject(nested, true);
                     foreach (var (name, id) in new[] { ("SYMBOLA", innerId), ("SYMBOLB", outerId) })
                     {
                         var layer = ReviewLayer(source, tr, "N-WE-IE-" + name + "-S");
-                        var reference = new BlockReference(Point3d.Origin, id) { LayerId = layer };
+                        using var reference = new BlockReference(Point3d.Origin, id) { LayerId = layer };
                         model.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true);
                     }
                     foreach (var (name, description) in new[] {
@@ -44,7 +44,7 @@ public partial class Commands
                     {
                         var layer = ReviewLayer(source, tr, name);
                         ((LayerTableRecord)tr.GetObject(layer, OpenMode.ForWrite)).Description = description;
-                        var line = new Line(Point3d.Origin, new Point3d(5, 0, 0)) { LayerId = layer };
+                        using var line = new Line(Point3d.Origin, new Point3d(5, 0, 0)) { LayerId = layer };
                         model.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                     }
                     tr.Commit();

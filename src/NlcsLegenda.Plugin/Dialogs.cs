@@ -274,12 +274,14 @@ internal sealed class SettingsDialog : LegendDialog
         root.Controls.Add(Group("Viewport",
             BoundCheck("Viewport zelf tekenen", () => _settings.ViewportManual, v => _settings.ViewportManual = v),
             LabeledRow("Marge (mm):", margin)));
-        root.Controls.Add(BoundCheck("Titel tonen", () => _settings.IncludeTitle, v => _settings.IncludeTitle = v));
         var resetFormat = new Button { Text = "TAUW-opmaak herstellen", AutoSize = true };
         resetFormat.Click += (_, _) => { _settings.ResetFormattingToTemplate(); RefreshGrids(); };
         var resetAll = new Button { Text = "Alle instellingen herstellen", AutoSize = true };
         resetAll.Click += (_, _) => { ResetToDefaults(_settings); RefreshGrids(); };
-        root.Controls.Add(Group("Standaardinstellingen", resetFormat, resetAll));
+        var defaults = Group("Standaardinstellingen");
+        defaults.Controls[0].Controls.Add(resetFormat);
+        defaults.Controls[0].Controls.Add(resetAll);
+        root.Controls.Add(defaults);
         page.Controls.Add(root);
         return page;
     }
@@ -291,9 +293,11 @@ internal sealed class SettingsDialog : LegendDialog
 
         var xrefs = new Button { Text = "Xrefs\u2026", AutoSize = true };
         xrefs.Click += (_, _) => EditXrefInclusion();
-        root.Controls.Add(Group("Bronnen",
+        var sources = Group("Bronnen",
             BoundCheck("Onzichtbare (bevroren/uit) lagen meenemen", () => _settings.IncludeInvisibleLayers, v => _settings.IncludeInvisibleLayers = v),
-            XrefChoice(), xrefs));
+            XrefChoice());
+        sources.Controls[0].Controls.Add(xrefs);
+        root.Controls.Add(sources);
 
         var klic = new Button { Text = "KLIC-velden en groepering…", AutoSize = true, Padding = new Padding(6, 3, 6, 3) };
         klic.Click += (_, _) =>
