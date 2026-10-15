@@ -71,9 +71,20 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDAEXPORTREVIEWTEST` | Voert INFO en export uit voor een bestaande selectielegenda, na een globale omschrijvingswijziging en na verwijdering van de selectie. |
 | `NLCSLEGENDAMETADATATEST` | Controleert dat onleesbare legendaopslag niet wordt overschreven en dat batch-export de fout meldt en verdergaat zonder bronbestanden te wijzigen. |
 
+`NLCSLEGENDAXREFCHOICETEST` controleert uitgesloten xref-inserts en geneste KLIC-bronnen;
+`NLCSLEGENDAXREFCHOICEVERIFY` herhaalt de keuzes na heropenen. `NLCSLEGENDASOURCETEST`
+controleert gedeelde symboolonderdelen uit twee koppelingen naar hetzelfde bestand,
+afzonderlijke laagkleuren en de werkelijk getekende omschrijvingen. `NLCSLEGENDASOURCEVERIFY`
+herhaalt die controle na heropenen.
+
 De releasecontrole `dev/scripts/Run-ReleaseAcceptance.ps1` voert een vaste selectie van deze commando's uit op afzonderlijke kopieën, controleert de geladen DLL-hash en stopt bij een fout, ontbrekend resultaat of mislukte QSAVE. Gebruik deze testcommando's uitsluitend in een testtekening: fixturecommando's voegen objecten en tijdelijke xrefs toe.
 
-De runners vereisen PowerShell 7.4 of nieuwer en starten alleen zonder andere CAD-processen.
+De runners vereisen PowerShell 7.4 of nieuwer. Met `-Isolated` gebruikt de releasecontrole
+per run een afzonderlijk tijdelijk CAD-profiel en controleert het daadwerkelijk gebruikte
+profielpad. Zo kunnen aparte testtekeningen naast een andere CAD-sessie worden verwerkt.
+De runner leest of herstelt dan geen waarden uit het normale CAD-profiel.
+
+Zonder `-Isolated` starten de runners alleen zonder andere CAD-processen.
 Elke run heeft een timeout. De controle vergelijkt de tijdelijke `FILEDIA`- en
 `SECURELOAD`-waarden binnen CAD én de opgeslagen profielwaarden na afsluiten.
 `FILEDIA` staat in het register als `FixedProfile/General Configuration/FileDialog`;

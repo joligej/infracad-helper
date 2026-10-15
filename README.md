@@ -180,7 +180,10 @@ regel verschijnt dan onder de eigen kopregel, ook als de gewone status ervan uit
 
 Werk je met externe referenties, dan bepaalt `NLCSLEGENDAXREFS` per gekoppelde xref of
 die meetelt. De keuze geldt voor de aanwezige of gekozen legenda. Voor nieuwe
-legenda's pas je de xref-keuze aan onder Standaard. Is het xref-bestand op schijf gewijzigd sinds het laden, herlaad dan eerst de
+legenda's pas je de xref-keuze aan onder Standaard. Onder Instellingen → Bronnen en inhoud
+zet **Xrefs meenemen** alle bronnen aan of uit en vervangt daarbij eerdere uitzonderingen.
+Met **Xrefs…** kies je afzonderlijke koppelingen; een gemengde keuze wordt aangegeven.
+Een uitgeschakelde bovenliggende koppeling sluit ook de inhoud van geneste xrefs uit. Is het xref-bestand op schijf gewijzigd sinds het laden, herlaad dan eerst de
 xref voordat je de legenda bijwerkt. Zo blijven hoeveelheden en voorbeelden op dezelfde
 bronversie gebaseerd; bij een versieverschil blijft de bestaande legenda behouden.
 
@@ -268,7 +271,9 @@ en het tekentype: lijn, arcering of symbool. De volledige opbouw staat in
 Een eigen omschrijving van de legenda krijgt voorrang. Daarna gebruikt de plugin de
 omschrijving uit de tekening: bij een KLIC-symbool eerst het ingevulde attribuut
 `OMSCHRIJVING`, anders de laagbeschrijving. Ontbreekt die, dan volgen de ingebouwde
-catalogus en ten slotte een leesbare laagnaam. Eigen laagkoppelingen gebruiken de tekst
+catalogus en ten slotte een leesbare laagnaam. Technische bronlabels (`NLCS-basis`,
+alleen `KLIC` of een herhaalde laagnaam) gelden niet als objectomschrijving. Een bruikbare
+tekst na `NLCS-basis:` blijft behouden; zelf ingestelde omschrijvingen worden niet gefilterd. Eigen laagkoppelingen gebruiken de tekst
 uit hun koppeling. Er is geen koppeling met InfraCAD of een externe database.
 `NLCSLEGENDAINFO` laat zien welke regels op de laagnaam terugvallen, zodat je gericht een
 eigen omschrijving kunt toevoegen.
@@ -317,9 +322,12 @@ tekeningen voor stijlen, xrefs, symbolen, arceringen, eigen lagen, plaatsing en 
 legenda's. Het script controleert de geladen DLL-hash, echte QSAVE, heropenen, vijftig
 updates en ongewijzigde systeemvariabelen. Het stopt bij een fout of ontbrekend testresultaat.
 Gebruik `-AcadVersion 2027` voor de 2027-host en `-PluginPath <geïnstalleerde DLL>` voor
-acceptatie na installatie. De runners vereisen PowerShell 7.4 of nieuwer; sluit AutoCAD
-en wacht tot andere Core Console-taken klaar zijn. Ze controleren ook de opgeslagen
-profielwaarden. Logs en resultaten blijven lokaal onder `artifacts/acceptance/`.
+acceptatie na installatie. De runners vereisen PowerShell 7.4 of nieuwer.
+Met `-Isolated` gebruikt iedere run een eigen tijdelijk CAD-profiel en kan de proef op
+een afzonderlijke testtekening naast andere CAD-processen draaien. Deze controle bewijst
+geen normale GUI-start of automatische bundellading. Zonder die optie moeten andere
+CAD-processen gesloten zijn; dan worden ook de opgeslagen profielwaarden gecontroleerd.
+Logs, tijdelijke profielen en resultaten blijven lokaal onder `artifacts/acceptance/`.
 
 ## Ondersteunde versies
 

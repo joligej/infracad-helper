@@ -37,6 +37,13 @@ public static class StandardTexts
 
     private static readonly Dictionary<string, string> ElementOverrides = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["KL|DATA"] = "Datakabel",
+        ["KL|WATER"] = "Waterleiding",
+        ["KL|GAS"] = "Gasleiding",
+        ["KL|ET"] = "Elektriciteitskabel",
+        ["KL|ET_LS"] = "Laagspanningskabel",
+        ["KL|ET_MS"] = "Middenspanningskabel",
+        ["KL|ET_HS"] = "Hoogspanningskabel",
         ["VH|OPENVERHARDING_BETONSTRAATSTEEN"] = "Betonstraatsteen",
         ["VH|OPENVERHARDING_STRAATBAKSTEEN"] = "Straatbaksteen (gebakken)",
         ["VH|OPENVERHARDING_NATUURSTEEN"] = "Natuursteen",

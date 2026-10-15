@@ -122,6 +122,7 @@ public partial class Commands
             {
                 var registry = LegendStore.Load(db, tr);
                 var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+                ed.WriteMessage("\nBronnen lezen...");
                 var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, DescriptionCatalog.Default(), excluded);
                 if (analysis.Entries.Count == 0)
                 {
@@ -131,6 +132,7 @@ public partial class Commands
                 }
                 ReportAnalysis(ed, analysis);
 
+                ed.WriteMessage($"\nLegenda tekenen ({analysis.Entries.Count} regels)...");
                 btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _, out var issues);
                 ReportRenderIssues(ed, issues);
 
@@ -1102,9 +1104,9 @@ public partial class Commands
                     break;
 
                 if (res.StringResult == "Alle")
-                    foreach (var x in xrefs) settings.XrefInclusion[x] = true;
+                    settings.SetAllXrefs(true);
                 else if (res.StringResult == "Geen")
-                    foreach (var x in xrefs) settings.XrefInclusion[x] = false;
+                    settings.SetAllXrefs(false);
                 else if (int.TryParse(res.StringResult, out var n) && n >= 1 && n <= xrefs.Count)
                 {
                     var x = xrefs[n - 1];
@@ -4496,7 +4498,7 @@ public partial class Commands
         try
         {
             var working = s.Clone();
-            using var dialog = new SettingsDialog(working, "Nieuwe legenda");
+            using var dialog = new SettingsDialog(working, "Nieuwe legenda", xrefNames: CollectXrefNames(ed.Document.Database));
             dialog.ApplyRequested += (_, _) =>
             {
                 s.CopyFrom(dialog.Settings);
