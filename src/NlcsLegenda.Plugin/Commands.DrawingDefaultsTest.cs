@@ -67,18 +67,20 @@ public partial class Commands
         {
             using var tr = doc.Database.TransactionManager.StartTransaction();
             foreach (double scale in new[] { 200.0, 500.0, 1000.0 })
-            foreach (double height in new[] { 100.0, 120.0 })
             {
-                var settings = new LegendSettings { Scale = scale, MaxLegendHeightMm = height, DrawBorder = true,
-                    ManualEntries = Enumerable.Range(0, 18).Select(i => new ManualEntry { Layer = "EIGEN", Description = $"Eigen regel {i}" }).ToList() };
-                var analysis = DrawingAnalyzer.Analyze(doc.Database, tr, settings);
-                var block = LegendBuilder.BuildBlock(doc.Database, tr, analysis, settings, out var rows, out _);
-                var extents = new Extents3d();
-                foreach (ObjectId id in (BlockTableRecord)tr.GetObject(block, OpenMode.ForRead))
-                    extents.AddExtents(((Entity)tr.GetObject(id, OpenMode.ForRead)).GeometricExtents);
-                double measured = (extents.MaxPoint.Y - extents.MinPoint.Y) / settings.ModelUnitsPerPaperMm;
-                if (rows != 18 || measured > height + 0.01)
-                    throw new InvalidOperationException($"Hoogte {measured} mm, toegestaan {height} mm; {rows} regels.");
+                foreach (double height in new[] { 100.0, 120.0 })
+                {
+                    var settings = new LegendSettings { Scale = scale, MaxLegendHeightMm = height, DrawBorder = true,
+                        ManualEntries = Enumerable.Range(0, 18).Select(i => new ManualEntry { Layer = "EIGEN", Description = $"Eigen regel {i}" }).ToList() };
+                    var analysis = DrawingAnalyzer.Analyze(doc.Database, tr, settings);
+                    var block = LegendBuilder.BuildBlock(doc.Database, tr, analysis, settings, out var rows, out _);
+                    var extents = new Extents3d();
+                    foreach (ObjectId id in (BlockTableRecord)tr.GetObject(block, OpenMode.ForRead))
+                        extents.AddExtents(((Entity)tr.GetObject(id, OpenMode.ForRead)).GeometricExtents);
+                    double measured = (extents.MaxPoint.Y - extents.MinPoint.Y) / settings.ModelUnitsPerPaperMm;
+                    if (rows != 18 || measured > height + 0.01)
+                        throw new InvalidOperationException($"Hoogte {measured} mm, toegestaan {height} mm; {rows} regels.");
+                }
             }
             var tooSmall = new LegendSettings { MaxLegendHeightMm = 1, ManualEntries = new() { new() { Layer = "EIGEN", Description = "Te hoog" } } };
             bool rejected = false;

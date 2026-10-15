@@ -100,9 +100,8 @@ public partial class Commands
         var tagged = entities.Where(e => LegendManagement.ReadRow(e) is not null).ToArray();
         if (tagged.OfType<MText>().Count() != 2 || tagged.Length < 4)
             errors.Add("Tekstkeuze verliest de koppeling met de bronregel.");
-        foreach (var entity in tagged)
+        foreach (var row in tagged.Select(e => LegendManagement.ReadRow(e)!.Value))
         {
-            var row = LegendManagement.ReadRow(entity)!.Value;
             if (row.Element != "CUSTOMIZATION" || row.Hoofdgroep is not ("VH" or "IE"))
                 errors.Add("Tekstkeuze verwijst naar een verkeerde bronregel.");
         }

@@ -11,9 +11,8 @@ public sealed class CustomStatus
     public static bool Assign(IReadOnlyList<CustomStatus> statuses, CustomStatus target, string key)
     {
         bool changed = false;
-        foreach (var status in statuses)
-            if (!ReferenceEquals(status, target))
-                changed |= status.Members.RemoveAll(m => string.Equals(m, key, StringComparison.OrdinalIgnoreCase)) > 0;
+        foreach (var status in statuses.Where(s => !ReferenceEquals(s, target)))
+            changed |= status.Members.RemoveAll(m => string.Equals(m, key, StringComparison.OrdinalIgnoreCase)) > 0;
         if (!target.Members.Contains(key, StringComparer.OrdinalIgnoreCase))
         {
             target.Members.Add(key);
