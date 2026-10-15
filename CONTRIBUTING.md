@@ -20,8 +20,9 @@ toe. Voor de plugin zelf staan er headless scripts in `dev/scripts/`.
 ## Stijl
 
 Houd de bestaande stijl aan (zie `.editorconfig`): vier spaties, `var` waar het type
-duidelijk is, en commentaar alleen waar het echt iets verduidelijkt. Teksten in de UI
-en documentatie zijn Nederlands.
+duidelijk is. Gebruik weinig commentaar: korte Nederlandse fragmenten in kleine letters,
+alleen waar de reden voor de code anders onduidelijk blijft. Teksten in de UI en
+documentatie zijn Nederlands.
 
 ## Pull requests
 
