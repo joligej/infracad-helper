@@ -38,6 +38,10 @@ public sealed class LegendEntry
 
     public bool IsBlank => DescriptionSource == DescriptionSource.Blanco;
 
+    public bool IsManual => DescriptionSource == DescriptionSource.Handmatig;
+
+    public string? ManualHatchPattern { get; init; }
+
     public Dictionary<NlcsDrawType, string> LayersByType { get; init; } = new();
 
     public IReadOnlyList<NlcsLayerSource> SourceLayers { get; init; } = System.Array.Empty<NlcsLayerSource>();

@@ -266,7 +266,7 @@ internal sealed class SettingsDialog : LegendDialog
         root.Controls.Add(Group("Viewport",
             BoundCheck("Viewport zelf tekenen", () => _settings.ViewportManual, v => _settings.ViewportManual = v),
             LabeledRow("Marge (mm):", margin)));
-        var resetFormat = new Button { Text = "TAUW-opmaak herstellen", AutoSize = true };
+        var resetFormat = new Button { Text = "Templateopmaak herstellen", AutoSize = true };
         resetFormat.Click += (_, _) => { _settings.ResetFormattingToTemplate(); RefreshGrids(); };
         var resetAll = new Button { Text = "Alle instellingen herstellen", AutoSize = true };
         resetAll.Click += (_, _) => { ResetToDefaults(_settings); RefreshGrids(); };
@@ -732,7 +732,7 @@ internal sealed class CustomStatusDialog : LegendDialog
         split.Panel2.Controls.Add(_members);
         split.Panel2.Controls.Add(memberLabel);
 
-        _statusList.SelectedIndexChanged += (_, _) => LoadMembers();
+        _statusList.SelectedIndexChanged += (_, _) => { if (!_loading) LoadMembers(); };
         _members.ItemCheck += OnMemberCheck;
 
         var buttons = new ButtonBar(withApply: false);
@@ -801,14 +801,16 @@ internal sealed class CustomStatusDialog : LegendDialog
         var members = _statuses[sel].Members;
         if (e.NewValue == CheckState.Checked)
         {
-            if (!members.Contains(key, StringComparer.OrdinalIgnoreCase))
-                members.Add(key);
+            CustomStatus.Assign(_statuses, _statuses[sel], key);
         }
         else
         {
             members.RemoveAll(m => string.Equals(m, key, StringComparison.OrdinalIgnoreCase));
         }
-        _statusList.Items[sel] = $"{_statuses[sel].Name} ({members.Count})";
+        _loading = true;
+        for (int i = 0; i < _statuses.Count; i++)
+            _statusList.Items[i] = $"{_statuses[i].Name} ({_statuses[i].Members.Count})";
+        _loading = false;
     }
 
     private string? Prompt(string label, string initial = "")

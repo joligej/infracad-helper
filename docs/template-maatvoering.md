@@ -67,7 +67,7 @@ de repository. Gebruik met het acceptatiescript `-Cases templatefile` en
 `-ReferenceTemplatePath <pad-naar-DWT>`.
 
 Bestaande persoonlijke instellingen worden niet automatisch overschreven.
-**Instellingen → Legenda → TAUW-opmaak herstellen** herstelt de maatvoering, lagen,
+**Instellingen → Legenda → Templateopmaak herstellen** herstelt de maatvoering, lagen,
 kolomindeling, koppen en voorbeeldweergave. De extra hoeveelheden en totaalregel
 worden uitgezet. Teksten, schaal, handmatige volgorde en bronkeuzes blijven behouden;
 de knop **Tekeningnotities** in het opmerkingenvenster herstelt desgewenst de standaardtekst.

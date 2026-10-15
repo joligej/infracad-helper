@@ -42,7 +42,7 @@ $save
 (princ "\nHEADLESS_END\n")
 _.QUIT
 _Y
-"@ | Set-Content -LiteralPath $script -Encoding ascii
+"@ -split "`r?`n" | Where-Object { $_.Length -gt 0 } | Set-Content -LiteralPath $script -Encoding ascii
 try {
     $run = Invoke-NlcsCoreConsole -Executable $core -Drawing $copy -Script $script -Log (Join-Path $work 'console.log')
     $log = ((Get-Content -LiteralPath $run.Log -Raw) -replace "`0", '')

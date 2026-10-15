@@ -36,6 +36,38 @@ public partial class Commands
         }
     }
 
+    [CommandMethod("NLCSLEGENDAEXPORTISOLATIONTEST", CommandFlags.Modal)]
+    public void NlcsLegendaExportIsolationTest()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        try
+        {
+            using var snapshot = new GlobalSettingsSnapshot();
+            var db = doc.Database;
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                var registry = LegendStore.Load(db, tr);
+                var settings = new LegendSettings { ManualEntries = new() { new() { Layer = "EIGEN", Description = "Opgeslagen eigen regel" } } };
+                var definition = IsoDef(registry, settings); definition.Name = "Exportisolatie";
+                registry.Add(definition);
+                if (BuildManagedLegend(db, tr, registry, definition, out _, out _) != UpdateResult.Updated)
+                    throw new InvalidOperationException("Opgeslagen legenda ontbreekt.");
+                LegendStore.Save(db, tr, registry);
+                tr.Commit();
+            }
+            Directory.CreateDirectory(ConfigDir);
+            File.WriteAllText(ConfigPath, "{ ongeldige globale instellingen");
+            NlcsLegendaExport();
+            string export = Path.Join(Path.GetDirectoryName(db.Filename), Path.GetFileNameWithoutExtension(db.Filename) + "_Legenda-Exportisolatie.json");
+            if (!File.Exists(export) || !File.ReadAllText(export).Contains("Opgeslagen eigen regel"))
+                throw new InvalidOperationException("Bestaande legenda kon niet onafhankelijk van de globale instellingen worden geëxporteerd.");
+            doc.Editor.WriteMessage("\nEXPORTISOLATION opgeslagen legenda exporteert met onleesbare globale instellingen -> OK");
+        }
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException)
+        { doc.Editor.WriteMessage($"\nEXPORTISOLATION FAIL: {ex}"); }
+    }
+
     [CommandMethod("NLCSLEGENDAGLOBALSETTINGSTEST", CommandFlags.Modal)]
     public void NlcsLegendaGlobalSettingsTest()
     {
