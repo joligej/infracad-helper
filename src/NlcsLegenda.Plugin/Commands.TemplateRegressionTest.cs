@@ -32,7 +32,8 @@ public partial class Commands
             var wideId = Add(wide, "N-WE-MA-TEST_MARKERING-G");
             using var outline = new Polyline(); outline.AddVertexAt(0, new Point2d(0, 2), 0, 0, 0); outline.AddVertexAt(1, new Point2d(4, 2), 0, 0, 0); outline.AddVertexAt(2, new Point2d(4, 3), 0, 0, 0); outline.AddVertexAt(3, new Point2d(0, 3), 0, 0, 0); outline.Closed = true;
             var outlineId = Add(outline, "N-WE-GR-TEST_BOMENGROEP-S");
-            var circleId = Add(new Circle(new Point3d(10, 4, 0), Vector3d.ZAxis, .5), "B-WE-RI-TEST_PUT-G");
+            using var sourceCircle = new Circle(new Point3d(10, 4, 0), Vector3d.ZAxis, .5);
+            var circleId = Add(sourceCircle, "B-WE-RI-TEST_PUT-G");
             using var edge = new Polyline(); edge.AddVertexAt(0, new Point2d(0, 5), 0, 0, 0); edge.AddVertexAt(1, new Point2d(4, 5), 0, 0, 0); edge.AddVertexAt(2, new Point2d(4, 6), 0, 0, 0); edge.AddVertexAt(3, new Point2d(0, 6), 0, 0, 0); edge.Closed = true;
             var edgeId = Add(edge, "N-WE-VH-TEST_HATCH-GV");
             using var hatch = new Hatch(); var hatchId = Add(hatch, "N-WE-VH-TEST_HATCH-A"); hatch.ColorIndex = 0; ((LayerTableRecord)tr.GetObject(hatch.LayerId, OpenMode.ForWrite)).Color = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, 254);
