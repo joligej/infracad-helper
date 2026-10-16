@@ -44,15 +44,18 @@ internal sealed class OverviewDialog : LegendDialog
     private readonly CheckBox _issuesOnly = new() { Text = "Alleen bronmeldingen", AutoSize = true };
     private readonly Dictionary<LegendEntry, string[]> _rowValues = new();
     private readonly Dictionary<(LegendEntry, string), string> _fieldValues = new();
+    private readonly Func<string, IReadOnlyList<LegendExample>>? _loadExamples;
     private bool _loading;
     private OverviewLegend Current => _legends[_legend.SelectedIndex];
 
     public OverviewDialog(IReadOnlyList<OverviewLegend> legends, Func<IReadOnlyList<OverviewLegend>, string?> save,
-        Func<OverviewLegend, IReadOnlyList<LegendEntry>>? analyze = null)
+        Func<OverviewLegend, IReadOnlyList<LegendEntry>>? analyze = null,
+        Func<string, IReadOnlyList<LegendExample>>? loadExamples = null)
     {
         _legends = legends;
         _save = save;
         _analyze = analyze;
+        _loadExamples = loadExamples;
         Text = "NLCS Legenda – overzicht";
         Font = SystemFonts.MessageBoxFont;
         ClientSize = new Size(960, 620);
@@ -73,6 +76,7 @@ internal sealed class OverviewDialog : LegendDialog
             var button = new Button { Text = title, AutoSize = true, Padding = new Padding(4) };
             button.Click += (_, _) => action(); tools.Controls.Add(button);
         }
+        ActionButton("Voorbeeld…", EditExample);
         ActionButton("KLIC-instellingen…", EditKlic);
         ActionButton("KLIC-details…", ShowKlicDetails);
         ActionButton("Exporteer lijst…", ExportVisible);
@@ -219,6 +223,40 @@ internal sealed class OverviewDialog : LegendDialog
         Current.Settings.ManualEntryOrder = LegendOrder.Remember(Current.Settings.ManualEntryOrder, _entries);
         Current.Changed = true;
         FillGrid(to);
+    }
+
+    private void EditExample()
+    {
+        if (Current.Id.Length == 0 || _grid.CurrentRow is not { } row) return;
+        var entry = _visible[row.Index];
+        using var dialog = new ExampleDialog(Current.Settings.ExampleLibraryPath, _loadExamples ?? (_ => Array.Empty<LegendExample>()));
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        var previous = Current.Settings.Clone();
+        try
+        {
+            Current.Settings.ExampleLibraryPath = dialog.LibraryPath;
+            Current.Settings.ExampleOverrides = LegendOrder.AlignChoices(Current.Settings.ExampleOverrides, Current.Entries);
+            if (dialog.AddEntry && dialog.SelectedExample is { } example)
+            {
+                var manual = new ManualEntry { Layer = "X-XX-AL-LEGENDA_VOORBEELD-S", Type = NlcsDrawType.Symbool,
+                    Description = example.Name, SymbolBlock = example.BlockName, Status = entry.Status };
+                Current.Settings.ManualEntries.Add(manual);
+                Current.Settings.ExampleOverrides[LegendOrder.Key(manual.ToLegendEntry())] = example.BlockName;
+            }
+            else
+            {
+                string key = LegendOrder.Key(entry);
+                if (dialog.SelectedBlock is null) Current.Settings.ExampleOverrides.Remove(key);
+                else Current.Settings.ExampleOverrides[key] = dialog.SelectedBlock;
+            }
+            if (_analyze is not null) Current.Entries = _analyze(Current);
+            Current.Changed = true; LoadEntries();
+        }
+        catch (Exception ex)
+        {
+            Current.Settings.CopyFrom(previous);
+            MessageBox.Show(this, ex.Message, "Voorbeeld", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private void EditKlic()

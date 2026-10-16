@@ -12,7 +12,7 @@ public static class LegendBuilder
     private const double SubHeaderHeightRatio = 1.0;
     private const double SubHeaderIndentRatio = 0.15;
 
-    private sealed record PreparedSymbol(IReadOnlyList<ObjectId> Entities, double Width, double Height);
+    private sealed record PreparedSymbol(IReadOnlyList<ObjectId> Entities, double Width, double Height, bool IsExample = false);
 
     public static ObjectId BuildBlock(
         Database db, Transaction tr, AnalysisResult analysis, LegendSettings s,
@@ -53,10 +53,42 @@ public static class LegendBuilder
         // werkelijke symboolhoogte reserveren vóór de indeling
         using var imports = new SymbolImportSession(db, tr);
         var symbols = new Dictionary<LegendEntry, PreparedSymbol>();
+        var savedExamples = ExampleLibrary.ReadCatalog(db, tr).ToDictionary(e => e.BlockName, StringComparer.Ordinal);
+        var exampleChoices = LegendOrder.AlignChoices(s.ExampleOverrides, analysis.Entries);
+        ExampleLibrary? examples = null;
+        try
+        {
+            foreach (var entry in analysis.Entries)
+            {
+                string key = LegendOrder.Key(entry);
+                bool chosen = exampleChoices.TryGetValue(key, out var name);
+                if (chosen && string.IsNullOrEmpty(name)) continue;
+                LegendExample? example = chosen && savedExamples.TryGetValue(name!, out var stored) && bt.Has(stored.BlockName) ? stored : null;
+                if (example is null && !string.IsNullOrWhiteSpace(s.ExampleLibraryPath))
+                {
+                    examples ??= new ExampleLibrary(s.ExampleLibraryPath, db, tr);
+                    example = chosen ? examples.Examples.FirstOrDefault(e => e.BlockName == name)
+                        : LegendExample.Match(examples.Examples, entry, s.Scale);
+                    if (example is not null) examples.Import(db, tr, example);
+                }
+                if (chosen && example is null) throw new InvalidOperationException($"Het gekozen voorbeeld voor '{entry.Description}' ontbreekt.");
+                if (example is null) continue;
+                using var reference = new BlockReference(Point3d.Origin, bt[example.BlockName])
+                { ScaleFactors = new Scale3d(s.Scale / example.Scale), Layer = "0" };
+                AppendEntity(btr, reference); tr.AddNewlyCreatedDBObject(reference, true);
+                double factor = s.Scale / example.Scale;
+                reference.TransformBy(Matrix3d.Displacement(new Vector3d(-example.AnchorX * factor, -example.AnchorY * factor, 0)));
+                var bounds = reference.GeometricExtents;
+                symbols.Add(entry, new PreparedSymbol(new[] { reference.ObjectId },
+                    2 * Math.Max(Math.Abs(bounds.MinPoint.X), Math.Abs(bounds.MaxPoint.X)),
+                    2 * Math.Max(Math.Abs(bounds.MinPoint.Y), Math.Abs(bounds.MaxPoint.Y)), true));
+            }
+        }
+        finally { examples?.Dispose(); }
         if (s.InsertSymbolBlocks && analysis.Entries.Any(e => e.IsManual && e.SymbolLayer is not null && e.SymbolBlockName is null))
             throw new InvalidOperationException("Vul bij iedere eigen symboolregel een bloknaam in.");
         if (s.InsertSymbolBlocks)
-            foreach (var entry in analysis.Entries.Where(e => e.SymbolLayer is not null && e.SymbolBlockName is not null))
+            foreach (var entry in analysis.Entries.Where(e => !symbols.ContainsKey(e) && e.SymbolLayer is not null && e.SymbolBlockName is not null))
             {
                 string layer = entry.SymbolLayer!;
                 string name = entry.SymbolBlockName!;
@@ -328,14 +360,14 @@ public static class LegendBuilder
         }
 
         // tekenvolgorde: vlak, vulling, arcering, lijn, symbool
-        if (entry.VlakLayer is { } vlakLayer)
+        if (prepared?.IsExample != true && entry.VlakLayer is { } vlakLayer)
         {
             var area = MakeRectangle(btr.Database, x, bottom, swatchW, swatchH, renderLayers[vlakLayer]);
             rowEntities.Add(AppendEntity(btr, area));
             tr.AddNewlyCreatedDBObject(area, true);
         }
 
-        if (entry.FillLayer is { } fillLayer)
+        if (prepared?.IsExample != true && entry.FillLayer is { } fillLayer)
         {
             var fillBoundary = MakeRectangle(btr.Database, x, bottom, swatchW, swatchH, renderLayers[fillLayer]);
             var fillId = AppendEntity(btr, fillBoundary);
@@ -344,7 +376,7 @@ public static class LegendBuilder
             rowEntities.Add(AddSolidFill(btr, tr, fillId, renderLayers[fillLayer]));
         }
 
-        if (entry.HatchLayer is { } hatchLayer)
+        if (prepared?.IsExample != true && entry.HatchLayer is { } hatchLayer)
         {
             var pattern = entry.ManualHatchPattern ?? "SOLID";
             var sample = entry.IsManual ? new HatchSample {
@@ -356,7 +388,7 @@ public static class LegendBuilder
                 s.HatchScaleFactor * (sample?.ScaleForLegend(s.Scale) ?? 1)));
         }
 
-        if (entry.GeometryLayer is { } geoLayer)
+        if (prepared?.IsExample != true && entry.GeometryLayer is { } geoLayer)
         {
             var band = SeparationBandProfile.For(entry);
             void AddLine(double offsetMm, bool edge)
@@ -368,6 +400,8 @@ public static class LegendBuilder
                 line.AddVertexAt(0, new Point2d(x + (bandDirection ? swatchW : 0), y), 0, 0, 0);
                 line.AddVertexAt(1, new Point2d(x + (bandDirection ? 0 : swatchW), y), 0, 0, 0);
                 line.Layer = renderLayers[geoLayer];
+                if (band is null && analysis.LayerStyles.TryGetValue(geoLayer, out var sourceStyle))
+                    line.ConstantWidth = sourceStyle.PolylineWidth;
                 if (edge)
                 {
                     var style = new LayerDisplayStyle
@@ -487,15 +521,25 @@ public static class LegendBuilder
         try
         {
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
-            if (!bt.Has(blockName))
+            if (sample?.IsPrimitive != true && !bt.Has(blockName))
             {
                 failureReason = $"Symboolblok '{blockName}' ontbreekt in de hostdatabase.";
                 return false;
             }
-            var defId = imports.Import(bt[blockName], sample?.SourceXref);
-
-            // annotatieve vergroting voorkomen door het symbool te ontleden
-            primitives = ExplodeToPrimitives(btr, tr, db, imports, layer, defId, created, includeInvisible, sample, out var probeOk);
+            bool probeOk;
+            if (sample is { IsPrimitive: true })
+            {
+                var primitive = imports.ImportPrimitive(sample.ReferenceId, btr.ObjectId, sample.SourceXref);
+                primitive.XData = null;
+                if (sample.InsertionStyle is { } style) ApplyEntityStyle(primitive, style, tr, db);
+                primitives.Add(primitive.ObjectId); created.Add(primitive.ObjectId); probeOk = true;
+            }
+            else
+            {
+                var defId = imports.Import(bt[blockName], sample?.SourceXref);
+                // annotatieve vergroting voorkomen door het symbool te ontleden
+                primitives = ExplodeToPrimitives(btr, tr, db, imports, layer, defId, created, includeInvisible, sample, out probeOk);
+            }
             if (!probeOk || primitives.Count == 0)
             {
                 foreach (var id in created.Concat(primitives).Distinct())
@@ -525,6 +569,7 @@ public static class LegendBuilder
                 var localId = bt.Add(local); tr.AddNewlyCreatedDBObject(local, true);
                 using var ids = new ObjectIdCollection(primitives.ToArray());
                 local.AssumeOwnershipOf(ids);
+                ((DrawOrderTable)tr.GetObject(local.DrawOrderTableId, OpenMode.ForWrite)).SetRelativeDrawOrder(ids);
                 foreach (var id in primitives) ((Entity)tr.GetObject(id, OpenMode.ForWrite)).Layer = layer;
                 using var reference = new BlockReference(Point3d.Origin, localId);
                 SetLegendDefaults(reference, db);
@@ -561,7 +606,7 @@ public static class LegendBuilder
 
             // modelmaat behouden, behalve bij een expliciete nlcs-schaalvariant
             double fit = sample is null ? modelPerPaperMm
-                : sample.SourceScale is > 0 ? modelPerPaperMm * 1000 / sample.SourceScale.Value : 1;
+                : sample.SourceScale is > 1 ? modelPerPaperMm * 1000 / sample.SourceScale.Value : 1;
 
             var center = new Point3d((minX + maxX) / 2.0, (minY + maxY) / 2.0, 0);
             var m = Matrix3d.Displacement(new Vector3d(centerX - center.X, centerY - center.Y, 0))
@@ -574,6 +619,8 @@ public static class LegendBuilder
                 e.TransformBy(m);
                 e.Layer = layer;
             }
+            using (var order = new ObjectIdCollection(primitives.ToArray()))
+                ((DrawOrderTable)tr.GetObject(btr.DrawOrderTableId, OpenMode.ForWrite)).SetRelativeDrawOrder(order);
             var texts = primitives.Where(id => tr.GetObject(id, OpenMode.ForRead) is MText).ToArray();
             if (texts.Length > 0)
             {
@@ -592,7 +639,7 @@ public static class LegendBuilder
         }
     }
 
-    private static void TransformPlanarSymbol(Entity entity, Matrix3d transform)
+    internal static void TransformPlanarSymbol(Entity entity, Matrix3d transform)
     {
         try { entity.TransformBy(transform); }
         catch (Autodesk.AutoCAD.Runtime.Exception ex) when (ex.ErrorStatus == Autodesk.AutoCAD.Runtime.ErrorStatus.CannotScaleNonUniformly && entity.IsPlanar)
@@ -650,15 +697,36 @@ public static class LegendBuilder
             {
                 var sourceId = snapshot.Database.GetObjectId(false, sample.SourceId.NonForwardedHandle, 0);
                 using var copy = (Hatch)((Hatch)sourceTr.GetObject(sourceId, OpenMode.ForRead)).Clone();
-                copy.RemoveAssociatedObjectIds(); copy.Associative = false; copy.XData = null;
+                copy.XData = null;
                 var model = (BlockTableRecord)sourceTr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(snapshot.Database), OpenMode.ForWrite);
                 copyId = model.AppendEntity(copy); sourceTr.AddNewlyCreatedDBObject(copy, true);
+                copy.Associative = false; copy.RemoveAssociatedObjectIds();
                 sourceTr.Commit();
             }
             using var ids = new ObjectIdCollection { copyId };
             using var mapping = new IdMapping();
             snapshot.Database.WblockCloneObjects(ids, owner, mapping, DuplicateRecordCloning.Ignore, false);
             return (Hatch)tr.GetObject(mapping[copyId].Value, OpenMode.ForWrite);
+        }
+
+        public Entity ImportPrimitive(ObjectId sourceId, ObjectId owner, string sourceXref)
+        {
+            using var ids = new ObjectIdCollection { sourceId };
+            using var mapping = new IdMapping();
+            if (sourceId.OriginalDatabase == host)
+                host.DeepCloneObjects(ids, owner, mapping, false);
+            else
+            {
+                string prefix = string.IsNullOrEmpty(sourceXref) ? string.Empty : sourceXref + "|";
+                var key = (sourceId.OriginalDatabase, prefix);
+                if (!_sources.TryGetValue(key, out var snapshot))
+                    _sources.Add(key, snapshot = new SymbolSnapshot(sourceId.OriginalDatabase, prefix));
+                sourceId = snapshot.Database.GetObjectId(false, sourceId.NonForwardedHandle, 0);
+                ids.Clear(); ids.Add(sourceId);
+                snapshot.Database.WblockCloneObjects(ids, owner, mapping, DuplicateRecordCloning.Ignore, false);
+            }
+            TrackBlocks(mapping);
+            return (Entity)tr.GetObject(mapping[sourceId].Value, OpenMode.ForWrite);
         }
 
         public BlockReference ImportReference(ObjectId sourceId, ObjectId owner, string sourceXref)
@@ -682,7 +750,7 @@ public static class LegendBuilder
             var copy = (BlockReference)tr.GetObject(mapping[sourceId].Value, OpenMode.ForWrite);
             var inverse = copy.BlockTransform.Inverse();
             foreach (ObjectId id in copy.AttributeCollection)
-                ((AttributeReference)tr.GetObject(id, OpenMode.ForWrite)).TransformBy(inverse);
+                TransformPlanarSymbol((AttributeReference)tr.GetObject(id, OpenMode.ForWrite), inverse);
             copy.BlockTransform = Matrix3d.Identity;
             return copy;
         }
@@ -823,18 +891,26 @@ public static class LegendBuilder
         created.Add(probe.ObjectId);
         var insertionLayer = sample?.InsertionLayerStyle ?? DrawingAnalyzer.EntityLayerStyle(probe, tr);
         if (sample?.InsertionStyle is { } insertionStyle) ApplyEntityStyle(probe, insertionStyle, tr, db);
-        var queue = new Queue<(ObjectId Id, LayerDisplayStyle Layer)>();
-        queue.Enqueue((probe.ObjectId, insertionLayer));
+        var queue = new Stack<(ObjectId Id, LayerDisplayStyle Layer)>();
+        queue.Push((probe.ObjectId, insertionLayer));
         int guard = 0;
         while (queue.Count > 0)
         {
             if (++guard > 5000) throw new InvalidOperationException("Het symbool bevat te veel geneste objecten.");
-            var (id, inheritedLayer) = queue.Dequeue();
+            var (id, inheritedLayer) = queue.Pop();
             var entity = (Entity)tr.GetObject(id, OpenMode.ForWrite);
             if (entity is not BlockReference reference) { result.Add(id); continue; }
             using var pieces = new DBObjectCollection();
             try
             {
+                // gelijke xy-schaal behouden bij een vlak symbool met afwijkende z-schaal
+                var scale = reference.ScaleFactors;
+                var definition = (BlockTableRecord)tr.GetObject(reference.BlockTableRecord, OpenMode.ForRead);
+                bool flat = Math.Abs(Math.Abs(scale.X) - Math.Abs(scale.Y)) < 1e-9
+                    && Math.Abs(Math.Abs(scale.X) - Math.Abs(scale.Z)) > 1e-9
+                    && definition.Cast<ObjectId>().All(child => tr.GetObject(child, OpenMode.ForRead) is Entity e
+                        && TryEntityExtents(e, out var low, out var high) && Math.Abs(low.Z) < 1e-9 && Math.Abs(high.Z) < 1e-9);
+                if (flat) reference.ScaleFactors = new Scale3d(scale.X, scale.Y, Math.CopySign(Math.Abs(scale.X), scale.Z));
                 reference.Explode(pieces);
                 var parentStyle = DrawingAnalyzer.EntityStyle(reference, tr, null, inheritedLayer);
                 foreach (ObjectId attributeId in reference.AttributeCollection)
@@ -855,12 +931,12 @@ public static class LegendBuilder
                     created.Add(text.ObjectId);
                     result.Add(text.ObjectId);
                 }
-                var definition = (BlockTableRecord)tr.GetObject(reference.BlockTableRecord, OpenMode.ForRead);
                 var sourceIds = definition.Cast<ObjectId>().ToArray();
                 var sourceOrder = ((DrawOrderTable)tr.GetObject(definition.DrawOrderTableId, OpenMode.ForRead)).GetFullDrawOrder(0).Cast<ObjectId>().ToArray();
                 var indexes = sourceIds.Select((sourceId, index) => (sourceId, index)).ToDictionary(pair => pair.sourceId, pair => pair.index);
                 var ordered = sourceIds.Length == pieces.Count && sourceOrder.Length == sourceIds.Length
                     ? sourceOrder.Select(sourceId => pieces[indexes[sourceId]]) : pieces.Cast<DBObject>();
+                var children = new List<(ObjectId Id, LayerDisplayStyle Layer)>();
                 foreach (var piece in ordered.OfType<Entity>())
                 {
                     if (piece is AttributeDefinition { Constant: false }
@@ -875,13 +951,15 @@ public static class LegendBuilder
                     piece.Visible = true;
                     var pieceLayerStyle = DrawingAnalyzer.EntityLayerStyle(piece, tr, inheritedLayer);
                     var pieceStyle = DrawingAnalyzer.EntityStyle(piece, tr, parentStyle, pieceLayerStyle);
+                    if (piece is Hatch hatch) hatch.BackgroundColor = DrawingAnalyzer.ResolveColor(hatch.BackgroundColor, parentStyle, pieceLayerStyle);
                     if (piece.Layer == "0") piece.LayerId = reference.LayerId;
                     ApplyEntityStyle(piece, pieceStyle, tr, db);
                     AppendEntity(btr, piece);
                     created.Add(piece.ObjectId);
                     tr.AddNewlyCreatedDBObject(piece, true);
-                    queue.Enqueue((piece.ObjectId, pieceLayerStyle));
+                    children.Add((piece.ObjectId, pieceLayerStyle));
                 }
+                for (int i = children.Count - 1; i >= 0; i--) queue.Push(children[i]);
             }
             finally
             {
@@ -1005,7 +1083,7 @@ public static class LegendBuilder
         }
 
         var mt = new MText();
-        mt.SetDatabaseDefaults();
+        mt.SetDatabaseDefaults(btr.Database);
         mt.Normal = dbt.Normal;
         mt.Layer = dbt.Layer;
         mt.Color = dbt.Color;
@@ -1153,9 +1231,14 @@ public static class LegendBuilder
             var patternType = sample?.PatternType ?? HatchPatternType.PreDefined;
             if (embedded)
             {
+                if (hatch.ObjectId.IsNull)
+                {
+                    AppendEntity(btr, hatch);
+                    tr.AddNewlyCreatedDBObject(hatch, true);
+                }
                 // ingesloten patroon behouden, ook zonder hetzelfde pat-bestand
-                hatch.RemoveAssociatedObjectIds();
                 hatch.Associative = false;
+                hatch.RemoveAssociatedObjectIds();
                 hatch.TransformBy(sample!.SourceTransform);
                 var min = hatch.GeometricExtents.MinPoint;
                 hatch.TransformBy(Matrix3d.Displacement(Point3d.Origin - min));
@@ -1187,6 +1270,7 @@ public static class LegendBuilder
                     hatch.PatternAngle = sample.IsSolid ? 0.0 : sample.PatternAngle;
                 }
                 if (sample.Color is not null) hatch.Color = sample.Color;
+                if (sample.BackgroundColor is not null) hatch.BackgroundColor = sample.BackgroundColor;
                 hatch.Transparency = sample.Transparency.ToAutoCadValue();
             }
 

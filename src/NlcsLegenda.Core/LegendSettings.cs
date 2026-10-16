@@ -120,6 +120,13 @@ public sealed class LegendSettings
     [Browsable(false)]
     public List<string> ManualEntryOrder { get; set; } = new();
 
+    [Browsable(false)]
+    public string ExampleLibraryPath { get; set; } = string.Empty;
+
+    [Browsable(false)]
+    public Dictionary<string, string> ExampleOverrides { get; set; } = new(StringComparer.Ordinal);
+
+
     [Category("Weergave"), DisplayName("Exploderen bij plaatsen"), Description("Losse entiteiten; anders blijft het één blok.")]
     public bool ExplodeOnPlace { get; set; } = false;
 
@@ -472,6 +479,7 @@ public sealed class LegendSettings
                 p.SetValue(this, p.GetValue(other));
 
         Klic = other.Klic.Clone();
+        ExampleOverrides = new Dictionary<string, string>(other.ExampleOverrides, StringComparer.Ordinal);
         IncludedStatuses = new HashSet<NlcsStatus>(other.IncludedStatuses);
         IncludedDrawTypes = new HashSet<NlcsDrawType>(other.IncludedDrawTypes);
         ExcludedDisciplines = new HashSet<string>(other.ExcludedDisciplines, StringComparer.OrdinalIgnoreCase);
@@ -540,7 +548,7 @@ public sealed class LegendSettings
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
             or nameof(CustomLayerRules) or nameof(BlankEntries)
-            or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder) or nameof(Klic);
+            or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder) or nameof(Klic) or nameof(ExampleOverrides);
 
     [JsonIgnore, Browsable(false)]
     public double ModelUnitsPerPaperMm => Scale / 1000.0;
@@ -607,6 +615,8 @@ public sealed class LegendSettings
         IncludedDrawTypes ??= new HashSet<NlcsDrawType>();
         ManualEntryOrder = (ManualEntryOrder ?? new List<string>()).Where(k => !string.IsNullOrWhiteSpace(k)).Distinct(StringComparer.Ordinal).ToList();
         ManualEntries ??= new List<ManualEntry>();
+        ExampleOverrides = new Dictionary<string, string>(ExampleOverrides ?? new(), StringComparer.Ordinal);
+        ExampleLibraryPath ??= string.Empty;
         BlankEntries ??= new List<BlankEntry>();
         CustomStatuses ??= new List<CustomStatus>();
         CustomLayerRules ??= new List<CustomLayerRule>();

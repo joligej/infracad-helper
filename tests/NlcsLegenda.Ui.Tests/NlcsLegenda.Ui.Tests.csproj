@@ -6,6 +6,7 @@
   <ItemGroup>
     <Compile Include="../../src/NlcsLegenda.Plugin/KlicOptionsDialog.cs" Link="KlicOptionsDialog.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/KlicDetailsDialog.cs" Link="KlicDetailsDialog.cs" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/ExampleDialog.cs" Link="ExampleDialog.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/OverviewDialog.cs" Link="OverviewDialog.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/DialogLayout.cs" Link="DialogLayout.cs" />
     <ProjectReference Include="../../src/NlcsLegenda.Core/NlcsLegenda.Core.csproj" />

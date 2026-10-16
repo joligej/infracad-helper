@@ -62,6 +62,8 @@ public sealed class HatchSample
 
     public Color? Color { get; set; }
 
+    public Color? BackgroundColor { get; set; }
+
     public TransparencyValue Transparency { get; set; } =
         new(TransparencyMethod.ByAlpha, 255);
 
@@ -132,6 +134,7 @@ public sealed class HatchSample
             PatternSpace = hatch.PatternType == HatchPatternType.UserDefined ? hatch.PatternSpace : 1.0,
             PatternDouble = hatch.PatternType == HatchPatternType.UserDefined && hatch.PatternDouble,
             Color = hatch.Color,
+            BackgroundColor = hatch.BackgroundColor,
             Transparency = TransparencyValue.From(hatch.Transparency)
         };
     }

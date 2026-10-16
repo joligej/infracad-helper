@@ -38,6 +38,8 @@ public sealed class LayerDisplayStyle
 
     public double LinetypeScale { get; init; } = 1.0;
 
+    public double PolylineWidth { get; init; }
+
     public LineWeight LineWeight { get; init; } = LineWeight.ByLineWeightDefault;
 
     public TransparencyValue Transparency { get; init; } =
@@ -184,13 +186,19 @@ public static class DrawingAnalyzer
             if (!inheritsVisibleLayer && !IsVisible(ent.Layer, tr, c)) return;
         }
         var layerStyle = EntityLayerStyle(ent, tr, inheritedLayerStyle);
-        var effectiveStyle = EntityStyle(ent, tr, inheritedStyle, layerStyle);
+        var effectiveStyle = EntityStyle(ent, tr, inheritedStyle, layerStyle, transform);
         var block = ent as BlockReference;
         var definition = block is not null && !block.BlockTableRecord.IsNull
             ? tr.GetObject(block.BlockTableRecord, OpenMode.ForRead) as BlockTableRecord : null;
         // xref-insert als broncontainer, ook op een symboollaag
         if (definition is not { IsFromExternalReference: true })
-            Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle);
+        {
+            Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle, inheritedStyle);
+            // een herkenbaar symbool niet nogmaals als losse interne lijnen tellen
+            if (block is not null && NlcsLayerParser.TryParse(ent.Layer, out var blockLayer)
+                && blockLayer.DrawType is NlcsDrawType.Symbool or NlcsDrawType.Geometrie)
+                return;
+        }
 
         if (ent is BlockReference br && !br.BlockTableRecord.IsNull)
         {
@@ -214,7 +222,7 @@ public static class DrawingAnalyzer
     }
 
     private static void Record(Entity ent, Transaction tr, Collector c, LegendSettings settings,
-        Matrix3d transform, string sourceXref, LayerDisplayStyle style, LayerDisplayStyle layerStyle)
+        Matrix3d transform, string sourceXref, LayerDisplayStyle style, LayerDisplayStyle layerStyle, LayerDisplayStyle? parentStyle)
     {
         var layerName = ent.Layer;
         KlicObjectData? metadata = null;
@@ -239,7 +247,14 @@ public static class DrawingAnalyzer
                 return;
             }
         }
-        if (!settings.IsDrawTypeIncluded(parsed!.DrawType) || !EntityMatchesType(ent, parsed.DrawType)) return;
+        var actualType = parsed!.DrawType;
+        if (rule is null)
+        {
+            if (ent is BlockReference or Circle or Ellipse && actualType == NlcsDrawType.Geometrie) actualType = NlcsDrawType.Symbool;
+            else if (ent is Hatch && actualType == NlcsDrawType.Geometrie) actualType = NlcsDrawType.Arcering;
+            parsed = CopyLayer(parsed, sourceXref, parsed.Netbeheerder, parsed.KlicGroupKey, actualType);
+        }
+        if (!settings.IsDrawTypeIncluded(actualType) || !EntityMatchesType(ent, actualType)) return;
 
         HatchSample? hatch = ent is Hatch h ? HatchSample.From(h, transform) : null;
         if (hatch is not null)
@@ -248,6 +263,7 @@ public static class DrawingAnalyzer
             hatch.SourceScale = parsed.Scale;
             hatch.TargetScale = settings.Scale;
             hatch.Color = style.Color;
+            hatch.BackgroundColor = ResolveColor(hatch.BackgroundColor!, parentStyle, layerStyle);
             hatch.Transparency = style.Transparency;
         }
         SymbolSample? symbol = null;
@@ -266,6 +282,16 @@ public static class DrawingAnalyzer
             symbol = new SymbolSample(blockName, identity, SymbolTransform.From(transform * br.BlockTransform))
             { ReferenceId = br.ObjectId, SourceXref = sourceXref, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers),
                 InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceScale = parsed.Scale, TargetScale = settings.Scale };
+        }
+        if (ent is Curve curve && parsed.DrawType == NlcsDrawType.Symbool)
+        {
+            string identity = PrimitiveSymbolIdentity(curve, tr) + ":" + StyleSignature(style);
+            symbol = new SymbolSample("@" + curve.GetType().Name, identity, SymbolTransform.From(transform))
+            {
+                ReferenceId = curve.ObjectId, IsPrimitive = true, SourceXref = sourceXref,
+                InsertionStyle = style, InsertionLayerStyle = layerStyle,
+                SourceScale = parsed.Scale, TargetScale = settings.Scale
+            };
         }
         metadata ??= c.Klic.Read(ent, sourceXref);
         string appearance = SampleSignature(style, hatch, symbol);
@@ -323,12 +349,12 @@ public static class DrawingAnalyzer
         finally { path.Remove(id); }
     }
 
-    private static NlcsLayerName CopyLayer(NlcsLayerName p, string source, string provider, string klicGroup = "") => new()
+    private static NlcsLayerName CopyLayer(NlcsLayerName p, string source, string provider, string klicGroup = "", NlcsDrawType? drawType = null) => new()
     {
         Raw = p.Raw, LocalName = p.LocalName, IsXref = source.Length > 0,
         XrefName = source, Netbeheerder = provider, KlicGroupKey = klicGroup, StatusCode = p.StatusCode, Status = p.Status,
         Discipline = p.Discipline, Hoofdgroep = p.Hoofdgroep, Element = p.Element,
-        TypeSuffix = p.TypeSuffix, DrawType = p.DrawType, Scale = p.Scale
+        TypeSuffix = p.TypeSuffix, DrawType = drawType ?? p.DrawType, Scale = p.Scale
     };
 
     internal static LayerDisplayStyle EntityLayerStyle(Entity entity, Transaction tr, LayerDisplayStyle? parentLayer = null)
@@ -345,12 +371,9 @@ public static class DrawingAnalyzer
     }
 
     internal static LayerDisplayStyle EntityStyle(Entity entity, Transaction tr,
-        LayerDisplayStyle? parent, LayerDisplayStyle layer)
+        LayerDisplayStyle? parent, LayerDisplayStyle layer, Matrix3d? transform = null)
     {
-        var color = entity.Color.IsByLayer ? layer.Color
-            : entity.Color.IsByBlock ? parent?.Color ?? layer.Color : entity.Color;
-        if (color.IsByLayer || color.IsByBlock)
-            color = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, 7);
+        var color = ResolveColor(entity.Color, parent, layer);
         string linetype = LayerNaming.LocalName(entity.Linetype);
         var inheritedLine = linetype.Equals("ByLayer", StringComparison.OrdinalIgnoreCase) ? layer
             : linetype.Equals("ByBlock", StringComparison.OrdinalIgnoreCase) ? parent ?? layer : null;
@@ -360,12 +383,33 @@ public static class DrawingAnalyzer
             Linetype = inheritedLine?.Linetype ?? entity.Linetype,
             LinetypeIdentity = inheritedLine?.LinetypeIdentity ?? LinetypeSignature(entity.LinetypeId, tr),
             LinetypeScale = entity.LinetypeScale,
+            PolylineWidth = ConstantWidth(entity, tr) * (transform?.CoordinateSystem3d.Xaxis.Length ?? 1),
             LineWeight = entity.LineWeight == LineWeight.ByLayer ? layer.LineWeight
                 : entity.LineWeight == LineWeight.ByBlock ? parent?.LineWeight ?? layer.LineWeight : entity.LineWeight,
             Transparency = entity.Transparency.IsByLayer ? layer.Transparency
                 : entity.Transparency.IsByBlock ? parent?.Transparency ?? layer.Transparency
                 : TransparencyValue.From(entity.Transparency)
         };
+    }
+
+    internal static Autodesk.AutoCAD.Colors.Color ResolveColor(Autodesk.AutoCAD.Colors.Color color, LayerDisplayStyle? parent, LayerDisplayStyle layer)
+    {
+        var resolved = color.IsByLayer ? layer.Color : color.IsByBlock ? parent?.Color ?? color : color;
+        return resolved.IsByLayer || resolved.IsByBlock
+            ? Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, 7) : resolved;
+    }
+
+    private static double ConstantWidth(Entity entity, Transaction tr)
+    {
+        IEnumerable<double> widths = entity switch
+        {
+            Polyline p => Enumerable.Range(0, p.NumberOfVertices).SelectMany(i => new[] { p.GetStartWidthAt(i), p.GetEndWidthAt(i) }),
+            Polyline2d p => p.Cast<object>().Select(i => i is Vertex2d vertex ? vertex : (Vertex2d)tr.GetObject((ObjectId)i, OpenMode.ForRead))
+                .SelectMany(v => new[] { v.StartWidth, v.EndWidth }),
+            _ => Array.Empty<double>()
+        };
+        var values = widths.ToArray();
+        return values.Length > 0 && values.All(w => Math.Abs(w - values[0]) < 1e-9) ? values[0] : 0;
     }
 
     internal static string LinetypeSignature(ObjectId id, Transaction tr)
@@ -393,11 +437,12 @@ public static class DrawingAnalyzer
 
     private static string ColorSignature(Autodesk.AutoCAD.Colors.Color color) =>
         color.ColorMethod == Autodesk.AutoCAD.Colors.ColorMethod.ByAci && color.ColorIndex == 7
-            ? "foreground" : color.ColorValue.ToArgb().ToString(System.Globalization.CultureInfo.InvariantCulture);
+            ? "foreground" : color.ColorMethod == Autodesk.AutoCAD.Colors.ColorMethod.None
+                ? "none" : color.ColorValue.ToArgb().ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private static string StyleSignature(LayerDisplayStyle style) => string.Join("|",
         ColorSignature(style.Color), style.LinetypeIdentity, NumberSignature(style.LinetypeIdentity == "Continuous" ? 1 : style.LinetypeScale),
-        style.LineWeight, style.Transparency.Signature);
+        style.LineWeight, style.Transparency.Signature, NumberSignature(style.PolylineWidth));
 
     private static string ReadAttribute(BlockReference br, Transaction tr, string tag)
     {
@@ -503,7 +548,7 @@ public static class DrawingAnalyzer
     // alleen objecten van de gekozen elementsoort meetellen
     internal static bool EntityMatchesType(Entity ent, NlcsDrawType type) => type switch
     {
-        NlcsDrawType.Symbool => ent is BlockReference,
+        NlcsDrawType.Symbool => ent is BlockReference or Curve,
         NlcsDrawType.Arcering => ent is Hatch,
         NlcsDrawType.Vlakvulling => ent is Hatch or Curve,
         NlcsDrawType.Vlak => ent is Curve or Hatch,
@@ -599,11 +644,26 @@ public static class DrawingAnalyzer
             NumberSignature(hatch.PatternSpace * hatch.ScaleForLegend(hatch.TargetScale)), hatch.PatternDouble,
             hatch.IsSolid, hatch.DefinitionSignature(hatch.ScaleForLegend(hatch.TargetScale)),
             hatch.Color is null ? string.Empty : ColorSignature(hatch.Color),
+            hatch.BackgroundColor is null ? string.Empty : ColorSignature(hatch.BackgroundColor),
             hatch.Transparency.Signature);
     }
 
     private static string SampleSignature(LayerDisplayStyle style, HatchSample? hatch, SymbolSample? symbol) =>
         symbol is not null ? symbol.RenderIdentity : StyleSignature(style) + "|" + HatchSignature(hatch);
+
+    private static string PrimitiveSymbolIdentity(Curve curve, Transaction tr)
+    {
+        var origin = curve.GeometricExtents.MinPoint;
+        var points = Enumerable.Range(0, 65).Select(i => PointSignature(
+            curve.GetPointAtParameter(curve.StartParam + (curve.EndParam - curve.StartParam) * i / 64) - origin));
+        string widths = curve is Polyline polyline ? string.Join(";", Enumerable.Range(0, polyline.NumberOfVertices)
+            .Select(i => NumberSignature(polyline.GetStartWidthAt(i)) + ":" + NumberSignature(polyline.GetEndWidthAt(i)))) : string.Empty;
+        if (curve is Polyline2d polyline2d)
+            widths = string.Join(";", polyline2d.Cast<object>().Select(i => i is Vertex2d vertex ? vertex : (Vertex2d)tr.GetObject((ObjectId)i, OpenMode.ForRead))
+                .Select(v => NumberSignature(v.StartWidth) + ":" + NumberSignature(v.EndWidth)));
+        string shape = curve.GetType().Name + "|" + curve.Closed + "|" + widths + "|" + string.Join(";", points);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(shape)));
+    }
 
     private static string SymbolDefinitionIdentity(ObjectId definitionId, Database host, Transaction tr, LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible)
     {
@@ -622,14 +682,14 @@ public static class DrawingAnalyzer
             var source = (AttributeReference)tr.GetObject(id, OpenMode.ForRead);
             if (string.IsNullOrWhiteSpace(source.TextString) || !includeInvisible && (source.Invisible || !source.Visible)) continue;
             using var copy = (AttributeReference)source.Clone();
-            copy.TransformBy(inverse);
+            LegendBuilder.TransformPlanarSymbol(copy, inverse);
             if (!((LayerTableRecord)tr.GetObject(source.LayerId, OpenMode.ForRead)).IsPlottable) continue;
             var layer = EntityLayerStyle(source, tr, parentLayer);
             var style = EntityStyle(source, tr, parent, layer);
             using var multiline = source.IsMTextAttribute ? source.MTextAttribute : null;
             if (multiline is not null)
             {
-                multiline.TransformBy(inverse);
+                LegendBuilder.TransformPlanarSymbol(multiline, inverse);
                 parts.Add(source.Tag + ":" + SymbolEntitySignature(multiline, reference.Database, tr,
                     new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible));
             }
@@ -746,6 +806,7 @@ public static class DrawingAnalyzer
                     + TextStyleSignature(text.TextStyleId, host, tr));
                 break;
             case Hatch hatch:
+                parts.Add(ColorSignature(ResolveColor(hatch.BackgroundColor, parent, layerStyle)));
                 parts.Add(HatchSample.From(hatch).DefinitionSignature(1));
                 parts.Add($"H:{hatch.PatternType}:{hatch.PatternName}:{NumberSignature(hatch.PatternScale)}:"
                     + $"{NumberSignature(hatch.PatternAngle)}:{NumberSignature(hatch.PatternSpace)}:{hatch.PatternDouble}:"

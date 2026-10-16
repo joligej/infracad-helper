@@ -13,6 +13,7 @@ public class ConsumerAuditTests
 
     private static readonly Dictionary<string, string> Consumers = new()
     {
+        [nameof(LegendSettings.ExampleLibraryPath)] = "LegendBuilder/ExampleLibrary voorbeeldenimport",
         [nameof(LegendSettings.SchemaVersion)] = "LegendSettings.Normalize schemaversie",
         [nameof(LegendSettings.Scale)] = "LegendSettings.ToModel / LegendLayoutEngine",
         [nameof(LegendSettings.IncludeTitle)] = "LegendBuilder titel",

@@ -1354,7 +1354,7 @@ public partial class Commands
                 tr.Commit();
             }
             int built = BuildPlaceXrefLegend(db, settings, out var error, out var group, out var blockId);
-            if (built != 4 || error != "geen") throw new InvalidOperationException(error);
+            if (built != 4 || error != "geen") throw new InvalidOperationException($"Verwacht 4 regels, gevonden {built}; {error}");
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 AssertLegendHostOwnership(db, tr, group, blockId);
