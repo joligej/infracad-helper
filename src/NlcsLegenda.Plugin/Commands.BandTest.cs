@@ -93,47 +93,49 @@ public partial class Commands
         using var tr = db.TransactionManager.StartTransaction();
         var excluded = LegendManagement.CollectManagedIds(db, tr, LegendStore.Load(db, tr));
         foreach (int sourceMode in new[] { 0, 1, 2 })
-        foreach (double scale in new[] { 200d, 500d, 1000d })
         {
-            var settings = new LegendSettings { Scale = scale, IncludeXrefLayers = sourceMode != 0, DrawSwatchFrame = false };
-            var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
-            var xrefIds = model.Cast<ObjectId>().Where(id => tr.GetObject(id, OpenMode.ForRead) is BlockReference br
-                && ((BlockTableRecord)tr.GetObject(br.BlockTableRecord, OpenMode.ForRead)).IsFromExternalReference).ToArray();
-            var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection: sourceMode == 2 ? xrefIds : null, excludedIds: excluded);
-            var entries = analysis.Entries.Where(e => expected.ContainsKey(e.Element)).ToArray();
-            if (entries.Length != 3 || entries.Any(e => e.SourceLayers.Count != (sourceMode == 1 ? 2 : 1)))
-                throw new InvalidOperationException("Bronkeuze of groepering onjuist.");
-            foreach (var entry in entries)
+            foreach (double scale in new[] { 200d, 500d, 1000d })
             {
-                var single = new AnalysisResult { Entries = new[] { entry }, LayerStyles = analysis.LayerStyles };
-                var blockId = LegendBuilder.BuildBlock(db, tr, single, settings, out _, out _);
-                var lines = ((BlockTableRecord)tr.GetObject(blockId, OpenMode.ForRead)).Cast<ObjectId>()
-                    .Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Polyline>().Where(p => p.NumberOfVertices == 2)
-                    .OrderBy(p => p.GetPoint2dAt(0).Y).ToArray();
-                if (lines.Length != 4) throw new InvalidOperationException("Geen vier lijnen: " + entry.Element);
-                var template = expected[entry.Element];
-                double sourceMid = template.Average(p => p.GetPoint2dAt(0).Y);
-                double actualMid = lines.Average(p => p.GetPoint2dAt(0).Y);
-                for (int i = 0; i < 4; i++)
+                var settings = new LegendSettings { Scale = scale, IncludeXrefLayers = sourceMode != 0, DrawSwatchFrame = false };
+                var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+                var xrefIds = model.Cast<ObjectId>().Where(id => tr.GetObject(id, OpenMode.ForRead) is BlockReference br
+                    && ((BlockTableRecord)tr.GetObject(br.BlockTableRecord, OpenMode.ForRead)).IsFromExternalReference).ToArray();
+                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection: sourceMode == 2 ? xrefIds : null, excludedIds: excluded);
+                var entries = analysis.Entries.Where(e => expected.ContainsKey(e.Element)).ToArray();
+                if (entries.Length != 3 || entries.Any(e => e.SourceLayers.Count != (sourceMode == 1 ? 2 : 1)))
+                    throw new InvalidOperationException("Bronkeuze of groepering onjuist.");
+                foreach (var entry in entries)
                 {
-                    void Near(double a, double b)
+                    var single = new AnalysisResult { Entries = new[] { entry }, LayerStyles = analysis.LayerStyles };
+                    var blockId = LegendBuilder.BuildBlock(db, tr, single, settings, out _, out _);
+                    var lines = ((BlockTableRecord)tr.GetObject(blockId, OpenMode.ForRead)).Cast<ObjectId>()
+                        .Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Polyline>().Where(p => p.NumberOfVertices == 2)
+                        .OrderBy(p => p.GetPoint2dAt(0).Y).ToArray();
+                    if (lines.Length != 4) throw new InvalidOperationException("Geen vier lijnen: " + entry.Element);
+                    var template = expected[entry.Element];
+                    double sourceMid = template.Average(p => p.GetPoint2dAt(0).Y);
+                    double actualMid = lines.Average(p => p.GetPoint2dAt(0).Y);
+                    for (int i = 0; i < 4; i++)
                     {
-                        if (Math.Abs(a - b) > 0.002) throw new InvalidOperationException($"Maatverschil {entry.Element}: {a:R} / {b:R}");
+                        void Near(double a, double b)
+                        {
+                            if (Math.Abs(a - b) > 0.002) throw new InvalidOperationException($"Maatverschil {entry.Element}: {a:R} / {b:R}");
+                        }
+                        Near(lines[i].Length / settings.ModelUnitsPerPaperMm, template[i].Length / 0.2);
+                        Near((lines[i].GetPoint2dAt(0).Y - actualMid) / settings.ModelUnitsPerPaperMm,
+                            (template[i].GetPoint2dAt(0).Y - sourceMid) / 0.2);
+                        if (lines[i].GetPoint2dAt(0).X <= lines[i].GetPoint2dAt(1).X)
+                            throw new InvalidOperationException("Lijnrichting gewijzigd.");
+                        var wanted = DrawingAnalyzer.EntityLayerStyle(template[i], sourceTr);
+                        var actual = DrawingAnalyzer.EntityStyle(lines[i], tr, null, DrawingAnalyzer.EntityLayerStyle(lines[i], tr));
+                        if (actual.Color.ColorIndex != wanted.Color.ColorIndex || actual.LineWeight != wanted.LineWeight
+                            || !LayerNaming.LocalName(actual.Linetype).Equals(wanted.Linetype, StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidOperationException("Lijnstijl wijkt af: " + entry.Element);
                     }
-                    Near(lines[i].Length / settings.ModelUnitsPerPaperMm, template[i].Length / 0.2);
-                    Near((lines[i].GetPoint2dAt(0).Y - actualMid) / settings.ModelUnitsPerPaperMm,
-                        (template[i].GetPoint2dAt(0).Y - sourceMid) / 0.2);
-                    if (lines[i].GetPoint2dAt(0).X <= lines[i].GetPoint2dAt(1).X)
-                        throw new InvalidOperationException("Lijnrichting gewijzigd.");
-                    var wanted = DrawingAnalyzer.EntityLayerStyle(template[i], sourceTr);
-                    var actual = DrawingAnalyzer.EntityStyle(lines[i], tr, null, DrawingAnalyzer.EntityLayerStyle(lines[i], tr));
-                    if (actual.Color.ColorIndex != wanted.Color.ColorIndex || actual.LineWeight != wanted.LineWeight
-                        || !LayerNaming.LocalName(actual.Linetype).Equals(wanted.Linetype, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException("Lijnstijl wijkt af: " + entry.Element);
+                    double expectedLength = template.Where(p => p.Layer.Contains(entry.Element, StringComparison.Ordinal)).Sum(p => p.Length) * (sourceMode == 1 ? 2 : 1);
+                    if (Math.Abs(entry.Metric.Length - expectedLength) > 0.002)
+                        throw new InvalidOperationException("Voorbeeldlijnen wijzigen de hoeveelheid.");
                 }
-                double expectedLength = template.Where(p => p.Layer.Contains(entry.Element, StringComparison.Ordinal)).Sum(p => p.Length) * (sourceMode == 1 ? 2 : 1);
-                if (Math.Abs(entry.Metric.Length - expectedLength) > 0.002)
-                    throw new InvalidOperationException("Voorbeeldlijnen wijzigen de hoeveelheid.");
             }
         }
         tr.Abort();
