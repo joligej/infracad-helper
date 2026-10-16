@@ -74,7 +74,9 @@ public partial class Commands
                 throw new InvalidOperationException("Referentie gewijzigd.");
             doc.Editor.WriteMessage("\nAPPEARANCE ingesloten patronen, gesloten vulling, A01/A02 en tekenvolgorde lokaal/xref -> OK");
         }
-        catch (System.Exception ex) { doc.Editor.WriteMessage("\nAPPEARANCE FAIL: " + ex); }
+        catch (InvalidOperationException ex) { doc.Editor.WriteMessage("\nAPPEARANCE FAIL: " + ex); }
+        catch (IOException ex) { doc.Editor.WriteMessage("\nAPPEARANCE FAIL: " + ex); }
+        catch (Autodesk.AutoCAD.Runtime.Exception ex) { doc.Editor.WriteMessage("\nAPPEARANCE FAIL: " + ex); }
     }
 
     [CommandMethod("NLCSLEGENDAAPPEARANCEVERIFY", CommandFlags.Modal)]
@@ -82,7 +84,9 @@ public partial class Commands
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         try { CheckAppearance(doc.Database); doc.Editor.WriteMessage("\nAPPEARANCE na heropenen -> OK"); }
-        catch (System.Exception ex) { doc.Editor.WriteMessage("\nAPPEARANCE FAIL: " + ex); }
+        catch (InvalidOperationException ex) { doc.Editor.WriteMessage("\nAPPEARANCE FAIL: " + ex); }
+        catch (IOException ex) { doc.Editor.WriteMessage("\nAPPEARANCE FAIL: " + ex); }
+        catch (Autodesk.AutoCAD.Runtime.Exception ex) { doc.Editor.WriteMessage("\nAPPEARANCE FAIL: " + ex); }
     }
 
     private static void CheckAppearance(Database db)
@@ -107,9 +111,10 @@ public partial class Commands
         var hatches = entities.OfType<Hatch>().Where(h => !h.IsSolidFill).ToArray();
         var actual = hatches.Select(h => HatchSample.From(h).DefinitionSignature(1)).Order().ToArray();
         if (!actual.SequenceEqual(expected) || actual.Length != 2) throw new InvalidOperationException("Ingesloten patroon gewijzigd.");
-        foreach (var hatch in hatches.Concat(entities.OfType<Hatch>().Where(h => h.Layer.Contains("APPEARANCE_SOLID", StringComparison.Ordinal))))
+        var loops = hatches.Concat(entities.OfType<Hatch>().Where(h => h.Layer.Contains("APPEARANCE_SOLID", StringComparison.Ordinal)))
+            .Select(h => h.GetLoopAt(0));
+        foreach (var loop in loops)
         {
-            var loop = hatch.GetLoopAt(0);
             if (!loop.IsPolyline || loop.Polyline.Count != 5 || (loop.Polyline[0].Vertex - loop.Polyline[4].Vertex).Length > 1e-9)
                 throw new InvalidOperationException("Arceringsrand niet gesloten.");
         }

@@ -834,9 +834,8 @@ public static class LegendBuilder
                 var indexes = sourceIds.Select((sourceId, index) => (sourceId, index)).ToDictionary(pair => pair.sourceId, pair => pair.index);
                 var ordered = sourceIds.Length == pieces.Count && sourceOrder.Length == sourceIds.Length
                     ? sourceOrder.Select(sourceId => pieces[indexes[sourceId]]) : pieces.Cast<DBObject>();
-                foreach (DBObject obj in ordered)
+                foreach (var piece in ordered.OfType<Entity>())
                 {
-                    if (obj is not Entity piece) continue;
                     if (piece is AttributeDefinition { Constant: false }
                         && (reference.ObjectId != probe.ObjectId || sample is not null && !sample.ReferenceId.IsNull)) continue;
                     if (piece is AttributeDefinition { Invisible: true } && !includeInvisible) continue;
