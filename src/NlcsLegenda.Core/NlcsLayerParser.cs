@@ -18,6 +18,21 @@ public static class NlcsLayerParser
         var xrefName = isXref ? raw[..raw.LastIndexOf('|')] : string.Empty;
 
         var parts = local.Split('-');
+        // oude lagen met een underscore vóór het tekentype
+        int typeIndex = parts.Length - 1;
+        if (typeIndex > 0 && IsPositiveInteger(parts[typeIndex])) typeIndex--;
+        if (typeIndex >= 3 && NlcsDrawTypeExtensions.FromSuffix(parts[typeIndex]) == NlcsDrawType.Overig)
+        {
+            int split = parts[typeIndex].LastIndexOf('_');
+            if (split > 0 && NlcsDrawTypeExtensions.FromSuffix(parts[typeIndex][(split + 1)..])
+                is NlcsDrawType.Arcering or NlcsDrawType.Vlakvulling or NlcsDrawType.Symbool)
+            {
+                var fields = parts.ToList();
+                fields[typeIndex] = parts[typeIndex][..split];
+                fields.Insert(typeIndex + 1, parts[typeIndex][(split + 1)..]);
+                parts = fields.ToArray();
+            }
+        }
         if (parts.Length < 5)
             return false;
 

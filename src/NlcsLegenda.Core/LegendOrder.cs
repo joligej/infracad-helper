@@ -43,6 +43,13 @@ public static class LegendOrder
         }).ToList();
     }
 
+    public static Dictionary<string, string> AlignChoices(IReadOnlyDictionary<string, string> choices, IEnumerable<LegendEntry> entries)
+    {
+        var previous = choices.ToArray();
+        var aligned = Align(previous.Select(p => p.Key).ToArray(), entries.Select(Key).ToArray());
+        return previous.Select((pair, index) => (Key: aligned[index], pair.Value)).ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
+    }
+
     public static List<string> Remember(IReadOnlyList<string> previous, IEnumerable<LegendEntry> ordered)
     {
         var current = ordered.Select(Key).Distinct(StringComparer.Ordinal).ToList();

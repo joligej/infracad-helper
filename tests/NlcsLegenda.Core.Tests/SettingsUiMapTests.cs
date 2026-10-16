@@ -17,6 +17,8 @@ public class SettingsUiMapTests
 
     private static readonly Dictionary<string, Surface> Map = new()
     {
+        [nameof(LegendSettings.ExampleLibraryPath)] = new("Overzicht > Voorbeeld > Bibliotheek", Binding.Subdialog),
+        [nameof(LegendSettings.ExampleOverrides)] = new("Overzicht > Voorbeeld", Binding.Subdialog),
         [nameof(LegendSettings.SchemaVersion)] = new("(intern: schema)", Binding.Intern),
         [nameof(LegendSettings.Scale)] = new("Algemeen", Binding.Numeric),
         [nameof(LegendSettings.Title)] = new("Algemeen", Binding.Text),

@@ -9,7 +9,7 @@ param(
     [string]$TemplatePath,
     [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -30,6 +30,8 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ templateregression=@('NLCSLEGENDATEMPLATEREGRESSIONTEST','TEMPLATEREGRESSION lijnbreedte, losse symboolcurve, cirkel en associatieve arcering; bron behouden -> OK')
+ examples=@('NLCSLEGENDAEXAMPLETEST','EXAMPLE bibliotheekimport en bronmaat 1:200 naar 1:500 -> OK','NLCSLEGENDAEXAMPLEVERIFY','EXAMPLE na heropenen: gekozen voorbeeld zonder bronbibliotheek behouden -> OK')
  band=@('NLCSLEGENDABANDTEST','BAND drie DWT-varianten, vier lijnen, stijlen en drie schalen lokaal/xref -> OK','NLCSLEGENDABANDVERIFY','BAND na heropenen -> OK')
  appearance=@('NLCSLEGENDAAPPEARANCETEST','APPEARANCE ingesloten patronen, gesloten vulling, A01/A02 en tekenvolgorde lokaal/xref -> OK','NLCSLEGENDAAPPEARANCEVERIFY','APPEARANCE na heropenen -> OK')
  sources=@('NLCSLEGENDASOURCETEST','SOURCETEST gedeelde symbolen, xref-overrides en gewone omschrijvingen -> OK','NLCSLEGENDASOURCEVERIFY','SOURCETEST na heropenen -> OK')
@@ -155,7 +157,7 @@ foreach($case in $Cases){
  if($case -eq 'livetarget'){$expected+="1 legenda('s) in deze tekening:"}
  if($case -eq 'liveempty'){$expected+='Geen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.'}
  Run-Case $case $drawing $specs[$case][0] $expected
- if($case -in @('band','appearance','sources','xrefchoices','klic','customization','overview','abclocal','abcxref','oldreopen')){
+ if($case -in @('examples','band','appearance','sources','xrefchoices','klic','customization','overview','abclocal','abcxref','oldreopen')){
   $expected=@($specs[$case][3])
   Run-Case "$case-verify" $drawing $specs[$case][2] $expected
  }

@@ -35,7 +35,8 @@ public partial class Commands
                 }
                 tr.Commit();
             }
-            using var dialog = new OverviewDialog(items, changed => SaveOverviewOrder(doc.Database, changed), item => AnalyzeOverview(doc.Database, item));
+            using var dialog = new OverviewDialog(items, changed => SaveOverviewOrder(doc.Database, changed), item => AnalyzeOverview(doc.Database, item), path =>
+            { using var tr = doc.Database.TransactionManager.StartTransaction(); using var library = new ExampleLibrary(path, doc.Database, tr); return library.Examples; });
             AcWindows.ShowModalDialog(dialog);
         }
         catch (System.Exception ex) { doc.Editor.WriteMessage($"\nOverzicht kon niet worden geopend: {ex.Message}"); }
@@ -66,6 +67,9 @@ public partial class Commands
                 if (active.FindById(item.Id) is null) return "Een legenda is niet meer aanwezig. Open Overzicht opnieuw.";
                 var target = registry.FindById(item.Id)!;
                 target.Settings.Klic = item.Settings.Klic.Clone();
+                target.Settings.ExampleLibraryPath = item.Settings.ExampleLibraryPath;
+                target.Settings.ExampleOverrides = new Dictionary<string, string>(item.Settings.ExampleOverrides, StringComparer.Ordinal);
+                target.Settings.ManualEntries = item.Settings.ManualEntries.Select(e => e.Clone()).ToList();
                 target.Settings.SortMode = item.Settings.SortMode;
                 target.Settings.ManualEntryOrder = new List<string>(item.Settings.ManualEntryOrder);
                 if (BuildManagedLegend(db, tr, registry, target, out _, out _) != UpdateResult.Updated)

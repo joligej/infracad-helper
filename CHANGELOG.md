@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.32.0 - 2026-10-16
+
+- Overzicht laat per regel een volledig voorbeeld uit een aparte DWG-bibliotheek kiezen, inclusief codes, afdekvlakken en samengestelde lijnen. De bronmaat schaalt mee met de legenda.
+- Gebruikte voorbeelden en keuzes blijven in de tekening bewaard, ook na heropenen zonder bibliotheekbestand. Bij meerdere varianten blijft de keuze aan de gebruiker.
+- Arceringen behouden hun afzonderlijke voor- en achtergrondkleur. Tekenvolgorde blijft behouden bij het importeren en ontleden van geneste blokken.
+- Vlakke symbolen verliezen geen cirkels of polylijnbreedtes meer door een afwijkende Z-schaal. Losse symboolcurven en oude laagsuffixen worden herkend.
+- Associatieve bronarceringen worden veilig gekopieerd en losgekoppeld. Hulpcontouren op een arceerlaag leveren geen extra regel op; bronblokken worden niet dubbel geteld.
+- Bedrijfseigen voorbeelden blijven buiten de openbare installer.
+
 ## 1.31.6 - 2026-10-16
 
 - Scheidingsbanden 100/300, 115/345 en 220/440 krijgen de vier lijnen uit de TAUW-template, met de gemeten onderlinge afstanden, kantlijnen en oorspronkelijke binnenlijntypen.

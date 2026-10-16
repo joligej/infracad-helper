@@ -6,6 +6,29 @@ namespace NlcsLegenda.Core.Tests;
 public class NlcsLayerParserTests
 {
     [Theory]
+    [InlineData("N-WE-VH-VERHARDING_BETONSTRAATSTEEN_KF_HALFST_ROOD_A-200", "VERHARDING_BETONSTRAATSTEEN_KF_HALFST_ROOD", NlcsDrawType.Arcering, 200)]
+    [InlineData("REF|N-WE-GR-BOOM_NR_S-500", "BOOM_NR", NlcsDrawType.Symbool, 500)]
+    [InlineData("N-WE-VH-ROLLAAG_A", "ROLLAAG", NlcsDrawType.Arcering, null)]
+    public void TryParse_OldTemplateSuffix(string raw, string element, NlcsDrawType type, int? scale)
+    {
+        Assert.True(NlcsLayerParser.TryParse(raw, out var parsed));
+        Assert.Equal(element, parsed!.Element);
+        Assert.Equal(type, parsed.DrawType);
+        Assert.Equal(scale, parsed.Scale);
+        Assert.Equal(raw, parsed.Raw);
+    }
+
+    [Theory]
+    [InlineData("N-WE-GR-BOOM_NR_S-G", "BOOM_NR_S")]
+    [InlineData("N-WE-VH-VERHARDING_A-G", "VERHARDING_A")]
+    public void TryParse_ElementEndingInTypeKeepsExplicitSuffix(string raw, string element)
+    {
+        Assert.True(NlcsLayerParser.TryParse(raw, out var parsed));
+        Assert.Equal(element, parsed!.Element);
+        Assert.Equal(NlcsDrawType.Geometrie, parsed.DrawType);
+    }
+
+    [Theory]
     [InlineData("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A", "N", "WE", "VH", "OPENVERHARDING_BETONSTRAATSTEEN", "A", null)]
     [InlineData("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A-200", "N", "WE", "VH", "OPENVERHARDING_BETONSTRAATSTEEN", "A", 200)]
     [InlineData("V-WE-RI-HWA_RIOOLLEIDING_PVC_160-G", "V", "WE", "RI", "HWA_RIOOLLEIDING_PVC_160", "G", null)]

@@ -23,6 +23,7 @@ internal static class Program
             CheckCustomizationRoundtrip();
             CheckStatusReassignment();
             Func<Form>[] factories = {
+                () => new ExampleDialog("voorbeelden.dwg", _ => new[] { new LegendExample("b", "Scheidingband met tekst en meerdere lijnen", "WEG", 200, Array.Empty<string>()) }),
                 () => new XrefInclusionDialog(new[] { "Een lange xrefnaam met veel informatie.dwg" }, new()),
                 () => new CustomStatusDialog(new[] { new CustomStatus { Name = "Eigen status" } }, new[] { ("key", "Voorbeeldregel") }),
                 () => new RemarksEditDialog("Notities", StandardTexts.DrawingRemarks),
@@ -52,6 +53,13 @@ internal static class Program
                 Application.DoEvents();
                 CheckButtons(form);
                 Check(Descendants(form).All(c => c is not TextBox || c.Height >= c.Font.Height), form.Text + ": teksthoogte");
+                if (form is ExampleDialog && args.FirstOrDefault() is { } output)
+                {
+                    Directory.CreateDirectory(output);
+                    using var image = new Bitmap(form.Width, form.Height);
+                    form.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
+                    image.Save(Path.Join(output, $"examples-{scale:0.00}.png"));
+                }
                 form.Close();
             }
         }

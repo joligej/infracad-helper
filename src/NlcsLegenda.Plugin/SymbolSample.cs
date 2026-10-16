@@ -6,6 +6,8 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
 {
     public Autodesk.AutoCAD.DatabaseServices.ObjectId ReferenceId { get; init; }
 
+    public bool IsPrimitive { get; init; }
+
     public string SourceXref { get; init; } = string.Empty;
 
     public string AttributeIdentity { get; init; } = string.Empty;
@@ -19,7 +21,7 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
 
     public double TargetScale { get; init; } = 1000;
 
-    public SymbolTransform RenderTransform => SourceScale is > 0
+    public SymbolTransform RenderTransform => SourceScale is > 1
         ? Transform.Divide(SourceScale.Value / TargetScale) : Transform;
 
     public string RenderIdentity =>
