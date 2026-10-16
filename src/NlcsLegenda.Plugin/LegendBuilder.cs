@@ -358,13 +358,40 @@ public static class LegendBuilder
 
         if (entry.GeometryLayer is { } geoLayer)
         {
-            using var line = new Polyline();
-            SetLegendDefaults(line, db);
-            line.AddVertexAt(0, new Point2d(x, midY), 0, 0, 0);
-            line.AddVertexAt(1, new Point2d(x + swatchW, midY), 0, 0, 0);
-            line.Layer = renderLayers[geoLayer];
-            rowEntities.Add(AppendEntity(btr, line));
-            tr.AddNewlyCreatedDBObject(line, true);
+            var band = SeparationBandProfile.For(entry);
+            void AddLine(double offsetMm, bool edge)
+            {
+                using var line = new Polyline();
+                SetLegendDefaults(line, db);
+                double y = midY + s.ToModel(offsetMm);
+                bool bandDirection = band is not null;
+                line.AddVertexAt(0, new Point2d(x + (bandDirection ? swatchW : 0), y), 0, 0, 0);
+                line.AddVertexAt(1, new Point2d(x + (bandDirection ? 0 : swatchW), y), 0, 0, 0);
+                line.Layer = renderLayers[geoLayer];
+                if (edge)
+                {
+                    var style = new LayerDisplayStyle
+                    {
+                        Color = Color.FromColorIndex(ColorMethod.ByAci, 210),
+                        LineWeight = LineWeight.LineWeight035,
+                        Linetype = "Continuous", LinetypeIdentity = "Continuous"
+                    };
+                    line.Layer = EnsureStyledLayer(tr, db, "NLCS_LEGENDA_KANTVERHARDING", style);
+                    line.Color = style.Color;
+                    line.LineWeight = style.LineWeight;
+                    line.LinetypeId = ResolveStyleLinetype(tr, db, style);
+                }
+                rowEntities.Add(AppendEntity(btr, line));
+                tr.AddNewlyCreatedDBObject(line, true);
+            }
+            if (band is not null)
+            {
+                AddLine(-band.OuterOffsetMm, true);
+                AddLine(-band.InnerOffsetMm, false);
+                AddLine(band.InnerOffsetMm, false);
+                AddLine(band.OuterOffsetMm, true);
+            }
+            else AddLine(0, false);
         }
 
         if (prepared is not null)

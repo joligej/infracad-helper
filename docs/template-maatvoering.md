@@ -74,3 +74,27 @@ de knop **Tekeningnotities** in het opmerkingenvenster herstelt desgewenst de st
 De standaard gebruikt een correcte NLCS-ISO-stijl, ook als de host al een afwijkende
 stijl met die naam heeft. Een expliciet gekozen eigen stijl blijft leidend; ontbreekt
 die stijl, dan wordt dit gemeld en blijft de vorige legenda behouden.
+
+## Scheidingsbanden
+
+De drie scheidingsbanden zijn samengestelde voorbeelden: twee doorlopende
+kantlijnen (ACI 210, 0,35 mm) en twee binnenlijnen met de stijl van de bronlaag.
+De lijnrichting volgt de template. De afstanden zijn op 16 oktober 2026 uit de
+1:200-voorbeelden gemeten en worden als papiermaten met de legendaschaal omgerekend.
+
+| NLCS-element | Tussen kantlijnen | Tussen binnenlijnen |
+| --- | --- | --- |
+| KANTOPSLUITING_SCHEIDINGSBAND_100X300 | 1,50 mm | 0,50 mm |
+| KANTOPSLUITING_SCHEIDINGSBAND_115X345 | 1,75 mm | 0,60 mm |
+| KANTOPSLUITING_SCHEIDINGSBAND_220X440 | 2,20 mm | 1,10 mm |
+
+De getekende breedte van het 115/345-voorbeeld is 350 mm op modelschaal;
+de templategeometrie is hier leidend, niet de maattekst. De naam en omschrijving
+worden niet aangepast. De samengestelde weergave geldt alleen voor deze drie
+NLCS-elementen met lijngeometrie. Handmatige regels en andere elementen behouden
+hun bestaande weergave. Extra voorbeeldlijnen tellen niet mee in hoeveelheden.
+
+De native proef `NLCSLEGENDABANDTEST` vergelijkt de lijnmaten en stijlen
+rechtstreeks met de originele DWT op 1:200, 1:500 en 1:1000, lokaal, gecombineerd
+en uitsluitend via een xref. Met `-Cases band` voert het acceptatiescript ook
+heropenen en vijftig keer bijwerken uit. De referentie blijft buiten git.
