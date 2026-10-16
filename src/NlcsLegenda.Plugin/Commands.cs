@@ -125,7 +125,7 @@ public partial class Commands
 
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var br = new BlockReference(Point3d.Origin, btrId);
+                using var br = new BlockReference(Point3d.Origin, btrId);
                 LegendBuilder.SetLegendDefaults(br, db);
                 LegendBuilder.AppendEntity(ms, br);
                 tr.AddNewlyCreatedDBObject(br, true);
@@ -1898,7 +1898,7 @@ public partial class Commands
                 var insert = ComputeInsertPoint(db, settings);
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var br = new BlockReference(insert, btrId);
+                using var br = new BlockReference(insert, btrId);
                 LegendBuilder.SetLegendDefaults(br, db);
                 LegendBuilder.AppendEntity(ms, br);
                 tr.AddNewlyCreatedDBObject(br, true);

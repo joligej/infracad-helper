@@ -244,6 +244,7 @@ public static class DrawingAnalyzer
         HatchSample? hatch = ent is Hatch h ? HatchSample.From(h, transform) : null;
         if (hatch is not null)
         {
+            hatch.SourceXref = sourceXref;
             hatch.SourceScale = parsed.Scale;
             hatch.TargetScale = settings.Scale;
             hatch.Color = style.Color;
@@ -263,7 +264,8 @@ public static class DrawingAnalyzer
                 c.SymbolDefinitionIdentities[cacheKey] = identity;
             }
             symbol = new SymbolSample(blockName, identity, SymbolTransform.From(transform * br.BlockTransform))
-            { InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceScale = parsed.Scale, TargetScale = settings.Scale };
+            { ReferenceId = br.ObjectId, SourceXref = sourceXref, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers),
+                InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceScale = parsed.Scale, TargetScale = settings.Scale };
         }
         metadata ??= c.Klic.Read(ent, sourceXref);
         string appearance = SampleSignature(style, hatch, symbol);
@@ -313,7 +315,7 @@ public static class DrawingAnalyzer
                 if (tr.GetObject(child, OpenMode.ForRead) is Entity entity)
                 {
                     var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                    if (!includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
+                    if (!layer.IsPlottable || !includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
                     if (entity is not BlockReference nested || HasSymbolGeometry(nested.BlockTableRecord, tr, includeInvisible, path)) return true;
                 }
             return false;
@@ -595,7 +597,7 @@ public static class DrawingAnalyzer
             NumberSignature(hatch.PatternScale * hatch.ScaleForLegend(hatch.TargetScale)),
             NumberSignature(hatch.PatternAngle),
             NumberSignature(hatch.PatternSpace * hatch.ScaleForLegend(hatch.TargetScale)), hatch.PatternDouble,
-            hatch.IsSolid,
+            hatch.IsSolid, hatch.DefinitionSignature(hatch.ScaleForLegend(hatch.TargetScale)),
             hatch.Color is null ? string.Empty : ColorSignature(hatch.Color),
             hatch.Transparency.Signature);
     }
@@ -608,6 +610,46 @@ public static class DrawingAnalyzer
         string content = BlockContentSignature(definitionId, host, tr, new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible);
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(content)));
+    }
+
+    private static string AttributeIdentity(BlockReference reference, Transaction tr,
+        LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible)
+    {
+        var parts = new List<string>();
+        var inverse = reference.BlockTransform.Inverse();
+        foreach (ObjectId id in reference.AttributeCollection)
+        {
+            var source = (AttributeReference)tr.GetObject(id, OpenMode.ForRead);
+            if (string.IsNullOrWhiteSpace(source.TextString) || !includeInvisible && (source.Invisible || !source.Visible)) continue;
+            using var copy = (AttributeReference)source.Clone();
+            copy.TransformBy(inverse);
+            if (!((LayerTableRecord)tr.GetObject(source.LayerId, OpenMode.ForRead)).IsPlottable) continue;
+            var layer = EntityLayerStyle(source, tr, parentLayer);
+            var style = EntityStyle(source, tr, parent, layer);
+            using var multiline = source.IsMTextAttribute ? source.MTextAttribute : null;
+            if (multiline is not null)
+            {
+                multiline.TransformBy(inverse);
+                parts.Add(source.Tag + ":" + SymbolEntitySignature(multiline, reference.Database, tr,
+                    new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible));
+            }
+            else
+            {
+                // uitgelijnde tekst gebruikt het anker; position kan nog een oude tekstbreedte bevatten
+                var anchor = copy.HorizontalMode == TextHorizontalMode.TextLeft && copy.VerticalMode == TextVerticalMode.TextBase
+                    ? copy.Position : copy.AlignmentPoint;
+                string position = PointSignature(anchor);
+                if (copy.HorizontalMode is TextHorizontalMode.TextAlign or TextHorizontalMode.TextFit)
+                    position += ":" + PointSignature(copy.Position);
+                parts.Add($"{source.Tag}:{source.TextString}:{position}:{PointSignature(copy.Normal)}:"
+                    + $"{NumberSignature(copy.Height)}:{NumberSignature(copy.Rotation)}:{NumberSignature(copy.WidthFactor)}:"
+                    + $"{NumberSignature(copy.Oblique)}:{copy.HorizontalMode}:{copy.VerticalMode}:{copy.IsMirroredInX}:{copy.IsMirroredInY}:"
+                    + StyleSignature(style) + ":" + TextStyleSignature(copy.TextStyleId, reference.Database, tr));
+            }
+        }
+        if (parts.Count == 0) return string.Empty;
+        parts.Sort(StringComparer.Ordinal);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join("\n", parts))));
     }
 
     private static string BlockContentSignature(
@@ -624,7 +666,7 @@ public static class DrawingAnalyzer
                 if (tr.GetObject(id, OpenMode.ForRead) is Entity entity)
                 {
                     var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                    if (!includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
+                    if (!layer.IsPlottable || !includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
                     entities.Add(SymbolEntitySignature(entity, host, tr, path, depth, parent, parentLayer, includeInvisible));
                 }
             entities.Sort(StringComparer.Ordinal);
@@ -704,6 +746,7 @@ public static class DrawingAnalyzer
                     + TextStyleSignature(text.TextStyleId, host, tr));
                 break;
             case Hatch hatch:
+                parts.Add(HatchSample.From(hatch).DefinitionSignature(1));
                 parts.Add($"H:{hatch.PatternType}:{hatch.PatternName}:{NumberSignature(hatch.PatternScale)}:"
                     + $"{NumberSignature(hatch.PatternAngle)}:{NumberSignature(hatch.PatternSpace)}:{hatch.PatternDouble}:"
                     + $"{hatch.NumberOfLoops}:{PointSignature(hatch.Normal)}:{NumberSignature(hatch.Elevation)}");
@@ -720,6 +763,8 @@ public static class DrawingAnalyzer
                 }
                 break;
             case BlockReference nested:
+                var attributes = AttributeIdentity(nested, tr, style, layerStyle, includeInvisible);
+                if (attributes.Length > 0) parts.Add(attributes);
                 parts.Add($"B:{PointSignature(nested.Position)}:"
                     + $"{SymbolTransform.From(nested.BlockTransform).Signature}:"
                     + BlockContentSignature(nested.BlockTableRecord, host, tr, path, depth + 1, style, layerStyle, includeInvisible));

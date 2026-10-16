@@ -4,6 +4,12 @@ namespace NlcsLegenda.Plugin;
 
 public sealed record SymbolSample(string BlockName, string DefinitionIdentity, SymbolTransform Transform)
 {
+    public Autodesk.AutoCAD.DatabaseServices.ObjectId ReferenceId { get; init; }
+
+    public string SourceXref { get; init; } = string.Empty;
+
+    public string AttributeIdentity { get; init; } = string.Empty;
+
     public LayerDisplayStyle? InsertionStyle { get; init; }
 
     public LayerDisplayStyle? InsertionLayerStyle { get; init; }
@@ -17,7 +23,7 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
         ? Transform.Divide(SourceScale.Value / TargetScale) : Transform;
 
     public string RenderIdentity =>
-        $"S:{DefinitionIdentity}:{RenderTransform.Signature}";
+        $"S:{DefinitionIdentity}:{RenderTransform.Signature}" + (AttributeIdentity.Length == 0 ? string.Empty : ":" + AttributeIdentity);
 }
 
 public readonly record struct SymbolTransform(Vector3d XAxis, Vector3d YAxis, Vector3d ZAxis)

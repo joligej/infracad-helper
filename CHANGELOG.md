@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.31.5 - 2026-10-16
+
+- Arceringen behouden de ingesloten patroondefinitie uit de tekening, ook via xrefs en als een gelijknamig PAT-bestand afwijkt.
+- Arceervakken hebben een gesloten rand; volle vullingen worden niet meer als een driehoek getekend.
+- Symbolen behouden ingevulde blokattributen. Verschillende waarden krijgen afzonderlijke legendaregels.
+- Anonieme symboolblokken uit xrefs worden via hun bronverwijzing opgehaald.
+- Vullingen blijven achter de symbooltekst. Niet-plotbare hulplijnen in bronblokken komen niet meer als gewone lijnen in de legenda terecht.
+- Vijf waarschuwingen over het vrijgeven van CAD-objecten verholpen, ook bij fouten vóór registratie in de transactie.
+
 ## 1.31.4 - 2026-10-15
 
 - Legenda’s volgen hun eigen kleur, lijndikte, lijntype en transparantie, ook als de actieve tekeninstellingen afwijken.

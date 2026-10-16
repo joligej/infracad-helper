@@ -26,6 +26,20 @@ public readonly record struct TransparencyValue(TransparencyMethod Method, byte 
 
 public sealed class HatchSample
 {
+    private sealed record PatternLine(double Angle, double X, double Y, double OffsetX, double OffsetY, double[] Dashes);
+
+    private PatternLine[] _definition = Array.Empty<PatternLine>();
+
+    internal string DefinitionSignature(double factor) => string.Join(";", _definition.Select(line =>
+        string.Join(",", new[] { line.Angle, line.X * factor, line.Y * factor, line.OffsetX * factor, line.OffsetY * factor }
+            .Concat(line.Dashes.Select(d => d * factor)).Select(v => Math.Round(v, 9).ToString("R", System.Globalization.CultureInfo.InvariantCulture)))));
+
+    internal string SourceXref { get; set; } = string.Empty;
+
+    internal ObjectId SourceId { get; private set; }
+
+    internal Matrix3d SourceTransform { get; private set; } = Matrix3d.Identity;
+
     public string PatternName { get; set; } = "SOLID";
 
     public HatchPatternType PatternType { get; set; } = HatchPatternType.PreDefined;
@@ -72,13 +86,16 @@ public sealed class HatchSample
         else if (!hatch.IsSolidFill)
             throw new InvalidOperationException($"Arcering '{hatch.PatternName}' is ongelijk geschaald in het bronvlak; één patroonhoek en schaal kunnen dit niet weergeven.");
         using var copy = (Hatch)hatch.GetTransformedCopy(transform);
-        return From(copy);
+        var sample = From(copy);
+        sample.SourceId = hatch.ObjectId;
+        sample.SourceTransform = transform;
+        return sample;
     }
 
     public static HatchSample From(Hatch hatch)
     {
         var patternName = hatch.PatternName.Trim();
-        var isSolid = string.Equals(patternName, "SOLID", StringComparison.OrdinalIgnoreCase);
+        var isSolid = hatch.IsSolidFill;
         var scale = hatch.PatternScale;
         var angle = hatch.PatternAngle;
         if (!isSolid && (!double.IsFinite(scale) || scale <= 0))
@@ -94,9 +111,20 @@ public sealed class HatchSample
                 angle += fullTurn;
         }
 
+        var definitions = new List<PatternLine>();
+        double baseX = 0, baseY = 0;
+        for (int i = 0; i < hatch.NumberOfPatternDefinitions; i++)
+        {
+            var line = hatch.GetPatternDefinitionAt(i);
+            if (i == 0) { baseX = line.BaseX; baseY = line.BaseY; }
+            definitions.Add(new PatternLine(line.Angle, line.BaseX - baseX, line.BaseY - baseY,
+                line.OffsetX, line.OffsetY, line.GetDashes().Cast<double>().ToArray()));
+        }
         return new HatchSample
         {
-            PatternName = patternName,
+            _definition = definitions.ToArray(),
+            SourceId = hatch.ObjectId,
+            PatternName = isSolid ? "SOLID" : patternName,
             PatternType = isSolid ? HatchPatternType.PreDefined : hatch.PatternType,
             PatternScale = isSolid ? 1.0 : scale,
             PatternAngle = isSolid ? 0.0 : angle,
