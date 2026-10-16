@@ -61,7 +61,7 @@ public sealed class ExampleLibrary : IDisposable
         if (nod.Contains(key)) ((Xrecord)tr.GetObject(nod.GetAt(key), OpenMode.ForWrite)).Data = data;
         else
         {
-            var record = new Xrecord { Data = data };
+            using var record = new Xrecord { Data = data };
             nod.SetAt(key, record); tr.AddNewlyCreatedDBObject(record, true);
         }
     }

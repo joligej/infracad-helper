@@ -21,30 +21,30 @@ public partial class Commands
             ObjectId Layer(string name)
             {
                 var layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
-                var layer = new LayerTableRecord { Name = name }; var id = layers.Add(layer); tr.AddNewlyCreatedDBObject(layer, true); return id;
+                using var layer = new LayerTableRecord { Name = name }; var id = layers.Add(layer); tr.AddNewlyCreatedDBObject(layer, true); return id;
             }
             ObjectId Add(Entity entity, string layer)
             {
                 entity.SetDatabaseDefaults(db); entity.LayerId = Layer(layer);
                 var id = model.AppendEntity(entity); tr.AddNewlyCreatedDBObject(entity, true); return id;
             }
-            var wide = new Polyline(); wide.AddVertexAt(0, new Point2d(0, 0), 0, 0, 0); wide.AddVertexAt(1, new Point2d(10, 0), 0, 0, 0); wide.ConstantWidth = .3;
+            using var wide = new Polyline(); wide.AddVertexAt(0, new Point2d(0, 0), 0, 0, 0); wide.AddVertexAt(1, new Point2d(10, 0), 0, 0, 0); wide.ConstantWidth = .3;
             var wideId = Add(wide, "N-WE-MA-TEST_MARKERING-G");
-            var outline = new Polyline(); outline.AddVertexAt(0, new Point2d(0, 2), 0, 0, 0); outline.AddVertexAt(1, new Point2d(4, 2), 0, 0, 0); outline.AddVertexAt(2, new Point2d(4, 3), 0, 0, 0); outline.AddVertexAt(3, new Point2d(0, 3), 0, 0, 0); outline.Closed = true;
+            using var outline = new Polyline(); outline.AddVertexAt(0, new Point2d(0, 2), 0, 0, 0); outline.AddVertexAt(1, new Point2d(4, 2), 0, 0, 0); outline.AddVertexAt(2, new Point2d(4, 3), 0, 0, 0); outline.AddVertexAt(3, new Point2d(0, 3), 0, 0, 0); outline.Closed = true;
             var outlineId = Add(outline, "N-WE-GR-TEST_BOMENGROEP-S");
             var circleId = Add(new Circle(new Point3d(10, 4, 0), Vector3d.ZAxis, .5), "B-WE-RI-TEST_PUT-G");
-            var edge = new Polyline(); edge.AddVertexAt(0, new Point2d(0, 5), 0, 0, 0); edge.AddVertexAt(1, new Point2d(4, 5), 0, 0, 0); edge.AddVertexAt(2, new Point2d(4, 6), 0, 0, 0); edge.AddVertexAt(3, new Point2d(0, 6), 0, 0, 0); edge.Closed = true;
+            using var edge = new Polyline(); edge.AddVertexAt(0, new Point2d(0, 5), 0, 0, 0); edge.AddVertexAt(1, new Point2d(4, 5), 0, 0, 0); edge.AddVertexAt(2, new Point2d(4, 6), 0, 0, 0); edge.AddVertexAt(3, new Point2d(0, 6), 0, 0, 0); edge.Closed = true;
             var edgeId = Add(edge, "N-WE-VH-TEST_HATCH-GV");
-            var hatch = new Hatch(); var hatchId = Add(hatch, "N-WE-VH-TEST_HATCH-A"); hatch.ColorIndex = 0; ((LayerTableRecord)tr.GetObject(hatch.LayerId, OpenMode.ForWrite)).Color = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, 254);
+            using var hatch = new Hatch(); var hatchId = Add(hatch, "N-WE-VH-TEST_HATCH-A"); hatch.ColorIndex = 0; ((LayerTableRecord)tr.GetObject(hatch.LayerId, OpenMode.ForWrite)).Color = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByAci, 254);
             hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31"); hatch.BackgroundColor = Autodesk.AutoCAD.Colors.Color.FromColorIndex(Autodesk.AutoCAD.Colors.ColorMethod.ByLayer, 256); hatch.Associative = true;
             using (var boundaries = new ObjectIdCollection { edgeId }) hatch.AppendLoop(HatchLoopTypes.External, boundaries);
             hatch.EvaluateHatch(true);
             var blocks = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
-            var planar = new BlockTableRecord { Name = "TEMPLATE_PLANAR" }; blocks.Add(planar); tr.AddNewlyCreatedDBObject(planar, true);
-            var rim = new Polyline(); rim.AddVertexAt(0, new Point2d(-.1, -.1), 0, 0, 0); rim.AddVertexAt(1, new Point2d(.1, -.1), 0, 0, 0); rim.AddVertexAt(2, new Point2d(.1, .1), 0, 0, 0); rim.Closed = true; rim.ConstantWidth = .02;
+            using var planar = new BlockTableRecord { Name = "TEMPLATE_PLANAR" }; blocks.Add(planar); tr.AddNewlyCreatedDBObject(planar, true);
+            using var rim = new Polyline(); rim.AddVertexAt(0, new Point2d(-.1, -.1), 0, 0, 0); rim.AddVertexAt(1, new Point2d(.1, -.1), 0, 0, 0); rim.AddVertexAt(2, new Point2d(.1, .1), 0, 0, 0); rim.Closed = true; rim.ConstantWidth = .02;
             planar.AppendEntity(rim); tr.AddNewlyCreatedDBObject(rim, true);
-            var round = new Circle(Point3d.Origin, Vector3d.ZAxis, .15); planar.AppendEntity(round); tr.AddNewlyCreatedDBObject(round, true);
-            var planarReference = new BlockReference(Point3d.Origin, planar.ObjectId) { ScaleFactors = new Scale3d(6, 6, 1) };
+            using var round = new Circle(Point3d.Origin, Vector3d.ZAxis, .15); planar.AppendEntity(round); tr.AddNewlyCreatedDBObject(round, true);
+            using var planarReference = new BlockReference(Point3d.Origin, planar.ObjectId) { ScaleFactors = new Scale3d(6, 6, 1) };
             var planarId = Add(planarReference, "V-WE-IE-TEST_PAAL-S");
             var settings = new LegendSettings { Scale = 200, IncludeTitle = false, IncludeText = false, IncludeGroupHeaders = false, IncludeFooter = false, IncludeRemarks = false, DrawSwatchFrame = false };
             var analysis = DrawingAnalyzer.Analyze(db, tr, settings, new[] { wideId, outlineId, circleId, hatchId, planarId });
@@ -56,7 +56,7 @@ public partial class Commands
             if (!entities.OfType<Hatch>().Any(h => !h.Associative && h.PatternName == "ANSI31" && h.ColorIndex == 7 && h.BackgroundColor.ColorIndex == 254)) throw new InvalidOperationException("Associatieve arcering kon niet worden losgekoppeld.");
             if (!entities.OfType<Circle>().Any(c => Math.Abs(c.Radius - .9) < 1e-9)
                 || !entities.OfType<Polyline>().Any(p => Math.Abs(p.ConstantWidth - .12) < 1e-9)) throw new InvalidOperationException("Afwijkende z-schaal verandert vlakke symboolgeometrie.");
-            if (planarReference.ScaleFactors.Z != 1 || Math.Abs(rim.ConstantWidth - .02) > 1e-9) throw new InvalidOperationException("Bronsymbool gewijzigd.");
+            if (Math.Abs(planarReference.ScaleFactors.Z - 1) > 1e-9 || Math.Abs(rim.ConstantWidth - .02) > 1e-9) throw new InvalidOperationException("Bronsymbool gewijzigd.");
             if (!hatch.BackgroundColor.IsByLayer || !hatch.Associative || hatch.GetAssociatedObjectIds().Count != 1 || outline.NumberOfVertices != 4) throw new InvalidOperationException("Brongeometrie gewijzigd.");
             tr.Abort();
             doc.Editor.WriteMessage("\nTEMPLATEREGRESSION lijnbreedte, losse symboolcurve, cirkel en associatieve arcering; bron behouden -> OK");
@@ -75,17 +75,17 @@ public partial class Commands
             {
                 using var tr = source.TransactionManager.StartTransaction();
                 var bt = (BlockTable)tr.GetObject(source.BlockTableId, OpenMode.ForWrite);
-                var block = new BlockTableRecord { Name = "NLCS_VOORBEELD_TEST" }; bt.Add(block); tr.AddNewlyCreatedDBObject(block, true);
+                using var block = new BlockTableRecord { Name = "NLCS_VOORBEELD_TEST" }; bt.Add(block); tr.AddNewlyCreatedDBObject(block, true);
                 foreach (double y in new[] { -.2, .2 })
                 {
-                    var line = new Polyline(); line.SetDatabaseDefaults(source); line.AddVertexAt(0, new Point2d(-2.4, y), 0, 0, 0); line.AddVertexAt(1, new Point2d(2.4, y), 0, 0, 0); line.ColorIndex = 1;
+                    using var line = new Polyline(); line.SetDatabaseDefaults(source); line.AddVertexAt(0, new Point2d(-2.4, y), 0, 0, 0); line.AddVertexAt(1, new Point2d(2.4, y), 0, 0, 0); line.ColorIndex = 1;
                     block.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                 }
-                var text = new MText { Contents = "A1", TextHeight = .15, Location = Point3d.Origin, ColorIndex = 1 };
+                using var text = new MText { Contents = "A1", TextHeight = .15, Location = Point3d.Origin, ColorIndex = 1 };
                 block.AppendEntity(text); tr.AddNewlyCreatedDBObject(text, true);
-                var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, .15) { ColorIndex = 1 };
+                using var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, .15) { ColorIndex = 1 };
                 block.AppendEntity(circle); tr.AddNewlyCreatedDBObject(circle, true);
-                var mask = new Hatch { Color = Autodesk.AutoCAD.Colors.Color.FromRgb(255, 255, 255) };
+                using var mask = new Hatch { Color = Autodesk.AutoCAD.Colors.Color.FromRgb(255, 255, 255) };
                 block.AppendEntity(mask); tr.AddNewlyCreatedDBObject(mask, true); mask.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
                 using (var boundary = new ObjectIdCollection { circle.ObjectId }) mask.AppendLoop(HatchLoopTypes.External, boundary);
                 mask.EvaluateHatch(true);

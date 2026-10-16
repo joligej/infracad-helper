@@ -73,7 +73,7 @@ public static class LegendBuilder
                 }
                 if (chosen && example is null) throw new InvalidOperationException($"Het gekozen voorbeeld voor '{entry.Description}' ontbreekt.");
                 if (example is null) continue;
-                var reference = new BlockReference(Point3d.Origin, bt[example.BlockName])
+                using var reference = new BlockReference(Point3d.Origin, bt[example.BlockName])
                 { ScaleFactors = new Scale3d(s.Scale / example.Scale), Layer = "0" };
                 AppendEntity(btr, reference); tr.AddNewlyCreatedDBObject(reference, true);
                 double factor = s.Scale / example.Scale;
