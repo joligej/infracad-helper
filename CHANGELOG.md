@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.31.6 - 2026-10-16
+
+- Scheidingsbanden 100/300, 115/345 en 220/440 krijgen de vier lijnen uit de TAUW-template, met de gemeten onderlinge afstanden, kantlijnen en oorspronkelijke binnenlijntypen.
+- De samengestelde voorbeelden schalen mee met de legenda en werken ook vanuit xrefs. Eigen handmatige voorbeelden blijven behouden.
+
 ## 1.31.5 - 2026-10-16
 
 - Arceringen behouden de ingesloten patroondefinitie uit de tekening, ook via xrefs en als een gelijknamig PAT-bestand afwijkt.
