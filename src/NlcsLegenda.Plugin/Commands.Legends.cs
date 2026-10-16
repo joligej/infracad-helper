@@ -51,7 +51,7 @@ public partial class Commands
         if (issues.Count > 0)
             throw new InvalidOperationException($"Legenda niet gewijzigd: {issues[0].Reason}");
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-        var br = new BlockReference(hadGeometry ? topLeft : ComputeInsertPoint(db, def.Settings), btrId);
+        using var br = new BlockReference(hadGeometry ? topLeft : ComputeInsertPoint(db, def.Settings), btrId);
         LegendBuilder.SetLegendDefaults(br, db);
         LegendBuilder.AppendEntity(ms, br);
         tr.AddNewlyCreatedDBObject(br, true);

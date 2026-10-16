@@ -30,6 +30,7 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ appearance=@('NLCSLEGENDAAPPEARANCETEST','APPEARANCE ingesloten patronen, gesloten vulling, A01/A02 en tekenvolgorde lokaal/xref -> OK','NLCSLEGENDAAPPEARANCEVERIFY','APPEARANCE na heropenen -> OK')
  sources=@('NLCSLEGENDASOURCETEST','SOURCETEST gedeelde symbolen, xref-overrides en gewone omschrijvingen -> OK','NLCSLEGENDASOURCEVERIFY','SOURCETEST na heropenen -> OK')
  xrefchoices=@('NLCSLEGENDAXREFCHOICETEST','XREFCHOICE xref-inserts, opgeslagen keuzes en geneste KLIC-bronnen -> OK','NLCSLEGENDAXREFCHOICEVERIFY','XREFCHOICE na heropenen: bronkeuzes en KLIC-hoeveelheden -> OK')
  klic=@('NLCSLEGENDAKLICTEST','KLIC lokale en geneste xrefs: 4 netbeheerders, onbekend, 30m, samenvoegen en uitsluiten -> OK','NLCSLEGENDAKLICVERIFY','KLIC na heropenen: netbeheerders en 30m behouden -> OK')
@@ -100,7 +101,7 @@ foreach($case in $Cases){
   if($command.StartsWith('NLCS') -and !$sourceText.Contains('[CommandMethod("'+$command+'"')){throw "Onbekend testcommando: $command"}
  }
 }
-if('templatefile' -in $Cases){
+if('templatefile' -in $Cases -or 'appearance' -in $Cases){
  if(!$ReferenceTemplatePath -or !(Test-Path -LiteralPath $ReferenceTemplatePath -PathType Leaf)){throw 'templatefile vereist -ReferenceTemplatePath met de originele DWT.'}
  $ReferenceTemplatePath=(Resolve-Path -LiteralPath $ReferenceTemplatePath).Path
 }
@@ -153,7 +154,7 @@ foreach($case in $Cases){
  if($case -eq 'livetarget'){$expected+="1 legenda('s) in deze tekening:"}
  if($case -eq 'liveempty'){$expected+='Geen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.'}
  Run-Case $case $drawing $specs[$case][0] $expected
- if($case -in @('sources','xrefchoices','klic','customization','overview','abclocal','abcxref','oldreopen')){
+ if($case -in @('appearance','sources','xrefchoices','klic','customization','overview','abclocal','abcxref','oldreopen')){
   $expected=@($specs[$case][3])
   Run-Case "$case-verify" $drawing $specs[$case][2] $expected
  }
@@ -164,7 +165,7 @@ foreach($case in $Cases){
   Copy-Item -LiteralPath (Join-Path $dir 'reload_replacement.dwg') -Destination (Join-Path $dir 'reload_source.dwg') -Force
   Run-Case 'reload-verify' $drawing 'NLCSLEGENDAXREFRELOADVERIFY' @('XREFRELOAD totaal: OK')
  }
- if(!$SkipReopen -and $case -in @('realsize','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','hatch','oldupdate','mtext')){
+ if(!$SkipReopen -and $case -in @('appearance','realsize','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','hatch','oldupdate','mtext')){
   $commands='NLCSLEGENDASTABILITYTEST'
   $expected=@('STABILITY updates=10','STABILITY updates=50','STABILITY orphan blocks=0 -> OK')
   if($case -eq 'placement'){

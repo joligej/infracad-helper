@@ -138,7 +138,7 @@ public static class LegendBuilder
                 case LegendItemKind.Entry:
                     try
                     {
-                        DrawEntry(btr, tr, db, item, analysis, s,
+                        DrawEntry(btr, tr, db, imports, item, analysis, s,
                             swatchW, swatchH, textGap, textH, colWidth, styleId, sampleColumnWidth,
                             symbols.GetValueOrDefault(item.Entry!));
                         rowCount++;
@@ -283,7 +283,7 @@ public static class LegendBuilder
                 heading.GeometricExtents.MinPoint.Y - textH * 0.3);
         }
 
-        var mt = new MText();
+        using var mt = new MText();
         SetLegendDefaults(mt, btr.Database);
         mt.Layer = s.TextLayer;
         if (!styleId.IsNull)
@@ -302,7 +302,7 @@ public static class LegendBuilder
     }
 
     private static void DrawEntry(
-        BlockTableRecord btr, Transaction tr, Database db, LegendPlacement item, AnalysisResult analysis,
+        BlockTableRecord btr, Transaction tr, Database db, SymbolImportSession imports, LegendPlacement item, AnalysisResult analysis,
         LegendSettings s, double swatchW, double swatchH, double textGap, double textH,
         double colWidth, ObjectId styleId, double sampleColumnWidth, PreparedSymbol? prepared)
     {
@@ -352,13 +352,13 @@ public static class LegendBuilder
                 Transparency = new TransparencyValue(TransparencyMethod.ByLayer, 255),
                 IsSolid = pattern.Equals("SOLID", StringComparison.OrdinalIgnoreCase)
             } : analysis.HatchSamples.GetValueOrDefault(hatchLayer);
-            rowEntities.Add(AddHatch(btr, tr, x, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample,
+            rowEntities.Add(AddHatch(btr, tr, imports, x, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample,
                 s.HatchScaleFactor * (sample?.ScaleForLegend(s.Scale) ?? 1)));
         }
 
         if (entry.GeometryLayer is { } geoLayer)
         {
-            var line = new Polyline();
+            using var line = new Polyline();
             SetLegendDefaults(line, db);
             line.AddVertexAt(0, new Point2d(x, midY), 0, 0, 0);
             line.AddVertexAt(1, new Point2d(x + swatchW, midY), 0, 0, 0);
@@ -465,10 +465,10 @@ public static class LegendBuilder
                 failureReason = $"Symboolblok '{blockName}' ontbreekt in de hostdatabase.";
                 return false;
             }
-            var defId = imports.Import(bt[blockName]);
+            var defId = imports.Import(bt[blockName], sample?.SourceXref);
 
             // annotatieve vergroting voorkomen door het symbool te ontleden
-            primitives = ExplodeToPrimitives(btr, tr, db, layer, defId, created, includeInvisible, sample, out var probeOk);
+            primitives = ExplodeToPrimitives(btr, tr, db, imports, layer, defId, created, includeInvisible, sample, out var probeOk);
             if (!probeOk || primitives.Count == 0)
             {
                 foreach (var id in created.Concat(primitives).Distinct())
@@ -547,6 +547,12 @@ public static class LegendBuilder
                 e.TransformBy(m);
                 e.Layer = layer;
             }
+            var texts = primitives.Where(id => tr.GetObject(id, OpenMode.ForRead) is MText).ToArray();
+            if (texts.Length > 0)
+            {
+                using var textIds = new ObjectIdCollection(texts);
+                ((DrawOrderTable)tr.GetObject(btr.DrawOrderTableId, OpenMode.ForWrite)).MoveToTop(textIds);
+            }
             placed = primitives;
             return true;
         }
@@ -601,29 +607,77 @@ public static class LegendBuilder
     private sealed class SymbolImportSession(Database host, Transaction tr) : IDisposable
     {
         private readonly Dictionary<(Database, string), SymbolSnapshot> _sources = new();
-        private readonly Dictionary<ObjectId, ObjectId> _definitions = new();
+        private readonly Dictionary<(ObjectId, string), ObjectId> _definitions = new();
         private readonly List<ObjectId> _importedBlocks = new();
 
-        public ObjectId Import(ObjectId definitionId)
+        public Hatch CopyHatch(HatchSample sample, ObjectId owner)
+        {
+            var original = sample.SourceId.OriginalDatabase;
+            if (original == host) return (Hatch)((Hatch)tr.GetObject(sample.SourceId, OpenMode.ForRead)).Clone();
+            string prefix = string.IsNullOrEmpty(sample.SourceXref) ? string.Empty : sample.SourceXref + "|";
+            var key = (original, prefix);
+            if (!_sources.TryGetValue(key, out var snapshot))
+                _sources.Add(key, snapshot = new SymbolSnapshot(original, prefix));
+            ObjectId copyId;
+            using (var sourceTr = snapshot.Database.TransactionManager.StartTransaction())
+            {
+                var sourceId = snapshot.Database.GetObjectId(false, sample.SourceId.NonForwardedHandle, 0);
+                using var copy = (Hatch)((Hatch)sourceTr.GetObject(sourceId, OpenMode.ForRead)).Clone();
+                copy.RemoveAssociatedObjectIds(); copy.Associative = false; copy.XData = null;
+                var model = (BlockTableRecord)sourceTr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(snapshot.Database), OpenMode.ForWrite);
+                copyId = model.AppendEntity(copy); sourceTr.AddNewlyCreatedDBObject(copy, true);
+                sourceTr.Commit();
+            }
+            using var ids = new ObjectIdCollection { copyId };
+            using var mapping = new IdMapping();
+            snapshot.Database.WblockCloneObjects(ids, owner, mapping, DuplicateRecordCloning.Ignore, false);
+            return (Hatch)tr.GetObject(mapping[copyId].Value, OpenMode.ForWrite);
+        }
+
+        public BlockReference ImportReference(ObjectId sourceId, ObjectId owner, string sourceXref)
+        {
+            using var ids = new ObjectIdCollection { sourceId };
+            using var mapping = new IdMapping();
+            if (sourceId.OriginalDatabase == host)
+                host.DeepCloneObjects(ids, owner, mapping, false);
+            else
+            {
+                var source = (BlockReference)tr.GetObject(sourceId, OpenMode.ForRead);
+                Import(source.BlockTableRecord, sourceXref);
+                string prefix = string.IsNullOrEmpty(sourceXref) ? string.Empty : sourceXref + "|";
+                var snapshot = _sources[(sourceId.OriginalDatabase, prefix)];
+                var localId = snapshot.Database.GetObjectId(false, sourceId.NonForwardedHandle, 0);
+                ids.Clear(); ids.Add(localId);
+                snapshot.Database.WblockCloneObjects(ids, owner, mapping, DuplicateRecordCloning.Ignore, false);
+                sourceId = localId;
+            }
+            TrackBlocks(mapping);
+            var copy = (BlockReference)tr.GetObject(mapping[sourceId].Value, OpenMode.ForWrite);
+            var inverse = copy.BlockTransform.Inverse();
+            foreach (ObjectId id in copy.AttributeCollection)
+                ((AttributeReference)tr.GetObject(id, OpenMode.ForWrite)).TransformBy(inverse);
+            copy.BlockTransform = Matrix3d.Identity;
+            return copy;
+        }
+
+        public ObjectId Import(ObjectId definitionId, string? sourceXref = null)
         {
             var original = definitionId.OriginalDatabase;
             if (original == host) return definitionId;
-            if (_definitions.TryGetValue(definitionId, out var cached)) return cached;
             var definition = (BlockTableRecord)tr.GetObject(definitionId, OpenMode.ForRead);
             int separator = definition.Name.LastIndexOf('|');
-            string xrefPrefix = separator >= 0 ? definition.Name[..(separator + 1)] : string.Empty;
+            string xrefPrefix = sourceXref is null ? (separator >= 0 ? definition.Name[..(separator + 1)] : string.Empty)
+                : string.IsNullOrEmpty(sourceXref) ? string.Empty : sourceXref + "|";
+            if (_definitions.TryGetValue((definitionId, xrefPrefix), out var cached)) return cached;
             var key = (original, xrefPrefix);
             if (!_sources.TryGetValue(key, out var snapshot))
                 _sources.Add(key, snapshot = new SymbolSnapshot(original, xrefPrefix));
-            string localName = LayerNaming.LocalName(definition.Name);
-            if (!snapshot.Definitions.TryGetValue(localName, out var sourceId))
-                throw new InvalidOperationException($"Symbooldefinitie '{localName}' ontbreekt in de bron.");
+            // anonieme xref-blokken krijgen in de host een andere naam
+            var sourceId = snapshot.Database.GetObjectId(false, definitionId.NonForwardedHandle, 0);
             using var ids = new ObjectIdCollection { sourceId };
             using var mapping = new IdMapping();
             snapshot.Database.WblockCloneObjects(ids, host.BlockTableId, mapping, DuplicateRecordCloning.Ignore, false);
-            foreach (IdPair pair in mapping)
-                if (pair.IsCloned && pair.Value.ObjectClass.IsDerivedFrom(Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(BlockTableRecord))))
-                    _importedBlocks.Add(pair.Value);
+            TrackBlocks(mapping);
             var hostLayers = (LayerTable)tr.GetObject(host.LayerTableId, OpenMode.ForRead);
             foreach (IdPair pair in mapping)
                 if (snapshot.OriginalLayers.TryGetValue(pair.Key, out var layerName) && layerName != "0" && hostLayers.Has(xrefPrefix + layerName))
@@ -631,7 +685,7 @@ public static class LegendBuilder
                     var from = (LayerTableRecord)tr.GetObject(hostLayers[xrefPrefix + layerName], OpenMode.ForRead);
                     var to = (LayerTableRecord)tr.GetObject(pair.Value, OpenMode.ForWrite);
                     to.Color = from.Color; to.LineWeight = from.LineWeight; to.Transparency = from.Transparency;
-                    to.IsOff = from.IsOff; to.IsFrozen = from.IsFrozen;
+                    to.IsOff = from.IsOff; to.IsFrozen = from.IsFrozen; to.IsPlottable = from.IsPlottable;
                     var lt = (LinetypeTableRecord)tr.GetObject(from.LinetypeObjectId, OpenMode.ForRead);
                     to.LinetypeObjectId = ResolveStyleLinetype(tr, host, new LayerDisplayStyle
                     {
@@ -644,10 +698,16 @@ public static class LegendBuilder
             if (mapped.Value.IsNull || mapped.Value.Database != host)
                 throw new InvalidOperationException("Het symbool is niet naar de hostdatabase gekopieerd.");
 
-            _definitions.Add(definitionId, mapped.Value);
+            _definitions.Add((definitionId, xrefPrefix), mapped.Value);
             return mapped.Value;
         }
 
+        private void TrackBlocks(IdMapping mapping)
+        {
+            foreach (IdPair pair in mapping)
+                if (pair.IsCloned && pair.Value.ObjectClass.IsDerivedFrom(Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(BlockTableRecord)))
+                    && !_importedBlocks.Contains(pair.Value)) _importedBlocks.Add(pair.Value);
+        }
         public void Dispose()
         {
             try
@@ -669,7 +729,6 @@ public static class LegendBuilder
     private sealed class SymbolSnapshot : IDisposable
     {
         public Database Database { get; }
-        public Dictionary<string, ObjectId> Definitions { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<ObjectId, string> OriginalLayers { get; }
 
         public SymbolSnapshot(Database loaded, string xrefPrefix)
@@ -678,9 +737,6 @@ public static class LegendBuilder
             try
             {
                 using var transaction = Database.TransactionManager.StartTransaction();
-                var blocks = (BlockTable)transaction.GetObject(Database.BlockTableId, OpenMode.ForRead);
-                foreach (ObjectId id in blocks)
-                    Definitions.Add(((BlockTableRecord)transaction.GetObject(id, OpenMode.ForRead)).Name, id);
                 // aparte bronruimte voor koppelingen met verschillende laaginstellingen
                 string identity = Database.FingerprintGuid + Database.VersionGuid + xrefPrefix;
                 string prefix = "NLCS_SRC_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
@@ -722,17 +778,22 @@ public static class LegendBuilder
     }
 
     private static List<ObjectId> ExplodeToPrimitives(
-        BlockTableRecord btr, Transaction tr, Database db, string layer, ObjectId defId,
+        BlockTableRecord btr, Transaction tr, Database db, SymbolImportSession imports, string layer, ObjectId defId,
         List<ObjectId> created, bool includeInvisible, SymbolSample? sample, out bool ok)
     {
         var result = new List<ObjectId>();
         ok = false;
-        using var probe = new BlockReference(Point3d.Origin, defId);
+        using var probe = sample is not null && !sample.ReferenceId.IsNull
+            ? imports.ImportReference(sample.ReferenceId, btr.ObjectId, sample.SourceXref)
+            : new BlockReference(Point3d.Origin, defId);
         SetLegendDefaults(probe, db);
         probe.Layer = layer;
-        AppendEntity(btr, probe);
+        if (probe.ObjectId.IsNull)
+        {
+            AppendEntity(btr, probe);
+            tr.AddNewlyCreatedDBObject(probe, true);
+        }
         created.Add(probe.ObjectId);
-        tr.AddNewlyCreatedDBObject(probe, true);
         var insertionLayer = sample?.InsertionLayerStyle ?? DrawingAnalyzer.EntityLayerStyle(probe, tr);
         if (sample?.InsertionStyle is { } insertionStyle) ApplyEntityStyle(probe, insertionStyle, tr, db);
         var queue = new Queue<(ObjectId Id, LayerDisplayStyle Layer)>();
@@ -748,17 +809,45 @@ public static class LegendBuilder
             try
             {
                 reference.Explode(pieces);
-                foreach (DBObject obj in pieces)
+                var parentStyle = DrawingAnalyzer.EntityStyle(reference, tr, null, inheritedLayer);
+                foreach (ObjectId attributeId in reference.AttributeCollection)
+                {
+                    var attribute = (AttributeReference)tr.GetObject(attributeId, OpenMode.ForWrite);
+                    if (string.IsNullOrWhiteSpace(attribute.TextString) || !includeInvisible && (attribute.Invisible || !attribute.Visible)) continue;
+                    var attributeLayer = DrawingAnalyzer.EntityLayerStyle(attribute, tr, inheritedLayer);
+                    var attributeStyle = DrawingAnalyzer.EntityStyle(attribute, tr, parentStyle, attributeLayer);
+                    if (!((LayerTableRecord)tr.GetObject(attribute.LayerId, OpenMode.ForRead)).IsPlottable) continue;
+                    using var multiline = attribute.IsMTextAttribute ? attribute.MTextAttribute : null;
+                    var text = multiline ?? SymbolTextToMText(btr, tr, attribute);
+                    if (multiline is not null)
+                    {
+                        AppendEntity(btr, text); tr.AddNewlyCreatedDBObject(text, true);
+                        attribute.Erase();
+                    }
+                    ApplyEntityStyle(text, attributeStyle, tr, db);
+                    created.Add(text.ObjectId);
+                    result.Add(text.ObjectId);
+                }
+                var definition = (BlockTableRecord)tr.GetObject(reference.BlockTableRecord, OpenMode.ForRead);
+                var sourceIds = definition.Cast<ObjectId>().ToArray();
+                var sourceOrder = ((DrawOrderTable)tr.GetObject(definition.DrawOrderTableId, OpenMode.ForRead)).GetFullDrawOrder(0).Cast<ObjectId>().ToArray();
+                var indexes = sourceIds.Select((sourceId, index) => (sourceId, index)).ToDictionary(pair => pair.sourceId, pair => pair.index);
+                var ordered = sourceIds.Length == pieces.Count && sourceOrder.Length == sourceIds.Length
+                    ? sourceOrder.Select(sourceId => pieces[indexes[sourceId]]) : pieces.Cast<DBObject>();
+                foreach (DBObject obj in ordered)
                 {
                     if (obj is not Entity piece) continue;
+                    if (piece is AttributeDefinition { Constant: false }
+                        && (reference.ObjectId != probe.ObjectId || sample is not null && !sample.ReferenceId.IsNull)) continue;
+                    if (piece is AttributeDefinition { Invisible: true } && !includeInvisible) continue;
                     if (piece.LinetypeId.Database != db || piece.LayerId.Database != db)
                         throw new InvalidOperationException("Een symboolafhankelijkheid hoort niet bij de hostdatabase.");
                     if (!includeInvisible && !piece.Visible) continue;
                     var pieceLayer = (LayerTableRecord)tr.GetObject(piece.LayerId, OpenMode.ForRead);
+                    if (!pieceLayer.IsPlottable) continue;
                     if (!includeInvisible && LayerNaming.LocalName(pieceLayer.Name) != "0" && (pieceLayer.IsOff || pieceLayer.IsFrozen)) continue;
                     piece.Visible = true;
                     var pieceLayerStyle = DrawingAnalyzer.EntityLayerStyle(piece, tr, inheritedLayer);
-                    var parentStyle = DrawingAnalyzer.EntityStyle(reference, tr, null, inheritedLayer);
                     var pieceStyle = DrawingAnalyzer.EntityStyle(piece, tr, parentStyle, pieceLayerStyle);
                     if (piece.Layer == "0") piece.LayerId = reference.LayerId;
                     ApplyEntityStyle(piece, pieceStyle, tr, db);
@@ -1010,6 +1099,8 @@ public static class LegendBuilder
             using (var loop = new ObjectIdCollection { boundaryId })
                 hatch.AppendLoop(HatchLoopTypes.External, loop);
             hatch.EvaluateHatch(true);
+            using var back = new ObjectIdCollection { hatch.ObjectId };
+            ((DrawOrderTable)tr.GetObject(btr.DrawOrderTableId, OpenMode.ForWrite)).MoveToBottom(back);
             return hatch.ObjectId;
         }
         catch
@@ -1023,17 +1114,35 @@ public static class LegendBuilder
     }
 
     private static ObjectId AddHatch(
-        BlockTableRecord btr, Transaction tr, double x, double yBottom, double w, double h,
+        BlockTableRecord btr, Transaction tr, SymbolImportSession imports, double x, double yBottom, double w, double h,
         string layer, HatchSample? sample, double scaleFactor)
     {
-        var hatch = new Hatch();
+        using var hatch = sample is { IsSolid: false } && !sample.SourceId.IsNull
+            ? imports.CopyHatch(sample, btr.ObjectId)
+            : new Hatch();
         try
         {
-            SetLegendDefaults(hatch, btr.Database);
-            hatch.Layer = layer;
+            bool embedded = sample is { IsSolid: false } && !sample.SourceId.IsNull;
             var patternName = sample?.PatternName ?? "SOLID";
             var patternType = sample?.PatternType ?? HatchPatternType.PreDefined;
-            hatch.SetHatchPattern(patternType, patternName);
+            if (embedded)
+            {
+                // ingesloten patroon behouden, ook zonder hetzelfde pat-bestand
+                hatch.RemoveAssociatedObjectIds();
+                hatch.Associative = false;
+                hatch.TransformBy(sample!.SourceTransform);
+                var min = hatch.GeometricExtents.MinPoint;
+                hatch.TransformBy(Matrix3d.Displacement(Point3d.Origin - min));
+                hatch.TransformBy(Matrix3d.Scaling(scaleFactor, Point3d.Origin));
+                hatch.TransformBy(Matrix3d.Displacement(new Vector3d(x, yBottom, 0)));
+                while (hatch.NumberOfLoops > 0) hatch.RemoveLoopAt(hatch.NumberOfLoops - 1);
+                hatch.Normal = Vector3d.ZAxis; hatch.Elevation = 0;
+                hatch.XData = null;
+            }
+            SetLegendDefaults(hatch, btr.Database);
+            hatch.MaterialId = ((DBDictionary)tr.GetObject(btr.Database.MaterialDictionaryId, OpenMode.ForRead)).GetAt("ByLayer");
+            hatch.Layer = layer;
+            if (!embedded) hatch.SetHatchPattern(patternType, patternName);
             if (sample is not null)
             {
                 var patternScale = sample.IsSolid ? 1.0 : sample.PatternScale * scaleFactor;
@@ -1041,40 +1150,45 @@ public static class LegendBuilder
                     throw new InvalidOperationException($"Arcering '{patternName}' heeft een ongeldige render-schaal.");
                 if (!double.IsFinite(sample.PatternAngle))
                     throw new InvalidOperationException($"Arcering '{patternName}' heeft een ongeldige render-hoek.");
-                hatch.PatternScale = patternScale;
-                if (sample.PatternType == HatchPatternType.UserDefined)
+                if (!embedded)
                 {
-                    hatch.PatternSpace = sample.PatternSpace * scaleFactor;
-                    hatch.PatternDouble = sample.PatternDouble;
+                    hatch.PatternScale = patternScale;
+                    if (sample.PatternType == HatchPatternType.UserDefined)
+                    {
+                        hatch.PatternSpace = sample.PatternSpace * scaleFactor;
+                        hatch.PatternDouble = sample.PatternDouble;
+                    }
+                    hatch.PatternAngle = sample.IsSolid ? 0.0 : sample.PatternAngle;
                 }
-                hatch.PatternAngle = sample.IsSolid ? 0.0 : sample.PatternAngle;
-                if (sample.Color is not null)
-                    hatch.Color = sample.Color;
+                if (sample.Color is not null) hatch.Color = sample.Color;
                 hatch.Transparency = sample.Transparency.ToAutoCadValue();
             }
 
-            AppendEntity(btr, hatch);
-            tr.AddNewlyCreatedDBObject(hatch, true);
+            if (hatch.ObjectId.IsNull)
+            {
+                AppendEntity(btr, hatch);
+                tr.AddNewlyCreatedDBObject(hatch, true);
+            }
             hatch.Associative = false;
             var pts = new Point2dCollection
             {
                 new Point2d(x, yBottom),
                 new Point2d(x + w, yBottom),
                 new Point2d(x + w, yBottom + h),
-                new Point2d(x, yBottom + h)
+                new Point2d(x, yBottom + h),
+                new Point2d(x, yBottom)
             };
-            var bulges = new DoubleCollection { 0.0, 0.0, 0.0, 0.0 };
+            var bulges = new DoubleCollection { 0.0, 0.0, 0.0, 0.0, 0.0 };
             hatch.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline, pts, bulges);
-            hatch.SetHatchPattern(patternType, patternName);
+            if (!embedded) hatch.SetHatchPattern(patternType, patternName);
             hatch.EvaluateHatch(true);
+            using var back = new ObjectIdCollection { hatch.ObjectId };
+            ((DrawOrderTable)tr.GetObject(btr.DrawOrderTableId, OpenMode.ForWrite)).MoveToBottom(back);
             return hatch.ObjectId;
         }
         catch
         {
-            if (!hatch.ObjectId.IsNull)
-                EraseSafe(tr, hatch.ObjectId);
-            else
-                hatch.Dispose();
+            if (!hatch.ObjectId.IsNull) EraseSafe(tr, hatch.ObjectId);
             throw;
         }
     }
