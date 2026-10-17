@@ -160,7 +160,7 @@ foreach($case in $Cases){
  if($case -eq 'livetarget'){$expected+="1 legenda('s) in deze tekening:"}
  if($case -eq 'liveempty'){$expected+='Geen legenda om bij te werken. Plaats er eerst een met NLCSLEGENDA.'}
  Run-Case $case $drawing $specs[$case][0] $expected
- if($case -in @('examples','band','appearance','sources','xrefchoices','klic','customization','overview','abclocal','abcxref','oldreopen')){
+ if($specs[$case].Count -eq 4){
   $expected=@($specs[$case][3])
   Run-Case "$case-verify" $drawing $specs[$case][2] $expected
  }
