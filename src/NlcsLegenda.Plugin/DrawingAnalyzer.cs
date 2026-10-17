@@ -468,7 +468,12 @@ public static class DrawingAnalyzer
         switch (ent)
         {
             case Hatch h:
-                area = ReadHatchArea(h) * AreaScale(transform, h.Normal);
+                try { area = ReadHatchArea(h) * AreaScale(transform, h.Normal); }
+                catch (Autodesk.AutoCAD.Runtime.Exception ex) when (ex.ErrorStatus is Autodesk.AutoCAD.Runtime.ErrorStatus.NotApplicable or Autodesk.AutoCAD.Runtime.ErrorStatus.InvalidInput)
+                {
+                    metric = metric with { AreaIssue = LayerMetric.MergeIssues(metric.AreaIssue,
+                        $"Arcering {h.Handle} op {h.Layer}: oppervlak niet meetbaar; controleer de contouren.") };
+                }
                 break;
             case Curve curve:
                 if (identity)
@@ -497,18 +502,30 @@ public static class DrawingAnalyzer
     {
         try { return Math.Abs(hatch.Area); }
         catch (Autodesk.AutoCAD.Runtime.Exception ex) when (ex.ErrorStatus == Autodesk.AutoCAD.Runtime.ErrorStatus.NotApplicable
-            && hatch.NumberOfLoops == 1)
+            && hatch.NumberOfLoops > 0)
         {
-            // oude contourvlag herstellen op een tijdelijke arceringskopie
-            var loop = hatch.GetLoopAt(0);
-            using var measure = new Hatch();
-            measure.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
+            return RecalculateHatchArea(hatch);
+        }
+    }
+
+    internal static double RecalculateHatchArea(Hatch hatch)
+    {
+        // contouren opnieuw evalueren, zonder bronarcering of associaties te wijzigen
+        using var measure = new Hatch();
+        measure.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
+        measure.HatchStyle = hatch.NumberOfLoops == 1 ? HatchStyle.Normal : hatch.HatchStyle;
+        var loops = Enumerable.Range(0, hatch.NumberOfLoops).Select(hatch.GetLoopAt)
+            .OrderBy(loop => loop.LoopType.HasFlag(HatchLoopTypes.External) ? 0 : 1);
+        foreach (var loop in loops)
+        {
+            var type = hatch.NumberOfLoops == 1 ? HatchLoopTypes.External
+                : loop.LoopType & (HatchLoopTypes.External | HatchLoopTypes.Outermost | HatchLoopTypes.Textbox);
             if (loop.IsPolyline)
             {
                 var points = new Point2dCollection();
                 var bulges = new DoubleCollection();
                 foreach (BulgeVertex vertex in loop.Polyline) { points.Add(vertex.Vertex); bulges.Add(vertex.Bulge); }
-                measure.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Polyline, points, bulges);
+                measure.AppendLoop(type | HatchLoopTypes.Polyline, points, bulges);
             }
             else
             {
@@ -516,11 +533,11 @@ public static class DrawingAnalyzer
                 foreach (Curve2d curve in loop.Curves)
                     types.Add(curve switch { LineSegment2d => 1, CircularArc2d => 2, EllipticalArc2d => 3, NurbCurve2d => 4,
                         _ => throw new InvalidOperationException("Onbekende arceringsgrens; oppervlak niet betrouwbaar meetbaar.") });
-                measure.AppendLoop(HatchLoopTypes.External, loop.Curves, types);
+                measure.AppendLoop(type, loop.Curves, types);
             }
-            measure.EvaluateHatch(true);
-            return Math.Abs(measure.Area);
         }
+        measure.EvaluateHatch(true);
+        return Math.Abs(measure.Area);
     }
 
     private static bool TryMatchCustomRule(
@@ -654,8 +671,13 @@ public static class DrawingAnalyzer
     private static string PrimitiveSymbolIdentity(Curve curve, Transaction tr)
     {
         var origin = curve.GeometricExtents.MinPoint;
-        var points = Enumerable.Range(0, 65).Select(i => PointSignature(
-            curve.GetPointAtParameter(curve.StartParam + (curve.EndParam - curve.StartParam) * i / 64) - origin));
+        // vertices meten, ook bij een dubbele sluitvertex zonder segmentlengte
+        var points = curve is Polyline poly
+            ? Enumerable.Range(0, poly.NumberOfVertices).Select(i =>
+                PointSignature(poly.GetPoint3dAt(i) - origin) + ":" + NumberSignature(poly.GetBulgeAt(i)))
+            : Enumerable.Range(0, 65).Select(i => PointSignature(
+                (i == 0 ? curve.StartPoint : i == 64 ? curve.EndPoint
+                    : curve.GetPointAtParameter(curve.StartParam + (curve.EndParam - curve.StartParam) * i / 64)) - origin));
         string widths = curve is Polyline polyline ? string.Join(";", Enumerable.Range(0, polyline.NumberOfVertices)
             .Select(i => NumberSignature(polyline.GetStartWidthAt(i)) + ":" + NumberSignature(polyline.GetEndWidthAt(i)))) : string.Empty;
         if (curve is Polyline2d polyline2d)
@@ -911,7 +933,7 @@ public static class DrawingAnalyzer
         {
             CustomQuantityMode.Aantal => before.Add(delta.Count, 0, 0),
             CustomQuantityMode.Lengte => before.Add(0, delta.Length, 0),
-            CustomQuantityMode.Oppervlak => before.Add(0, 0, delta.Area),
+            CustomQuantityMode.Oppervlak => before.Add(0, 0, delta.Area) with { AreaIssue = after.AreaIssue },
             _ => after
         };
         c.Metrics[key] = masked;

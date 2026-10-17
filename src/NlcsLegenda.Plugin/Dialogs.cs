@@ -65,14 +65,19 @@ internal sealed class SettingsDialog : LegendDialog
     private readonly IReadOnlyList<string> _xrefNames;
     private readonly Func<LegendSettings, IReadOnlyList<EntryCheckItem>>? _compositionSource;
     private bool _syncing;
+    private readonly IReadOnlyList<ManualEntry> _layerChoices;
 
     public event EventHandler? ApplyRequested;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Func<string?>? SaveChanges { get; set; }
 
     public SettingsDialog(LegendSettings settings, string contextLabel,
         IReadOnlyList<EntryCheckItem>? composition = null, IReadOnlyList<string>? xrefNames = null,
-        Func<LegendSettings, IReadOnlyList<EntryCheckItem>>? compositionSource = null)
+        Func<LegendSettings, IReadOnlyList<EntryCheckItem>>? compositionSource = null,
+        IReadOnlyList<ManualEntry>? layerChoices = null)
     {
         _composition = composition;
+        _layerChoices = layerChoices ?? Array.Empty<ManualEntry>();
         _compositionSource = compositionSource;
         _xrefNames = xrefNames ?? Array.Empty<string>();
         _settings = settings;
@@ -131,7 +136,7 @@ internal sealed class SettingsDialog : LegendDialog
         var buttons = new ButtonBar(withApply: true);
         buttons.Apply!.Click += (_, _) =>
         {
-            if (ValidateScale())
+            if (ValidateScale() && Save())
                 ApplyRequested?.Invoke(this, EventArgs.Empty);
         };
         AcceptButton = buttons.Ok;
@@ -577,7 +582,7 @@ internal sealed class SettingsDialog : LegendDialog
         if (_composition is null && _compositionSource is null) return;
         var composition = CompositionItems();
         if (composition is null) return;
-        using var dlg = new LegendManageDialog(composition, _settings);
+        using var dlg = new LegendManageDialog(composition, _settings, _layerChoices);
         void Apply()
         {
             _settings.ExcludedEntries = dlg.ExcludedKeys;
@@ -597,9 +602,23 @@ internal sealed class SettingsDialog : LegendDialog
         return false;
     }
 
+    private bool Save()
+    {
+        try
+        {
+            if (SaveChanges?.Invoke() is not { } error) return true;
+            MessageBox.Show(this, error, "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        return false;
+    }
+
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
-        if (DialogResult == DialogResult.OK && !ValidateScale())
+        if (DialogResult == DialogResult.OK && (!ValidateScale() || !Save()))
             e.Cancel = true;
     }
 

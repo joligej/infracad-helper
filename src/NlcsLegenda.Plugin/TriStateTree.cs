@@ -13,6 +13,7 @@ internal sealed class TriStateTree : TreeView
         CheckBoxes = false;
         HideSelection = false;
         ShowRootLines = true;
+        ShowNodeToolTips = true;
         ShowPlusMinus = true;
         FullRowSelect = false;
         StateImageList = BuildStateImages();
@@ -26,8 +27,8 @@ internal sealed class TriStateTree : TreeView
         foreach (var group in _model.Filter(filter))
         {
             var gnode = new TreeNode(group.Label) { Tag = group };
-            foreach (var leaf in group.Leaves)
-                gnode.Nodes.Add(new TreeNode(leaf.Label) { Tag = leaf });
+            foreach (var leaf in _model.VisibleLeaves(group, filter))
+                gnode.Nodes.Add(new TreeNode(leaf.Label) { Tag = leaf, ToolTipText = leaf.SearchText });
             Nodes.Add(gnode);
             gnode.Expand();
         }
@@ -59,8 +60,10 @@ internal sealed class TriStateTree : TreeView
     {
         switch (node.Tag)
         {
-            case CompositionTree.Group g:
-                _model.SetGroup(g, g.State != TriState.On);
+            case CompositionTree.Group:
+                var visible = node.Nodes.Cast<TreeNode>().Select(n => n.Tag).OfType<CompositionTree.Leaf>().ToArray();
+                bool include = visible.Any(l => !l.Included);
+                foreach (var leaf in visible) leaf.Included = include;
                 break;
             case CompositionTree.Leaf l:
                 l.Included = !l.Included;
@@ -75,13 +78,12 @@ internal sealed class TriStateTree : TreeView
     {
         foreach (TreeNode gnode in Nodes)
         {
-            if (gnode.Tag is CompositionTree.Group g)
-                gnode.StateImageIndex = g.State switch
-                {
-                    TriState.On => 1,
-                    TriState.Partial => 2,
-                    _ => 0
-                };
+            if (gnode.Tag is CompositionTree.Group)
+            {
+                var leaves = gnode.Nodes.Cast<TreeNode>().Select(n => n.Tag).OfType<CompositionTree.Leaf>().ToArray();
+                int count = leaves.Count(l => l.Included);
+                gnode.StateImageIndex = count == 0 ? 0 : count == leaves.Length ? 1 : 2;
+            }
             foreach (TreeNode cnode in gnode.Nodes)
                 if (cnode.Tag is CompositionTree.Leaf l)
                     cnode.StateImageIndex = l.Included ? 1 : 0;

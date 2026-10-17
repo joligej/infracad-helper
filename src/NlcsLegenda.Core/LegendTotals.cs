@@ -11,13 +11,15 @@ public sealed class GroupTotal
     public double Length { get; init; }
 
     public double Area { get; init; }
+
+    public bool HasUnknownArea { get; init; }
 }
 
 public static class LegendTotals
 {
     public static IReadOnlyList<GroupTotal> ByHoofdgroep(IEnumerable<LegendEntry> entries)
     {
-        var groups = new Dictionary<string, (int entries, int count, double length, double area)>(
+        var groups = new Dictionary<string, (int entries, int count, double length, double area, bool unknownArea)>(
             StringComparer.OrdinalIgnoreCase);
 
         foreach (var e in entries)
@@ -29,7 +31,7 @@ public static class LegendTotals
             {
                 case QuantityKind.Count: acc.count += e.Metric.Count; break;
                 case QuantityKind.Length: acc.length += e.Metric.Length; break;
-                case QuantityKind.Area: acc.area += e.Metric.Area; break;
+                case QuantityKind.Area: acc.area += e.Metric.Area; acc.unknownArea |= e.Metric.HasUnknownArea; break;
             }
             groups[key] = acc;
         }
@@ -42,7 +44,8 @@ public static class LegendTotals
                 EntryCount = kv.Value.entries,
                 Count = kv.Value.count,
                 Length = kv.Value.length,
-                Area = kv.Value.area
+                Area = kv.Value.area,
+                HasUnknownArea = kv.Value.unknownArea
             })
             .ToList();
     }

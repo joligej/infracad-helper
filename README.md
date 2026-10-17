@@ -49,9 +49,13 @@ De globale instellingen zijn het startpunt voor een **nieuwe** legenda. Zet je l
 globale standaard anders, dan verandert een bestaande legenda niet mee: die houdt de
 instellingen waarmee hij is gemaakt. Bij één aanwezige legenda openen de instelcommando's direct die legenda. Bij meerdere
 klik je de gewenste legenda aan of kies je uit een lijst. Gewiste legenda's tellen niet
-mee; Undo maakt ze weer bereikbaar. Zonder legenda bewerk je de globale standaard.
-De knop **Standaard** (`NLCSLEGENDASTANDAARD`) opent die standaard ook als er al legenda's
-zijn. De instellingen van één bestaande legenda bewerk je ook via `NLCSLEGENDABEHEER`.
+mee; Undo maakt ze weer bereikbaar. **Lokale instellingen** (`NLCSLEGENDAOPTIES`) werkt
+uitsluitend op een bestaande legenda. **Toepassen** tekent die legenda meteen opnieuw;
+**Opslaan** doet hetzelfde en sluit het venster. Een fout houdt het venster open en
+behoudt de vorige legenda en instellingen.
+**Globale standaard** (`NLCSLEGENDASTANDAARD`) opent afzonderlijk de instellingen voor
+nieuwe legenda's, ook wanneer er nog geen legenda in de tekening staat. De instellingen
+van één bestaande legenda bewerk je ook via `NLCSLEGENDABEHEER`.
 Het instellingenvenster bundelt alles in tabbladen: naast schaal, inhoud, opmaak, teksten,
 hoeveelheden en schaalbalk zitten daar ook de per-xref keuze, de eigen statussen inclusief
 ledentoewijzing en de omschrijvingen. De losse commando's blijven als snelkoppeling bestaan.
@@ -91,12 +95,20 @@ Wil je een hele projectmap in één keer, dan leest `NLCSLEGENDABATCH` elke DWG 
 gekozen map (zonder ze te openen of te wijzigen) en zet alles in één uittrekstaat met
 een kolom *Tekening*; een tekening die niet leesbaar is, wordt overgeslagen en gemeld.
 
+Kan AutoCAD het oppervlak van een bronarcering niet bepalen, dan verschijnt `? m²` in de legenda en bij het oppervlaktetotaal. **Overzicht → Broncontrole** vermeldt de laag en het object. CSV en JSON laten het numerieke oppervlak leeg en nemen die melding mee. Herstel de broncontour en werk de legenda bij om weer een volledig oppervlak te krijgen.
+
 Niet elke NLCS-laag hoeft in de legenda. Met `NLCSLEGENDAUITVINKEN` klik je een
 element aan om die regel weg te laten (of weer terug te zetten). Heb je een eigen laag
 die er juist wél bij hoort, dan maak je met `NLCSLEGENDATOEVOEGEN` een regel aan: je
 kiest het type (lijn, vlak, arcering, vlakvulling of symbool), de laag en de
 omschrijving. In `NLCSLEGENDASAMENSTELLEN` staat dit bij elkaar in één venster. Het uitvinken
-en de eigen regels horen bij de globale standaard of bij één legenda.
+en de eigen regels horen bij de gekozen legenda, of bij de expliciet geopende globale
+standaard. **Laag toevoegen** biedt een lijst met lokale lagen en een voorgestelde
+omschrijving, type en waar beschikbaar een blok of patroon. Je kunt die gegevens aanpassen.
+Zoeken werkt op elk deel van de laagnaam of omschrijving, zonder hoofdletterverschil;
+`*` kan delen combineren. De bronlijst bovenaan zoekt ook in xref-lagen. Tijdens het
+filteren schakelt een groepsvinkje alleen de zichtbare resultaten om. Via **Lijst** in
+`NLCSLEGENDATOEVOEGEN` en `NLCSLEGENDAUITVINKEN` open je hetzelfde venster.
 
 ### Overzicht en eigen volgorde
 

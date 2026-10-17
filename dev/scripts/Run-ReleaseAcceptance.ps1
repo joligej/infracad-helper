@@ -9,7 +9,7 @@ param(
     [string]$TemplatePath,
     [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -30,6 +30,9 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ hatcharearegression=@('NLCSLEGENDAHATCHAREAREGRESSION','HATCHAREAREGRESSION eilanden en gaten, drie stijlen en bron behouden -> OK')
+ settingregression=@('NLCSLEGENDASETTINGREGRESSION','SETTINGREGRESSION lokale A direct getekend, B en globale standaard gescheiden, fouten teruggedraaid -> OK')
+ frameregression=@('NLCSLEGENDAFRAMEREGRESSION','FRAMEREGRESSION breed symbool, gevuld kader en lange tekst zonder botsing -> OK','NLCSLEGENDAFRAMEVERIFY','FRAMEREGRESSION na heropenen -> OK')
  templateregression=@('NLCSLEGENDATEMPLATEREGRESSIONTEST','TEMPLATEREGRESSION lijnbreedte, losse symboolcurve, cirkel en associatieve arcering; bron behouden -> OK')
  examples=@('NLCSLEGENDAEXAMPLETEST','EXAMPLE bibliotheekimport en bronmaat 1:200 naar 1:500 -> OK','NLCSLEGENDAEXAMPLEVERIFY','EXAMPLE na heropenen: gekozen voorbeeld zonder bronbibliotheek behouden -> OK')
  band=@('NLCSLEGENDABANDTEST','BAND drie DWT-varianten, vier lijnen, stijlen en drie schalen lokaal/xref -> OK','NLCSLEGENDABANDVERIFY','BAND na heropenen -> OK')

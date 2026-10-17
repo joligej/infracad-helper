@@ -15,6 +15,8 @@ internal static class Program
         {
             foreach (float scale in new[] { 1f, 1.25f, 1.5f, 2f })
                 CheckSettings(scale, args.FirstOrDefault());
+            CheckLayerSearch();
+            CheckSettingsSave();
             CheckTemplateReset();
             CheckXrefControls();
             CheckOverview();
@@ -23,6 +25,7 @@ internal static class Program
             CheckCustomizationRoundtrip();
             CheckStatusReassignment();
             Func<Form>[] factories = {
+                () => new LayerChoiceDialog(new[] { new ManualEntry { Layer = "N-WE-GR-BOOM-V", Description = "Boom" } }),
                 () => new ExampleDialog("voorbeelden.dwg", _ => new[] { new LegendExample("b", "Scheidingband met tekst en meerdere lijnen", "WEG", 200, Array.Empty<string>()) }),
                 () => new XrefInclusionDialog(new[] { "Een lange xrefnaam met veel informatie.dwg" }, new()),
                 () => new CustomStatusDialog(new[] { new CustomStatus { Name = "Eigen status" } }, new[] { ("key", "Voorbeeldregel") }),
@@ -67,6 +70,45 @@ internal static class Program
         foreach(var error in Errors) Console.WriteLine("FAIL " + error);
         Console.WriteLine($"UI: {_checks} controles; {Errors.Count} fouten");
         return Errors.Count == 0 ? 0 : 1;
+    }
+
+    private static void CheckSettingsSave()
+    {
+        int saves = 0;
+        using var dialog = new SettingsDialog(new(), "Legenda: A") { SaveChanges = () => { saves++; return null; } };
+        OpenOffscreen(dialog);
+        Descendants(dialog).OfType<Button>().Single(b => b.Text == "Toepassen").PerformClick();
+        Check(saves == 1 && dialog.Visible, "Toepassen slaat onmiddellijk op en houdt het venster open");
+        dialog.DialogResult = DialogResult.OK;
+        dialog.Close();
+        Check(saves == 2, "Opslaan gebruikt hetzelfde toepaspad");
+    }
+
+    private static void CheckLayerSearch()
+    {
+        using var picker = new LayerChoiceDialog(new[] {
+            new ManualEntry { Layer = "N-WE-GR-BOOM-V", Description = "Boom" },
+            new ManualEntry { Layer = "N-WE-GR-GRAS-V", Description = "Gras" } });
+        OpenOffscreen(picker);
+        var search = Descendants(picker).OfType<TextBox>().Single();
+        var grid = Descendants(picker).OfType<DataGridView>().Single();
+        search.Text = "*gr*bOo*";
+        Check(grid.Rows.Count == 1 && picker.Selected?.Layer == "N-WE-GR-BOOM-V", "Laag toevoegen zoekt in het midden, zonder hoofdletterverschil");
+        search.Text = "ontbreekt";
+        Check(grid.Rows.Count == 0 && picker.Selected is null, "Lege zoekuitslag kan geen oude laag toevoegen");
+        picker.Close();
+        using var manage = new LegendManageDialog(new[] {
+            new EntryCheckItem("a", "Waterleiding", "KLIC", "BRON|B-WE-KL-WATER-G"),
+            new EntryCheckItem("b", "Datakabel", "KLIC", "BRON|B-WE-KL-DATA-G") }, new());
+        OpenOffscreen(manage);
+        Descendants(manage).OfType<TextBox>().Single().Text = "-water-";
+        var tree = Descendants(manage).OfType<TriStateTree>().Single();
+        Check(tree.Nodes.Count == 1 && tree.Nodes[0].Nodes.Count == 1, "Samenstellen verbergt niet-passende lagen binnen de groep");
+        tree.SelectedNode = tree.Nodes[0];
+        typeof(TriStateTree).GetMethod("OnKeyDown", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(tree, new object[] { new KeyEventArgs(Keys.Space) });
+        Check(manage.ExcludedKeys.SetEquals(new[] { "a" }), "Gefilterde groep schakelt alleen zichtbare lagen uit");
+        manage.Close();
     }
 
     private static void CheckStatusReassignment()

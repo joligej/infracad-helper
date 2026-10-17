@@ -80,7 +80,7 @@ public sealed class LegendEntry
     {
         get
         {
-            if (IsArea && Metric.Area > 0) return QuantityKind.Area;
+            if (IsArea && (Metric.Area > 0 || Metric.HasUnknownArea)) return QuantityKind.Area;
             // geen lijnlengte uit de interne geometrie van een symbool
             if (GeometryLayer is not null && Metric.Length > 0) return QuantityKind.Length;
             if (Metric.Count > 0) return QuantityKind.Count;
@@ -97,7 +97,7 @@ public sealed class LegendEntry
         string fmt = "N" + Math.Max(0, decimals);
         return QuantityType switch
         {
-            QuantityKind.Area => Metric.Area.ToString(fmt, nl) + " " + unitArea,
+            QuantityKind.Area => (Metric.HasUnknownArea ? "?" : Metric.Area.ToString(fmt, nl)) + " " + unitArea,
             QuantityKind.Length => Metric.Length.ToString(fmt, nl) + " " + unitLength,
             QuantityKind.Count => Metric.Count.ToString(nl) + " " + unitCount,
             _ => string.Empty
@@ -136,5 +136,7 @@ public enum DescriptionSource
 
     EigenKoppeling,
 
-    Blanco
+    Blanco,
+
+    Bloknaam
 }

@@ -16,6 +16,7 @@ public sealed class CompositionTree
         public string Key { get; init; } = string.Empty;
         public string Label { get; init; } = string.Empty;
         public bool Included { get; set; } = true;
+        public string SearchText { get; init; } = string.Empty;
     }
 
     public sealed class Group
@@ -37,7 +38,11 @@ public sealed class CompositionTree
     public List<Group> Groups { get; } = new();
 
     public static CompositionTree Build(
-        IEnumerable<(string Key, string Label, string Group)> items, ISet<string> excluded)
+        IEnumerable<(string Key, string Label, string Group)> items, ISet<string> excluded) =>
+        Build(items.Select(i => (i.Key, i.Label, i.Group, i.Key)), excluded);
+
+    public static CompositionTree Build(
+        IEnumerable<(string Key, string Label, string Group, string SearchText)> items, ISet<string> excluded)
     {
         var available = items.ToList();
         var expanded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -51,7 +56,7 @@ public sealed class CompositionTree
         var tree = new CompositionTree();
         tree._unlistedExclusions.UnionWith(excluded);
         var byLabel = new Dictionary<string, Group>(StringComparer.CurrentCultureIgnoreCase);
-        foreach (var (key, label, group) in available)
+        foreach (var (key, label, group, searchText) in available)
         {
             var groupLabel = string.IsNullOrWhiteSpace(group) ? "Overig" : group.Trim();
             if (!byLabel.TryGetValue(groupLabel, out var g))
@@ -65,6 +70,7 @@ public sealed class CompositionTree
             {
                 Key = key,
                 Label = label,
+                SearchText = searchText,
                 Included = !excluded.Contains(key)
             });
         }
@@ -89,13 +95,9 @@ public sealed class CompositionTree
         return set;
     }
 
-    public IEnumerable<Group> Filter(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-            return Groups;
-        var needle = text.Trim();
-        return Groups.Where(g =>
-            g.Label.Contains(needle, StringComparison.CurrentCultureIgnoreCase)
-            || g.Leaves.Any(l => l.Label.Contains(needle, StringComparison.CurrentCultureIgnoreCase)));
-    }
+    public IEnumerable<Leaf> VisibleLeaves(Group group, string? text) =>
+        LayerSearch.Matches(group.Label, text) ? group.Leaves : group.Leaves.Where(l =>
+            LayerSearch.Matches(l.Label, text) || LayerSearch.Matches(l.SearchText, text));
+
+    public IEnumerable<Group> Filter(string? text) => Groups.Where(g => VisibleLeaves(g, text).Any());
 }

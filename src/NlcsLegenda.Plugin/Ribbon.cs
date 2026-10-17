@@ -122,8 +122,8 @@ internal static class RibbonBuilder
             ("Exporteren", "NLCSLEGENDAEXPORT", "Schrijf de regels weg als CSV en JSON."),
             ("Batch", "NLCSLEGENDABATCH", "Alle tekeningen in een map in één uittrekstaat."));
         AddPanel(tab, "Instellingen",
-            ("Instellingen", "NLCSLEGENDAOPTIES", "Schaal, opmaak en inhoud van een legenda."),
-            ("Standaard", "NLCSLEGENDASTANDAARD", "Instellingen voor nieuwe legenda's."),
+            ("Lokale instellingen", "NLCSLEGENDAOPTIES", "Schaal, opmaak en inhoud van een legenda."),
+            ("Globale standaard", "NLCSLEGENDASTANDAARD", "Instellingen voor nieuwe legenda's."),
             ("Profielen", "NLCSLEGENDAPRESET", "Instellingen bewaren en opnieuw gebruiken."));
         AddPanel(tab, "Beheer en hulp",
             ("Legenda's", "NLCSLEGENDABEHEER", "Legenda's hernoemen, opzoeken en verwijderen."),

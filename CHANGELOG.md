@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.32.1 - 2026-10-18
+
+- Lokale instellingen en globale standaard hebben afzonderlijke knoppen. Lokale instellingen vallen niet meer terug op de globale standaard wanneer er geen legenda aanwezig is.
+- Toepassen en Opslaan bouwen de gekozen legenda direct opnieuw op en verversen het scherm. Bij een fout blijft het venster open met behoud van de vorige legenda.
+- Samenstellen zoekt op elk deel van de omschrijving en bronlaagnaam, ook bij xrefs. Groepsvinkjes veranderen tijdens zoeken alleen de zichtbare resultaten. Eigen regels kunnen vanuit een doorzoekbare lagenlijst worden toegevoegd.
+- Een breed symbool vergroot de kaders van andere regels niet meer. Vullingen sluiten daardoor weer op hun eigen kader aan. Lange woorden breken binnen de tekstkolom af.
+- Gegenereerde NLCS-laagbeschrijvingen worden als gewone namen weergegeven. BGT-symbolen op algemene meubellagen krijgen hun specifieke naam uit het blok; eigen teksten blijven behouden.
+- Symbolen met dubbele sluitpunten in een polylijn blokkeren de legenda niet meer. Oude arceringen worden op een tijdelijke kopie opnieuw gemeten; een onmeetbare broncontour krijgt `? m²` en een bronmelding in Overzicht, ook na samenvoegen en in de export.
+
 ## 1.32.0 - 2026-10-16
 
 - Overzicht laat per regel een volledig voorbeeld uit een aparte DWG-bibliotheek kiezen, inclusief codes, afdekvlakken en samengestelde lijnen. De bronmaat schaalt mee met de legenda.

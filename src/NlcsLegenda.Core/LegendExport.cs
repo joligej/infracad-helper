@@ -49,7 +49,7 @@ public static class LegendExport
     private static string[] CsvHeader() => new[]
     {
         "Status", "Discipline", "Hoofdgroep", "Element", "Omschrijving",
-        "Herkomst", "Types", "Aantal", "Lengte_m", "Oppervlak_m2", "Hoeveelheid", "Eenheid", "Netbeheerders"
+        "Herkomst", "Types", "Aantal", "Lengte_m", "Oppervlak_m2", "Hoeveelheid", "Eenheid", "Netbeheerders", "Oppervlak_broncontrole"
     };
 
     private static string[] CsvFields(LegendEntry e, string fmt, CultureInfo nl,
@@ -67,10 +67,11 @@ public static class LegendExport
             Csv(types),
             e.Metric.Count.ToString(Inv),
             e.Metric.Length.ToString("F" + fmt[1..], Inv),
-            e.Metric.Area.ToString("F" + fmt[1..], Inv),
+            e.Metric.HasUnknownArea ? string.Empty : e.Metric.Area.ToString("F" + fmt[1..], Inv),
             Csv(QuantityValue(e, fmt, nl)),
             Csv(QuantityUnit(e, unitArea, unitLength, unitCount)),
-            Csv(string.Join("; ", e.Netbeheerders))
+            Csv(string.Join("; ", e.Netbeheerders)),
+            Csv(e.Metric.AreaIssue ?? string.Empty)
         };
     }
 
@@ -101,7 +102,8 @@ public static class LegendExport
             types = e.LayersByType.Keys.Select(k => k.ToString()).ToArray(),
             aantal = e.Metric.Count,
             lengteM = Math.Round(e.Metric.Length, round),
-            oppervlakM2 = Math.Round(e.Metric.Area, round),
+            oppervlakM2 = e.Metric.HasUnknownArea ? (double?)null : Math.Round(e.Metric.Area, round),
+            oppervlakBroncontrole = e.Metric.AreaIssue,
             hoeveelheid = QuantityValue(e, fmt, nl),
             eenheid = QuantityUnit(e, unitArea, unitLength, unitCount)
         });
@@ -134,7 +136,8 @@ public static class LegendExport
             types = e.LayersByType.Keys.Select(k => k.ToString()).ToArray(),
             aantal = e.Metric.Count,
             lengteM = Math.Round(e.Metric.Length, round),
-            oppervlakM2 = Math.Round(e.Metric.Area, round),
+            oppervlakM2 = e.Metric.HasUnknownArea ? (double?)null : Math.Round(e.Metric.Area, round),
+            oppervlakBroncontrole = e.Metric.AreaIssue,
             hoeveelheid = QuantityValue(e, fmt, nl),
             eenheid = QuantityUnit(e, unitArea, unitLength, unitCount)
         }));
@@ -144,7 +147,7 @@ public static class LegendExport
 
     private static string QuantityValue(LegendEntry e, string fmt, CultureInfo nl) => e.QuantityType switch
     {
-        QuantityKind.Area => e.Metric.Area.ToString(fmt, nl),
+        QuantityKind.Area => e.Metric.HasUnknownArea ? "?" : e.Metric.Area.ToString(fmt, nl),
         QuantityKind.Length => e.Metric.Length.ToString(fmt, nl),
         QuantityKind.Count => e.Metric.Count.ToString(nl),
         _ => string.Empty
@@ -167,6 +170,7 @@ public static class LegendExport
         DescriptionSource.Laagnaam => "laagnaam",
         DescriptionSource.EigenKoppeling => "eigen koppeling",
         DescriptionSource.Blanco => "blanco",
+        DescriptionSource.Bloknaam => "bloknaam",
         _ => string.Empty
     };
 

@@ -44,6 +44,8 @@ public partial class Commands
         var analysis = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, DescriptionCatalog.Default(), excluded);
         if (analysis.Entries.Count == 0)
             return UpdateResult.NoEntries;
+        int unknownAreas = analysis.Entries.Count(e => e.Metric.HasUnknownArea);
+        if (unknownAreas > 0) note = AppendNote(note, $"{unknownAreas} regel(s) met onbekend oppervlak (? m²); zie de bronmeldingen in Overzicht");
 
         bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out var topLeft, keepGroup: true);
 
@@ -248,10 +250,9 @@ public partial class Commands
         string id = def.Id;
         var working = def.Settings.Clone();
         using var dialog = new SettingsDialog(working, $"Legenda: {def.Name}", xrefNames: CollectXrefNames(db),
-            compositionSource: current => BuildCompositionItems(db, current, id));
-        dialog.ApplyRequested += (_, _) => ApplySettingsAndRebuild(ed, db, id, working);
-        if (AcWindows.ShowModalDialog(dialog) == WinForms.DialogResult.OK)
-            ApplySettingsAndRebuild(ed, db, id, working);
+            compositionSource: current => BuildCompositionItems(db, current, id), layerChoices: BuildLayerChoices(db, working));
+        dialog.SaveChanges = () => ApplySettingsAndRebuild(ed, db, id, working);
+        AcWindows.ShowModalDialog(dialog);
     }
 
     private void ManagerCopySettings(Editor ed, Database db, LegendRegistry registry)
@@ -403,7 +404,7 @@ public partial class Commands
         }
     }
 
-    private void ApplySettingsAndRebuild(Editor ed, Database db, string id, LegendSettings newSettings)
+    private string? ApplySettingsAndRebuild(Editor ed, Database db, string id, LegendSettings newSettings)
     {
         try
         {
@@ -412,7 +413,7 @@ public partial class Commands
             {
                 var reg = LegendStore.Load(db, tr);
                 var def = reg.FindById(id);
-                if (def is null) { tr.Commit(); ed.WriteMessage("\nLegenda niet meer gevonden."); return; }
+                if (def is null) { ed.WriteMessage("\nLegenda niet meer gevonden."); return "Legenda niet meer gevonden."; }
                 def.Settings.CopyFrom(newSettings);
                 r = BuildManagedLegend(db, tr, reg, def, out _, out note);
                 if (r == UpdateResult.Updated)
@@ -420,18 +421,25 @@ public partial class Commands
                 tr.Commit();
             }
             PurgePending(db);
-            ed.WriteMessage(r switch
+            if (r != UpdateResult.Updated)
             {
-                UpdateResult.Updated => note.Length > 0
-                    ? $"\nInstellingen toegepast en legenda bijgewerkt. Let op: {note}."
-                    : "\nInstellingen toegepast en legenda bijgewerkt.",
-                UpdateResult.NoEntries => $"\nGeen inhoud om te tekenen met deze instellingen ({note}); oude legenda blijft staan.",
-                _ => "\nBijwerken mislukt; de oude legenda blijft staan."
-            });
+                string error = r == UpdateResult.NoEntries
+                    ? "Geen inhoud om te tekenen met deze instellingen" + (note.Length == 0 ? "" : $" ({note})") + ". De vorige legenda en instellingen zijn behouden."
+                    : "Bijwerken mislukt. De vorige legenda en instellingen zijn behouden.";
+                ed.WriteMessage("\n" + error);
+                return error;
+            }
+            ed.Regen();
+            AcApp.UpdateScreen();
+            ed.WriteMessage(note.Length > 0
+                ? $"\nInstellingen toegepast en legenda bijgewerkt. Let op: {note}."
+                : "\nInstellingen toegepast en legenda bijgewerkt.");
+            return null;
         }
         catch (Exception ex)
         {
             ed.WriteMessage($"\nToepassen mislukt: {ex.Message}");
+            return "Toepassen mislukt: " + ex.Message;
         }
     }
 
