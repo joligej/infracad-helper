@@ -86,7 +86,7 @@ public static class LegendGrouping
                 KlicObjects = KlicSummary.Combine(group.SelectMany(l => klicObjects?.Invoke(l.EffectiveRenderLayerName) ?? Array.Empty<KlicObjectData>())),
                 KlicDescriptionFields = settings.Klic.DescriptionFields.ToArray(),
                 Description = ResolveDescription(
-                    group, representative, settings, layerDescription, descriptions, descriptionSourceOf, out var descSource),
+                    group, representative, settings, layerDescription, descriptions, descriptionSourceOf, blockName, out var descSource),
                 DescriptionSource = descSource,
                 LayersByType = byType,
                 Metric = metric,
@@ -266,7 +266,7 @@ public static class LegendGrouping
     private static string ResolveDescription(
         List<NlcsLayerName> group, NlcsLayerName representative, LegendSettings settings,
         Func<string, string?>? layerDescription, DescriptionCatalog catalog,
-        Func<string, DescriptionSource?>? descriptionSourceOf, out DescriptionSource source)
+        Func<string, DescriptionSource?>? descriptionSourceOf, string? blockName, out DescriptionSource source)
     {
         // tekstvolgorde: eigen tekst, bron, catalogus, nette laagnaam
         if (settings.DescriptionOverrides.Elementen.Count > 0)
@@ -297,6 +297,14 @@ public static class LegendGrouping
                 }
                 return desc.Trim();
             }
+        }
+
+        if (SymbolDescription.Describe(blockName, representative) is { } symbolText)
+        {
+            source = DescriptionSource.Bloknaam;
+            return settings.IncludeGeneralDescription
+                ? StandardTexts.HoofdgroepName(representative.Hoofdgroep) + settings.GeneralSeparator + symbolText
+                : symbolText;
         }
 
         var text = catalog.Describe(

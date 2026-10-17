@@ -30,7 +30,7 @@ public partial class Commands
             }
             using var wide = new Polyline(); wide.AddVertexAt(0, new Point2d(0, 0), 0, 0, 0); wide.AddVertexAt(1, new Point2d(10, 0), 0, 0, 0); wide.ConstantWidth = .3;
             var wideId = Add(wide, "N-WE-MA-TEST_MARKERING-G");
-            using var outline = new Polyline(); outline.AddVertexAt(0, new Point2d(0, 2), 0, 0, 0); outline.AddVertexAt(1, new Point2d(4, 2), 0, 0, 0); outline.AddVertexAt(2, new Point2d(4, 3), 0, 0, 0); outline.AddVertexAt(3, new Point2d(0, 3), 0, 0, 0); outline.Closed = true;
+            using var outline = new Polyline(); outline.AddVertexAt(0, new Point2d(0, 2), 0, 0, 0); outline.AddVertexAt(1, new Point2d(4, 2), 0, 0, 0); outline.AddVertexAt(2, new Point2d(4, 3), 0, 0, 0); outline.AddVertexAt(3, new Point2d(0, 3), 0, 0, 0); outline.AddVertexAt(4, new Point2d(0, 2), 0, 0, 0); outline.Closed = true;
             var outlineId = Add(outline, "N-WE-GR-TEST_BOMENGROEP-S");
             using var sourceCircle = new Circle(new Point3d(10, 4, 0), Vector3d.ZAxis, .5);
             var circleId = Add(sourceCircle, "B-WE-RI-TEST_PUT-G");
@@ -58,7 +58,7 @@ public partial class Commands
             if (!entities.OfType<Circle>().Any(c => Math.Abs(c.Radius - .9) < 1e-9)
                 || !entities.OfType<Polyline>().Any(p => Math.Abs(p.ConstantWidth - .12) < 1e-9)) throw new InvalidOperationException("Afwijkende z-schaal verandert vlakke symboolgeometrie.");
             if (Math.Abs(planarReference.ScaleFactors.Z - 1) > 1e-9 || Math.Abs(rim.ConstantWidth - .02) > 1e-9) throw new InvalidOperationException("Bronsymbool gewijzigd.");
-            if (!hatch.BackgroundColor.IsByLayer || !hatch.Associative || hatch.GetAssociatedObjectIds().Count != 1 || outline.NumberOfVertices != 4) throw new InvalidOperationException("Brongeometrie gewijzigd.");
+            if (!hatch.BackgroundColor.IsByLayer || !hatch.Associative || hatch.GetAssociatedObjectIds().Count != 1 || outline.NumberOfVertices != 5) throw new InvalidOperationException("Brongeometrie gewijzigd.");
             tr.Abort();
             doc.Editor.WriteMessage("\nTEMPLATEREGRESSION lijnbreedte, losse symboolcurve, cirkel en associatieve arcering; bron behouden -> OK");
         }

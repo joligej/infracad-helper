@@ -7,11 +7,12 @@ namespace NlcsLegenda.Plugin;
 
 internal sealed class EntryCheckItem
 {
-    public EntryCheckItem(string key, string label, string group = "")
+    public EntryCheckItem(string key, string label, string group = "", string searchText = "")
     {
         Key = key;
         Label = label;
         Group = group;
+        SearchText = searchText;
     }
 
     public string Key { get; }
@@ -19,6 +20,8 @@ internal sealed class EntryCheckItem
     public string Label { get; }
 
     public string Group { get; }
+
+    public string SearchText { get; }
 
     public override string ToString() => Label;
 }
@@ -52,8 +55,11 @@ internal sealed class LegendManageDialog : LegendDialog
     private readonly IReadOnlyList<EntryCheckItem> _allEntries;
 
     public event EventHandler? ApplyRequested;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Func<string?>? SaveChanges { get; set; }
 
-    public LegendManageDialog(IReadOnlyList<EntryCheckItem> allEntries, LegendSettings initial)
+    public LegendManageDialog(IReadOnlyList<EntryCheckItem> allEntries, LegendSettings initial,
+        IReadOnlyList<ManualEntry>? layerChoices = null, bool addLayer = false)
     {
         _allEntries = allEntries;
 
@@ -88,7 +94,7 @@ internal sealed class LegendManageDialog : LegendDialog
 
         var topGroup = new GroupBox { Text = "NLCS-regels (vink uit wat je niet wilt)", Dock = DockStyle.Fill, Padding = new Padding(8) };
         _tree = new TriStateTree { Dock = DockStyle.Fill };
-        _filter = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Filter\u2026" };
+        _filter = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Zoek in omschrijving of laagnaam…" };
         _filter.TextChanged += (_, _) => _tree.SetModel(_tree.Model, _filter.Text);
         topGroup.Controls.Add(_tree);
         topGroup.Controls.Add(_filter);
@@ -100,6 +106,17 @@ internal sealed class LegendManageDialog : LegendDialog
         var remove = new Button { Text = "Verwijderen", AutoSize = true, Margin = new Padding(0, 4, 0, 0) };
         remove.Click += (_, _) => RemoveSelectedRows();
         removeBar.Controls.Add(remove);
+        var add = new Button { Text = "Laag toevoegen…", AutoSize = true, Margin = new Padding(0, 4, 8, 0), Enabled = layerChoices is { Count: > 0 } };
+        add.Click += (_, _) =>
+        {
+            using var picker = new LayerChoiceDialog(layerChoices!);
+            if (picker.ShowDialog(this) != DialogResult.OK || picker.Selected is not { } selected) return;
+            _grid.EndEdit();
+            _rows.Add(ToRow(selected));
+            _grid.CurrentCell = _grid.Rows[_rows.Count - 1].Cells[2];
+        };
+        removeBar.Controls.Add(add);
+        if (addLayer) Shown += (_, _) => BeginInvoke(new Action(add.PerformClick));
         bottomGroup.Controls.Add(_grid);
         bottomGroup.Controls.Add(removeBar);
         split.Panel2.Controls.Add(bottomGroup);
@@ -112,7 +129,7 @@ internal sealed class LegendManageDialog : LegendDialog
                 Warn(err);
                 return;
             }
-            ApplyRequested?.Invoke(this, EventArgs.Empty);
+            if (Save()) ApplyRequested?.Invoke(this, EventArgs.Empty);
         };
         AcceptButton = buttons.Ok;
         CancelButton = buttons.Cancel;
@@ -125,13 +142,26 @@ internal sealed class LegendManageDialog : LegendDialog
             {
                 Warn(err);
                 e.Cancel = true;
+                return;
             }
+            e.Cancel = !Save();
         };
 
         Controls.Add(split);
         Controls.Add(buttons);
 
         LoadFrom(initial);
+    }
+
+    private bool Save()
+    {
+        try
+        {
+            if (SaveChanges?.Invoke() is not { } error) return true;
+            Warn(error);
+        }
+        catch (Exception ex) { Warn(ex.Message); }
+        return false;
     }
 
     private void Warn(string message) =>
@@ -217,10 +247,14 @@ internal sealed class LegendManageDialog : LegendDialog
     private void LoadFrom(LegendSettings settings)
     {
         var model = CompositionTree.Build(
-            _allEntries.Select(i => (i.Key, i.Label, i.Group)), settings.ExcludedEntries);
+            _allEntries.Select(i => (i.Key, i.Label, i.Group, i.SearchText)), settings.ExcludedEntries);
         _tree.SetModel(model, _filter.Text);
 
-        _rows = new BindingList<ManualRow>(settings.ManualEntries.Select(m => new ManualRow
+        _rows = new BindingList<ManualRow>(settings.ManualEntries.Select(ToRow).ToList());
+        _grid.DataSource = _rows;
+    }
+
+    private static ManualRow ToRow(ManualEntry m) => new()
         {
             Laag = m.Layer,
             Type = FromDrawType(m.Type),
@@ -229,9 +263,7 @@ internal sealed class LegendManageDialog : LegendDialog
             Patroon = m.HatchPattern ?? string.Empty,
             Blok = m.SymbolBlock ?? string.Empty,
             Hoofdgroep = m.Hoofdgroep
-        }).ToList());
-        _grid.DataSource = _rows;
-    }
+        };
 
     private void RemoveSelectedRows()
     {
@@ -270,4 +302,50 @@ internal sealed class LegendManageDialog : LegendDialog
         "Overig" => NlcsStatus.Overig,
         _ => NlcsStatus.Nieuw
     };
+}
+
+internal sealed class LayerChoiceDialog : LegendDialog
+{
+    private readonly IReadOnlyList<ManualEntry> _choices;
+    private readonly DataGridView _list;
+    public ManualEntry? Selected => _list.CurrentRow?.Tag is ManualEntry entry ? entry.Clone() : null;
+
+    public LayerChoiceDialog(IReadOnlyList<ManualEntry> choices)
+    {
+        _choices = choices;
+        Text = "Laag voor eigen regel";
+        ClientSize = new Size(760, 480);
+        MinimumSize = new Size(520, 340);
+        StartPosition = FormStartPosition.CenterParent;
+        ShowInTaskbar = false;
+        MinimizeBox = false;
+        var search = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Zoek een deel van de laagnaam of omschrijving…", AccessibleName = "Laag zoeken" };
+        _list = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false, RowHeadersVisible = false, MultiSelect = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
+        _list.Columns.Add("layer", "Laag");
+        _list.Columns.Add("description", "Omschrijving");
+        _list.Columns[0].FillWeight = 65;
+        _list.Columns[1].FillWeight = 35;
+        _list.Columns[0].MinimumWidth = 240;
+        _list.Columns[1].MinimumWidth = 160;
+        var buttons = new ButtonBar(false);
+        buttons.Ok.Text = "Toevoegen";
+        AcceptButton = buttons.Ok;
+        CancelButton = buttons.Cancel;
+        void Filter()
+        {
+            _list.Rows.Clear();
+            foreach (var choice in _choices.Where(c => LayerSearch.Matches(c.Layer, search.Text) || LayerSearch.Matches(c.Description, search.Text)))
+                _list.Rows[_list.Rows.Add(choice.Layer, choice.Description)].Tag = choice;
+            buttons.Ok.Enabled = _list.Rows.Count > 0;
+        }
+        search.TextChanged += (_, _) => Filter();
+        _list.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) { DialogResult = DialogResult.OK; Close(); } };
+        FormClosing += (_, e) => { if (DialogResult == DialogResult.OK && Selected is null) e.Cancel = true; };
+        Controls.Add(_list);
+        Controls.Add(search);
+        Controls.Add(buttons);
+        Filter();
+    }
 }

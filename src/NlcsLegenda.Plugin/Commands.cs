@@ -122,6 +122,8 @@ public partial class Commands
                 ed.WriteMessage($"\nLegenda tekenen ({analysis.Entries.Count} regels)...");
                 btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _, out var issues);
                 ReportRenderIssues(ed, issues);
+                int unknownAreas = analysis.Entries.Count(e => e.Metric.HasUnknownArea);
+                if (unknownAreas > 0) ed.WriteMessage($"\n{unknownAreas} regel(s) met onbekend oppervlak (? m²); zie de bronmeldingen in Overzicht.");
 
                 var ms = (BlockTableRecord)tr.GetObject(
                     SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
@@ -683,14 +685,14 @@ public partial class Commands
             if (!globalDefaults && !ResolveMutationTarget(ed, db, out target)) { ed.WriteMessage("\nGeannuleerd."); return; }
             var settings = GetTargetSettings(db, target);
             using var dialog = new SettingsDialog(settings, target.ContextLabel, xrefNames: CollectXrefNames(db),
-                compositionSource: current => BuildCompositionItems(db, current, target.IsGlobal ? null : target.LegendId));
-            dialog.ApplyRequested += (_, _) => ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
+                compositionSource: current => BuildCompositionItems(db, current, target.IsGlobal ? null : target.LegendId),
+                layerChoices: BuildLayerChoices(db, settings));
+            dialog.SaveChanges = () => ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
         }
         catch (Exception ex)
         {
@@ -771,9 +773,14 @@ public partial class Commands
 
         try
         {
-            var peo = new PromptEntityOptions("\nSelecteer een NLCS-object om uit/aan te vinken");
+            var peo = new PromptEntityOptions("\nSelecteer een NLCS-object om uit/aan te vinken [Lijst]", "Lijst");
             peo.SetRejectMessage("\nGeen geldig object.");
             var per = ed.GetEntity(peo);
+            if (per.Status == PromptStatus.Keyword && per.StringResult == "Lijst")
+            {
+                NlcsLegendaSamenstellenInteractive();
+                return;
+            }
             if (per.Status != PromptStatus.OK)
             {
                 ed.WriteMessage("\nGeannuleerd.");
@@ -830,11 +837,16 @@ public partial class Commands
         try
         {
             var peo = new PromptEntityOptions(
-                "\nSelecteer een object van de gewenste laag [Typen]", "Typen");
+                "\nSelecteer een object van de gewenste laag [Lijst/Typen]", "Lijst Typen");
             peo.AllowNone = false;
             var per = ed.GetEntity(peo);
             string layerName;
             string? pickedBlock = null;
+            if (per.Status == PromptStatus.Keyword && per.StringResult == "Lijst")
+            {
+                NlcsLegendaSamenstellenInteractive(addLayer: true);
+                return;
+            }
             if (per.Status == PromptStatus.Keyword && per.StringResult == "Typen")
             {
                 var pso = new PromptStringOptions("\nLaagnaam:") { AllowSpaces = true };
@@ -981,7 +993,7 @@ public partial class Commands
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    private void NlcsLegendaSamenstellenInteractive()
+    private void NlcsLegendaSamenstellenInteractive(bool addLayer = false)
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null)
@@ -996,20 +1008,18 @@ public partial class Commands
 
             var items = BuildCompositionItems(db, settings, target.IsGlobal ? null : target.LegendId);
 
-            using var dialog = new LegendManageDialog(items, settings);
-            void Apply()
+            using var dialog = new LegendManageDialog(items, settings, BuildLayerChoices(db, settings), addLayer);
+            dialog.SaveChanges = () =>
             {
                 settings.ExcludedEntries = dialog.ExcludedKeys;
                 settings.ManualEntries = dialog.ManualEntries;
-                ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
-            }
-            dialog.ApplyRequested += (_, _) => Apply();
+                return ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
+            };
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            Apply();
         }
         catch (Exception ex)
         {
@@ -4128,7 +4138,8 @@ public partial class Commands
             var parts = new List<string>();
             if (g.Count > 0) parts.Add($"{g.Count} st");
             if (g.Length > 0) parts.Add($"{g.Length:0} m");
-            if (g.Area > 0) parts.Add($"{g.Area:0} m\u00B2");
+            if (g.HasUnknownArea) parts.Add("? m\u00B2");
+            else if (g.Area > 0) parts.Add($"{g.Area:0} m\u00B2");
             var q = parts.Count > 0 ? " = " + string.Join(", ", parts) : string.Empty;
             sb.Append($"\n    - {StandardTexts.HoofdgroepName(g.Hoofdgroep)} ({g.Hoofdgroep}): {g.EntryCount} regel(s){q}");
         }

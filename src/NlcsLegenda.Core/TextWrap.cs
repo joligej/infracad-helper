@@ -2,6 +2,36 @@ namespace NlcsLegenda.Core;
 
 public static class TextWrap
 {
+    public static string BreakLongWords(string text, Func<string, bool> fits)
+    {
+        var output = new System.Text.StringBuilder();
+        int start = 0;
+        while (start < text.Length)
+        {
+            if (char.IsWhiteSpace(text[start])) { output.Append(text[start++]); continue; }
+            int end = start;
+            while (end < text.Length && !char.IsWhiteSpace(text[end])) end++;
+            var word = text[start..end];
+            while (!fits(word))
+            {
+                var positions = System.Globalization.StringInfo.ParseCombiningCharacters(word);
+                if (positions.Length < 2) break;
+                int lo = 1, hi = positions.Length - 1;
+                while (lo < hi)
+                {
+                    int mid = (lo + hi + 1) / 2;
+                    if (fits(word[..positions[mid]])) lo = mid; else hi = mid - 1;
+                }
+                int split = positions[lo];
+                output.Append(word[..split]).Append('\n');
+                word = word[split..];
+            }
+            output.Append(word);
+            start = end;
+        }
+        return output.ToString();
+    }
+
     public static List<string> Wrap(string? text, int maxChars)
     {
         var result = new List<string>();

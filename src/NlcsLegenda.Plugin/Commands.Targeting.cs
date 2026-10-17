@@ -37,7 +37,10 @@ public partial class Commands
             tr.Commit();
         }
         if (reg.Legends.Count == 0)
-            return true;
+        {
+            ed.WriteMessage("\nGeen legenda aanwezig. Plaats eerst een legenda, of kies Globale standaard voor nieuwe legenda's.");
+            return false;
+        }
         var def = ResolveTargetLegend(ed, db, reg, pickVerb);
         if (def is null)
             return false;
@@ -57,7 +60,7 @@ public partial class Commands
         return clone;
     }
 
-    private void ApplyTargetSettings(
+    private string? ApplyTargetSettings(
         Editor ed, Database db, MutationTarget target, LegendSettings settings, string what)
     {
         if (target.IsGlobal)
@@ -65,8 +68,8 @@ public partial class Commands
             var where = SaveGlobalDefaults(settings);
             ed.WriteMessage(
                 $"\n{what} opgeslagen als globale standaard ({where}); bestaande legenda's blijven ongewijzigd.");
-            return;
+            return null;
         }
-        ApplySettingsAndRebuild(ed, db, target.LegendId, settings);
+        return ApplySettingsAndRebuild(ed, db, target.LegendId, settings);
     }
 }

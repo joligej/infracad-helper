@@ -217,9 +217,10 @@ public static class LegendBuilder
             int count = analysis.Entries.Sum(e => e.Metric.Count);
             double length = analysis.Entries.Sum(e => e.Metric.Length);
             double area = analysis.Entries.Sum(e => e.Metric.Area);
+            string areaText = analysis.Entries.Any(e => e.Metric.HasUnknownArea) ? "?" : area.ToString(fmt, nl);
             lines.Add($"{s.TotalsPrefix} {count} {s.UnitCount}, " +
                       $"{length.ToString(fmt, nl)} {s.UnitLength}, " +
-                      $"{area.ToString(fmt, nl)} {s.UnitArea}");
+                      $"{areaText} {s.UnitArea}");
         }
         return lines;
     }
@@ -343,6 +344,7 @@ public static class LegendBuilder
         double top = item.YTop;
         double midY = top - item.RowHeight / 2.0;
         double bottom = midY - swatchH / 2.0;
+        double sampleX = x + (sampleColumnWidth - swatchW) / 2;
 
         var rowEntities = new List<ObjectId>();
         var renderLayers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -362,14 +364,14 @@ public static class LegendBuilder
         // tekenvolgorde: vlak, vulling, arcering, lijn, symbool
         if (prepared?.IsExample != true && entry.VlakLayer is { } vlakLayer)
         {
-            var area = MakeRectangle(btr.Database, x, bottom, swatchW, swatchH, renderLayers[vlakLayer]);
+            var area = MakeRectangle(btr.Database, sampleX, bottom, swatchW, swatchH, renderLayers[vlakLayer]);
             rowEntities.Add(AppendEntity(btr, area));
             tr.AddNewlyCreatedDBObject(area, true);
         }
 
         if (prepared?.IsExample != true && entry.FillLayer is { } fillLayer)
         {
-            var fillBoundary = MakeRectangle(btr.Database, x, bottom, swatchW, swatchH, renderLayers[fillLayer]);
+            var fillBoundary = MakeRectangle(btr.Database, sampleX, bottom, swatchW, swatchH, renderLayers[fillLayer]);
             var fillId = AppendEntity(btr, fillBoundary);
             tr.AddNewlyCreatedDBObject(fillBoundary, true);
             rowEntities.Add(fillId);
@@ -384,7 +386,7 @@ public static class LegendBuilder
                 Transparency = new TransparencyValue(TransparencyMethod.ByLayer, 255),
                 IsSolid = pattern.Equals("SOLID", StringComparison.OrdinalIgnoreCase)
             } : analysis.HatchSamples.GetValueOrDefault(hatchLayer);
-            rowEntities.Add(AddHatch(btr, tr, imports, x, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample,
+            rowEntities.Add(AddHatch(btr, tr, imports, sampleX, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample,
                 s.HatchScaleFactor * (sample?.ScaleForLegend(s.Scale) ?? 1)));
         }
 
@@ -397,8 +399,8 @@ public static class LegendBuilder
                 SetLegendDefaults(line, db);
                 double y = midY + s.ToModel(offsetMm);
                 bool bandDirection = band is not null;
-                line.AddVertexAt(0, new Point2d(x + (bandDirection ? swatchW : 0), y), 0, 0, 0);
-                line.AddVertexAt(1, new Point2d(x + (bandDirection ? 0 : swatchW), y), 0, 0, 0);
+                line.AddVertexAt(0, new Point2d(sampleX + (bandDirection ? swatchW : 0), y), 0, 0, 0);
+                line.AddVertexAt(1, new Point2d(sampleX + (bandDirection ? 0 : swatchW), y), 0, 0, 0);
                 line.Layer = renderLayers[geoLayer];
                 if (band is null && analysis.LayerStyles.TryGetValue(geoLayer, out var sourceStyle))
                     line.ConstantWidth = sourceStyle.PolylineWidth;
@@ -459,7 +461,9 @@ public static class LegendBuilder
         if (s.DrawSwatchFrame)
         {
             double frameHeight = Math.Max(swatchH, prepared?.Height ?? 0);
-            var frame = MakeRectangle(btr.Database, x, midY - frameHeight / 2, sampleColumnWidth, frameHeight, s.SwatchFrameLayer);
+            double frameWidth = Math.Max(swatchW, prepared?.Width ?? 0);
+            var frame = MakeRectangle(btr.Database, x + (sampleColumnWidth - frameWidth) / 2,
+                midY - frameHeight / 2, frameWidth, frameHeight, s.SwatchFrameLayer);
             AppendEntity(btr, frame);
             tr.AddNewlyCreatedDBObject(frame, true);
         }
@@ -505,6 +509,16 @@ public static class LegendBuilder
         mt.LineSpacingStyle = LineSpacingStyle.AtLeast;
         mt.LineSpacingFactor = s.LineSpacingFactor;
         mt.Contents = MTextFormat.Escape(text);
+        if (mt.ActualWidth > width + 1e-8)
+        {
+            // alleen woorden splitsen die zelfstandig buiten de tekstkolom vallen
+            string wrapped = TextWrap.BreakLongWords(text, word =>
+            {
+                mt.Contents = MTextFormat.Escape(word);
+                return mt.ActualWidth <= width + 1e-8;
+            });
+            mt.Contents = MTextFormat.Escape(wrapped);
+        }
         return mt;
     }
 

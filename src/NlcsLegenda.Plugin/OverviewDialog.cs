@@ -193,7 +193,7 @@ internal sealed class OverviewDialog : LegendDialog
     private string[] RowValues(LegendEntry entry)
     {
         if (_rowValues.TryGetValue(entry, out var cached)) return cached;
-        var issues = KlicSummary.Issues(entry.KlicObjects);
+        var issues = LayerMetric.MergeIssues(KlicSummary.Issues(entry.KlicObjects), entry.Metric.AreaIssue) ?? string.Empty;
         var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, string.Join(", ", entry.Netbeheerders),
                 string.Join(", ", entry.LayersByType.Keys), entry.QuantityText(Current.Settings.QuantityDecimals, Current.Settings.UnitArea, Current.Settings.UnitLength, Current.Settings.UnitCount),
                 string.Join(Environment.NewLine, entry.SourceLayers.Select(s => s.SourceLayerName).Distinct()), string.Join(", ", entry.MergedMembers) };
