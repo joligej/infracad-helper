@@ -47,7 +47,7 @@ public sealed class FailureHandlingTests
         var order = new List<int>();
         var first = new IOException("eerste");
         var second = new InvalidOperationException("tweede");
-        var scope = new ResourceScope();
+        using var scope = new ResourceScope();
         scope.Defer(() => { order.Add(1); throw first; });
         scope.Defer(() => order.Add(2));
         scope.Defer(() => { order.Add(3); throw second; });

@@ -2596,7 +2596,7 @@ public partial class Commands
                         : AddLayer(lt, tr, "Eigen kabels");
                     var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
                     var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
-                    var l3 = new Line(new Point3d(0, 0, 0), new Point3d(3, 0, 0)) { LayerId = host };
+                    using var l3 = new Line(new Point3d(0, 0, 0), new Point3d(3, 0, 0)) { LayerId = host };
                     ms.AppendEntity(l3); tr.AddNewlyCreatedDBObject(l3, true);
                     tr.Commit();
                 }
@@ -2608,10 +2608,7 @@ public partial class Commands
                     var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
                     var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
                     foreach (var id in new[] { xrefA, xrefB })
-                    {
-                        var br = new BlockReference(Point3d.Origin, id);
-                        ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
-                    }
+                        AddTestReference(ms, tr, id);
                     tr.Commit();
                 }
 
@@ -2706,9 +2703,9 @@ public partial class Commands
                     var divLayer = lt.Has("Div kabels") ? lt["Div kabels"] : AddLayer(lt, tr, "Div kabels", 1);
                     var eqLayer = lt.Has("Eq kabels") ? lt["Eq kabels"] : AddLayer(lt, tr, "Eq kabels");
                     var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                    var l1 = new Line(new Point3d(0, 0, 0), new Point3d(4, 0, 0)) { LayerId = divLayer };
+                    using var l1 = new Line(new Point3d(0, 0, 0), new Point3d(4, 0, 0)) { LayerId = divLayer };
                     ms.AppendEntity(l1); tr.AddNewlyCreatedDBObject(l1, true);
-                    var l2 = new Line(new Point3d(0, 50, 0), new Point3d(4, 50, 0)) { LayerId = eqLayer };
+                    using var l2 = new Line(new Point3d(0, 50, 0), new Point3d(4, 50, 0)) { LayerId = eqLayer };
                     ms.AppendEntity(l2); tr.AddNewlyCreatedDBObject(l2, true);
                     tr.Commit();
                 }
@@ -2718,10 +2715,7 @@ public partial class Commands
                 {
                     var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
                     foreach (var id in new[] { xDiv, xEq })
-                    {
-                        var br = new BlockReference(Point3d.Origin, id);
-                        ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
-                    }
+                        AddTestReference(ms, tr, id);
                     tr.Commit();
                 }
 
@@ -2891,8 +2885,8 @@ public partial class Commands
             DiagnosticRun.Execute(() =>
             {
                 Directory.CreateDirectory(dir);
-                string a = Path.Combine(dir, "a_met.dwg");
-                string b = Path.Combine(dir, "b_zonder.dwg");
+                string a = Path.Join(dir, "a_met.dwg");
+                string b = Path.Join(dir, "b_zonder.dwg");
                 CreateXrefLineDwg(a, "Eigen batchkabel", 8.0);
                 CreateXrefLineDwg(b, "Iets anders", 3.0);
                 string ha1 = Sha256(a), hb1 = Sha256(b);
@@ -3057,6 +3051,13 @@ public partial class Commands
             ed.WriteMessage($"\nEIGENZICHT: bevroren eigen={off.eigen} nlcs={off.nlcs} (verw false/false); " +
                 $"meenemen eigen={on.eigen} nlcs={on.nlcs} (verw true/true) -> {(ok ? "OK" : "FAIL")}");
         }, message => ed.WriteMessage(message), "NlcsLegendaEigenZichtbaarTest");
+    }
+
+    private static void AddTestReference(BlockTableRecord target, Transaction tr, ObjectId definition)
+    {
+        using var reference = new BlockReference(Point3d.Origin, definition);
+        target.AppendEntity(reference);
+        tr.AddNewlyCreatedDBObject(reference, true);
     }
 
     private static void CreateXrefLineDwg(string path, string layer, double length, short colorIndex = 0)
