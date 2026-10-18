@@ -105,6 +105,7 @@ internal static class RibbonIcons
                 break;
 
             case "NLCSLEGENDAOPTIES":
+            case "NLCSLEGENDASTANDAARD":
                 g.DrawLine(pen, 8 * s, 12 * s, 24 * s, 12 * s);
                 g.DrawLine(pen, 8 * s, 20 * s, 24 * s, 20 * s);
                 Knob(g, fill, pen, s, 19f, 12f);

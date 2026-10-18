@@ -60,6 +60,9 @@ jobs:
       - name: Test vensters en bediening
         if: matrix.acad == '2025'
         run: dotnet run --project tests/NlcsLegenda.Ui.Tests -c Release
+      - name: Test ribbonpictogrammen
+        if: matrix.acad == '2025'
+        run: dotnet run --project tests/NlcsLegenda.Ui.Tests -c Release -- --icons
       - name: Test profielherstel en PowerShell-syntax
         if: matrix.acad == '2025'
         run: ./dev/scripts/Test-CoreConsoleState.ps1

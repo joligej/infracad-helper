@@ -19,7 +19,7 @@ internal sealed class LayerEditDialog : LegendDialog
     private readonly TextBox _object = new() { Dock = DockStyle.Fill };
     private readonly ComboBox _element = new() { DropDownStyle = ComboBoxStyle.DropDown, Width = 90 };
     private readonly TextBox _scale = new() { Width = 70 };
-    private readonly Label _preview = new() { AutoSize = true, Dock = DockStyle.Fill, Font = new Font(FontFamily.GenericMonospace, 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+    private readonly Label _preview = new() { AutoSize = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
     private readonly Label _status2 = new() { AutoSize = true, Dock = DockStyle.Fill, ForeColor = Color.Firebrick, TextAlign = ContentAlignment.TopLeft };
     private readonly Button _ok;
 
@@ -31,6 +31,7 @@ internal sealed class LayerEditDialog : LegendDialog
         NlcsLayerComponents initial, string sourceName, int affected, bool sourceLocked,
         Func<string, (bool exists, int count, string info)>? targetProbe)
     {
+        _preview.Font = Own(new Font(FontFamily.GenericMonospace, 10, FontStyle.Bold));
         _comp = initial;
         _affected = affected;
         _probe = targetProbe;

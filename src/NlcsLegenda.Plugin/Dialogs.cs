@@ -99,7 +99,7 @@ internal sealed class SettingsDialog : LegendDialog
             AutoSize = true,
             TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(10, 0, 0, 0),
-            Font = new Font(SystemFonts.MessageBoxFont!, FontStyle.Bold)
+            Font = Own(new Font(SystemFonts.MessageBoxFont!, FontStyle.Bold))
         };
 
         var tabs = new TabControl { Dock = DockStyle.Fill, Appearance = TabAppearance.FlatButtons,
