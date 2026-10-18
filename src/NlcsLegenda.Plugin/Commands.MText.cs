@@ -453,11 +453,8 @@ public partial class Commands
         LegendScope scope = LegendScope.WholeDrawing, List<string>? handles = null)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
-        foreach (var n in new[] { s.HeaderTextLayer, s.TextLayer, s.FrameLayer }.Where(n => !string.IsNullOrEmpty(n) && !lt.Has(n)))
-            {
-                using var r = new LayerTableRecord { Name = n };
-                lt.Add(r); tr.AddNewlyCreatedDBObject(r, true);
-            }
+        foreach (var name in new[] { s.HeaderTextLayer, s.TextLayer, s.FrameLayer }.Where(name => !string.IsNullOrEmpty(name) && !lt.Has(name)))
+            AddLayer(lt, tr, name);
 
         var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
         var btr = new BlockTableRecord { Name = "NLCS_LEGENDA_" + System.Guid.NewGuid().ToString("N"), Origin = Point3d.Origin };

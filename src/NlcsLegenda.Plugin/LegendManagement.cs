@@ -115,13 +115,10 @@ internal static class LegendManagement
         if (!gd.Contains(groupName) || tr.GetObject(gd.GetAt(groupName), OpenMode.ForRead) is not Group g)
             return false;
         bool any = false;
-        foreach (var ent in Entities(g.GetAllEntityIds(), tr, OpenMode.ForRead))
+        foreach (var measured in MeasuredExtents(Entities(g.GetAllEntityIds(), tr, OpenMode.ForRead), tr, Matrix3d.Identity, 0))
         {
-            if (TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out var e))
-            {
-                extents.AddExtents(e);
-                any = true;
-            }
+            extents.AddExtents(measured);
+            any = true;
         }
         return any;
     }
@@ -129,6 +126,10 @@ internal static class LegendManagement
     // blokinhoud meten bij ontbrekende grafische grenzen
     public static bool TryGetEntityExtents(Transaction tr, Entity ent, out Extents3d extents)
         => TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out extents);
+
+    private static IEnumerable<Extents3d> MeasuredExtents(IEnumerable<Entity> entities, Transaction tr, Matrix3d transform, int depth) =>
+        entities.Select(entity => TryEntityExtents(tr, entity, transform, depth, out var extents) ? (Extents3d?)extents : null)
+            .OfType<Extents3d>();
 
     private static bool TryEntityExtents(Transaction tr, Entity ent, Matrix3d xform, int depth, out Extents3d extents)
     {
@@ -139,13 +140,10 @@ internal static class LegendManagement
         {
             var m = xform * br.BlockTransform;
             bool any = false;
-            foreach (var child in Entities(btr.Cast<ObjectId>(), tr, OpenMode.ForRead))
+            foreach (var measured in MeasuredExtents(Entities(btr.Cast<ObjectId>(), tr, OpenMode.ForRead), tr, m, depth + 1))
             {
-                if (TryEntityExtents(tr, child, m, depth + 1, out var ce))
-                {
-                    extents.AddExtents(ce);
-                    any = true;
-                }
+                extents.AddExtents(measured);
+                any = true;
             }
             return any;
         }
