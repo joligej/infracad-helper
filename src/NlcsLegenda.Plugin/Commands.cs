@@ -19,14 +19,14 @@ public partial class Commands
 {
     private const string LegendLayerPrefix = "X-XX-AL-LEGENDA";
 
-    private static string ConfigDir => Path.Combine(
+    private static string ConfigDir => Path.Join(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NlcsLegenda");
 
-    private static string ConfigPath => Path.Combine(ConfigDir, "settings.json");
+    private static string ConfigPath => Path.Join(ConfigDir, "settings.json");
 
-    private static string DescriptionsPath => Path.Combine(ConfigDir, "omschrijvingen.json");
+    private static string DescriptionsPath => Path.Join(ConfigDir, "omschrijvingen.json");
 
-    private static string PresetsDir => Path.Combine(ConfigDir, "presets");
+    private static string PresetsDir => Path.Join(ConfigDir, "presets");
 
     internal static string PluginVersion
     {
@@ -278,8 +278,8 @@ public partial class Commands
             }
 
             var baseName = string.IsNullOrEmpty(db.Filename)
-                ? Path.Combine(Path.GetTempPath(), suffix)
-                : Path.Combine(Path.GetDirectoryName(db.Filename)!,
+                ? Path.Join(Path.GetTempPath(), suffix)
+                : Path.Join(Path.GetDirectoryName(db.Filename)!,
                     Path.GetFileNameWithoutExtension(db.Filename) + "_" + suffix);
 
             var csvPath = baseName + ".csv";
@@ -344,7 +344,7 @@ public partial class Commands
         var ed = doc.Editor;
         DiagnosticRun.Execute(() =>
         {
-            var sidecar = Path.Combine(Path.GetTempPath(), "nlcs_batch_test.txt");
+            var sidecar = Path.Join(Path.GetTempPath(), "nlcs_batch_test.txt");
             if (!File.Exists(sidecar))
             {
                 ed.WriteMessage($"\nNLCSBATCHTEST: {sidecar} ontbreekt.");
@@ -377,8 +377,8 @@ public partial class Commands
             .ToList();
 
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        var csvPath = Path.Combine(folder, $"NLCS-uittrekstaat_{stamp}.csv");
-        var jsonPath = Path.Combine(folder, $"NLCS-uittrekstaat_{stamp}.json");
+        var csvPath = Path.Join(folder, $"NLCS-uittrekstaat_{stamp}.csv");
+        var jsonPath = Path.Join(folder, $"NLCS-uittrekstaat_{stamp}.json");
         File.WriteAllText(csvPath,
             LegendExport.ToCombinedCsv(withEntries, settings.QuantityDecimals, settings.UnitArea, settings.UnitLength, settings.UnitCount, settings.Klic.Columns),
             new UTF8Encoding(true));
@@ -2580,8 +2580,8 @@ public partial class Commands
         var ed = doc.Editor;
         var db = doc.Database;
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
-        string pathA = Path.Combine(dir, "eigen_xref_a.dwg");
-        string pathB = Path.Combine(dir, "eigen_xref_b.dwg");
+        string pathA = Path.Join(dir, "eigen_xref_a.dwg");
+        string pathB = Path.Join(dir, "eigen_xref_b.dwg");
         try
         {
             DiagnosticRun.Execute(() =>
@@ -2879,7 +2879,7 @@ public partial class Commands
         if (doc is null)
             return;
         var ed = doc.Editor;
-        string dir = Path.Combine(Path.GetTempPath(), "nlcs_eigenbatch_" + Guid.NewGuid().ToString("N"));
+        string dir = Path.Join(Path.GetTempPath(), "nlcs_eigenbatch_" + Guid.NewGuid().ToString("N"));
         try
         {
             DiagnosticRun.Execute(() =>
@@ -3137,8 +3137,8 @@ public partial class Commands
         DiagnosticRun.Execute(() =>
         {
             string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
-            string pathA = Path.Combine(dir, "abc_xref_a.dwg");
-            string pathB = Path.Combine(dir, "abc_xref_b.dwg");
+            string pathA = Path.Join(dir, "abc_xref_a.dwg");
+            string pathB = Path.Join(dir, "abc_xref_b.dwg");
             CreateXrefSourceDwg(pathA, "N-WE-VH-XREFA-G");
             CreateXrefSourceDwg(pathB, "N-WE-VH-XREFB-G");
 

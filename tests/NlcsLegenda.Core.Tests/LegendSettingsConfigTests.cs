@@ -8,7 +8,7 @@ public class LegendSettingsConfigTests
     [Fact]
     public void SaveAndLoad_RoundTripsValues()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nlcs_{Guid.NewGuid():N}.json");
+        var path = Path.Join(Path.GetTempPath(), $"nlcs_{Guid.NewGuid():N}.json");
         try
         {
             var original = new LegendSettings
@@ -44,7 +44,7 @@ public class LegendSettingsConfigTests
     [Fact]
     public void Load_MissingFile_ReturnsDefaults()
     {
-        var loaded = LegendSettings.Load(Path.Combine(Path.GetTempPath(), $"missing_{Guid.NewGuid():N}.json"));
+        var loaded = LegendSettings.Load(Path.Join(Path.GetTempPath(), $"missing_{Guid.NewGuid():N}.json"));
         Assert.Equal(200, loaded.Scale);
         Assert.True(loaded.IncludeText);
     }

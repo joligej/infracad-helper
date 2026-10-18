@@ -94,7 +94,7 @@ public class SettingsCustomizationTests
     [Fact]
     public void Settings_RoundtripKeepsCustomTexts()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nlcs-settings-{Guid.NewGuid():N}.json");
+        var path = Path.Join(Path.GetTempPath(), $"nlcs-settings-{Guid.NewGuid():N}.json");
         try
         {
             var original = new LegendSettings

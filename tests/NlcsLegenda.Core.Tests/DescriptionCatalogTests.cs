@@ -38,7 +38,7 @@ public class DescriptionCatalogTests
     [Fact]
     public void SaveAndLoad_RoundTrips()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nlcs_desc_{Guid.NewGuid():N}.json");
+        var path = Path.Join(Path.GetTempPath(), $"nlcs_desc_{Guid.NewGuid():N}.json");
         try
         {
             var catalog = new DescriptionCatalog();
