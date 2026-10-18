@@ -25,7 +25,7 @@ internal sealed class KlicAttachedData : IDisposable
         if (dictionary.Contains("AEC_PROPERTY_SETS"))
         {
             try { ReadPropertySets(dictionary.GetAt("AEC_PROPERTY_SETS"), tr, records); }
-            catch (Exception ex) { issues.Add("Property Sets niet leesbaar: " + Message(ex)); }
+            catch (Exception ex) when (IsAdapterFailure(ex)) { issues.Add("Property Sets niet leesbaar: " + Message(ex)); }
         }
         bool hasObjectData = false;
         foreach (DBDictionaryEntry entry in dictionary)
@@ -41,7 +41,7 @@ internal sealed class KlicAttachedData : IDisposable
         string context = "objectrecords";
         try
         {
-            var method = _odTables!.GetType().GetMethod("GetObjectRecords", new[] { typeof(uint), typeof(DBObject), _readMode!.GetType(), typeof(bool) })!;
+            var method = Method(_odTables!, "GetObjectRecords", typeof(uint), typeof(DBObject), _readMode!.GetType(), typeof(bool));
             using var rows = (IDisposable)method.Invoke(_odTables, new[] { (object)0u, entity, _readMode, false })!;
             foreach (var row in (IEnumerable)rows)
             {
@@ -67,7 +67,7 @@ internal sealed class KlicAttachedData : IDisposable
                 if (values.Count > 0) records.Add(new KlicRecord(KlicSource.ObjectData, table.Name, values));
             }
         }
-        catch (Exception ex) { issues.Add("Object Data niet volledig leesbaar (" + context + "): " + Message(ex)); }
+        catch (Exception ex) when (IsAdapterFailure(ex)) { issues.Add("Object Data niet volledig leesbaar (" + context + "): " + Message(ex)); }
     }
 
     private void ReadPropertySets(ObjectId id, Transaction tr, List<KlicRecord> records)
@@ -91,7 +91,7 @@ internal sealed class KlicAttachedData : IDisposable
                 _definitions.Add(definitionId, definition = (name, fields.ToArray()));
             }
             if (definition.Fields.Length == 0) continue;
-            var getAt = set.GetType().GetMethod("GetAt", new[] { typeof(int) })!;
+            var getAt = Method(set, "GetAt", typeof(int));
             var values = definition.Fields.ToDictionary(f => f.Name,
                 f => Convert.ToString(getAt.Invoke(set, new object[] { f.Id }), CultureInfo.InvariantCulture) ?? "");
             records.Add(new KlicRecord(KlicSource.PropertySets, definition.Name, values));
@@ -116,7 +116,9 @@ internal sealed class KlicAttachedData : IDisposable
                 if (!File.Exists(file)) throw new InvalidOperationException("Deze AutoCAD-host heeft geen Map-API.");
                 assembly = Assembly.LoadFrom(file);
             }
-            var application = assembly.GetType("Autodesk.Gis.Map.HostMapApplicationServices", true)!.GetProperty("Application")!.GetValue(null)!;
+            var application = (assembly.GetType("Autodesk.Gis.Map.HostMapApplicationServices", true)!.GetProperty("Application")
+                ?? throw new MissingMemberException("Map.Application ontbreekt.")).GetValue(null)
+                ?? throw new InvalidOperationException("Map.Application is niet beschikbaar.");
             // geen actief map-project gebruiken voor een andere brontekening
             if (!Autodesk.AutoCAD.ApplicationServices.Core.Application.DocumentManager.Cast<Autodesk.AutoCAD.ApplicationServices.Document>()
                 .Any(d => d.Database.UnmanagedObject == _database.UnmanagedObject))
@@ -124,12 +126,12 @@ internal sealed class KlicAttachedData : IDisposable
                 _mapIssue = "Object Data in deze xref of achtergrondtekening is niet gecontroleerd. Open de bron-DWG in Civil 3D/Map voor deze controle; ingebedde gegevens en leesbare Property Sets blijven beschikbaar.";
                 return;
             }
-            var project = application.GetType().GetMethod("GetProjectForDB", new[] { typeof(Database) })!.Invoke(application, new object[] { _database });
+            var project = Method(application, "GetProjectForDB", typeof(Database)).Invoke(application, new object[] { _database });
             if (project is null) throw new InvalidOperationException("Deze bron-database is niet beschikbaar als Map-project.");
             if (((Database)Get(project, "Database")!).UnmanagedObject != _database.UnmanagedObject) throw new InvalidOperationException("Map-project hoort bij een andere bron-database.");
             _odTables = Get(project, "ODTables")!;
             _readMode = Enum.Parse(assembly.GetType("Autodesk.Gis.Map.Constants.OpenMode", true)!, "OpenForRead");
-            foreach (string name in (IEnumerable)_odTables.GetType().GetMethod("GetTableNames")!.Invoke(_odTables, null)!)
+            foreach (string name in (IEnumerable)Method(_odTables, "GetTableNames").Invoke(_odTables, null)!)
             {
                 if (!name.StartsWith("KLIC_", StringComparison.OrdinalIgnoreCase)) continue;
                 var table = Get(_odTables, "Item", name)!;
@@ -148,8 +150,17 @@ internal sealed class KlicAttachedData : IDisposable
             }
             if (_tables.Count == 0) _mapIssue = "Object Data aanwezig, maar geen leesbare KLIC-tabellen gevonden.";
         }
-        catch (Exception ex) { _mapIssue = "Object Data niet gecontroleerd: " + Message(ex); }
+        catch (Exception ex) when (IsAdapterFailure(ex)) { _mapIssue = "Object Data niet gecontroleerd: " + Message(ex); }
     }
+
+    private static bool IsAdapterFailure(Exception error) => !ExceptionSafety.IsFatal(error)
+        && error is Autodesk.AutoCAD.Runtime.Exception or TargetInvocationException or TypeLoadException
+            or MissingMemberException or InvalidOperationException or InvalidCastException or ArgumentException
+            or IOException or UnauthorizedAccessException or NotSupportedException or FormatException
+            or System.Runtime.InteropServices.ExternalException;
+
+    private static MethodInfo Method(object target, string name, params Type[] types) =>
+        target.GetType().GetMethod(name, types) ?? throw new MissingMethodException(target.GetType().FullName, name);
 
     private static object? Get(object obj, string name, params object[] index) =>
         (obj.GetType().GetProperty(name) ?? throw new MissingMemberException(obj.GetType().Name, name)).GetValue(obj, index);
@@ -161,7 +172,10 @@ internal sealed class KlicAttachedData : IDisposable
     }
     public void Dispose()
     {
-        foreach (var table in _tables) (table.Table as IDisposable)?.Dispose();
-        (_odTables as IDisposable)?.Dispose();
+        using var cleanup = new ResourceScope();
+        if (_odTables is IDisposable tables) cleanup.Own(tables);
+        foreach (var table in _tables.Select(table => table.Table).OfType<IDisposable>()) cleanup.Own(table);
+        _tables.Clear();
+        _odTables = null;
     }
 }

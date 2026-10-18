@@ -58,7 +58,7 @@ public partial class Commands
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             string folder = Path.GetDirectoryName(db.Filename)!;
             string a = Path.Join(folder, "klic-a.dwg"), b = Path.Join(folder, "klic-b.dwg"), outer = Path.Join(folder, "klic-outer.dwg");
@@ -71,8 +71,7 @@ public partial class Commands
             AddKlicXref(db, outer, "OUTER", 2); AddKlicXref(db, b, "SECOND", 1);
             CheckKlicDrawing(db);
             doc.Editor.WriteMessage("\nKLIC lokale en geneste xrefs: 4 netbeheerders, onbekend, 30m, samenvoegen en uitsluiten -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nKLIC FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaKlicTest");
     }
 
     private static void AddKlicXref(Database db, string file, string name, double scale)
@@ -137,7 +136,7 @@ public partial class Commands
     public void NlcsLegendaKlicVerify()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
-        try { CheckKlicDrawing(doc.Database); doc.Editor.WriteMessage("\nKLIC na heropenen: netbeheerders en 30m behouden -> OK"); }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nKLIC FAIL: {ex}"); }
+        DiagnosticRun.Execute(() =>
+        { CheckKlicDrawing(doc.Database); doc.Editor.WriteMessage("\nKLIC na heropenen: netbeheerders en 30m behouden -> OK"); }, message => doc.Editor.WriteMessage(message), "NlcsLegendaKlicVerify");
     }
 }

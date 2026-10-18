@@ -20,7 +20,8 @@ public sealed class Plugin : IExtensionApplication
         {
             RibbonBuilder.Initialize();
         }
-        catch (System.Exception ex)
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException
+            or ArgumentException or System.Runtime.InteropServices.ExternalException or System.IO.IOException or NotSupportedException)
         {
             ed?.WriteMessage($"\nNLCS Legenda: de werkbalk kon niet worden opgebouwd ({ex.Message}). De commando's werken wel.\n");
         }

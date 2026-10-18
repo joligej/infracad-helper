@@ -22,7 +22,7 @@ public partial class Commands
         {
             ShowHelp();
         }
-        catch (System.Exception ex)
+        catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nHelp kon niet worden geopend: {ex.Message}");
         }

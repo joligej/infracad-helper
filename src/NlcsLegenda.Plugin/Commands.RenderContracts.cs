@@ -17,7 +17,7 @@ public partial class Commands
         var db = doc.Database;
         var ed = doc.Editor;
         const string layerName = "N-WE-VH-PROPERTY-G";
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -61,7 +61,7 @@ public partial class Commands
             {
                 var result = DrawingAnalyzer.Analyze(db, tr, settings);
                 var rows = result.Entries.Where(e => e.Element == "PROPERTY").ToList();
-                if (rows.Count != 5 || !rows.Select(e => e.Metric.Length).OrderBy(x => x).SequenceEqual(new[] { 3d,4,4,5,6 }))
+                if (rows.Count != 5 || !rows.Select(e => e.Metric.Length).OrderBy(x => x).SequenceEqual(new[] { 3d, 4, 4, 5, 6 }))
                     throw new InvalidOperationException("Stijlpartities of hoeveelheden onjuist.");
                 var inherited = result.Entries.Single(e => e.Element == "INHERIT");
                 if (Math.Abs(inherited.Metric.Length - 15) > 1e-8) throw new InvalidOperationException("ByBlock niet gelijk aan expliciete stijl.");
@@ -74,7 +74,7 @@ public partial class Commands
                 var block = (BlockTableRecord)tr.GetObject(blockIdBuilt, OpenMode.ForRead);
                 var swatches = block.Cast<ObjectId>().Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Polyline>()
                     .Where(e => e.Layer.StartsWith(layerName, StringComparison.Ordinal)).ToList();
-                if (swatches.Count != 5 || swatches.Any(e => e.Color.ColorValue.ToArgb() != Color.FromRgb(30,80,160).ColorValue.ToArgb())
+                if (swatches.Count != 5 || swatches.Any(e => e.Color.ColorValue.ToArgb() != Color.FromRgb(30, 80, 160).ColorValue.ToArgb())
                     || swatches.Count(e => e.Transparency.IsByAlpha && e.Transparency.Alpha == 100) != 1
                     || swatches.Count(e => e.LineWeight == LineWeight.LineWeight100) != 1
                     || swatches.Count(e => e.Linetype == "PROPERTY_DASH") != 2
@@ -99,15 +99,14 @@ public partial class Commands
             if (!failed || ReadPlacementFingerprint(db) != before)
                 throw new InvalidOperationException("Mislukte update laat gedeeltelijke wijzigingen achter.");
             ed.WriteMessage("\nPROPERTY mislukte tekenregel: vorige legenda en registratie behouden -> OK");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nPROPERTY FAIL: {ex}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaPropertyTest");
     }
     [CommandMethod("NLCSLEGENDASYMBOLEDGETEST", CommandFlags.Modal)]
     public void NlcsLegendaSymbolEdgeTest()
     {
         var doc = AcAp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -157,8 +156,7 @@ public partial class Commands
                 tr.Abort();
             }
             doc.Editor.WriteMessage("\nSYMBOLEDGE leeg/verborgen/lijn/verschillende arceringscontouren -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nSYMBOLEDGE FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaSymbolEdgeTest");
     }
 
     [CommandMethod("NLCSLEGENDAPOLYOWNERSHIPTEST", CommandFlags.Modal)]
@@ -166,7 +164,7 @@ public partial class Commands
     {
         var doc = AcAp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = db.TransactionManager.StartTransaction();
             var layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
@@ -181,7 +179,7 @@ public partial class Commands
                 using Curve curve = spatial ? new Polyline3d() : new Polyline2d();
                 curve.LayerId = layerId;
                 definition.AppendEntity(curve); tr.AddNewlyCreatedDBObject(curve, true);
-                foreach (var point in new[] { Point3d.Origin, new Point3d(3,0,0), new Point3d(3,4,0) })
+                foreach (var point in new[] { Point3d.Origin, new Point3d(3, 0, 0), new Point3d(3, 4, 0) })
                 {
                     if (curve is Polyline2d p2)
                     {
@@ -210,8 +208,7 @@ public partial class Commands
             }
             tr.Commit();
             doc.Editor.WriteMessage("\nPOLYOWNERSHIP 2D/3D 14m en bronvertices ongewijzigd na drie analyses -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nPOLYOWNERSHIP FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaPolyOwnershipTest");
     }
 
     [CommandMethod("NLCSLEGENDAPAPERSCALETEST", CommandFlags.Modal)]
@@ -219,7 +216,7 @@ public partial class Commands
     {
         var doc = AcAp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             foreach (double scale in new[] { 100d, 200d, 500d, 1000d })
             {
@@ -248,9 +245,8 @@ public partial class Commands
                     throw new InvalidOperationException($"Tekstbasislijn of afstand wijkt af: bodies={bodies.Count}.");
                 var border = entities.OfType<Polyline>().Where(e => e.Closed && e.Layer == settings.FrameLayer)
                     .Select(e => e.GeometricExtents).OrderByDescending(e => (e.MaxPoint.X - e.MinPoint.X) * (e.MaxPoint.Y - e.MinPoint.Y)).First();
-                foreach (var entity in entities)
+                foreach (var bounds in entities.Select(entity => entity.GeometricExtents))
                 {
-                    var bounds = entity.GeometricExtents;
                     if (bounds.MinPoint.X < border.MinPoint.X - 1e-5 || bounds.MinPoint.Y < border.MinPoint.Y - 1e-5
                         || bounds.MaxPoint.X > border.MaxPoint.X + 1e-5 || bounds.MaxPoint.Y > border.MaxPoint.Y + 1e-5)
                         throw new InvalidOperationException("Uitvoer steekt buiten het kader.");
@@ -258,7 +254,6 @@ public partial class Commands
                 tr.Abort();
                 doc.Editor.WriteMessage($"\nPAPERSCALE 1:{scale:0} vakken24x5/tekst2.5/kop2.5/titel5/gap5.7188/basislijn/kader -> OK");
             }
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nPAPERSCALE FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaPaperScaleTest");
     }
 }

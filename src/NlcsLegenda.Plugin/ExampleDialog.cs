@@ -55,7 +55,7 @@ internal sealed class ExampleDialog : LegendDialog
         {
             _examples = _load(path); LibraryPath = path; _path.Text = System.IO.Path.GetFileName(path); Filter();
         }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Voorbeelden", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { MessageBox.Show(this, ex.Message, "Voorbeelden", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
     }
 
     private void Filter()

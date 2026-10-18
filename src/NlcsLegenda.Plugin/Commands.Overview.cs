@@ -38,7 +38,7 @@ public partial class Commands
             { using var tr = doc.Database.TransactionManager.StartTransaction(); using var library = new ExampleLibrary(path, doc.Database, tr); return library.Examples; });
             AcWindows.ShowModalDialog(dialog);
         }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nOverzicht kon niet worden geopend: {ex.Message}"); }
+        catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex)) { doc.Editor.WriteMessage($"\nOverzicht kon niet worden geopend: {ex.Message}"); }
     }
 
     private static IReadOnlyList<LegendEntry> AnalyzeOverview(Database db, OverviewLegend item)
@@ -77,7 +77,7 @@ public partial class Commands
             LegendStore.Save(db, tr, registry);
             tr.Commit();
         }
-        catch (System.Exception ex) { return $"De volgorde is niet opgeslagen: {ex.Message}"; }
+        catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex)) { return $"De volgorde is niet opgeslagen: {ex.Message}"; }
         PurgePending(db);
         return null;
     }

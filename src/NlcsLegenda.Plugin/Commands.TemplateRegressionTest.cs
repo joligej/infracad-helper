@@ -13,7 +13,7 @@ public partial class Commands
     public void TemplateRegressionTest()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var db = doc.Database;
             using var tr = db.TransactionManager.StartTransaction();
@@ -61,8 +61,7 @@ public partial class Commands
             if (!hatch.BackgroundColor.IsByLayer || !hatch.Associative || hatch.GetAssociatedObjectIds().Count != 1 || outline.NumberOfVertices != 5) throw new InvalidOperationException("Brongeometrie gewijzigd.");
             tr.Abort();
             doc.Editor.WriteMessage("\nTEMPLATEREGRESSION lijnbreedte, losse symboolcurve, cirkel en associatieve arcering; bron behouden -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage("\nTEMPLATEREGRESSION FAIL: " + ex); }
+        }, message => doc.Editor.WriteMessage(message), "TemplateRegressionTest");
     }
 
     [CommandMethod("NLCSLEGENDAEXAMPLETEST", CommandFlags.Modal)]
@@ -70,7 +69,7 @@ public partial class Commands
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         string path = Path.Join(Path.GetDirectoryName(doc.Database.Filename)!, "example-library.dwg");
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var source = new Database(true, true))
             {
@@ -111,15 +110,14 @@ public partial class Commands
             }
             File.Delete(path);
             doc.Editor.WriteMessage("\nEXAMPLE bibliotheekimport en bronmaat 1:200 naar 1:500 -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage("\nEXAMPLE FAIL: " + ex); }
+        }, message => doc.Editor.WriteMessage(message), "ExampleTest");
     }
 
     [CommandMethod("NLCSLEGENDAEXAMPLEVERIFY", CommandFlags.Modal)]
     public void ExampleVerify()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = doc.Database.TransactionManager.StartTransaction();
             var settings = LegendStore.Load(doc.Database, tr).FindById("example-regression")!.Settings;
@@ -129,8 +127,7 @@ public partial class Commands
             blockId = LegendBuilder.BuildBlock(doc.Database, tr, new AnalysisResult { Entries = new[] { ExampleTestEntry() } }, automatic, out _, out _);
             CheckExampleBlock(doc.Database, tr, blockId); tr.Abort();
             doc.Editor.WriteMessage("\nEXAMPLE na heropenen: gekozen voorbeeld zonder bronbibliotheek behouden -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage("\nEXAMPLE FAIL: " + ex); }
+        }, message => doc.Editor.WriteMessage(message), "ExampleVerify");
     }
 
     private static LegendEntry ExampleTestEntry() => new() { Status = NlcsStatus.Nieuw, Discipline = "WE", Hoofdgroep = "VH", Element = "EXAMPLE_BAND", Description = "Testband" };

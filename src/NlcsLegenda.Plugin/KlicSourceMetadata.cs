@@ -54,7 +54,9 @@ internal sealed class KlicSourceMetadata : IDisposable
 
     public void Dispose()
     {
-        foreach (var source in _sources.Values) source.Attached.Dispose();
+        using var cleanup = new ResourceScope();
+        foreach (var source in _sources.Values) cleanup.Own(source.Attached);
+        _sources.Clear();
     }
 
     private sealed class Source

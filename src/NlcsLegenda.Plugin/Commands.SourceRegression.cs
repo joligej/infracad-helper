@@ -14,7 +14,7 @@ public partial class Commands
     public void SourceRegressionTest()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var file = Path.Join(Path.GetDirectoryName(doc.Database.Filename)!, "shared-symbols.dwg");
             using (var source = new Database(true, true))
@@ -62,16 +62,15 @@ public partial class Commands
             }
             CheckSourceRegression(doc.Database);
             doc.Editor.WriteMessage("\nSOURCETEST gedeelde symbolen, xref-overrides en gewone omschrijvingen -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage("\nSOURCETEST FAIL: " + ex); }
+        }, message => doc.Editor.WriteMessage(message), "SourceRegressionTest");
     }
 
     [CommandMethod("NLCSLEGENDASOURCEVERIFY", CommandFlags.Modal)]
     public void SourceRegressionVerify()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
-        try { CheckSourceRegression(doc.Database); doc.Editor.WriteMessage("\nSOURCETEST na heropenen -> OK"); }
-        catch (System.Exception ex) { doc.Editor.WriteMessage("\nSOURCETEST FAIL: " + ex); }
+        DiagnosticRun.Execute(() =>
+        { CheckSourceRegression(doc.Database); doc.Editor.WriteMessage("\nSOURCETEST na heropenen -> OK"); }, message => doc.Editor.WriteMessage(message), "SourceRegressionVerify");
     }
 
     private static void CheckSourceRegression(Database db)

@@ -1,3 +1,4 @@
+using NlcsLegenda.Core;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
@@ -20,15 +21,13 @@ public partial class Commands
             HostApplicationServices.WorkingDatabase = db;
             try
             {
-                using var tr = db.TransactionManager.StartTransaction();
-                action(db, tr);
-                tr.Commit();
-                ed.WriteMessage($"\nLAYERMERGE {name} -> OK");
-            }
-            catch (System.Exception ex)
-            {
-                failures++;
-                ed.WriteMessage($"\nLAYERMERGE {name} -> FAIL: {ex.Message}");
+                if (!DiagnosticRun.Execute(() =>
+                {
+                    using var tr = db.TransactionManager.StartTransaction();
+                    action(db, tr);
+                    tr.Commit();
+                    ed.WriteMessage($"\nLAYERMERGE {name} -> OK");
+                }, message => ed.WriteMessage(message), "NlcsLegendaLayerMergeTest")) failures++;
             }
             finally { HostApplicationServices.WorkingDatabase = previous; }
         }

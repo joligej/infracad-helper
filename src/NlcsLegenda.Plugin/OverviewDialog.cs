@@ -156,7 +156,7 @@ internal sealed class OverviewDialog : LegendDialog
                 Current.Entries = _analyze(Current);
                 Current.NeedsAnalysis = false;
             }
-            catch (Exception ex) { _analysisError = "Bronnen niet gelezen: " + ex.Message + " Kies Vernieuwen om opnieuw te proberen."; }
+            catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { _analysisError = "Bronnen niet gelezen: " + ex.Message + " Kies Vernieuwen om opnieuw te proberen."; }
             finally { UseWaitCursor = false; }
         }
         _loading = true;
@@ -291,7 +291,7 @@ internal sealed class OverviewDialog : LegendDialog
             if (_analyze is not null) Current.Entries = _analyze(Current);
             Current.Changed = true; LoadEntries();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             Current.Settings.CopyFrom(previous);
             MessageBox.Show(this, ex.Message, "Voorbeeld", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -310,7 +310,7 @@ internal sealed class OverviewDialog : LegendDialog
             Current.Changed = Current.Id.Length > 0;
             ConfigureColumns(); LoadEntries();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             Current.Settings.Klic = previous;
             MessageBox.Show(this, "De KLIC-instellingen zijn niet toegepast: " + ex.Message, "KLIC-gegevens", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -337,7 +337,7 @@ internal sealed class OverviewDialog : LegendDialog
                 : LegendExport.ToCsv(_visible, s.QuantityDecimals, s.UnitArea, s.UnitLength, s.UnitCount, s.Klic.Columns);
             File.WriteAllText(dialog.FileName, text, new UTF8Encoding(dialog.FilterIndex == 1));
         }
-        catch (Exception ex) { MessageBox.Show(this, "Exporteren is niet gelukt: " + ex.Message, "Overzicht", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { MessageBox.Show(this, "Exporteren is niet gelukt: " + ex.Message, "Overzicht", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
     }
 
     private bool SaveChanges()

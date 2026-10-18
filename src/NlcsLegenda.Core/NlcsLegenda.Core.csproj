@@ -9,4 +9,7 @@
     <AssemblyName>NlcsLegenda.Core</AssemblyName>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="NlcsLegenda.Core.Tests" />
+  </ItemGroup>
 </Project>

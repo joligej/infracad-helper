@@ -20,14 +20,15 @@ public partial class Commands
             if (!passed) failures++;
             doc.Editor.WriteMessage($"\nCOMPOSITION {name} -> {(passed ? "OK" : "FAIL")}");
         }
-        try
+        if (!DiagnosticRun.Execute(() =>
         {
             ObjectId first;
             string legendId, before;
             var settings = new LegendSettings();
             settings.ManualEntries.Add(new ManualEntry
             {
-                Layer = "N-WE-VH-COMPOSITIONMANUAL-G", Description = "Alleen in legenda",
+                Layer = "N-WE-VH-COMPOSITIONMANUAL-G",
+                Description = "Alleen in legenda",
                 Type = NlcsDrawType.Geometrie
             });
             using (var tr = db.TransactionManager.StartTransaction())
@@ -81,12 +82,7 @@ public partial class Commands
             var tree = CompositionTree.Build(data.Select(i => (i.Key, i.Label, i.Group)), settings.ExcludedEntries);
             tree.SetGroup(tree.Groups.Single(), false);
             Check("DATA in een klik uit", tree.ExcludedKeys().Count == 2);
-        }
-        catch (System.Exception ex)
-        {
-            failures++;
-            doc.Editor.WriteMessage($"\nCOMPOSITION FAIL: {ex}");
-        }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaCompositionTest")) failures++;
         doc.Editor.WriteMessage($"\nCOMPOSITION totaal: {(failures == 0 ? "OK" : "FAIL")} ({failures} fouten)");
     }
 }

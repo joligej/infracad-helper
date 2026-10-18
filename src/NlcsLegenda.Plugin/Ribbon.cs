@@ -55,7 +55,8 @@ internal static class RibbonBuilder
                 _idleHooked = true;
             }
         }
-        catch (System.Exception ex)
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException
+            or ArgumentException or System.Runtime.InteropServices.ExternalException or System.IO.IOException or NotSupportedException)
         {
             _lastError = ex.Message;
         }
@@ -85,7 +86,8 @@ internal static class RibbonBuilder
                 _idleHooked = false;
             }
         }
-        catch (System.Exception ex)
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException
+            or ArgumentException or System.Runtime.InteropServices.ExternalException or System.IO.IOException or NotSupportedException)
         {
             _lastError = ex.Message;
             AcWindows.Idle -= OnIdle;

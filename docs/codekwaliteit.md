@@ -1,40 +1,43 @@
 # Codekwaliteit
 
-Beoordeling van de 167 open CodeQL-meldingen op 18 oktober 2026, na release 1.32.2.
-Alle meldingen hadden niveau `note`; er waren geen meldingen met niveau `warning`
-of `error`. Een laag niveau is geen reden om een melding over te slaan.
+De ronde na 1.32.3 begon met 142 CodeQL-meldingen: 111 over brede
+foutafhandeling, 27 over lussen en 4 over het vrijgeven van objecten.
+Ze hadden niveau `note`. De scanconfiguratie is niet versmald en meldingen
+worden niet handmatig gesloten om het aantal te verlagen.
 
-| Regel | Aantal bij aanvang | Beoordeling en wijziging |
-| --- | ---: | --- |
-| Brede foutafhandeling | 120 | Stille terugval bij configuratiebestanden verwijderd. CAD-extents en Windows-tekenfuncties vangen gerichte uitzonderingen op. Testcommando's, vensters, rollback en optionele Map-koppelingen behouden hun foutgrens waar die nodig is. |
-| Lege foutafhandeling | 9 | Alle gemelde plekken aangepast: leesfouten doorgeven, opruimfouten melden, mislukte verwijdering tijdens tekenen laten terugdraaien en verwachte testuitzonderingen expliciet controleren. |
-| Suggestie voor `Where` | 23 | Uitsluitingen met `UnionWith` opgebouwd en een dubbele dictionary-lookup door `TryAdd` vervangen. De overige lussen bevatten onder meer `out`-waarden, CAD-transacties, volgordeafhankelijke wijzigingen of vroege afslagen; een filterlambda maakt die niet duidelijker. |
-| Suggestie voor `Select` | 6 | Behouden. Het gaat onder meer om afzonderlijk vrij te geven vensters en CAD-objecten, en om een lokale tekstvariabele die tijdens het afbreken verandert. De levensduur blijft zichtbaar in de lus. |
-| Suggestie voor `using` | 4 | Behouden. De bibliotheek wordt pas geopend als een voorbeeld nodig is. Andere plekken ruimen verzamelingen of alleen nog niet aan een transactie overgedragen objecten op. Een algemeen `using` zou de levensduur veranderen. |
-| `Path.Combine` | 4 | `Path.Join` gebruikt voor het samenvoegen van een map met een bestandsnaam. Profielnamen worden daarnaast ontdaan van paden, ongeldige tekens en gereserveerde Windows-namen. |
-| Geneste voorwaarde | 1 | Samengevoegd bij het toepassen van de bronstijl. |
+## Wijzigingen in 1.32.4
 
-## Waarom sommige brede catches blijven
+- Globale instellingen worden eerst volledig voorbereid. Bij een mislukte
+  vervanging gebruikt herstel ook een tijdelijk bestand. De oorspronkelijke
+  fout, eventuele herstelfouten en opruimfouten blijven samen beschikbaar.
+- Een opruimbereik probeert alle geregistreerde bronnen te sluiten, in omgekeerde
+  volgorde en hoogstens één keer. CAD-objecten die al in een transactie staan
+  worden niet als losse objecten vrijgegeven. De voorbeeldenbibliotheek opent
+  nog steeds pas zodra een voorbeeld nodig is.
+- CAD-proeven gebruiken een gemeenschappelijke uitvoerder met een vaste
+  `FAIL:`-melding, testnaam en volledige foutinformatie. Ernstige geheugen- en
+  procesfouten worden doorgegeven. Een exportfout is geen CSV-resultaat meer.
+- Vensterproeven voeren de overige controles uit als één controle mislukt.
+  De uiteindelijke uitslag blijft dan mislukt.
+- Map-reflectie controleert ontbrekende methoden expliciet. Bestands-, CAD- en
+  Windows-foutpaden vangen hun toepasselijke fouttypen op.
+- Lussen selecteren de benodigde lagen, stijlen en attributen expliciet.
+  Testvoorbeelden wijzen ongeldige laagnamen af. Tekstafbreking splitst geen
+  gecombineerde letters of Unicode-symbolen.
 
-- Een CAD-test moet iedere mislukking in zijn log herkennen. Een onverwachte fout
-  mag niet ontsnappen zonder `FAIL` of een foutresultaat voor de testrunner.
-- Een venster meldt een fout en blijft open. Een mislukte bronanalyse levert geen
-  oude export op; een mislukte wijziging bewaart de voorgaande instellingen.
-- Herstel probeert alle systeemvariabelen of bestanden terug te zetten en meldt
-  de verzamelde fouten daarna. De eerste herstelmislukking mag de rest niet blokkeren.
-- Object Data en Property Sets gebruiken optionele, per CAD-versie verschillende
-  onderdelen. Een adapterfout wordt een zichtbare bronmelding, zonder te doen alsof
-  alle KLIC-gegevens gelezen zijn.
-- Een tekenfout krijgt context over de betreffende legendaregel en wordt daarna
-  doorgegeven. De transactie bewaart de vorige legenda.
+## Overblijvende foutgrenzen
 
-Deze redenen gelden voor de beoordeelde plekken, niet voor iedere nieuwe `catch`.
-Een nieuwe stille terugval of lege catch moet opnieuw worden beoordeeld.
-De scanconfiguratie is niet versmald en meldingen zijn niet in bulk afgesloten.
+Vensters melden gewone bewerkingsfouten en blijven open. Ernstige geheugen- en
+procesfouten passeren deze foutgrens, ook wanneer ze in een andere uitzondering
+zijn verpakt. Het opbouwen van een legendaregel voegt alleen aan gewone fouten
+context toe en geeft ze daarna door, zodat de transactie terugdraait. Een
+vensterproef controleert afzonderlijk dat geheugenuitputting wordt doorgegeven,
+de wachtcursor wordt hersteld en de bestaande lijst behouden blijft.
 
-## Controle bij wijzigingen
+## Validatie
 
-Gebruik de controles in [CONTRIBUTING](../CONTRIBUTING.md). Bij wijzigingen aan
-foutafhandeling horen ook foutgevallen: onleesbare configuratie, mislukte opbouw,
-terugdraaien, annuleren en herstel van CAD-instellingen. Een dalend aantal meldingen
-is pas nuttig als de plugin en de tests hun gedrag behouden.
+De tests dekken ook mislukte bestandsvervanging, herstel en opruiming tegelijk,
+onverwachte testfouten, volledige foutmeldingen, dubbel opruimen en Unicode-tekst.
+De native CAD-proef controleert dat een los object wordt vrijgegeven en een
+geregistreerd object beschikbaar blijft voor de transactie. Zie
+[CONTRIBUTING](../CONTRIBUTING.md) voor de volledige regressie- en releasecontroles.

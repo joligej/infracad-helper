@@ -70,7 +70,7 @@ internal sealed class KlicDetailsDialog : LegendDialog
                 if (!File.Exists(path)) throw new FileNotFoundException("De bijlage is niet gevonden. Controleer het pad in de brontekening.", path);
                 Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Bijlage", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or System.ComponentModel.Win32Exception) { MessageBox.Show(this, ex.Message, "Bijlage", MessageBoxButtons.OK, MessageBoxIcon.Information); }
         };
         attachments.Parent!.Controls.Add(open);
         var issues = KlicSummary.Issues(entry.KlicObjects);

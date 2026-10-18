@@ -16,20 +16,21 @@ internal static class Program
             DocumentationImages.Write(directory);
             return 0;
         }
-        try
+        DiagnosticRun.Execute(() =>
         {
             foreach (float scale in new[] { 1f, 1.25f, 1.5f, 2f })
-                CheckSettings(scale, args.FirstOrDefault());
-            CheckLayerSearch();
-            CheckSettingsSave();
-            CheckTemplateReset();
-            CheckXrefControls();
-            CheckOverview();
-            CheckOverviewLoading();
-            CheckKlic(args.FirstOrDefault());
-            CheckNestedEditors();
-            CheckCustomizationRoundtrip();
-            CheckStatusReassignment();
+                DiagnosticRun.Execute(() => CheckSettings(scale, args.FirstOrDefault()), Errors.Add, "CheckSettings");
+            DiagnosticRun.Execute(() => CheckLayerSearch(), Errors.Add, "CheckLayerSearch");
+            DiagnosticRun.Execute(() => CheckSettingsSave(), Errors.Add, "CheckSettingsSave");
+            DiagnosticRun.Execute(() => CheckTemplateReset(), Errors.Add, "CheckTemplateReset");
+            DiagnosticRun.Execute(() => CheckXrefControls(), Errors.Add, "CheckXrefControls");
+            DiagnosticRun.Execute(() => CheckOverview(), Errors.Add, "CheckOverview");
+            DiagnosticRun.Execute(() => CheckOverviewLoading(), Errors.Add, "CheckOverviewLoading");
+            DiagnosticRun.Execute(CheckOverviewFatalError, Errors.Add);
+            DiagnosticRun.Execute(() => CheckKlic(args.FirstOrDefault()), Errors.Add, "CheckKlic");
+            DiagnosticRun.Execute(() => CheckNestedEditors(), Errors.Add, "CheckNestedEditors");
+            DiagnosticRun.Execute(() => CheckCustomizationRoundtrip(), Errors.Add, "CheckCustomizationRoundtrip");
+            DiagnosticRun.Execute(() => CheckStatusReassignment(), Errors.Add, "CheckStatusReassignment");
             Func<Form>[] factories = {
                 () => new OverviewDialog(new[] { new OverviewLegend { Id = "test", Name = "Voorbeeld", Settings = new(), Entries = new[] { Entry("Regel") } } }, _ => null),
                 () => new LayerChoiceDialog(new[] { new ManualEntry { Layer = "N-WE-GR-BOOM-V", Description = "Boom" } }),
@@ -52,31 +53,55 @@ internal static class Program
             };
             foreach (var scale in new[] { 1f, 1.25f, 1.5f, 2f })
             foreach (var factory in factories)
-            {
-                using var form = factory();
-                OpenOffscreen(form);
-                form.AutoScaleMode = AutoScaleMode.None;
-                form.Scale(new SizeF(scale, scale));
-                form.Font = new Font(form.Font.FontFamily, 9f * scale);
-                form.MinimumSize = new Size(480, 340);
-                form.ClientSize = new Size(720, 540);
-                Application.DoEvents();
-                CheckButtons(form);
-                Check(Descendants(form).All(c => c is not TextBox || c.Height >= c.Font.Height), form.Text + ": teksthoogte");
-                if (form is ExampleDialog && args.FirstOrDefault() is { } output)
-                {
-                    Directory.CreateDirectory(output);
-                    using var image = new Bitmap(form.Width, form.Height);
-                    form.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
-                    image.Save(Path.Join(output, $"examples-{scale:0.00}.png"));
-                }
-                form.Close();
-            }
-        }
-        catch(Exception ex) { Errors.Add(ex.ToString()); }
+                DiagnosticRun.Execute(() => CheckForm(factory, scale, args.FirstOrDefault()), Errors.Add, $"venster {scale}");
+        }, Errors.Add);
         foreach(var error in Errors) Console.WriteLine("FAIL " + error);
         Console.WriteLine($"UI: {_checks} controles; {Errors.Count} fouten");
         return Errors.Count == 0 ? 0 : 1;
+    }
+
+    private static void CheckForm(Func<Form> factory, float scale, string? output)
+    {
+        using var form = factory();
+        OpenOffscreen(form);
+        form.AutoScaleMode = AutoScaleMode.None;
+        form.Scale(new SizeF(scale, scale));
+        form.Font = new Font(form.Font.FontFamily, 9f * scale);
+        form.MinimumSize = new Size(480, 340);
+        form.ClientSize = new Size(720, 540);
+        Application.DoEvents();
+        CheckButtons(form);
+        Check(Descendants(form).All(c => c is not TextBox || c.Height >= c.Font.Height), form.Text + ": teksthoogte");
+        if (form is ExampleDialog && output is not null)
+        {
+            Directory.CreateDirectory(output);
+            using var image = new Bitmap(form.Width, form.Height);
+            form.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
+            image.Save(Path.Join(output, $"examples-{scale:0.00}.png"));
+        }
+        form.Close();
+    }
+
+    private static void CheckOverviewFatalError()
+    {
+        var legend = new OverviewLegend { Id = "fatal", Name = "Proef", Settings = new(), Entries = new[] { Entry("Bestaand") } };
+        bool fail = false;
+        var error = new OutOfMemoryException("simulatie");
+        using var dialog = new OverviewDialog(new[] { legend }, _ => null,
+            _ => fail ? throw error : legend.Entries);
+        fail = true;
+        legend.NeedsAnalysis = true;
+        bool propagated = false;
+        try
+        {
+            typeof(OverviewDialog).GetMethod("LoadLegend", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                .Invoke(dialog, null);
+        }
+        catch (System.Reflection.TargetInvocationException ex) when (ReferenceEquals(ex.InnerException, error))
+        { propagated = true; }
+        Check(propagated, "Overzicht behandelt geheugenuitputting niet als een gewone bronfout");
+        Check(!dialog.UseWaitCursor, "Wachtcursor hersteld na ernstige bronfout");
+        Check(legend.Entries.Single().Description == "Bestaand", "Ernstige bronfout overschrijft de bestaande lijst niet");
     }
 
     private static void CheckSettingsSave()
@@ -302,8 +327,8 @@ internal static class Program
             if (dialog is null) return;
             timer.Stop();
             seen = true;
-            try { inspect(dialog); }
-            catch(Exception ex) { Errors.Add(ex.Message); dialog.DialogResult = DialogResult.Cancel; dialog.Close(); }
+            if (!DiagnosticRun.Execute(() => inspect(dialog), Errors.Add, title))
+            { dialog.DialogResult = DialogResult.Cancel; dialog.Close(); }
         };
         timer.Start();
         open();

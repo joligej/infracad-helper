@@ -484,9 +484,8 @@ internal sealed class SettingsDialog : LegendDialog
         var composition = CompositionItems();
         if (composition is null) return;
         if (_composition is not null || _compositionSource is not null)
-            foreach (var item in composition)
-                if (seen.Add(item.Key))
-                    available.Add((item.Key, item.Label));
+            foreach (var item in composition.Where(item => seen.Add(item.Key)))
+                available.Add((item.Key, item.Label));
         foreach (var manual in _settings.ManualEntries)
         {
             if (!manual.IsValid) continue;
@@ -569,7 +568,7 @@ internal sealed class SettingsDialog : LegendDialog
     private IReadOnlyList<EntryCheckItem>? CompositionItems()
     {
         try { return _compositionSource?.Invoke(_settings) ?? _composition ?? Array.Empty<EntryCheckItem>(); }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             MessageBox.Show(this, "De bronregels konden niet worden gelezen.\n\n" + ex.Message,
                 "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -609,7 +608,7 @@ internal sealed class SettingsDialog : LegendDialog
             if (SaveChanges?.Invoke() is not { } error) return true;
             MessageBox.Show(this, error, "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             MessageBox.Show(this, ex.Message, "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }

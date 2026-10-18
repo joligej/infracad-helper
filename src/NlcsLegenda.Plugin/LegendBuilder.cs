@@ -56,7 +56,7 @@ public static class LegendBuilder
         var savedExamples = ExampleLibrary.ReadCatalog(db, tr).ToDictionary(e => e.BlockName, StringComparer.Ordinal);
         var exampleChoices = LegendOrder.AlignChoices(s.ExampleOverrides, analysis.Entries);
         ExampleLibrary? examples = null;
-        try
+        using (var exampleResources = new ResourceScope())
         {
             foreach (var entry in analysis.Entries)
             {
@@ -66,7 +66,7 @@ public static class LegendBuilder
                 LegendExample? example = chosen && savedExamples.TryGetValue(name!, out var stored) && bt.Has(stored.BlockName) ? stored : null;
                 if (example is null && !string.IsNullOrWhiteSpace(s.ExampleLibraryPath))
                 {
-                    examples ??= new ExampleLibrary(s.ExampleLibraryPath, db, tr);
+                    examples ??= exampleResources.Own(new ExampleLibrary(s.ExampleLibraryPath, db, tr));
                     example = chosen ? examples.Examples.FirstOrDefault(e => e.BlockName == name)
                         : LegendExample.Match(examples.Examples, entry, s.Scale);
                     if (example is not null) examples.Import(db, tr, example);
@@ -84,7 +84,6 @@ public static class LegendBuilder
                     2 * Math.Max(Math.Abs(bounds.MinPoint.Y), Math.Abs(bounds.MaxPoint.Y)), true));
             }
         }
-        finally { examples?.Dispose(); }
         if (s.InsertSymbolBlocks && analysis.Entries.Any(e => e.IsManual && e.SymbolLayer is not null && e.SymbolBlockName is null))
             throw new InvalidOperationException("Vul bij iedere eigen symboolregel een bloknaam in.");
         if (s.InsertSymbolBlocks)
@@ -175,7 +174,7 @@ public static class LegendBuilder
                             symbols.GetValueOrDefault(item.Entry!));
                         rowCount++;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
                     {
                         throw new InvalidOperationException(
                             $"Legenda niet gewijzigd: '{item.Entry!.Description}' ({item.Entry.PrimaryLayer}) kon niet worden getekend.", ex);
@@ -348,10 +347,8 @@ public static class LegendBuilder
 
         var rowEntities = new List<ObjectId>();
         var renderLayers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var lyr in entry.LayersByType.Values)
+        foreach (var lyr in entry.LayersByType.Values.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            if (renderLayers.ContainsKey(lyr))
-                continue;
             if (!entry.IsManual && analysis.LayerStyles.TryGetValue(lyr, out var style))
                 renderLayers[lyr] = EnsureStyledLayer(tr, db, lyr, style);
             else
@@ -440,21 +437,11 @@ public static class LegendBuilder
             }
         }
 
-        foreach (ObjectId id in rowEntities)
-        {
-            if (tr.GetObject(id, OpenMode.ForWrite) is not Entity entity)
-                continue;
-            foreach (var rendered in renderLayers)
-                if (!entry.IsManual && rendered.Key != entry.SymbolLayer && entity.Layer == rendered.Value
-                    && analysis.LayerStyles.TryGetValue(rendered.Key, out var style))
-                {
-                    entity.Color = style.Color;
-                    entity.LineWeight = style.LineWeight;
-                    entity.Transparency = style.Transparency.ToAutoCadValue();
-                    entity.LinetypeId = ResolveStyleLinetype(tr, db, style);
-                    entity.LinetypeScale = style.LinetypeScale;
-                }
-        }
+        if (!entry.IsManual)
+            foreach (var entity in rowEntities.Select(id => tr.GetObject(id, OpenMode.ForWrite)).OfType<Entity>())
+                foreach (var style in renderLayers.Where(layer => layer.Key != entry.SymbolLayer && entity.Layer == layer.Value)
+                    .Select(layer => analysis.LayerStyles.GetValueOrDefault(layer.Key)).OfType<LayerDisplayStyle>())
+                    ApplyEntityStyle(entity, style, tr, db);
 
         if (s.DrawSwatchFrame)
         {
@@ -624,12 +611,10 @@ public static class LegendBuilder
             var m = Matrix3d.Displacement(new Vector3d(centerX - center.X, centerY - center.Y, 0))
                     * Matrix3d.Scaling(fit, center);
 
-            foreach (var id in primitives)
+            foreach (var entity in primitives.Select(id => tr.GetObject(id, OpenMode.ForWrite)).OfType<Entity>())
             {
-                if (tr.GetObject(id, OpenMode.ForWrite) is not Entity e)
-                    continue;
-                e.TransformBy(m);
-                e.Layer = layer;
+                entity.TransformBy(m);
+                entity.Layer = layer;
             }
             using (var order = new ObjectIdCollection(primitives.ToArray()))
                 ((DrawOrderTable)tr.GetObject(btr.DrawOrderTableId, OpenMode.ForWrite)).SetRelativeDrawOrder(order);
@@ -642,7 +627,7 @@ public static class LegendBuilder
             placed = primitives;
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
         {
             foreach (var id in created.Concat(primitives).Distinct())
                 EraseTemporary(tr, id);
@@ -692,6 +677,7 @@ public static class LegendBuilder
     // bronkopieën alleen hergebruiken binnen één bouwactie
     private sealed class SymbolImportSession(Database host, Transaction tr) : IDisposable
     {
+        private readonly ResourceScope _resources = new();
         private readonly Dictionary<(Database, string), SymbolSnapshot> _sources = new();
         private readonly Dictionary<(ObjectId, string), ObjectId> _definitions = new();
         private readonly List<ObjectId> _importedBlocks = new();
@@ -703,7 +689,7 @@ public static class LegendBuilder
             string prefix = string.IsNullOrEmpty(sample.SourceXref) ? string.Empty : sample.SourceXref + "|";
             var key = (original, prefix);
             if (!_sources.TryGetValue(key, out var snapshot))
-                _sources.Add(key, snapshot = new SymbolSnapshot(original, prefix));
+                _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(original, prefix)));
             ObjectId copyId;
             using (var sourceTr = snapshot.Database.TransactionManager.StartTransaction())
             {
@@ -732,7 +718,7 @@ public static class LegendBuilder
                 string prefix = string.IsNullOrEmpty(sourceXref) ? string.Empty : sourceXref + "|";
                 var key = (sourceId.OriginalDatabase, prefix);
                 if (!_sources.TryGetValue(key, out var snapshot))
-                    _sources.Add(key, snapshot = new SymbolSnapshot(sourceId.OriginalDatabase, prefix));
+                    _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(sourceId.OriginalDatabase, prefix)));
                 sourceId = snapshot.Database.GetObjectId(false, sourceId.NonForwardedHandle, 0);
                 ids.Clear(); ids.Add(sourceId);
                 snapshot.Database.WblockCloneObjects(ids, owner, mapping, DuplicateRecordCloning.Ignore, false);
@@ -778,7 +764,7 @@ public static class LegendBuilder
             if (_definitions.TryGetValue((definitionId, xrefPrefix), out var cached)) return cached;
             var key = (original, xrefPrefix);
             if (!_sources.TryGetValue(key, out var snapshot))
-                _sources.Add(key, snapshot = new SymbolSnapshot(original, xrefPrefix));
+                _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(original, xrefPrefix)));
             // anonieme xref-blokken krijgen in de host een andere naam
             var sourceId = snapshot.Database.GetObjectId(false, definitionId.NonForwardedHandle, 0);
             using var ids = new ObjectIdCollection { sourceId };
@@ -817,19 +803,18 @@ public static class LegendBuilder
         }
         public void Dispose()
         {
-            try
+            using var resources = _resources;
             {
                 for (int pass = 0; pass < _importedBlocks.Count; pass++)
                 {
                     bool erased = false;
-                    foreach (var imported in _importedBlocks)
-                        if (!imported.IsErased && tr.GetObject(imported, OpenMode.ForWrite) is BlockTableRecord block
-                            && block.GetBlockReferenceIds(true, false).Count == 0)
-                        { block.Erase(); erased = true; }
+                    foreach (var block in _importedBlocks.Where(id => !id.IsErased)
+                        .Select(id => tr.GetObject(id, OpenMode.ForWrite)).OfType<BlockTableRecord>()
+                        .Where(block => block.GetBlockReferenceIds(true, false).Count == 0))
+                    { block.Erase(); erased = true; }
                     if (!erased) break;
                 }
             }
-            finally { foreach (var source in _sources.Values) source.Dispose(); }
         }
     }
 
@@ -867,10 +852,9 @@ public static class LegendBuilder
                 var materials = (DBDictionary)transaction.GetObject(Database.MaterialDictionaryId, OpenMode.ForWrite);
                 var materialEntries = new List<(string Key, ObjectId Value)>();
                 foreach (DBDictionaryEntry item in materials) materialEntries.Add((item.Key, item.Value));
-                foreach (var item in materialEntries)
+                var reserved = new HashSet<string>(new[] { "ByLayer", "ByBlock", "Global" }, StringComparer.OrdinalIgnoreCase);
+                foreach (var item in materialEntries.Where(item => !reserved.Contains(item.Key)))
                 {
-                    if (item.Key.Equals("ByLayer", StringComparison.OrdinalIgnoreCase) || item.Key.Equals("ByBlock", StringComparison.OrdinalIgnoreCase)
-                        || item.Key.Equals("Global", StringComparison.OrdinalIgnoreCase)) continue;
                     string name = prefix + item.Value.Handle;
                     materials.SetName(item.Key, name);
                     ((Material)transaction.GetObject(item.Value, OpenMode.ForWrite)).Name = name;
@@ -912,8 +896,8 @@ public static class LegendBuilder
             var (id, inheritedLayer) = queue.Pop();
             var entity = (Entity)tr.GetObject(id, OpenMode.ForWrite);
             if (entity is not BlockReference reference) { result.Add(id); continue; }
-            using var pieces = new DBObjectCollection();
-            try
+            using var transient = new TransientObjects();
+            var pieces = transient.Items;
             {
                 // gelijke xy-schaal behouden bij een vlak symbool met afwijkende z-schaal
                 var scale = reference.ScaleFactors;
@@ -949,11 +933,11 @@ public static class LegendBuilder
                 var ordered = sourceIds.Length == pieces.Count && sourceOrder.Length == sourceIds.Length
                     ? sourceOrder.Select(sourceId => pieces[indexes[sourceId]]) : pieces.Cast<DBObject>();
                 var children = new List<(ObjectId Id, LayerDisplayStyle Layer)>();
-                foreach (var piece in ordered.OfType<Entity>())
+                bool hasAttributeValues = reference.ObjectId != probe.ObjectId || sample is not null && !sample.ReferenceId.IsNull;
+                foreach (var piece in ordered.OfType<Entity>().Where(piece =>
+                    !(piece is AttributeDefinition { Constant: false } && hasAttributeValues)
+                    && !(piece is AttributeDefinition { Invisible: true } && !includeInvisible)))
                 {
-                    if (piece is AttributeDefinition { Constant: false }
-                        && (reference.ObjectId != probe.ObjectId || sample is not null && !sample.ReferenceId.IsNull)) continue;
-                    if (piece is AttributeDefinition { Invisible: true } && !includeInvisible) continue;
                     if (piece.LinetypeId.Database != db || piece.LayerId.Database != db)
                         throw new InvalidOperationException("Een symboolafhankelijkheid hoort niet bij de hostdatabase.");
                     if (!includeInvisible && !piece.Visible) continue;
@@ -972,11 +956,6 @@ public static class LegendBuilder
                     children.Add((piece.ObjectId, pieceLayerStyle));
                 }
                 for (int i = children.Count - 1; i >= 0; i--) queue.Push(children[i]);
-            }
-            finally
-            {
-                foreach (DBObject obj in pieces)
-                    if (obj.ObjectId.IsNull) obj.Dispose();
             }
             reference.Erase();
         }
@@ -1030,7 +1009,7 @@ public static class LegendBuilder
             min = ge.MinPoint; max = ge.MaxPoint;
             return true;
         }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception)
         {
             return false;
         }

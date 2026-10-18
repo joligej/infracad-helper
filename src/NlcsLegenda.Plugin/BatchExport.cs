@@ -50,7 +50,7 @@ internal static class BatchExport
             tr.Commit();
             return new BatchDrawingResult { Drawing = name, Path = path, Entries = entries };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             return new BatchDrawingResult { Drawing = name, Path = path, Error = ex.Message };
         }

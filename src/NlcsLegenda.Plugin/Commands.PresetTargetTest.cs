@@ -13,14 +13,19 @@ public partial class Commands
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var snapshot = new GlobalSettingsSnapshot();
             var db = doc.Database;
             if (!ResolvePresetTarget(doc.Editor, db, out var globalTarget, "Test lege tekening", "test") || !globalTarget.IsGlobal)
                 throw new InvalidOperationException("Globale profielkeuze zonder legenda ontbreekt.");
-            var settings = new LegendSettings { Scale = 200, IncludeRemarks = false, IncludeScaleBar = false,
-                ManualEntries = new() { new() { Layer = "PRESET_LINE", Description = "Profielregel" } } };
+            var settings = new LegendSettings
+            {
+                Scale = 200,
+                IncludeRemarks = false,
+                IncludeScaleBar = false,
+                ManualEntries = new() { new() { Layer = "PRESET_LINE", Description = "Profielregel" } }
+            };
             if (ApplyTargetSettings(doc.Editor, db, globalTarget, settings, "Testprofiel") is { } error)
                 throw new InvalidOperationException(error);
             var dir = Path.Join(Path.GetDirectoryName(db.Filename), "profielen");
@@ -52,7 +57,6 @@ public partial class Commands
                 || Math.Abs(GetTargetSettings(db, localTarget).Scale - 500) > 1e-9)
                 throw new InvalidOperationException("Globaal profiel wijzigde de bestaande legenda.");
             doc.Editor.WriteMessage("\nPRESETTARGET globale en lokale profielen, zonder en met legenda, gescheiden -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nPRESETTARGET FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaPresetTargetTest");
     }
 }

@@ -28,7 +28,7 @@ public partial class Commands
                     }
                     else if (File.Exists(file.Key)) File.Delete(file.Key);
                 }
-                catch (System.Exception ex) { errors.Add(ex); }
+                catch (System.Exception ex) when (ex is IOException or UnauthorizedAccessException) { errors.Add(ex); }
             }
             if (!_directoryExisted && Directory.Exists(ConfigDir) && !Directory.EnumerateFileSystemEntries(ConfigDir).Any())
                 Directory.Delete(ConfigDir);
@@ -85,33 +85,35 @@ public partial class Commands
         string temp = Path.Join(Path.GetTempPath(), "nlcs_preset_" + Guid.NewGuid().ToString("N"));
         try
         {
-            Directory.CreateDirectory(ConfigDir);
-            var settings = new LegendSettings();
-            settings.DescriptionOverrides.Elementen["VH|SETTING"] = new DescriptionEntry { Specifiek = "Uit instellingen" };
-            settings.Save(ConfigPath);
-            var catalog = new DescriptionCatalog();
-            catalog.Elementen["VH|CATALOG"] = new DescriptionEntry { Specifiek = "Uit omschrijvingen" };
-            catalog.Save(DescriptionsPath);
-            var snapshot = GetTargetSettings(doc.Database, MutationTarget.Global);
-            LegendPresets.Save(temp, "snapshot", snapshot);
-            var loaded = LegendPresets.Load(temp, "snapshot")!;
-            Check("globaal profiel bevat beide tekstbronnen", loaded.DescriptionOverrides.Elementen.Count == 2
-                && loaded.DescriptionOverrides.Elementen.ContainsKey("VH|CATALOG"));
-            catalog.Elementen.Clear();
-            catalog.Elementen["VH|NEW"] = new DescriptionEntry { Specifiek = "Nieuw opgeslagen" };
-            SaveGlobalCatalog(catalog);
-            var current = GetTargetSettings(doc.Database, MutationTarget.Global);
-            Check("opnieuw bewerken vervangt oude overrides", current.DescriptionOverrides.Elementen.Count == 1
-                && current.DescriptionOverrides.Elementen.ContainsKey("VH|NEW"));
-            Check("eerder profiel behoudt eigen snapshot", loaded.DescriptionOverrides.Elementen.ContainsKey("VH|SETTING")
-                && !loaded.DescriptionOverrides.Elementen.ContainsKey("VH|NEW"));
-            File.WriteAllText(ConfigPath, "{ invalid");
-            bool refused = false;
-            try { GetTargetSettings(doc.Database, MutationTarget.Global); }
-            catch (InvalidDataException) { refused = true; }
-            Check("onleesbare globale instellingen worden gemeld", refused);
+            if (!DiagnosticRun.Execute(() =>
+            {
+                Directory.CreateDirectory(ConfigDir);
+                var settings = new LegendSettings();
+                settings.DescriptionOverrides.Elementen["VH|SETTING"] = new DescriptionEntry { Specifiek = "Uit instellingen" };
+                settings.Save(ConfigPath);
+                var catalog = new DescriptionCatalog();
+                catalog.Elementen["VH|CATALOG"] = new DescriptionEntry { Specifiek = "Uit omschrijvingen" };
+                catalog.Save(DescriptionsPath);
+                var snapshot = GetTargetSettings(doc.Database, MutationTarget.Global);
+                LegendPresets.Save(temp, "snapshot", snapshot);
+                var loaded = LegendPresets.Load(temp, "snapshot")!;
+                Check("globaal profiel bevat beide tekstbronnen", loaded.DescriptionOverrides.Elementen.Count == 2
+                    && loaded.DescriptionOverrides.Elementen.ContainsKey("VH|CATALOG"));
+                catalog.Elementen.Clear();
+                catalog.Elementen["VH|NEW"] = new DescriptionEntry { Specifiek = "Nieuw opgeslagen" };
+                SaveGlobalCatalog(catalog);
+                var current = GetTargetSettings(doc.Database, MutationTarget.Global);
+                Check("opnieuw bewerken vervangt oude overrides", current.DescriptionOverrides.Elementen.Count == 1
+                    && current.DescriptionOverrides.Elementen.ContainsKey("VH|NEW"));
+                Check("eerder profiel behoudt eigen snapshot", loaded.DescriptionOverrides.Elementen.ContainsKey("VH|SETTING")
+                    && !loaded.DescriptionOverrides.Elementen.ContainsKey("VH|NEW"));
+                File.WriteAllText(ConfigPath, "{ invalid");
+                bool refused = false;
+                try { GetTargetSettings(doc.Database, MutationTarget.Global); }
+                catch (InvalidDataException) { refused = true; }
+                Check("onleesbare globale instellingen worden gemeld", refused);
+            }, message => doc.Editor.WriteMessage(message), "NlcsLegendaGlobalSettingsTest")) failures++;
         }
-        catch (System.Exception ex) { failures++; doc.Editor.WriteMessage($"\nGLOBALSETTINGS FAIL: {ex}"); }
         finally
         {
             foreach (var original in originals)
