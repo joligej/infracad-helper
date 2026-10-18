@@ -60,19 +60,19 @@ internal static class LegendManagement
         if (idc.Count == 0) return;
 
         var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForWrite);
-        Group group;
-        if (gd.Contains(groupName))
+        using var created = gd.Contains(groupName) ? null : new Group("NLCS-legenda", true);
+        var group = created ?? (Group)tr.GetObject(gd.GetAt(groupName), OpenMode.ForWrite);
+        if (created is not null)
         {
-            group = (Group)tr.GetObject(gd.GetAt(groupName), OpenMode.ForWrite);
-        }
-        else
-        {
-            group = new Group("NLCS-legenda", true);
-            gd.SetAt(groupName, group);
-            tr.AddNewlyCreatedDBObject(group, true);
+            gd.SetAt(groupName, created);
+            tr.AddNewlyCreatedDBObject(created, true);
         }
         group.Append(idc);
     }
+
+    internal static IEnumerable<Entity> Entities(IEnumerable<ObjectId> ids, Transaction tr, OpenMode mode) =>
+        ids.Where(id => !id.IsNull && id.IsValid && !id.IsErased)
+            .Select(id => tr.GetObject(id, mode)).OfType<Entity>();
 
     public static bool TryEraseGroup(Database db, Transaction tr, string groupName, out Point3d topLeft, bool keepGroup = false)
     {
@@ -85,10 +85,8 @@ internal static class LegendManagement
         var ids = group.GetAllEntityIds();
         double minX = double.MaxValue, maxY = double.MinValue;
         bool any = false;
-        foreach (var id in ids)
+        foreach (var ent in Entities(ids, tr, OpenMode.ForWrite))
         {
-            if (tr.GetObject(id, OpenMode.ForWrite) is not Entity ent || ent.IsErased)
-                continue;
             if (TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out var ext))
             {
                 minX = Math.Min(minX, ext.MinPoint.X);
@@ -117,10 +115,9 @@ internal static class LegendManagement
         if (!gd.Contains(groupName) || tr.GetObject(gd.GetAt(groupName), OpenMode.ForRead) is not Group g)
             return false;
         bool any = false;
-        foreach (var id in g.GetAllEntityIds())
+        foreach (var ent in Entities(g.GetAllEntityIds(), tr, OpenMode.ForRead))
         {
-            if (tr.GetObject(id, OpenMode.ForRead) is Entity ent && !ent.IsErased
-                && TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out var e))
+            if (TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out var e))
             {
                 extents.AddExtents(e);
                 any = true;
@@ -142,10 +139,9 @@ internal static class LegendManagement
         {
             var m = xform * br.BlockTransform;
             bool any = false;
-            foreach (ObjectId cid in btr)
+            foreach (var child in Entities(btr.Cast<ObjectId>(), tr, OpenMode.ForRead))
             {
-                if (tr.GetObject(cid, OpenMode.ForRead) is Entity child && !child.IsErased
-                    && TryEntityExtents(tr, child, m, depth + 1, out var ce))
+                if (TryEntityExtents(tr, child, m, depth + 1, out var ce))
                 {
                     extents.AddExtents(ce);
                     any = true;
@@ -155,7 +151,7 @@ internal static class LegendManagement
         }
 
         Extents3d? b = null;
-        try { b = ent.Bounds; } catch { b = null; }
+        try { b = ent.Bounds; } catch (Autodesk.AutoCAD.Runtime.Exception) { b = null; }
         if (!b.HasValue) return false;
         var val = b.Value;
         if (!xform.IsEqualTo(Matrix3d.Identity))
@@ -178,7 +174,7 @@ internal static class LegendManagement
                 else
                     miss++;
             }
-            catch
+            catch (Exception ex) when (ex is FormatException or OverflowException or ArgumentException or Autodesk.AutoCAD.Runtime.Exception)
             {
                 miss++;
             }
@@ -189,11 +185,7 @@ internal static class LegendManagement
 
     public static List<string> ToHandles(IEnumerable<ObjectId> ids)
     {
-        var list = new List<string>();
-        foreach (var id in ids)
-            if (!id.IsNull && !id.IsErased)
-                list.Add(id.Handle.Value.ToString("X"));
-        return list;
+        return ids.Where(id => !id.IsNull && !id.IsErased).Select(id => id.Handle.Value.ToString("X")).ToList();
     }
 
     private const string RowApplication = "NLCS_LEGENDA_ROW";
@@ -205,7 +197,7 @@ internal static class LegendManagement
         if (!apps.Has(RowApplication))
         {
             apps.UpgradeOpen();
-            var app = new RegAppTableRecord { Name = RowApplication };
+            using var app = new RegAppTableRecord { Name = RowApplication };
             apps.Add(app);
             tr.AddNewlyCreatedDBObject(app, true);
         }
@@ -227,9 +219,8 @@ internal static class LegendManagement
     {
         if (entId.IsNull) return null;
         var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
-        foreach (var def in registry.Legends)
+        foreach (var def in registry.Legends.Where(def => gd.Contains(def.GroupName)))
         {
-            if (!gd.Contains(def.GroupName)) continue;
             if (tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead) is Group g
                 && g.GetAllEntityIds().Contains(entId))
                 return def;

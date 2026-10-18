@@ -474,9 +474,8 @@ public sealed class LegendSettings
     public void CopyFrom(LegendSettings other)
     {
         // collecties afzonderlijk kopiëren voor onafhankelijke legenda’s
-        foreach (var p in typeof(LegendSettings).GetProperties())
-            if (p is { CanRead: true, CanWrite: true } && !IsCollectionProperty(p))
-                p.SetValue(this, p.GetValue(other));
+        foreach (var p in typeof(LegendSettings).GetProperties().Where(p => p is { CanRead: true, CanWrite: true } && !IsCollectionProperty(p)))
+            p.SetValue(this, p.GetValue(other));
 
         Klic = other.Klic.Clone();
         ExampleOverrides = new Dictionary<string, string>(other.ExampleOverrides, StringComparer.Ordinal);

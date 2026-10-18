@@ -60,7 +60,7 @@ public partial class Commands
             ObjectId layerId;
             if (lt.Has(n)) layerId = lt[n];
             else { var r = new LayerTableRecord { Name = n }; layerId = lt.Add(r); tr.AddNewlyCreatedDBObject(r, true); }
-            var line = new Line(new Point3d(x, 0, 0), new Point3d(x + 10, 0, 0)) { LayerId = layerId };
+            using var line = new Line(new Point3d(x, 0, 0), new Point3d(x + 10, 0, 0)) { LayerId = layerId };
             ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
             x += 20;
         }
@@ -378,28 +378,28 @@ public partial class Commands
                 {
                     var nest = new BlockTableRecord { Name = "SYMTEKSTNEST", Origin = Point3d.Origin };
                     bt.Add(nest); tr.AddNewlyCreatedDBObject(nest, true);
-                    var nt = new DBText { TextString = nestMark, Height = 0.3, Position = new Point3d(0.2, 0.2, 0) };
+                    using var nt = new DBText { TextString = nestMark, Height = 0.3, Position = new Point3d(0.2, 0.2, 0) };
                     nt.SetDatabaseDefaults();
                     nest.AppendEntity(nt); tr.AddNewlyCreatedDBObject(nt, true);
 
                     var sbtr = new BlockTableRecord { Name = "SYMTEKSTBLOK", Origin = Point3d.Origin };
                     bt.Add(sbtr); tr.AddNewlyCreatedDBObject(sbtr, true);
-                    var ln = new Line(new Point3d(0, 0, 0), new Point3d(1, 1, 0));
+                    using var ln = new Line(new Point3d(0, 0, 0), new Point3d(1, 1, 0));
                     sbtr.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true);
-                    var t = new DBText { TextString = dbTextMark, Height = 0.3, Position = new Point3d(0, 0, 0) };
+                    using var t = new DBText { TextString = dbTextMark, Height = 0.3, Position = new Point3d(0, 0, 0) };
                     t.SetDatabaseDefaults();
                     sbtr.AppendEntity(t); tr.AddNewlyCreatedDBObject(t, true);
-                    var inner = new MText { Contents = mTextMark, TextHeight = 0.3, Location = new Point3d(0.5, 0.5, 0) };
+                    using var inner = new MText { Contents = mTextMark, TextHeight = 0.3, Location = new Point3d(0.5, 0.5, 0) };
                     inner.SetDatabaseDefaults();
                     sbtr.AppendEntity(inner); tr.AddNewlyCreatedDBObject(inner, true);
-                    var nref = new BlockReference(new Point3d(0.3, 0.3, 0), nest.ObjectId);
+                    using var nref = new BlockReference(new Point3d(0.3, 0.3, 0), nest.ObjectId);
                     sbtr.AppendEntity(nref); tr.AddNewlyCreatedDBObject(nref, true);
                 }
                 var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
                 const string symLayer = "N-WE-RI-SYMTEKST-S";
                 if (!lt.Has(symLayer)) { var lr = new LayerTableRecord { Name = symLayer }; lt.Add(lr); tr.AddNewlyCreatedDBObject(lr, true); }
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var bref = new BlockReference(new Point3d(0, 0, 0), bt["SYMTEKSTBLOK"]) { Layer = symLayer };
+                using var bref = new BlockReference(new Point3d(0, 0, 0), bt["SYMTEKSTBLOK"]) { Layer = symLayer };
                 ms.AppendEntity(bref); tr.AddNewlyCreatedDBObject(bref, true);
                 tr.Commit();
             }
@@ -453,10 +453,9 @@ public partial class Commands
         LegendScope scope = LegendScope.WholeDrawing, List<string>? handles = null)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
-        foreach (var n in new[] { s.HeaderTextLayer, s.TextLayer, s.FrameLayer })
-            if (!string.IsNullOrEmpty(n) && !lt.Has(n))
+        foreach (var n in new[] { s.HeaderTextLayer, s.TextLayer, s.FrameLayer }.Where(n => !string.IsNullOrEmpty(n) && !lt.Has(n)))
             {
-                var r = new LayerTableRecord { Name = n };
+                using var r = new LayerTableRecord { Name = n };
                 lt.Add(r); tr.AddNewlyCreatedDBObject(r, true);
             }
 
@@ -467,7 +466,7 @@ public partial class Commands
 
         void OldText(string text, double x, double y, double h)
         {
-            var t = new DBText();
+            using var t = new DBText();
             t.SetDatabaseDefaults();
             t.TextString = text;
             t.Height = h;
@@ -477,7 +476,7 @@ public partial class Commands
         }
         OldText("Oude legenda", 0, 0, s.ToModel(s.TitleTextHeightMm));
         OldText("Oude regel", 0, -5, s.ToModel(s.TextHeightMm));
-        var pl = new Polyline();
+        using var pl = new Polyline();
         pl.AddVertexAt(0, new Point2d(0, -5), 0, 0, 0);
         pl.AddVertexAt(1, new Point2d(5, -5), 0, 0, 0);
         pl.Layer = s.FrameLayer;
@@ -485,7 +484,7 @@ public partial class Commands
 
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
         var insert = ComputeInsertPoint(db, s);
-        var br = new BlockReference(insert, btrId) { Layer = s.FrameLayer };
+        using var br = new BlockReference(insert, btrId) { Layer = s.FrameLayer };
         ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
 
         var reg = LegendStore.Load(db, tr);
@@ -522,11 +521,11 @@ public partial class Commands
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
                 foreach (var n in new[] { "N-WE-VH-BREEDA-G", "N-WE-RI-BREEDB-G", "B-WE-VH-BREEDC-G" })
                 {
-                    var ln = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = L(n) };
+                    using var ln = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = L(n) };
                     ms.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true);
                     handles.Add(ln.Handle.Value.ToString("X"));
                 }
-                var eigen = new Line(new Point3d(0, 0, 0), new Point3d(7, 0, 0)) { LayerId = L("Eigen breed") };
+                using var eigen = new Line(new Point3d(0, 0, 0), new Point3d(7, 0, 0)) { LayerId = L("Eigen breed") };
                 ms.AppendEntity(eigen); tr.AddNewlyCreatedDBObject(eigen, true);
                 tr.Commit();
             }
@@ -666,7 +665,7 @@ public partial class Commands
             var handles = new List<string>();
             foreach (var n in new[] { "N-WE-VH-HEROPENA-G", "N-WE-RI-HEROPENB-G" })
             {
-                var ln = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = L(n) };
+                using var ln = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = L(n) };
                 ms.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true);
                 handles.Add(ln.Handle.Value.ToString("X"));
             }

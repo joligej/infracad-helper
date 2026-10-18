@@ -528,7 +528,7 @@ public partial class Commands
                 var lm = LayoutManager.Current;
                 var layout = (Layout)tr.GetObject(lm.GetLayoutId(lm.CurrentLayout), OpenMode.ForRead);
                 var ps = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite);
-                var vp = new Viewport();
+                using var vp = new Viewport();
                 ps.AppendEntity(vp);
                 tr.AddNewlyCreatedDBObject(vp, true);
 
@@ -1037,7 +1037,6 @@ public partial class Commands
     private static IReadOnlyList<string> CollectXrefNames(Database db)
     {
         var xrefs = new List<string>();
-        try
         {
             using var tr = db.TransactionManager.StartTransaction();
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
@@ -1046,10 +1045,6 @@ public partial class Commands
                     && btr.IsFromExternalReference && !btr.IsDependent)
                     xrefs.Add(btr.Name);
             tr.Commit();
-        }
-        catch
-        {
-            return xrefs;
         }
         xrefs.Sort(StringComparer.CurrentCultureIgnoreCase);
         return xrefs;
@@ -1660,15 +1655,9 @@ public partial class Commands
                 Specifiek = defaultEntry?.Specifiek ?? StandardTexts.Humanize(element)
             };
 
-            DescriptionEntry current;
-            if (target.IsGlobal)
-                current = LoadGlobalCatalog().Elementen.TryGetValue(key, out var existing)
-                    ? new DescriptionEntry { Algemeen = existing.Algemeen, Specifiek = existing.Specifiek }
-                    : new DescriptionEntry { Algemeen = fallback.Algemeen, Specifiek = fallback.Specifiek };
-            else
-                current = GetTargetSettings(db, target).DescriptionOverrides.Elementen.TryGetValue(key, out var ov)
-                    ? new DescriptionEntry { Algemeen = ov.Algemeen, Specifiek = ov.Specifiek }
-                    : new DescriptionEntry { Algemeen = fallback.Algemeen, Specifiek = fallback.Specifiek };
+            var catalog = target.IsGlobal ? LoadGlobalCatalog() : GetTargetSettings(db, target).DescriptionOverrides;
+            var value = catalog.Elementen.GetValueOrDefault(key) ?? fallback;
+            var current = new DescriptionEntry { Algemeen = value.Algemeen, Specifiek = value.Specifiek };
 
             using var dialog = new TextEditDialog(key, current, fallback);
             void Apply()
@@ -2084,10 +2073,8 @@ public partial class Commands
             parts.Add($"{e.GetType().Name}|{e.Layer}|{bounds}|{text}|{detail}");
         }
 
-        foreach (var id in g.GetAllEntityIds())
+        foreach (var e in LegendManagement.Entities(g.GetAllEntityIds(), tr, OpenMode.ForRead))
         {
-            if (tr.GetObject(id, OpenMode.ForRead) is not Entity e || e.IsErased)
-                continue;
             if (e is BlockReference br && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord btr)
                 foreach (ObjectId bid in btr)
                 {
@@ -2388,7 +2375,7 @@ public partial class Commands
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
                 foreach (var n in new[] { "N-WE-VH-BLTEST1-G", "N-WE-RI-BLTEST2-G" })
                 {
-                    var line = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = L(n) };
+                    using var line = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = L(n) };
                     ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                 }
                 tr.Commit();
@@ -2493,9 +2480,9 @@ public partial class Commands
                 var putten = EnsureLayer("Speciale putten");
                 var verharding = EnsureLayer("Eigen verharding");
 
-                var l5 = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = kabels };
+                using var l5 = new Line(new Point3d(0, 0, 0), new Point3d(5, 0, 0)) { LayerId = kabels };
                 line5 = ms.AppendEntity(l5); tr.AddNewlyCreatedDBObject(l5, true);
-                var pl = new Polyline();
+                using var pl = new Polyline();
                 pl.AddVertexAt(0, new Point2d(0, 10), 0, 0, 0);
                 pl.AddVertexAt(1, new Point2d(7, 10), 0, 0, 0);
                 pl.LayerId = kabels;
@@ -2508,16 +2495,16 @@ public partial class Commands
                 {
                     var bd = new BlockTableRecord { Name = "PUT" };
                     putBlock = bt.Add(bd); tr.AddNewlyCreatedDBObject(bd, true);
-                    var circ = new Circle(Point3d.Origin, Vector3d.ZAxis, 0.5);
+                    using var circ = new Circle(Point3d.Origin, Vector3d.ZAxis, 0.5);
                     bd.AppendEntity(circ); tr.AddNewlyCreatedDBObject(circ, true);
                 }
                 for (int i = 0; i < 3; i++)
                 {
-                    var brf = new BlockReference(new Point3d(i * 2.0, 20, 0), putBlock) { LayerId = putten };
+                    using var brf = new BlockReference(new Point3d(i * 2.0, 20, 0), putBlock) { LayerId = putten };
                     ms.AppendEntity(brf); tr.AddNewlyCreatedDBObject(brf, true);
                 }
 
-                var area = new Polyline();
+                using var area = new Polyline();
                 area.AddVertexAt(0, new Point2d(0, 30), 0, 0, 0);
                 area.AddVertexAt(1, new Point2d(10, 30), 0, 0, 0);
                 area.AddVertexAt(2, new Point2d(10, 35), 0, 0, 0);
@@ -2656,8 +2643,12 @@ public partial class Commands
         }
         finally
         {
-            try { if (File.Exists(pathA)) File.Delete(pathA); } catch { }
-            try { if (File.Exists(pathB)) File.Delete(pathB); } catch { }
+            DiagnosticRun.Execute(() =>
+            {
+                using var cleanup = new ResourceScope();
+                cleanup.Defer(() => File.Delete(pathA));
+                cleanup.Defer(() => File.Delete(pathB));
+            }, message => ed.WriteMessage(message), "EIGENXREF opruimen");
         }
     }
 
@@ -2795,14 +2786,14 @@ public partial class Commands
                 var kast = L("Eigen kast");
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
 
-                var bnd = new Polyline();
+                using var bnd = new Polyline();
                 bnd.AddVertexAt(0, new Point2d(0, 0), 0, 0, 0);
                 bnd.AddVertexAt(1, new Point2d(5, 0), 0, 0, 0);
                 bnd.AddVertexAt(2, new Point2d(5, 5), 0, 0, 0);
                 bnd.AddVertexAt(3, new Point2d(0, 5), 0, 0, 0);
                 bnd.Closed = true; bnd.LayerId = arc;
                 var bndId = ms.AppendEntity(bnd); tr.AddNewlyCreatedDBObject(bnd, true);
-                var hatch = new Hatch { LayerId = arc };
+                using var hatch = new Hatch { LayerId = arc };
                 ms.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
                 hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31");
                 hatch.Associative = false;
@@ -2817,7 +2808,7 @@ public partial class Commands
                 {
                     var bd = new BlockTableRecord { Name = "KAST" };
                     kb = bt.Add(bd); tr.AddNewlyCreatedDBObject(bd, true);
-                    var sq = new Polyline();
+                    using var sq = new Polyline();
                     sq.AddVertexAt(0, new Point2d(-0.5, -0.5), 0, 0, 0);
                     sq.AddVertexAt(1, new Point2d(0.5, -0.5), 0, 0, 0);
                     sq.AddVertexAt(2, new Point2d(0.5, 0.5), 0, 0, 0);
@@ -2825,7 +2816,7 @@ public partial class Commands
                     sq.Closed = true;
                     bd.AppendEntity(sq); tr.AddNewlyCreatedDBObject(sq, true);
                 }
-                var brf = new BlockReference(new Point3d(10, 0, 0), kb) { LayerId = kast };
+                using var brf = new BlockReference(new Point3d(10, 0, 0), kb) { LayerId = kast };
                 ms.AppendEntity(brf); tr.AddNewlyCreatedDBObject(brf, true);
                 tr.Commit();
             }
@@ -2858,9 +2849,8 @@ public partial class Commands
                         else if (e is BlockReference nbr && !nbr.BlockTableRecord.IsNull) { blockCount++; CountIn(nbr.BlockTableRecord); }
                     }
                 }
-                foreach (var id in g.GetAllEntityIds())
+                foreach (var e in g.GetAllEntityIds().Select(id => tr.GetObject(id, OpenMode.ForRead)))
                 {
-                    var e = tr.GetObject(id, OpenMode.ForRead);
                     if (e is Hatch) hatchCount++;
                     else if (e is BlockReference br && !br.BlockTableRecord.IsNull) { blockCount++; CountIn(br.BlockTableRecord); }
                 }
@@ -2906,7 +2896,8 @@ public partial class Commands
         }
         finally
         {
-            try { if (Directory.Exists(dir)) Directory.Delete(dir, true); } catch { }
+            DiagnosticRun.Execute(() => { if (Directory.Exists(dir)) Directory.Delete(dir, true); },
+                message => ed.WriteMessage(message), "EIGENBATCH opruimen");
         }
     }
 
@@ -2933,9 +2924,9 @@ public partial class Commands
                 ObjectId id = lt.Has("Eigen upd") ? lt["Eigen upd"] : AddLayer(lt, tr, "Eigen upd");
                 ObjectId nid = lt.Has("N-WE-VH-UPDTEST-G") ? lt["N-WE-VH-UPDTEST-G"] : AddLayer(lt, tr, "N-WE-VH-UPDTEST-G");
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var line = new Line(new Point3d(0, 0, 0), new Point3d(9, 0, 0)) { LayerId = id };
+                using var line = new Line(new Point3d(0, 0, 0), new Point3d(9, 0, 0)) { LayerId = id };
                 ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
-                var nline = new Line(new Point3d(0, 20, 0), new Point3d(7, 20, 0)) { LayerId = nid };
+                using var nline = new Line(new Point3d(0, 20, 0), new Point3d(7, 20, 0)) { LayerId = nid };
                 ms.AppendEntity(nline); tr.AddNewlyCreatedDBObject(nline, true);
                 tr.Commit();
             }
@@ -3020,9 +3011,9 @@ public partial class Commands
                 ((LayerTableRecord)tr.GetObject(nlcs, OpenMode.ForWrite)).IsFrozen = true;
                 var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
                 var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
-                var le = new Line(new Point3d(0, 0, 0), new Point3d(4, 0, 0)) { LayerId = eigen };
+                using var le = new Line(new Point3d(0, 0, 0), new Point3d(4, 0, 0)) { LayerId = eigen };
                 ms.AppendEntity(le); tr.AddNewlyCreatedDBObject(le, true);
-                var ln = new Line(new Point3d(0, 5, 0), new Point3d(6, 5, 0)) { LayerId = nlcs };
+                using var ln = new Line(new Point3d(0, 5, 0), new Point3d(6, 5, 0)) { LayerId = nlcs };
                 ms.AppendEntity(ln); tr.AddNewlyCreatedDBObject(ln, true);
                 tr.Commit();
             }
@@ -3079,7 +3070,7 @@ public partial class Commands
                 }
                 var msId = SymbolUtilityServices.GetBlockModelSpaceId(xdb);
                 var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
-                var line = new Line(new Point3d(0, 0, 0), new Point3d(length, 0, 0)) { Layer = layer };
+                using var line = new Line(new Point3d(0, 0, 0), new Point3d(length, 0, 0)) { Layer = layer };
                 ms.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                 tr.Commit();
             }
@@ -3109,7 +3100,7 @@ public partial class Commands
                 }
                 var msId = SymbolUtilityServices.GetBlockModelSpaceId(xdb);
                 var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
-                var pl = new Polyline();
+                using var pl = new Polyline();
                 pl.AddVertexAt(0, new Point2d(0, 0), 0, 0, 0);
                 pl.AddVertexAt(1, new Point2d(5, 0), 0, 0, 0);
                 pl.Layer = layer;
@@ -3149,11 +3140,7 @@ public partial class Commands
                 var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
                 var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
                 foreach (var id in new[] { xrefA, xrefB })
-                {
-                    var br = new BlockReference(Point3d.Origin, id);
-                    ms.AppendEntity(br);
-                    tr.AddNewlyCreatedDBObject(br, true);
-                }
+                    AddTestReference(ms, tr, id);
                 tr.Commit();
             }
 
@@ -3251,10 +3238,8 @@ public partial class Commands
                 {
                     var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
                     if (gd.Contains(def.GroupName) && tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead) is Group g)
-                        foreach (var id in g.GetAllEntityIds())
+                        foreach (var e in LegendManagement.Entities(g.GetAllEntityIds(), tr, OpenMode.ForRead))
                         {
-                            if (tr.GetObject(id, OpenMode.ForRead) is not Entity e || e.IsErased)
-                                continue;
                             if (e is BlockReference br
                                 && tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is BlockTableRecord btr)
                             {
@@ -3431,7 +3416,7 @@ public partial class Commands
                     var lm = LayoutManager.Current;
                     var layout = (Layout)tr.GetObject(lm.GetLayoutId(lm.CurrentLayout), OpenMode.ForRead);
                     var ps = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite);
-                    var vp = new Viewport();
+                    using var vp = new Viewport();
                     ps.AppendEntity(vp);
                     tr.AddNewlyCreatedDBObject(vp, true);
                     vp.CenterPoint = new Point3d(200, 150, 0);
@@ -3526,9 +3511,8 @@ public partial class Commands
                     var move = Matrix3d.Displacement(new Vector3d(1000, 500, 0));
                     var gd = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
                     var g = (Group)tr.GetObject(gd.GetAt(def.GroupName), OpenMode.ForRead);
-                    foreach (var id in g.GetAllEntityIds())
-                        if (tr.GetObject(id, OpenMode.ForWrite) is Entity ent && !ent.IsErased)
-                            ent.TransformBy(move);
+                    foreach (var entity in LegendManagement.Entities(g.GetAllEntityIds(), tr, OpenMode.ForWrite))
+                        entity.TransformBy(move);
 
                     LegendManagement.TryGetGroupExtents(db, tr, def.GroupName, out var after);
                     var cAfter = new Point2d(
@@ -3816,7 +3800,7 @@ public partial class Commands
                     tr.AddNewlyCreatedDBObject(ltr, true);
                 }
                 var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var line = new Autodesk.AutoCAD.DatabaseServices.Line(Point3d.Origin, new Point3d(1, 1, 0)) { Layer = layer };
+                using var line = new Autodesk.AutoCAD.DatabaseServices.Line(Point3d.Origin, new Point3d(1, 1, 0)) { Layer = layer };
                 ms.AppendEntity(line);
                 tr.AddNewlyCreatedDBObject(line, true);
                 tr.Commit();
@@ -3961,7 +3945,7 @@ public partial class Commands
             tr.AddNewlyCreatedDBObject(ltr, true);
         }
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-        var line = new Autodesk.AutoCAD.DatabaseServices.Line(Point3d.Origin, new Point3d(1, 1, 0)) { Layer = "N-WE-KL-UNDOSRC-G" };
+        using var line = new Autodesk.AutoCAD.DatabaseServices.Line(Point3d.Origin, new Point3d(1, 1, 0)) { Layer = "N-WE-KL-UNDOSRC-G" };
         ms.AppendEntity(line);
         tr.AddNewlyCreatedDBObject(line, true);
         tr.Commit();

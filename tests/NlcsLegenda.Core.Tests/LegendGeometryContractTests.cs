@@ -12,8 +12,10 @@ public class LegendGeometryContractTests
     {
         var layers = new List<NlcsLayerName>();
         foreach (var l in new[] { $"{Base1}-G", $"{Base1}-A", $"{Base2}-GV" })
-            if (NlcsLayerParser.TryParse(l, out var p))
-                layers.Add(p!);
+        {
+            Assert.True(NlcsLayerParser.TryParse(l, out var p), "Ongeldige testlaag");
+            layers.Add(p!);
+        }
         return LegendGrouping.Build(layers, new LegendSettings()).ToList();
     }
 

@@ -486,9 +486,8 @@ internal sealed class SettingsDialog : LegendDialog
         if (_composition is not null || _compositionSource is not null)
             foreach (var item in composition.Where(item => seen.Add(item.Key)))
                 available.Add((item.Key, item.Label));
-        foreach (var manual in _settings.ManualEntries)
+        foreach (var manual in _settings.ManualEntries.Where(manual => manual.IsValid))
         {
-            if (!manual.IsValid) continue;
             var key = LegendSettings.EntryKey(manual.ToLegendEntry());
             if (seen.Add(key))
                 available.Add((key, $"[eigen] {manual.Description}"));

@@ -11,8 +11,10 @@ public class DrawtypeMatrixTests
     {
         var layers = new List<NlcsLayerName>();
         foreach (var s in suffixes)
-            if (NlcsLayerParser.TryParse($"{Base}-{s}", out var p))
-                layers.Add(p!);
+        {
+            Assert.True(NlcsLayerParser.TryParse($"{Base}-{s}", out var p), "Ongeldige testlaag");
+            layers.Add(p!);
+        }
         var entries = LegendGrouping.Build(layers, new LegendSettings());
         return Assert.Single(entries);
     }

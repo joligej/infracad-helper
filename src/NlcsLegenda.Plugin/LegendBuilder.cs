@@ -583,10 +583,8 @@ public static class LegendBuilder
 
             double minX = double.MaxValue, minY = double.MaxValue;
             double maxX = double.MinValue, maxY = double.MinValue;
-            foreach (var id in primitives)
+            foreach (var e in primitives.Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>())
             {
-                if (tr.GetObject(id, OpenMode.ForRead) is not Entity e)
-                    continue;
                 if (!TryEntityExtents(e, out var lo, out var hi))
                     continue;
                 minX = Math.Min(minX, lo.X); minY = Math.Min(minY, lo.Y);
