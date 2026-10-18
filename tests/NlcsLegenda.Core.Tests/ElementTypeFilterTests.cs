@@ -51,9 +51,8 @@ public class ElementTypeFilterTests
         var entries = LegendGrouping.Build(Parse(AllTypeLayers()), s);
         var e = Assert.Single(entries);
         Assert.False(e.LayersByType.ContainsKey(off));
-        foreach (var t in new[] { NlcsDrawType.Geometrie, NlcsDrawType.Arcering, NlcsDrawType.Vlakvulling, NlcsDrawType.Symbool })
-            if (t != off)
-                Assert.True(e.LayersByType.ContainsKey(t));
+        foreach (var t in new[] { NlcsDrawType.Geometrie, NlcsDrawType.Arcering, NlcsDrawType.Vlakvulling, NlcsDrawType.Symbool }.Where(t => t != off))
+            Assert.True(e.LayersByType.ContainsKey(t));
     }
 
     [Fact]

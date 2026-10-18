@@ -79,7 +79,11 @@ internal static class Program
             form.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
             image.Save(Path.Join(output, $"examples-{scale:0.00}.png"));
         }
+        var controls = Descendants(form).ToArray();
+        string title = form.Text;
         form.Close();
+        form.Dispose();
+        Check(controls.All(control => control.IsDisposed), title + ": venster geeft alle onderliggende controls vrij");
     }
 
     private static void CheckOverviewFatalError()

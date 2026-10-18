@@ -174,7 +174,11 @@ public partial class Commands
                 else skipped++;
                 tr.Commit();
             }
-            catch { failed++; }
+            catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
+            {
+                failed++;
+                ed.WriteMessage($"\nLegenda {id} niet bijgewerkt: {ex.Message}");
+            }
         }
         PurgePending(db);
         ed.WriteMessage($"\nAlles bijwerken: {ok} bijgewerkt, {skipped} overgeslagen, {failed} fout.");

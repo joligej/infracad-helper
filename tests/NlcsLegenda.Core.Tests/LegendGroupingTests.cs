@@ -9,8 +9,10 @@ public class LegendGroupingTests
     {
         var parsed = new List<NlcsLayerName>();
         foreach (var l in layers)
-            if (NlcsLayerParser.TryParse(l, out var p))
-                parsed.Add(p);
+        {
+            Assert.True(NlcsLayerParser.TryParse(l, out var p), "Ongeldige testlaag");
+            parsed.Add(p!);
+        }
         return LegendGrouping.Build(parsed, new LegendSettings());
     }
 

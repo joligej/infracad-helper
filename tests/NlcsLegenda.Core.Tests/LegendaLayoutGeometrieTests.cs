@@ -10,8 +10,10 @@ public class LegendaLayoutGeometrieTests
     {
         var list = new List<NlcsLayerName>();
         foreach (var l in layers)
-            if (NlcsLayerParser.TryParse(l, out var p))
-                list.Add(p!);
+        {
+            Assert.True(NlcsLayerParser.TryParse(l, out var p), "Ongeldige testlaag");
+            list.Add(p!);
+        }
         return list;
     }
 

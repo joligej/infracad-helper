@@ -583,14 +583,13 @@ public static class LegendBuilder
 
             double minX = double.MaxValue, minY = double.MaxValue;
             double maxX = double.MinValue, maxY = double.MinValue;
-            foreach (var id in primitives)
+            var measured = primitives.Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>()
+                .Select(entity => TryEntityExtents(entity, out var lo, out var hi) ? (Extents3d?)new Extents3d(lo, hi) : null)
+                .OfType<Extents3d>();
+            foreach (var extents in measured)
             {
-                if (tr.GetObject(id, OpenMode.ForRead) is not Entity e)
-                    continue;
-                if (!TryEntityExtents(e, out var lo, out var hi))
-                    continue;
-                minX = Math.Min(minX, lo.X); minY = Math.Min(minY, lo.Y);
-                maxX = Math.Max(maxX, hi.X); maxY = Math.Max(maxY, hi.Y);
+                minX = Math.Min(minX, extents.MinPoint.X); minY = Math.Min(minY, extents.MinPoint.Y);
+                maxX = Math.Max(maxX, extents.MaxPoint.X); maxY = Math.Max(maxY, extents.MaxPoint.Y);
             }
 
             double extW = maxX - minX;

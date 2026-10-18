@@ -194,10 +194,8 @@ internal sealed class LegendManageDialog : LegendDialog
         {
             _grid.EndEdit();
             var list = new List<ManualEntry>();
-            foreach (var row in _rows)
+            foreach (var row in _rows.Where(row => !string.IsNullOrWhiteSpace(row.Laag) && !string.IsNullOrWhiteSpace(row.Omschrijving)))
             {
-                if (string.IsNullOrWhiteSpace(row.Laag) || string.IsNullOrWhiteSpace(row.Omschrijving))
-                    continue;
                 list.Add(new ManualEntry
                 {
                     Layer = row.Laag.Trim(),

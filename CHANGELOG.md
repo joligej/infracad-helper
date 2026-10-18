@@ -6,6 +6,7 @@
 - Tijdelijke CAD-objecten, xref-kopieën en Map-tabellen krijgen een afzonderlijk opruimbereik. Eén mislukte sluiting houdt de overige bronnen niet meer open; objecten van de CAD-transactie blijven behouden.
 - CAD- en vensterproeven melden fouten op dezelfde manier, met testnaam en volledige foutinformatie. Een fouttekst kan niet meer als geslaagde CSV-export worden vergeleken. Vensterproeven lopen na een afzonderlijke mislukking door.
 - De KLIC-koppeling meldt ontbrekende Map-methoden expliciet. Gerichte foutafhandeling voorkomt dat programmeerfouten worden behandeld als ontbrekende symbolen of onmeetbare objecten.
+- Mislukte xrefinventarisatie levert geen onvolledige keuzelijst meer op. Alles bijwerken meldt welke legenda is mislukt. Ook eerder afgesloten meldingen over testobjecten, groepsobjecten en stille opruimfouten zijn hersteld.
 - Lagen, stijlen, attributen en testvoorbeelden gebruiken expliciete selectie. Ongeldige testlagen laten de proef mislukken. Tekstafbreking houdt gecombineerde letters en symbolen heel.
 
 ## 1.32.3 - 2026-10-18

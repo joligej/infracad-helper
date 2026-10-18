@@ -34,6 +34,21 @@ context toe en geeft ze daarna door, zodat de transactie terugdraait. Een
 vensterproef controleert afzonderlijk dat geheugenuitputting wordt doorgegeven,
 de wachtcursor wordt hersteld en de bestaande lijst behouden blijft.
 
+## Eerder afgesloten meldingen
+
+Ook de ruwe scan is gecontroleerd. Oudere handmatig afgesloten meldingen bleven
+daarin terugkomen. Tijdelijke CAD-objecten krijgen alsnog een expliciete
+levensduur, ontbrekende xrefinformatie wordt niet als een volledige lijst
+gepresenteerd en fouten bij Alles bijwerken en het opruimen van testbestanden
+worden zichtbaar gemeld. Verwijderde groepsleden worden vóór het openen gefilterd.
+
+Drie soorten melding zijn inhoudelijk terecht als vals positief beoordeeld:
+controls worden door hun bovenliggende venster vrijgegeven; exacte vergelijking
+van opgeslagen schaalwaarden controleert behoud zonder afronding; een proef met
+een ongeldig schaalformaat controleert juist de afhandeling van `FormatException`.
+De vensterproeven controleren nu ook expliciet of alle onderliggende controls na
+het sluiten zijn vrijgegeven. De bestaande herstel- en formaattests blijven gelden.
+
 ## Validatie
 
 De tests dekken ook mislukte bestandsvervanging, herstel en opruiming tegelijk,

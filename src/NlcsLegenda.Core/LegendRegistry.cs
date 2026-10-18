@@ -34,11 +34,8 @@ public sealed class LegendRegistry
 
     public string NextDefaultName()
     {
-        var used = new HashSet<int>();
-        foreach (var l in Legends)
-            if (l.Name.StartsWith("Legenda ", StringComparison.OrdinalIgnoreCase)
-                && int.TryParse(l.Name["Legenda ".Length..], out var n))
-                used.Add(n);
+        var used = Legends.Select(l => l.Name.StartsWith("Legenda ", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(l.Name["Legenda ".Length..], out var n) ? (int?)n : null).OfType<int>().ToHashSet();
         int i = 1;
         while (used.Contains(i)) i++;
         return $"Legenda {i}";

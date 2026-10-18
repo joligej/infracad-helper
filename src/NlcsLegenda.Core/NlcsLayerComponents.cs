@@ -76,9 +76,7 @@ public sealed class NlcsLayerComponents
             Discipline.Trim().ToUpperInvariant(),
             Hoofdgroep.Trim().ToUpperInvariant()
         };
-        foreach (var o in ObjectParts)
-            if (!string.IsNullOrWhiteSpace(o))
-                parts.Add(o.Trim().ToUpperInvariant());
+        parts.AddRange(ObjectParts.Where(o => !string.IsNullOrWhiteSpace(o)).Select(o => o.Trim().ToUpperInvariant()));
         parts.Add(Element.Trim().ToUpperInvariant());
         if (!string.IsNullOrWhiteSpace(Scale))
             parts.Add(Scale.Trim());
@@ -104,9 +102,8 @@ public sealed class NlcsLayerComponents
         if (ObjectParts.Count == 0 || ObjectParts.All(string.IsNullOrWhiteSpace))
             errors.Add("Er moet minstens één OBJECT zijn.");
         else
-            foreach (var o in ObjectParts.Where(o => !string.IsNullOrWhiteSpace(o)))
-                if (!Field.IsMatch(o.Trim().ToUpperInvariant()))
-                    errors.Add($"OBJECT '{o}' bevat ongeldige tekens.");
+            foreach (var o in ObjectParts.Where(o => !string.IsNullOrWhiteSpace(o) && !Field.IsMatch(o.Trim().ToUpperInvariant())))
+                errors.Add($"OBJECT '{o}' bevat ongeldige tekens.");
 
         if (!IsValidElement(Element.Trim().ToUpperInvariant()))
             errors.Add($"ELEMENT '{Element}' is geen NLCS-element (bijv. G, GD, A, S, V, T25).");

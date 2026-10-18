@@ -28,12 +28,10 @@ public static class LegendGrouping
         }
         var groups = new Dictionary<string, List<NlcsLayerName>>();
 
-        foreach (var layer in usedLayers)
+        // uitgeschakelde soorten ook buiten de hoeveelheden
+        foreach (var layer in usedLayers.Where(layer => settings.IsIncluded(layer)
+            && SwatchTypes.Contains(layer.DrawType) && settings.IsDrawTypeIncluded(layer.DrawType)))
         {
-            if (!settings.IsIncluded(layer)) continue;
-            if (!SwatchTypes.Contains(layer.DrawType)) continue;
-            // uitgeschakelde soorten ook buiten de hoeveelheden
-            if (!settings.IsDrawTypeIncluded(layer.DrawType)) continue;
 
             var splitKey = layer.GroupKey + "\u0001" + layer.Netbeheerder.ToUpperInvariant() + "\u0001" + layer.KlicGroupKey + "\u0001" + layer.RenderIdentity;
             if (!groups.TryGetValue(splitKey, out var list))
@@ -96,10 +94,8 @@ public static class LegendGrouping
             });
         }
 
-        foreach (var manual in settings.ManualEntries)
+        foreach (var manual in settings.ManualEntries.Where(manual => manual.IsValid && settings.IsDrawTypeIncluded(manual.Type)))
         {
-            if (!manual.IsValid) continue;
-            if (!settings.IsDrawTypeIncluded(manual.Type)) continue;
             var basic = manual.ToLegendEntry();
             var custom = settings.FindCustomStatus(LegendSettings.EntryKey(basic))?.Name;
             if (custom is null && !settings.IncludedStatuses.Contains(manual.Status))

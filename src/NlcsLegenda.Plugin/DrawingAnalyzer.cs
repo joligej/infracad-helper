@@ -543,10 +543,8 @@ public static class DrawingAnalyzer
         Entity ent, Transaction tr, LegendSettings settings, string layerName, string sourceXref,
         out CustomLayerRule? rule, out NlcsLayerName? canonical)
     {
-        foreach (var r in settings.CustomLayerRules)
+        foreach (var r in settings.CustomLayerRules.Where(r => r.Matches(layerName, sourceXref) && EntityMatchesType(ent, r.Type)))
         {
-            if (!r.Matches(layerName, sourceXref)) continue;
-            if (!EntityMatchesType(ent, r.Type)) continue;
             if (r.BlockName is { Length: > 0 })
             {
                 var entBlock = ent is BlockReference br ? BlockName(br, tr) : string.Empty;
@@ -964,7 +962,7 @@ public static class DrawingAnalyzer
             return curve.GetDistanceAtParameter(curve.EndParam) -
                    curve.GetDistanceAtParameter(curve.StartParam);
         }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception)
         {
             return 0.0;
         }
@@ -973,7 +971,7 @@ public static class DrawingAnalyzer
     private static double SafeArea(Func<double> area)
     {
         try { return Math.Abs(area()); }
-        catch { return 0.0; }
+        catch (Autodesk.AutoCAD.Runtime.Exception) { return 0.0; }
     }
 
     internal static string BlockName(BlockReference br, Transaction tr)
@@ -983,7 +981,7 @@ public static class DrawingAnalyzer
             var id = br.IsDynamicBlock ? br.DynamicBlockTableRecord : br.BlockTableRecord;
             return tr.GetObject(id, OpenMode.ForRead) is BlockTableRecord btr ? btr.Name : string.Empty;
         }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception)
         {
             return string.Empty;
         }
