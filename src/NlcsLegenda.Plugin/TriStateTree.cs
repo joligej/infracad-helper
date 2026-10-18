@@ -7,6 +7,7 @@ namespace NlcsLegenda.Plugin;
 internal sealed class TriStateTree : TreeView
 {
     private CompositionTree _model = new();
+    private readonly ResourceScope _images = new();
 
     public TriStateTree()
     {
@@ -16,7 +17,24 @@ internal sealed class TriStateTree : TreeView
         ShowNodeToolTips = true;
         ShowPlusMinus = true;
         FullRowSelect = false;
-        StateImageList = BuildStateImages();
+        bool ready = false;
+        try
+        {
+            StateImageList = _images.Own(new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit });
+            foreach (var state in new[] { System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal,
+                System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal,
+                System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal })
+            {
+                var bitmap = _images.Own(new Bitmap(16, 16));
+                DrawGlyph(bitmap, state);
+                StateImageList.Images.Add(bitmap);
+            }
+            ready = true;
+        }
+        finally
+        {
+            if (!ready) _images.Dispose();
+        }
     }
 
     public void SetModel(CompositionTree model, string? filter = null)
@@ -90,18 +108,14 @@ internal sealed class TriStateTree : TreeView
         }
     }
 
-    private static ImageList BuildStateImages()
+    protected override void Dispose(bool disposing)
     {
-        var images = new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
-        images.Images.Add(Glyph(System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal, false));
-        images.Images.Add(Glyph(System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal, false));
-        images.Images.Add(Glyph(System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal, true));
-        return images;
+        try { base.Dispose(disposing); }
+        finally { if (disposing) _images.Dispose(); }
     }
 
-    private static Bitmap Glyph(System.Windows.Forms.VisualStyles.CheckBoxState state, bool mixed)
+    private static void DrawGlyph(Bitmap bmp, System.Windows.Forms.VisualStyles.CheckBoxState state)
     {
-        var bmp = new Bitmap(16, 16);
         using var g = Graphics.FromImage(bmp);
         g.Clear(Color.Transparent);
         var loc = new Point(0, 0);
@@ -114,9 +128,8 @@ internal sealed class TriStateTree : TreeView
             g.DrawRectangle(Pens.Gray, 1, 1, 12, 12);
             if (state == System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal)
                 g.DrawString("x", SystemFonts.DefaultFont, Brushes.Black, 2, 0);
-            else if (mixed)
+            else if (state == System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal)
                 g.FillRectangle(Brushes.Gray, 4, 4, 6, 6);
         }
-        return bmp;
     }
 }

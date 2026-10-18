@@ -1,10 +1,21 @@
 using System.Drawing;
 using System.Windows.Forms;
+using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
 internal class LegendDialog : Form
 {
+    private readonly ResourceScope _resources = new();
+
+    protected T Own<T>(T resource) where T : IDisposable => _resources.Own(resource);
+
+    protected override void Dispose(bool disposing)
+    {
+        try { base.Dispose(disposing); }
+        finally { if (disposing) _resources.Dispose(); }
+    }
+
     public LegendDialog()
     {
         AutoScaleDimensions = new SizeF(96, 96);

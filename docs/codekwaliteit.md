@@ -5,6 +5,22 @@ foutafhandeling, 27 over lussen en 4 over het vrijgeven van objecten.
 Ze hadden niveau `note`. De scanconfiguratie is niet versmald en meldingen
 worden niet handmatig gesloten om het aantal te verlagen.
 
+## Grafische resources in 1.32.5
+
+Een gesloten WinForms-control geeft een toegewezen `ImageList` of zelf gemaakt
+`Font` niet automatisch vrij. Samenstellen beheert daarom zijn eigen afbeeldingen
+en lijst; de vensters Instellingen en Laagnaam bewerken beheren hun eigen lettertypen.
+Regressieproeven faalden op 1.32.4 en controleren na reparatie dat de resources
+werkelijk worden vrijgegeven. Gedeelde Windows-resources blijven bruikbaar.
+
+Een afzonderlijke pictogramproef controleert alle 19 ribbonknoppen op 16 en 32
+pixels: maat, zichtbare tekening en hergebruik. Die proef draait in een eigen proces,
+zodat het laden van WPF de nagebootste WinForms-schermschalen niet tussentijds wijzigt.
+
+De eerder waargenomen GDI+-melding ontstond in
+`Autodesk.AutoCAD.LayerManager.MultiTreeView.OnDrawNode`. Een verband met deze
+resourcelekken is niet aangetoond; deze release claimt geen reparatie van die hostmelding.
+
 ## Wijzigingen in 1.32.4
 
 - Globale instellingen worden eerst volledig voorbereid. Bij een mislukte

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.32.5 - 2026-10-18
+
+- Samenstellen geeft de eigen aankruisafbeeldingen en afbeeldingslijst bij sluiten vrij, ook als het venster nog niet is getoond.
+- Instellingen en Laagnaam bewerken ruimen hun eigen lettertypen op. Gedeelde Windows-lettertypen blijven behouden.
+- Globale standaard heeft nu ook een teken in het ribbonpictogram. Alle 19 pictogrammen worden op beide afmetingen gecontroleerd.
+- Nieuwe regressieproeven controleren daadwerkelijk vrijgegeven tekenresources. De GDI+-melding uit Autodesk LayerManager is daarmee niet als opgelost aangemerkt.
+
 ## 1.32.4 - 2026-10-18
 
 - Opslag van de globale standaard herstelt bestanden via een tijdelijke kopie. Een opruimfout verbergt de oorspronkelijke fout niet meer; herstel- en opruimfouten worden samen gemeld.

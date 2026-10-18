@@ -10,6 +10,13 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args is ["--icons"])
+        {
+            DiagnosticRun.Execute(CheckRibbonIcons, Errors.Add);
+            foreach (var error in Errors) Console.WriteLine("FAIL " + error);
+            Console.WriteLine($"Pictogrammen: {_checks} controles; {Errors.Count} fouten");
+            return Errors.Count == 0 ? 0 : 1;
+        }
         Application.EnableVisualStyles();
         if (args is ["--docs", var directory])
         {
@@ -27,6 +34,8 @@ internal static class Program
             DiagnosticRun.Execute(() => CheckOverview(), Errors.Add, "CheckOverview");
             DiagnosticRun.Execute(() => CheckOverviewLoading(), Errors.Add, "CheckOverviewLoading");
             DiagnosticRun.Execute(CheckOverviewFatalError, Errors.Add);
+            DiagnosticRun.Execute(CheckTreeImagesDisposed, Errors.Add);
+            DiagnosticRun.Execute(CheckOwnedFontsDisposed, Errors.Add);
             DiagnosticRun.Execute(() => CheckKlic(args.FirstOrDefault()), Errors.Add, "CheckKlic");
             DiagnosticRun.Execute(() => CheckNestedEditors(), Errors.Add, "CheckNestedEditors");
             DiagnosticRun.Execute(() => CheckCustomizationRoundtrip(), Errors.Add, "CheckCustomizationRoundtrip");
@@ -106,6 +115,75 @@ internal static class Program
         Check(propagated, "Overzicht behandelt geheugenuitputting niet als een gewone bronfout");
         Check(!dialog.UseWaitCursor, "Wachtcursor hersteld na ernstige bronfout");
         Check(legend.Entries.Single().Description == "Bestaand", "Ernstige bronfout overschrijft de bestaande lijst niet");
+    }
+
+    private static void CheckRibbonIcons()
+    {
+        string[] commands = { "NLCSLEGENDA", "NLCSLEGENDAUPDATE", "NLCSLEGENDAINFO",
+            "NLCSLEGENDASAMENSTELLEN", "NLCSLEGENDAOMSCHRIJVINGEN", "NLCSLEGENDATEKST",
+            "NLCSLEGENDASTATUS", "NLCSLEGENDAXREFS", "NLCSLEGENDALAAGNAAM",
+            "NLCSLEGENDAVIEWPORT", "NLCSLEGENDAEXPORT", "NLCSLEGENDABATCH",
+            "NLCSLEGENDAOPTIES", "NLCSLEGENDASTANDAARD", "NLCSLEGENDAPRESET",
+            "NLCSLEGENDABEHEER", "NLCSLEGENDAELEMENT", "NLCSLEGENDACONFIG", "NLCSLEGENDAHELP" };
+        foreach (string command in commands)
+        foreach (int size in new[] { 16, 32 })
+        {
+            var image = RibbonIcons.Get(command, size) as System.Windows.Media.Imaging.BitmapSource;
+            Check(image is not null, command + ": pictogram aanwezig");
+            if (image is null) continue;
+            Check(image.IsFrozen && image.PixelWidth == size && image.PixelHeight == size,
+                command + ": vaste afbeelding op de gevraagde maat");
+            var converted = new System.Windows.Media.Imaging.FormatConvertedBitmap(
+                image, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+            var pixels = new byte[size * size * 4];
+            converted.CopyPixels(pixels, size * 4, 0);
+            int white = 0;
+            for (int i = 0; i < pixels.Length; i += 4)
+                if (pixels[i] > 220 && pixels[i + 1] > 150 && pixels[i + 2] > 50 && pixels[i + 3] > 127) white++;
+            Check(white > 4, command + ": herkenbaar teken binnen de blauwe achtergrond");
+            Check(ReferenceEquals(image, RibbonIcons.Get(command, size)), command + ": afbeelding hergebruikt");
+        }
+    }
+
+    private static void CheckOwnedFontsDisposed()
+    {
+        using var image = new Bitmap(100, 100);
+        using var graphics = Graphics.FromImage(image);
+        using var settings = new SettingsDialog(new(), "Fontproef");
+        using var layer = new LayerEditDialog(new NlcsLayerComponents(), "N-WE-KL-DATA-G", 0, false, null);
+        foreach (var dialog in new Form[] { settings, layer })
+        {
+            var font = Descendants(dialog).OfType<Label>().Single(label => label.Font.Bold).Font;
+            Check(graphics.MeasureString("Voorbeeld", font).Width > 0, "Eigen lettertype werkt voor sluiten");
+            dialog.Dispose();
+            bool disposed = false;
+            try { graphics.MeasureString("Voorbeeld", font); }
+            catch (ArgumentException) { disposed = true; }
+            Check(disposed, dialog.Text + ": eigen lettertype vrijgegeven");
+        }
+        Check(graphics.MeasureString("Voorbeeld", SystemFonts.MessageBoxFont!).Width > 0,
+            "Gedeeld Windows-lettertype blijft bruikbaar");
+    }
+
+    private static void CheckTreeImagesDisposed()
+    {
+        foreach (bool createHandle in new[] { false, true })
+        {
+            using var tree = new TriStateTree();
+            var images = tree.StateImageList!;
+            bool disposed = false;
+            images.Disposed += (_, _) => disposed = true;
+            if (createHandle)
+            {
+                tree.Nodes.Add(new TreeNode("Voorbeeld") { StateImageIndex = 1 });
+                _ = tree.Handle;
+                using var bitmap = new Bitmap(160, 100);
+                tree.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+            }
+            tree.Dispose();
+            Check(disposed, $"Samenstellen geeft eigen icoonlijst vrij (handle={createHandle})");
+            Check(!images.HandleCreated, "Gesloten boom houdt geen afbeeldingshandle vast");
+        }
     }
 
     private static void CheckSettingsSave()
