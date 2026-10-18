@@ -1256,7 +1256,7 @@ public partial class Commands
 
     private void PresetSave(Editor ed, Database db)
     {
-        if (!ResolveMutationTarget(ed, db, out var target, "Waarvan opslaan", "opslaan vanuit"))
+        if (!ResolvePresetTarget(ed, db, out var target, "Profiel opslaan vanuit", "opslaan vanuit"))
         { ed.WriteMessage("\nGeannuleerd."); return; }
         var name = AskPresetName(ed);
         if (name is null)
@@ -1289,10 +1289,10 @@ public partial class Commands
             ed.WriteMessage("\nProfiel niet gevonden.");
             return;
         }
-        if (!ResolveMutationTarget(ed, db, out var target, "Waarnaar laden", "laden naar"))
+        if (!ResolvePresetTarget(ed, db, out var target, "Profiel laden naar", "laden naar"))
         { ed.WriteMessage("\nGeannuleerd."); return; }
-        ed.WriteMessage($"\nProfiel \"{names[idx]}\" geladen.");
-        ApplyTargetSettings(ed, db, target, settings, "Profiel");
+        if (ApplyTargetSettings(ed, db, target, settings, "Profiel") is null)
+            ed.WriteMessage($"\nProfiel \"{names[idx]}\" geladen naar {target.ContextLabel}.");
     }
 
     private static void PresetList(Editor ed)

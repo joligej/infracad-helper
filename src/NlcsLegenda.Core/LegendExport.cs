@@ -15,9 +15,9 @@ public static class LegendExport
         var nl = CultureInfo.GetCultureInfo("nl-NL");
         string fmt = "N" + Math.Max(0, decimals);
         var sb = new StringBuilder();
-        sb.AppendLine(string.Join(';', CsvHeader().Concat(KlicHeaders(fields))));
+        sb.AppendLine(string.Join(';', CsvHeader().Concat(KlicHeaders(fields)).Concat(new[] { "Legenda-omschrijving", "Bronlagen" })));
         foreach (var e in entries)
-            sb.AppendLine(string.Join(';', CsvFields(e, fmt, nl, unitArea, unitLength, unitCount).Concat(KlicValues(e, fields))));
+            sb.AppendLine(string.Join(';', CsvFields(e, fmt, nl, unitArea, unitLength, unitCount).Concat(KlicValues(e, fields)).Concat(new[] { Csv(e.DisplayDescription), Csv(string.Join("; ", SourceLayers(e))) })));
         return sb.ToString();
     }
 
@@ -29,11 +29,11 @@ public static class LegendExport
         var nl = CultureInfo.GetCultureInfo("nl-NL");
         string fmt = "N" + Math.Max(0, decimals);
         var sb = new StringBuilder();
-        sb.AppendLine(string.Join(';', new[] { "Tekening" }.Concat(CsvHeader()).Concat(KlicHeaders(fields))));
+        sb.AppendLine(string.Join(';', new[] { "Tekening" }.Concat(CsvHeader()).Concat(KlicHeaders(fields)).Concat(new[] { "Legenda-omschrijving", "Bronlagen" })));
         foreach (var (drawing, entries) in perDrawing)
             foreach (var e in entries)
                 sb.AppendLine(string.Join(';',
-                    new[] { Csv(drawing) }.Concat(CsvFields(e, fmt, nl, unitArea, unitLength, unitCount).Concat(KlicValues(e, fields)))));
+                    new[] { Csv(drawing) }.Concat(CsvFields(e, fmt, nl, unitArea, unitLength, unitCount).Concat(KlicValues(e, fields)).Concat(new[] { Csv(e.DisplayDescription), Csv(string.Join("; ", SourceLayers(e))) }))));
         return sb.ToString();
     }
 
@@ -95,6 +95,7 @@ public static class LegendExport
             omschrijving = e.Description,
             netbeheerders = e.Netbeheerders,
             legendaOmschrijving = e.DisplayDescription,
+            bronlagen = SourceLayers(e),
             klic = fields.ToDictionary(k => k, k => KlicSummary.Field(e.KlicObjects, k)),
             klicBronnen = fields.ToDictionary(k => k, k => KlicSummary.Sources(e.KlicObjects, k)),
             klicBroncontrole = KlicSummary.Issues(e.KlicObjects),
@@ -129,6 +130,7 @@ public static class LegendExport
             omschrijving = e.Description,
             netbeheerders = e.Netbeheerders,
             legendaOmschrijving = e.DisplayDescription,
+            bronlagen = SourceLayers(e),
             klic = fields.ToDictionary(k => k, k => KlicSummary.Field(e.KlicObjects, k)),
             klicBronnen = fields.ToDictionary(k => k, k => KlicSummary.Sources(e.KlicObjects, k)),
             klicBroncontrole = KlicSummary.Issues(e.KlicObjects),
@@ -144,6 +146,9 @@ public static class LegendExport
 
         return JsonSerializer.Serialize(rows, new JsonSerializerOptions { WriteIndented = true });
     }
+
+    private static string[] SourceLayers(LegendEntry entry) => entry.SourceLayers
+        .Select(source => source.SourceLayerName).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
     private static string QuantityValue(LegendEntry e, string fmt, CultureInfo nl) => e.QuantityType switch
     {

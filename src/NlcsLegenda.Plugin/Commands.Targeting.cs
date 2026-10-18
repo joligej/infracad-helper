@@ -48,6 +48,20 @@ public partial class Commands
         return true;
     }
 
+    private static bool ResolvePresetTarget(Editor ed, Database db, out MutationTarget target,
+        string prompt, string pickVerb)
+    {
+        target = MutationTarget.Global;
+        var options = new PromptKeywordOptions("\n" + prompt) { AllowNone = true };
+        options.Keywords.Add("Legenda");
+        options.Keywords.Add("Standaard");
+        options.Keywords.Default = "Legenda";
+        var choice = ed.GetKeywords(options);
+        if (choice.Status != PromptStatus.OK) return false;
+        if (choice.StringResult == "Standaard") return true;
+        return ResolveMutationTarget(ed, db, out target, pickVerb: pickVerb);
+    }
+
     private static LegendSettings GetTargetSettings(Database db, MutationTarget target)
     {
         if (target.IsGlobal)

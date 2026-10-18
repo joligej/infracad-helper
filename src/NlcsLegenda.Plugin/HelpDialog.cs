@@ -25,12 +25,12 @@ internal sealed class HelpDialog : LegendDialog
             "Open Legenda's om ze te bekijken, bij te werken, te hernoemen, op te zoeken of te\n" +
             "verwijderen."),
         ("Instellingen",
-            "Open Instellingen voor schaal, inhoud, opmaak, teksten en hoeveelheden.\n\n" +
+            "Open Lokale instellingen voor de gekozen legenda: schaal, inhoud, opmaak en teksten.\n\n" +
             "Bij één aanwezige legenda open je die direct. Bij meerdere kies je welke.\n" +
-            "Standaard bewerkt de instellingen voor nieuwe legenda's.\n\n" +
-            "Opmaak → template zet de maatvoering terug; eigen teksten blijven behouden."),
+            "Globale standaard bewerkt alleen de instellingen voor nieuwe legenda's.\n\n" +
+            "Legenda → Templateopmaak herstellen zet de maten terug; eigen teksten blijven behouden.\n\nToepassen werkt de legenda direct bij. Opslaan doet dat ook en sluit het venster."),
         ("Overzicht en volgorde",
-            "Overzicht opent een lijst met regels, hoeveelheden, bronlagen en netbeheerders.\n\n" +
+            "Overzicht leest alleen de gekozen legenda. Vernieuwen leest de bron opnieuw.\n\n" +
             "Kies Handmatig en verplaats regels met de knoppen of Alt+↑ / Alt+↓.\n" +
             "Toepassen werkt de legenda bij; Opslaan sluit het venster. Elke legenda\n" +
             "onthoudt haar eigen volgorde, ook na opnieuw openen."),
@@ -49,6 +49,24 @@ internal sealed class HelpDialog : LegendDialog
             "een geopende bron-DWG in Civil 3D/Map; xrefs gebruiken de overige leesbare\n" +
             "gegevens. Niet-leesbare bronnen worden gemeld.\n\n" +
             "Een nulwaarde is geen gemeten diepte. Een standaarddiepte is apart benoemd."),
+        ("Samenstellen en zoeken",
+            "Samenstellen toont de bronregels en eigen regels. Zoek op een deel van de laagnaam\n" +
+            "of omschrijving; * kan meerdere delen combineren. Een groepsvinkje verandert\n" +
+            "tijdens zoeken alleen de zichtbare resultaten.\n\n" +
+            "Laag toevoegen opent een doorzoekbare lijst. Een eigen regel heeft geen gemeten\n" +
+            "hoeveelheid. Koppel een Eigen laag als de brongeometrie wel moet meetellen."),
+        ("Voorbeelden",
+            "Overzicht → Voorbeeld kiest een volledig voorbeeld uit een DWG-bibliotheek.\n\n" +
+            "Gebruiken koppelt het aan deze regel; Als nieuwe regel voegt het los toe.\n" +
+            "Uit tekening gebruikt de brongeometrie. Automatisch kiest alleen bij een\n" +
+            "eenduidige match. Gebruikte voorbeelden blijven in de DWG bewaard.\n\n" +
+            "Neem de bibliotheek mee naar een andere computer voor nog niet gebruikte voorbeelden."),
+        ("Profielen",
+            "Profielen bewaart een complete opzet, met instellingen en eigen omschrijvingen.\n\n" +
+            "Kies bij Opslaan of Laden expliciet Legenda of Standaard. Standaard werkt ook\n" +
+            "zonder legenda en verandert bestaande legenda's niet.\n\n" +
+            "Importeren en Exporteren delen een profiel als JSON; een voorbeeldenbibliotheek\n" +
+            "en het lettertype moeten afzonderlijk worden meegenomen."),
         ("Eigen lagen",
             "Heb je eigen lagen die geen NLCS zijn maar wel mee moeten tellen? Koppel ze onder\n" +
             "Eigen lagen in de instellingen.\n\n" +
@@ -64,9 +82,9 @@ internal sealed class HelpDialog : LegendDialog
         ("Hoeveelheden",
             "De legenda telt lengtes, aantallen en oppervlakten uit de tekening.\n\n" +
             "Zet hoeveelheden aan of uit in de instellingen. Overzicht laat de totalen zien\n" +
-            "zonder te tekenen."),
+            "zonder te tekenen.\n\nEen onmeetbaar oppervlak krijgt ? m². Overzicht → Broncontrole noemt de bronlaag\nen het object; herstel de broncontour en werk de legenda bij."),
         ("Export",
-            "Exporteren schrijft de regels weg als CSV en JSON, met de hoeveelheden.\n\n" +
+            "Exporteren schrijft CSV en JSON met hoeveelheden, omschrijvingen en bronlagen.\n\n" +
             "Batch doet dat voor alle tekeningen in een map tegelijk, in één uittrekstaat."),
         ("Commando's",
             "NLCSLEGENDA — legenda maken\n" +

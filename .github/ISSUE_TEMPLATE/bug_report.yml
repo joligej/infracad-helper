@@ -23,16 +23,29 @@ body:
     id: versie
     attributes:
       label: AutoCAD-/Civil 3D-versie
-      placeholder: "Civil 3D 2027"
+      placeholder: "Civil 3D 2027, inclusief update/buildnummer"
     validations:
       required: true
   - type: input
     id: plugin
     attributes:
       label: Versie van de plugin
-      placeholder: "v1.6.0"
+      description: "Te vinden onder Help in het lint NLCS Legenda."
+      placeholder: "Bijvoorbeeld 1.32.2"
+    validations:
+      required: true
   - type: textarea
     id: lagen
     attributes:
       label: Voorbeeldlaagnamen (optioneel)
       description: Plak enkele NLCS-laagnamen die met het probleem te maken hebben.
+  - type: textarea
+    id: context
+    attributes:
+      label: Tekening en instellingen
+      description: "Denk aan modelruimte/layout, meters of millimeters, legendaschaal, xrefs, hele tekening of selectie en één of meerdere legenda’s. Bij vensterproblemen ook schermresolutie en Windows-schermschaal."
+  - type: textarea
+    id: voorbeeld
+    attributes:
+      label: Klein voorbeeld of afbeelding (optioneel)
+      description: "Gebruik nagemaakte of geanonimiseerde gegevens. Geen vertrouwelijke projecttekeningen of volledige KLIC-leveringen."

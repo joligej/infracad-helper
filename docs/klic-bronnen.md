@@ -27,7 +27,9 @@ Bij **KLIC-instellingen → Overzicht en export** kies je velden zoals thema, ma
 diameter, druk, spanning, KLIC-melding, aanvraagdatum en aanvraagsoort. De gekozen velden
 verschijnen ook in CSV/JSON. De export vermeldt gebruikte bronnen en bronmeldingen.
 **Exporteer lijst** in Overzicht exporteert alleen de regels die het huidige filter toont.
-Het zoekfilter wijzigt de inhoud van de getekende legenda niet.
+Het zoekfilter wijzigt de inhoud van de getekende legenda niet. CSV bevat naast de
+oorspronkelijke omschrijving ook Legenda-omschrijving en Bronlagen; JSON bevat
+`omschrijving`, `legendaOmschrijving` en `bronlagen`. Xref-voorvoegsels blijven zichtbaar.
 
 Standaard krijgt de ingebedde InfraCAD-bron voorrang. Met **Gegevensbron** kies je desgewenst
 Property Sets of Object Data, bijvoorbeeld na een handmatige wijziging. Per tabel en veld

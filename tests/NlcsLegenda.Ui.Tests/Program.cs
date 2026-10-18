@@ -11,6 +11,11 @@ internal static class Program
     private static int Main(string[] args)
     {
         Application.EnableVisualStyles();
+        if (args is ["--docs", var directory])
+        {
+            DocumentationImages.Write(directory);
+            return 0;
+        }
         try
         {
             foreach (float scale in new[] { 1f, 1.25f, 1.5f, 2f })
@@ -20,11 +25,13 @@ internal static class Program
             CheckTemplateReset();
             CheckXrefControls();
             CheckOverview();
+            CheckOverviewLoading();
             CheckKlic(args.FirstOrDefault());
             CheckNestedEditors();
             CheckCustomizationRoundtrip();
             CheckStatusReassignment();
             Func<Form>[] factories = {
+                () => new OverviewDialog(new[] { new OverviewLegend { Id = "test", Name = "Voorbeeld", Settings = new(), Entries = new[] { Entry("Regel") } } }, _ => null),
                 () => new LayerChoiceDialog(new[] { new ManualEntry { Layer = "N-WE-GR-BOOM-V", Description = "Boom" } }),
                 () => new ExampleDialog("voorbeelden.dwg", _ => new[] { new LegendExample("b", "Scheidingband met tekst en meerdere lijnen", "WEG", 200, Array.Empty<string>()) }),
                 () => new XrefInclusionDialog(new[] { "Een lange xrefnaam met veel informatie.dwg" }, new()),
@@ -381,6 +388,46 @@ internal static class Program
         Check(values.Rows.Count == 2 && values.Rows.Cast<DataGridViewRow>().Count(r => (string)r.Cells[4].Value == "Ja") == 1,
             "beide bronwaarden en gekozen bron zichtbaar");
         details.Close(); overview.Close();
+    }
+
+    private static void CheckOverviewLoading()
+    {
+        var a = new OverviewLegend { Id = "A", Name = "A", Settings = new(), Entries = Array.Empty<LegendEntry>(), NeedsAnalysis = true };
+        var b = new OverviewLegend { Id = "B", Name = "B", Settings = new(), Entries = Array.Empty<LegendEntry>(), NeedsAnalysis = true };
+        var calls = new List<string>();
+        bool failB = true;
+        using var form = new OverviewDialog(new[] { a, b }, _ => null, item =>
+        {
+            calls.Add(item.Id);
+            if (item.Id == "B" && failB) throw new InvalidOperationException("Xref niet beschikbaar");
+            return new[] { Entry(item.Name) };
+        });
+        OpenOffscreen(form);
+        var controls = Descendants(form).ToList();
+        var legends = controls.OfType<ComboBox>().Single(c => c.Items.OfType<OverviewLegend>().Any());
+        var grid = controls.OfType<DataGridView>().Single();
+        Check(calls.SequenceEqual(new[] { "A" }), "Overzicht leest bij openen alleen de gekozen legenda");
+        Check(grid.ColumnHeadersHeight >= grid.Font.Height + grid.DefaultCellStyle.Padding.Vertical + 2,
+            "Kolomkoppen hebben ruimte voor tekst en padding");
+        Check(grid.Columns.Cast<DataGridViewColumn>().Where(c => c.HeaderText is "Netbeheerder" or "Samengevoegd" or "Broncontrole").All(c => !c.Visible),
+            "Lege informatiekolommen worden verborgen; gekozen KLIC-velden blijven staan");
+        legends.SelectedIndex = 1;
+        Check(grid.Rows.Count == 0 && b.NeedsAnalysis && controls.OfType<Label>().Any(l => l.Text.Contains("Xref niet beschikbaar")),
+            "Mislukte bronlezing toont een melding zonder oude regels");
+        Check(!controls.OfType<Button>().Single(c => c.Text == "Exporteer lijst…").Enabled,
+            "Mislukte bronlezing kan geen oude lijst exporteren");
+        legends.SelectedIndex = 0;
+        Check(calls.SequenceEqual(new[] { "A", "B" }) && grid.Rows.Count == 1,
+            "Andere legenda blijft bereikbaar zonder herhaalde analyse");
+        failB = false;
+        legends.SelectedIndex = 1;
+        Check(!b.NeedsAnalysis && grid.Rows.Count == 1, "Bronlezing opnieuw proberen na fout");
+        var sort = controls.OfType<ComboBox>().Single(c => c.Items.Contains("Handmatig"));
+        sort.SelectedItem = "Handmatig";
+        controls.OfType<Button>().Single(c => c.Text == "Vernieuwen").PerformClick();
+        Check(calls.SequenceEqual(new[] { "A", "B", "B", "B" }) && b.Changed && b.Settings.SortMode == LegendSortMode.Handmatig,
+            "Vernieuwen leest opnieuw en bewaart nog niet opgeslagen keuzes");
+        form.Close();
     }
 
     private static void CheckOverview()
