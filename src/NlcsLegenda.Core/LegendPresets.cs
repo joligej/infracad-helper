@@ -94,7 +94,7 @@ public static class LegendPresets
     }
 
     private static string PathFor(string dir, string name) =>
-        Path.Combine(dir, SafeFileName(name) + Extension);
+        Path.Join(dir, SafeFileName(name) + Extension);
 
     // vaste windows-tekenset, ook buiten windows
     private static readonly char[] InvalidFileChars =

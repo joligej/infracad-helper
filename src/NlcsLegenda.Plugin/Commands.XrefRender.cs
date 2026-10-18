@@ -1748,6 +1748,7 @@ public partial class Commands
             ed.WriteMessage($"\nPLACEMENT custom text height 3/4/6 mm: {(customHeightsOk ? "OK" : "FAIL")}; fout={error}");
 
             bool rollbackAttempted = false;
+            bool rollbackCaught = false;
             string rollbackError = string.Empty;
             var beforeRollback = ReadPlacementFingerprint(db);
             try
@@ -1766,9 +1767,9 @@ public partial class Commands
                 rollbackAttempted = true;
                 throw new InvalidOperationException(rollbackMarker);
             }
-            catch (System.Exception ex) when (ex.Message == rollbackMarker) { }
+            catch (InvalidOperationException ex) when (ex.Message == rollbackMarker) { rollbackCaught = true; }
             catch (System.Exception ex) { rollbackError = ex.GetType().Name + ": " + ex.Message; }
-            bool rollbackOk = rollbackAttempted && rollbackError.Length == 0
+            bool rollbackOk = rollbackAttempted && rollbackCaught && rollbackError.Length == 0
                 && beforeRollback == ReadPlacementFingerprint(db);
             ed.WriteMessage($"\nPLACEMENT rollback: {(rollbackOk ? "atomic" : "FAIL")} fout={rollbackError}");
             ed.WriteMessage($"\nPLACEMENT totaal: {(placementOk && explodedPlacementOk && rollbackOk ? "OK" : "FAIL")}; group={groupName}");

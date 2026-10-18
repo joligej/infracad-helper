@@ -2731,8 +2731,8 @@ public partial class Commands
         var ed = doc.Editor;
         var db = doc.Database;
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
-        string divXref = Path.Combine(dir, "any_div.dwg");
-        string eqXref = Path.Combine(dir, "any_eq.dwg");
+        string divXref = Path.Join(dir, "any_div.dwg");
+        string eqXref = Path.Join(dir, "any_eq.dwg");
         try
         {
             CreateXrefLineDwg(divXref, "Div kabels", 6.0, colorIndex: 3);
@@ -2812,8 +2812,12 @@ public partial class Commands
         }
         finally
         {
-            try { if (File.Exists(divXref)) File.Delete(divXref); } catch { }
-            try { if (File.Exists(eqXref)) File.Delete(eqXref); } catch { }
+            foreach (string path in new[] { divXref, eqXref })
+            {
+                try { File.Delete(path); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                { ed.WriteMessage($"\nEIGENANY FAIL: testbestand niet verwijderd: {path}: {ex.Message}"); }
+            }
         }
     }
 

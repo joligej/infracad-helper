@@ -89,9 +89,7 @@ public sealed class CompositionTree
     public HashSet<string> ExcludedKeys()
     {
         var set = new HashSet<string>(_unlistedExclusions, StringComparer.OrdinalIgnoreCase);
-        foreach (var leaf in AllLeaves())
-            if (!leaf.Included)
-                set.Add(leaf.Key);
+        set.UnionWith(AllLeaves().Where(leaf => !leaf.Included).Select(leaf => leaf.Key));
         return set;
     }
 

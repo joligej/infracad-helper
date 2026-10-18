@@ -79,3 +79,5 @@ programma’s niet automatisch bij een fout. Overschrijf geen bestaande releaset
 Meld een bug met de stappen om het te reproduceren, de AutoCAD-/Civil 3D-versie en zo
 mogelijk een voorbeeldtekening of de betreffende laagnamen.
 
+
+De beoordeling van CodeQL-meldingen staat in [Codekwaliteit](docs/codekwaliteit.md).

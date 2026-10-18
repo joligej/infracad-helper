@@ -647,19 +647,8 @@ public sealed class LegendSettings
         return result;
     }
 
-    public static LegendSettings FromJson(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return new LegendSettings();
-        try
-        {
-            return (JsonSerializer.Deserialize<LegendSettings>(json, JsonOptions) ?? new LegendSettings()).Normalize();
-        }
-        catch
-        {
-            return new LegendSettings();
-        }
-    }
+    public static LegendSettings FromJson(string? json) =>
+        TryParse(json, out var settings) ? settings : new LegendSettings();
 
     public static bool TryParse(string? json, out LegendSettings settings)
     {
@@ -682,15 +671,12 @@ public sealed class LegendSettings
 
     public static LegendSettings Load(string path)
     {
-        try
-        {
-            if (File.Exists(path))
-                return (JsonSerializer.Deserialize<LegendSettings>(File.ReadAllText(path), JsonOptions)
-                       ?? new LegendSettings()).Normalize();
-        }
-        catch
-        {
-        }
-        return new LegendSettings();
+        string json;
+        try { json = File.ReadAllText(path); }
+        catch (FileNotFoundException) { return new LegendSettings(); }
+        catch (DirectoryNotFoundException) { return new LegendSettings(); }
+        if (!TryParse(json, out var settings))
+            throw new InvalidDataException($"Instellingenbestand '{path}' is onleesbaar of heeft een niet-ondersteunde versie.");
+        return settings;
     }
 }

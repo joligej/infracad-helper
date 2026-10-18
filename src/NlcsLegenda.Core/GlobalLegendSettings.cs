@@ -6,12 +6,8 @@ public static class GlobalLegendSettings
     {
         var settingsPath = Path.Join(directory, "settings.json");
         var descriptionsPath = Path.Join(directory, "omschrijvingen.json");
-        var settings = new LegendSettings();
-        if (File.Exists(settingsPath) && !LegendSettings.TryParse(File.ReadAllText(settingsPath), out settings))
-            throw new InvalidDataException("De globale instellingen zijn onleesbaar of hebben een niet-ondersteunde versie.");
-        var descriptions = new DescriptionCatalog();
-        if (File.Exists(descriptionsPath) && !DescriptionCatalog.TryParse(File.ReadAllText(descriptionsPath), out descriptions))
-            throw new InvalidDataException("De globale omschrijvingen zijn onleesbaar.");
+        var settings = LegendSettings.Load(settingsPath);
+        var descriptions = DescriptionCatalog.Load(descriptionsPath);
         // voorrang van oude profielteksten behouden bij migratie
         descriptions.MergeFrom(settings.DescriptionOverrides);
         settings.DescriptionOverrides = descriptions.Clone();

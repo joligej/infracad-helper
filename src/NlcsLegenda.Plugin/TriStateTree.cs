@@ -109,7 +109,7 @@ internal sealed class TriStateTree : TreeView
         {
             CheckBoxRenderer.DrawCheckBox(g, loc, state);
         }
-        catch
+        catch (InvalidOperationException)
         {
             g.DrawRectangle(Pens.Gray, 1, 1, 12, 12);
             if (state == System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal)

@@ -150,10 +150,11 @@ public partial class Commands
                     {
                         AcApp.SetSystemVariable("FILEDIA", (short)(1 - filedia));
                         var inner = CaptureSystemVariables();
+                        bool cancelled = false;
                         try { AcApp.SetSystemVariable("FILEDIA", filedia); throw new OperationCanceledException(); }
-                        catch (OperationCanceledException) { }
+                        catch (OperationCanceledException) { cancelled = true; }
                         finally { RestoreSystemVariables(inner); }
-                        if (!Equals(AcApp.GetSystemVariable("FILEDIA"), (short)(1 - filedia)))
+                        if (!cancelled || !Equals(AcApp.GetSystemVariable("FILEDIA"), (short)(1 - filedia)))
                             throw new InvalidOperationException("Genest herstel verloor de buitenste waarde.");
                     }
                     finally { RestoreSystemVariables(outer); }
