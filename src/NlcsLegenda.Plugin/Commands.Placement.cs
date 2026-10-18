@@ -93,14 +93,16 @@ public partial class Commands
             if (max.X > min.X && max.Y > min.Y)
                 return new Point3d(max.X + s.ToModel(20.0), max.Y, 0.0);
         }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception)
         {
+            return Point3d.Origin;
         }
         return Point3d.Origin;
     }
 
     private static void PurgeTempBlock(Database db, ObjectId btrId)
     {
+        if (btrId.IsNull || btrId.IsErased) return;
         try
         {
             using var tr = db.TransactionManager.StartTransaction();
@@ -111,8 +113,10 @@ public partial class Commands
             }
             tr.Commit();
         }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception ex)
         {
+            Autodesk.AutoCAD.ApplicationServices.Core.Application.DocumentManager.MdiActiveDocument?.Editor
+                .WriteMessage($"\nTijdelijke legendablokken konden niet volledig worden opgeruimd: {ex.Message}");
         }
     }
 
@@ -138,8 +142,10 @@ public partial class Commands
             }
             tr.Commit();
         }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception ex)
         {
+            Autodesk.AutoCAD.ApplicationServices.Core.Application.DocumentManager.MdiActiveDocument?.Editor
+                .WriteMessage($"\nTijdelijke legendablokken konden niet volledig worden opgeruimd: {ex.Message}");
         }
     }
 }

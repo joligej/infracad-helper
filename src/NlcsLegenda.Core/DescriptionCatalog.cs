@@ -109,15 +109,13 @@ public sealed class DescriptionCatalog
 
     public static DescriptionCatalog Load(string path)
     {
-        try
-        {
-            if (File.Exists(path))
-                return FromJson(File.ReadAllText(path));
-        }
-        catch
-        {
-        }
-        return new DescriptionCatalog();
+        string json;
+        try { json = File.ReadAllText(path); }
+        catch (FileNotFoundException) { return new DescriptionCatalog(); }
+        catch (DirectoryNotFoundException) { return new DescriptionCatalog(); }
+        if (!TryParse(json, out var catalog))
+            throw new InvalidDataException($"Omschrijvingenbestand '{path}' is onleesbaar.");
+        return catalog;
     }
 
     public void Save(string path) =>

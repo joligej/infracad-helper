@@ -9,7 +9,7 @@ public class LegendPresetsTests : IDisposable
 
     public LegendPresetsTests()
     {
-        _dir = Path.Combine(Path.GetTempPath(), "nlcs_presets_" + Guid.NewGuid().ToString("N"));
+        _dir = Path.Join(Path.GetTempPath(), "nlcs_presets_" + Guid.NewGuid().ToString("N"));
     }
 
     public void Dispose()
@@ -107,7 +107,7 @@ public class LegendPresetsTests : IDisposable
     [Fact]
     public void List_EmptyOrMissingDir_ReturnsEmpty()
     {
-        Assert.Empty(LegendPresets.List(Path.Combine(_dir, "leeg")));
+        Assert.Empty(LegendPresets.List(Path.Join(_dir, "leeg")));
     }
 
     [Fact]
@@ -116,11 +116,11 @@ public class LegendPresetsTests : IDisposable
         var settings = new LegendSettings { Scale = 250, ToonArceringen = false };
         LegendPresets.Save(_dir, "Bron", settings);
 
-        var shared = Path.Combine(_dir, "gedeeld.json");
+        var shared = Path.Join(_dir, "gedeeld.json");
         LegendPresets.Export(_dir, "Bron", shared);
         Assert.True(File.Exists(shared));
 
-        var other = Path.Combine(_dir, "andere");
+        var other = Path.Join(_dir, "andere");
         Assert.True(LegendPresets.TryImport(other, shared, "Overgenomen", out var error));
         Assert.Equal(string.Empty, error);
 
@@ -134,7 +134,7 @@ public class LegendPresetsTests : IDisposable
     public void Import_InvalidJson_FailsAndLeavesExistingUntouched()
     {
         LegendPresets.Save(_dir, "Bestaand", new LegendSettings { Scale = 100 });
-        var bad = Path.Combine(_dir, "kapot.json");
+        var bad = Path.Join(_dir, "kapot.json");
         File.WriteAllText(bad, "{ dit is geen geldige json ");
 
         Assert.False(LegendPresets.TryImport(_dir, bad, "Bestaand", out var error));
@@ -146,7 +146,7 @@ public class LegendPresetsTests : IDisposable
     [Fact]
     public void Import_MissingFile_Fails()
     {
-        Assert.False(LegendPresets.TryImport(_dir, Path.Combine(_dir, "weg.json"), "X", out var error));
+        Assert.False(LegendPresets.TryImport(_dir, Path.Join(_dir, "weg.json"), "X", out var error));
         Assert.NotEqual(string.Empty, error);
     }
 
@@ -154,7 +154,7 @@ public class LegendPresetsTests : IDisposable
     public void Export_MissingPreset_Throws()
     {
         Assert.Throws<FileNotFoundException>(
-            () => LegendPresets.Export(_dir, "bestaatniet", Path.Combine(_dir, "uit.json")));
+            () => LegendPresets.Export(_dir, "bestaatniet", Path.Join(_dir, "uit.json")));
     }
 
     [Fact]

@@ -53,8 +53,7 @@ public static class LegendGrouping
                 .ThenBy(l => l.LocalName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(l => l.Raw, StringComparer.OrdinalIgnoreCase))
             {
-                if (!byType.ContainsKey(layer.DrawType))
-                    byType[layer.DrawType] = layer.EffectiveRenderLayerName;
+                byType.TryAdd(layer.DrawType, layer.EffectiveRenderLayerName);
             }
 
             var representative = group

@@ -895,7 +895,7 @@ public static class DrawingAnalyzer
             max = extents.MaxPoint;
             return true;
         }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception)
         {
             min = Point3d.Origin;
             max = Point3d.Origin;

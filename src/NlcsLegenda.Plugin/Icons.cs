@@ -34,7 +34,8 @@ internal static class RibbonIcons
             Cache[key] = image;
             return image;
         }
-        catch
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.ExternalException
+            or ArgumentException or InvalidOperationException or NotSupportedException or IOException)
         {
             return null;
         }

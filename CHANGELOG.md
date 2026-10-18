@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.32.3 - 2026-10-18
+
+- Onleesbare instellingen- en omschrijvingenbestanden geven een foutmelding. Alleen een ontbrekend bestand gebruikt de beginwaarden; een leesfout wordt niet meer als een leeg profiel behandeld.
+- Opruimfouten bij tijdelijke legendablokken worden gemeld. Tijdelijke tekenobjecten die niet kunnen worden verwijderd breken de opbouw af, zodat de transactie de vorige legenda kan behouden.
+- Terugval voor niet-meetbare CAD-objecten en ontbrekende Windows-vormgeving vangt alleen de bijbehorende soorten fouten op. Diagnostische proeven controleren annuleren en terugdraaien expliciet en melden achtergebleven testbestanden.
+- CodeQL-aandachtspunten zijn afzonderlijk beoordeeld. Padopbouw en enkele onnodige vertakkingen zijn vereenvoudigd; de redenen voor behouden meldingen staan in de onderhoudsdocumentatie.
+
 ## 1.32.2 - 2026-10-18
 
 - Profielen kunnen weer afzonderlijk worden opgeslagen en geladen voor een bestaande legenda of de globale standaard, ook zonder geplaatste legenda. De melding dat een profiel is geladen verschijnt pas na geslaagd toepassen.

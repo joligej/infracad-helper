@@ -445,16 +445,14 @@ public static class LegendBuilder
             if (tr.GetObject(id, OpenMode.ForWrite) is not Entity entity)
                 continue;
             foreach (var rendered in renderLayers)
-                if (!entry.IsManual && entity.Layer == rendered.Value && analysis.LayerStyles.TryGetValue(rendered.Key, out var style))
+                if (!entry.IsManual && rendered.Key != entry.SymbolLayer && entity.Layer == rendered.Value
+                    && analysis.LayerStyles.TryGetValue(rendered.Key, out var style))
                 {
-                    if (rendered.Key != entry.SymbolLayer)
-                    {
-                        entity.Color = style.Color;
-                        entity.LineWeight = style.LineWeight;
-                        entity.Transparency = style.Transparency.ToAutoCadValue();
-                        entity.LinetypeId = ResolveStyleLinetype(tr, db, style);
-                        entity.LinetypeScale = style.LinetypeScale;
-                    }
+                    entity.Color = style.Color;
+                    entity.LineWeight = style.LineWeight;
+                    entity.Transparency = style.Transparency.ToAutoCadValue();
+                    entity.LinetypeId = ResolveStyleLinetype(tr, db, style);
+                    entity.LinetypeScale = style.LinetypeScale;
                 }
         }
 
@@ -557,7 +555,7 @@ public static class LegendBuilder
             if (!probeOk || primitives.Count == 0)
             {
                 foreach (var id in created.Concat(primitives).Distinct())
-                    EraseSafe(tr, id);
+                    EraseTemporary(tr, id);
                 failureReason = $"Symboolblok '{blockName}' bevat geen omzetbare geometrie.";
                 return false;
             }
@@ -613,7 +611,7 @@ public static class LegendBuilder
             if (extW <= 1e-9 && extH <= 1e-9)
             {
                 foreach (var id in created.Concat(primitives).Distinct())
-                    EraseSafe(tr, id);
+                    EraseTemporary(tr, id);
                 failureReason = $"Symboolblok '{blockName}' heeft geen bruikbare extents.";
                 return false;
             }
@@ -647,7 +645,7 @@ public static class LegendBuilder
         catch (Exception ex)
         {
             foreach (var id in created.Concat(primitives).Distinct())
-                EraseSafe(tr, id);
+                EraseTemporary(tr, id);
             failureReason = $"Symboolblok '{blockName}' kon niet worden weergegeven: {ex.Message}";
             return false;
         }
@@ -1038,16 +1036,11 @@ public static class LegendBuilder
         }
     }
 
-    private static void EraseSafe(Transaction tr, ObjectId id)
+    private static void EraseTemporary(Transaction tr, ObjectId id)
     {
-        try
-        {
-            if (tr.GetObject(id, OpenMode.ForWrite) is Entity e && !e.IsErased)
-                e.Erase();
-        }
-        catch
-        {
-        }
+        if (id.IsNull || id.IsErased) return;
+        if (tr.GetObject(id, OpenMode.ForWrite) is Entity entity)
+            entity.Erase();
     }
 
     internal static ObjectId AppendEntity(BlockTableRecord btr, Entity entity)
@@ -1091,7 +1084,7 @@ public static class LegendBuilder
             anchor = new Point3d((ge.MinPoint.X + ge.MaxPoint.X) / 2.0,
                 (ge.MinPoint.Y + ge.MaxPoint.Y) / 2.0, (ge.MinPoint.Z + ge.MaxPoint.Z) / 2.0);
         }
-        catch
+        catch (Autodesk.AutoCAD.Runtime.Exception)
         {
             anchor = dbt.Position;
         }
@@ -1224,7 +1217,7 @@ public static class LegendBuilder
         catch
         {
             if (!hatch.ObjectId.IsNull)
-                EraseSafe(tr, hatch.ObjectId);
+                EraseTemporary(tr, hatch.ObjectId);
             else
                 hatch.Dispose();
             throw;
@@ -1312,7 +1305,7 @@ public static class LegendBuilder
         }
         catch
         {
-            if (!hatch.ObjectId.IsNull) EraseSafe(tr, hatch.ObjectId);
+            if (!hatch.ObjectId.IsNull) EraseTemporary(tr, hatch.ObjectId);
             throw;
         }
     }
