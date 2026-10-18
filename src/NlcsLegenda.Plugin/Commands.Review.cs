@@ -17,18 +17,13 @@ public partial class Commands
         int failures = 0;
         void Check(string name, Action<Database, Transaction> test)
         {
-            try
+            if (!DiagnosticRun.Execute(() =>
             {
                 using var tr = doc.Database.TransactionManager.StartTransaction();
                 test(doc.Database, tr);
                 tr.Abort();
                 doc.Editor.WriteMessage($"\nREVIEW {name} -> OK");
-            }
-            catch (System.Exception ex)
-            {
-                failures++;
-                doc.Editor.WriteMessage($"\nREVIEW {name} -> FAIL: {ex}");
-            }
+            }, message => doc.Editor.WriteMessage(message), "NlcsLegendaReviewTest")) failures++;
         }
         Check("geldige en ongeldige laagnamen", ReviewLayerNames);
         Check("eigen laag met lijn en symbool", ReviewMixedCustomLayer);
@@ -55,9 +50,9 @@ public partial class Commands
 
     private static void ReviewLayerNames(Database db, Transaction tr)
     {
-        foreach (var name in new[] { "N03-WE-VH-SUBSTATUS-G", "N-RI-RIO-INSPECTIE-G", "N-WE-VH-ONGELDIG-G-99999999999999999999" })
+        foreach (var layer in new[] { "N03-WE-VH-SUBSTATUS-G", "N-RI-RIO-INSPECTIE-G", "N-WE-VH-ONGELDIG-G-99999999999999999999" }
+            .Select(name => ReviewLayer(db, tr, name)))
         {
-            var layer = ReviewLayer(db, tr, name);
             using var line = new Line(Point3d.Origin, new Point3d(7, 0, 0)) { LayerId = layer };
             ReviewAppend(ReviewModel(db, tr), tr, line);
         }
@@ -67,6 +62,13 @@ public partial class Commands
                 throw new InvalidOperationException("Een geldige laagnaam wordt niet volledig geanalyseerd.");
         if (entries.Any(e => e.Element == "ONGELDIG"))
             throw new InvalidOperationException("Een ongeldige schaal wordt als bron gebruikt.");
+    }
+
+    private static void AppendVertex(Polyline3d polyline, Transaction tr, Point3d point)
+    {
+        using var vertex = new PolylineVertex3d(point);
+        polyline.AppendVertex(vertex);
+        tr.AddNewlyCreatedDBObject(vertex, true);
     }
 
     private static ObjectId ReviewLayer(Database db, Transaction tr, string name, short color = 7)
@@ -145,9 +147,7 @@ public partial class Commands
             ReviewAppend(block, tr, polyline);
             foreach (var point in new[] { new Point3d(0, i * 4d, 0), new Point3d(3, (1 - i) * 4d, 0), new Point3d(6, i * 4d, 0) })
             {
-                using var vertex = new PolylineVertex3d(point);
-                polyline.AppendVertex(vertex);
-                tr.AddNewlyCreatedDBObject(vertex, true);
+                AppendVertex(polyline, tr, point);
             }
             using var reference = new BlockReference(new Point3d(i * 10d, 0, 0), block.ObjectId) { LayerId = layer };
             ReviewAppend(ReviewModel(db, tr), tr, reference);
@@ -306,7 +306,7 @@ public partial class Commands
             }
             finally { HostApplicationServices.WorkingDatabase = previous; }
         }
-        try
+        DiagnosticRun.Execute(() =>
         {
             WriteSource(1);
             AttachAndInsert(db, path, "SNAPSHOT");
@@ -326,8 +326,7 @@ public partial class Commands
             if (!rejected || ReadPlacementFingerprint(db) != before)
                 throw new InvalidOperationException("Een gewijzigde bron wordt gemengd met de geladen versie of verandert de vorige legenda.");
             doc.Editor.WriteMessage("\nSNAPSHOT gewijzigde bron afgewezen; bestaande legenda behouden -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nSNAPSHOT FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaSnapshotTest");
     }
 
     [CommandMethod("NLCSLEGENDASNAPSHOTVERIFY", CommandFlags.Modal)]
@@ -335,7 +334,7 @@ public partial class Commands
     {
         var doc = AcAp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             double Radius()
             {
@@ -359,8 +358,7 @@ public partial class Commands
             PurgePending(db);
             if (Math.Abs(Radius() - 2.0) > 1e-8) throw new InvalidOperationException("De herladen bron levert niet de nieuwe symboolvorm.");
             doc.Editor.WriteMessage("\nSNAPSHOTVERIFY herladen bron; nieuwe symboolvorm -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nSNAPSHOTVERIFY FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaSnapshotVerify");
     }
 
     [CommandMethod("NLCSLEGENDAEXPORTREVIEWTEST", CommandFlags.Modal)]
@@ -369,7 +367,7 @@ public partial class Commands
         var doc = AcAp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
         using var userSettings = new GlobalSettingsSnapshot();
-        try
+        DiagnosticRun.Execute(() =>
         {
             ObjectId selected;
             using (var tr = db.TransactionManager.StartTransaction())
@@ -383,8 +381,10 @@ public partial class Commands
                 var registry = LegendStore.Load(db, tr);
                 var definition = new LegendDefinition
                 {
-                    Name = "Review export", Scope = LegendScope.Selection,
-                    SourceHandles = LegendManagement.ToHandles(new[] { selected }), GroupName = LegendRegistry.NewGroupName(),
+                    Name = "Review export",
+                    Scope = LegendScope.Selection,
+                    SourceHandles = LegendManagement.ToHandles(new[] { selected }),
+                    GroupName = LegendRegistry.NewGroupName(),
                     Settings = new LegendSettings { ExplodeOnPlace = false }
                 };
                 registry.Add(definition);
@@ -417,8 +417,7 @@ public partial class Commands
             if (!descriptions || !emptySelection)
                 throw new InvalidOperationException($"Eigen omschrijvingen={descriptions}; verdwenen selectie blijft leeg={emptySelection}.");
             doc.Editor.WriteMessage("\nEXPORTREVIEW eigen omschrijvingen en lege bronselectie -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nEXPORTREVIEW FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaExportReviewTest");
 
     }
 
@@ -473,7 +472,7 @@ public partial class Commands
     public void NlcsLegendaMetadataTest()
     {
         var doc = AcAp.DocumentManager.MdiActiveDocument;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var directory = System.IO.Path.Join(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "metadata");
             System.IO.Directory.CreateDirectory(directory);
@@ -529,7 +528,6 @@ public partial class Commands
                 || good.Entries.Count != 1 || Math.Abs(good.Entries[0].Metric.Length - 7) > 1e-8 || !unchanged)
                 throw new InvalidOperationException("Batch accepteert onleesbare gegevens of wijzigt een bronbestand.");
             doc.Editor.WriteMessage("\nMETADATA 12 onleesbare tekeningen afgewezen; geldige tekening 7m; bronbestanden ongewijzigd -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nMETADATA FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaMetadataTest");
     }
 }

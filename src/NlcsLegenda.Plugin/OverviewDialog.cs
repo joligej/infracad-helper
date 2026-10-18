@@ -337,7 +337,7 @@ internal sealed class OverviewDialog : LegendDialog
                 : LegendExport.ToCsv(_visible, s.QuantityDecimals, s.UnitArea, s.UnitLength, s.UnitCount, s.Klic.Columns);
             File.WriteAllText(dialog.FileName, text, new UTF8Encoding(dialog.FilterIndex == 1));
         }
-        catch (Exception ex) { MessageBox.Show(this, "Exporteren is niet gelukt: " + ex.Message, "Overzicht", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { MessageBox.Show(this, "Exporteren is niet gelukt: " + ex.Message, "Overzicht", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
     }
 
     private bool SaveChanges()

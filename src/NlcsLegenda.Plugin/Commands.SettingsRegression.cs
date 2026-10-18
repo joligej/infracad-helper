@@ -14,13 +14,18 @@ public partial class Commands
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var globalSnapshot = new GlobalSettingsSnapshot();
             if (ResolveMutationTarget(doc.Editor, db, out _))
                 throw new InvalidOperationException("Lokale instelling valt terug op globaal.");
-            var initial = new LegendSettings { Scale = 200, IncludeRemarks = false, IncludeScaleBar = false,
-                ManualEntries = new() { new() { Layer = "LOCAL_LINE", Description = "Eigen lijn" } } };
+            var initial = new LegendSettings
+            {
+                Scale = 200,
+                IncludeRemarks = false,
+                IncludeScaleBar = false,
+                ManualEntries = new() { new() { Layer = "LOCAL_LINE", Description = "Eigen lijn" } }
+            };
             string aId, bId;
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -82,8 +87,7 @@ public partial class Commands
             if (ApplySettingsAndRebuild(doc.Editor, db, aId, invalid) is null || State(aId) != savedA || State(bId) != bBefore)
                 throw new InvalidOperationException("Mislukte opbouw liet gewijzigde instellingen of geometrie achter.");
             doc.Editor.WriteMessage("\nSETTINGREGRESSION lokale A direct getekend, B en globale standaard gescheiden, fouten teruggedraaid -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nSETTINGREGRESSION FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaSettingRegression");
     }
 
     [CommandMethod("NLCSLEGENDAFRAMEREGRESSION", CommandFlags.Modal)]
@@ -91,7 +95,7 @@ public partial class Commands
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = db.TransactionManager.StartTransaction();
             var blocks = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
@@ -106,8 +110,16 @@ public partial class Commands
                 new LegendEntry { Status = NlcsStatus.Nieuw, Discipline = "WE", Hoofdgroep = "OG", Element = "LANG",
                     Description = new string('W', 96), LayersByType = new() { [NlcsDrawType.Geometrie] = "REGRESSION_LINE" }, Metric = new LayerMetric { Length = 12345 } }
             };
-            var settings = new LegendSettings { Scale = 200, DrawSwatchFrame = true, IncludeQuantities = true,
-                IncludeRemarks = false, IncludeFooter = false, IncludeScaleBar = false, IncludeGeneralDescription = false };
+            var settings = new LegendSettings
+            {
+                Scale = 200,
+                DrawSwatchFrame = true,
+                IncludeQuantities = true,
+                IncludeRemarks = false,
+                IncludeFooter = false,
+                IncludeScaleBar = false,
+                IncludeGeneralDescription = false
+            };
             var id = LegendBuilder.BuildBlock(db, tr, new AnalysisResult { Entries = entries }, settings, out int rows, out var issues);
             if (rows != 3 || issues.Count != 0) throw new InvalidOperationException("Testregels ontbreken.");
             var block = (BlockTableRecord)tr.GetObject(id, OpenMode.ForWrite); block.Name = "REGRESSION_FRAMES";
@@ -117,8 +129,7 @@ public partial class Commands
             tr.Commit();
             VerifyFrames(db);
             doc.Editor.WriteMessage("\nFRAMEREGRESSION breed symbool, gevuld kader en lange tekst zonder botsing -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nFRAMEREGRESSION FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaFrameRegression");
     }
 
     private static IEnumerable<Entity> RegressionEntities(Transaction tr, ObjectId id)
@@ -157,17 +168,17 @@ public partial class Commands
     public void NlcsLegendaHatchAreaRegression()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
-        try
+        DiagnosticRun.Execute(() =>
         {
             foreach (var (style, expected) in new[] { (HatchStyle.Normal, 68d), (HatchStyle.Outer, 64d), (HatchStyle.Ignore, 100d) })
             {
                 using var hatch = new Hatch(); hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID"); hatch.HatchStyle = style;
                 void Add(double lo, double hi, HatchLoopTypes type)
                 {
-                    var points = new Point2dCollection { new(lo,lo), new(hi,lo), new(hi,hi), new(lo,hi), new(lo,lo) };
+                    var points = new Point2dCollection { new(lo, lo), new(hi, lo), new(hi, hi), new(lo, hi), new(lo, lo) };
                     hatch.AppendLoop(type | HatchLoopTypes.Polyline, points, new DoubleCollection(new double[5]));
                 }
-                Add(0,10,HatchLoopTypes.External); Add(2,8,HatchLoopTypes.Outermost); Add(4,6,HatchLoopTypes.Default);
+                Add(0, 10, HatchLoopTypes.External); Add(2, 8, HatchLoopTypes.Outermost); Add(4, 6, HatchLoopTypes.Default);
                 hatch.EvaluateHatch(true);
                 double before = hatch.Area;
                 double actual = DrawingAnalyzer.RecalculateHatchArea(hatch);
@@ -193,15 +204,14 @@ public partial class Commands
                 tr.Abort();
             }
             doc.Editor.WriteMessage("\nHATCHAREAREGRESSION eilanden en gaten, drie stijlen en bron behouden -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nHATCHAREAREGRESSION FAIL: {ex}"); }
+        }, message => doc.Editor.WriteMessage(message), "NlcsLegendaHatchAreaRegression");
     }
 
     [CommandMethod("NLCSLEGENDAFRAMEVERIFY", CommandFlags.Modal)]
     public void NlcsLegendaFrameVerify()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
-        try { VerifyFrames(doc.Database); doc.Editor.WriteMessage("\nFRAMEREGRESSION na heropenen -> OK"); }
-        catch (System.Exception ex) { doc.Editor.WriteMessage($"\nFRAMEREGRESSION FAIL: {ex}"); }
+        DiagnosticRun.Execute(() =>
+        { VerifyFrames(doc.Database); doc.Editor.WriteMessage("\nFRAMEREGRESSION na heropenen -> OK"); }, message => doc.Editor.WriteMessage(message), "NlcsLegendaFrameVerify");
     }
 }

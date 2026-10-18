@@ -34,6 +34,14 @@ public class TextWrapAndReflowTests
         Assert.Empty(TextWrap.Wrap(null, 10));
     }
 
+    [Theory]
+    [InlineData("e\u0301e\u0301e\u0301", "e\u0301e\u0301", "e\u0301")]
+    [InlineData("🌳🌳🌳", "🌳🌳", "🌳")]
+    public void Wrap_DoesNotSplitCombinedCharacters(string text, string first, string second)
+    {
+        Assert.Equal(new[] { first, second }, TextWrap.Wrap(text, 2));
+    }
+
     private static LegendEntry Entry(string element, string description) => new()
     {
         Status = NlcsStatus.Nieuw,

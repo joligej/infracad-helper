@@ -92,7 +92,7 @@ public partial class Commands
         if (doc is null) return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -132,11 +132,7 @@ public partial class Commands
             }
             ed.WriteMessage($"\nMTEXT: DBText in alle legenda-blokken={orphan} -> {(orphan == 0 ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nMTEXT: totaal -> {(okR && okE && orphan == 0 ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nMTEXT error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaMTextTest");
     }
 
     [CommandMethod("NLCSLEGENDAVOLOPMAAKTEST", CommandFlags.Modal)]
@@ -146,7 +142,7 @@ public partial class Commands
         if (doc is null) return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var mt = new List<(double H, AttachmentPoint A, string L, double X, double Y, double W, bool U, double AH)>();
             var frames = new List<(double W, double H, double X, double CY)>();
@@ -234,8 +230,7 @@ public partial class Commands
 
             bool all = titleOk && headOk && bodyOk && qtyOk && scaleOk && swatchOk && sampleOk && borderOk && gapOk && vertOk && hatches > 0 && symbolEnts > 0;
             ed.WriteMessage($"\nVOLOPMAAK: totaal -> {(all ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nVOLOPMAAK error: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaVolOpmaakTest");
     }
 
     [CommandMethod("NLCSLEGENDAHOOGTETEST", CommandFlags.Modal)]
@@ -245,7 +240,7 @@ public partial class Commands
         if (doc is null) return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var s = new LegendSettings { Scale = 200, TextStyle = string.Empty };
             s.TextHeightMm = 3.0; s.HeaderTextHeightMm = 4.0; s.TitleTextHeightMm = 6.0;
@@ -298,8 +293,7 @@ public partial class Commands
             bool noDefaults = !heights.Any(h => Near(h, defBodyH) || Near(h, defTitleH));
             ed.WriteMessage($"\nHOOGTE vaste tekststijl: behouden={fixedStyleOk}; MText volgt eigen hoogte -> {(fixedStyleOk && bodyOk && headOk && titleOk && noDefaults ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nHOOGTE: body={bodyH:0.###}({bodyOk}) kop={headH:0.###}({headOk}) titel={titleH:0.###}({titleOk}) geen-default({noDefaults}) -> {(bodyOk && headOk && titleOk && noDefaults ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nHOOGTE error: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaHoogteTest");
     }
 
     [CommandMethod("NLCSLEGENDASYMBOOLTEKST2TEST", CommandFlags.Modal)]
@@ -309,7 +303,7 @@ public partial class Commands
         if (doc is null) return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = db.TransactionManager.StartTransaction();
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
@@ -362,8 +356,7 @@ public partial class Commands
             ed.WriteMessage($"\nSYMFID: DBText na conversie={dbtLeft} -> {(dbtLeft == 0 ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nSYMFID: totaal -> {(all && dbtLeft == 0 ? "OK" : "FAIL")}");
             tr.Commit();
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nSYMFID error: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaSymboolTekst2Test");
     }
 
     [CommandMethod("NLCSLEGENDASYMBOOLTEKSTTEST", CommandFlags.Modal)]
@@ -376,7 +369,7 @@ public partial class Commands
         const string dbTextMark = "SYMDBTEKST";
         const string mTextMark = "SYMMTEKST";
         const string nestMark = "SYMNESTTEKST";
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -434,11 +427,7 @@ public partial class Commands
             var e = Build(explode: true);
             ed.WriteMessage($"\nSYMTEKST: geexplodeerd DBText={e.dbt} MText={e.mt} bron-DBText->MText={e.db2mt} genest={e.nestOk} -> {(e.dbt == 0 && e.db2mt && e.nestOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nSYMTEKST: totaal -> {(r.dbt == 0 && r.db2mt && r.keptMt && r.nestOk && e.dbt == 0 && e.db2mt && e.nestOk ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nSYMTEKST error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaSymboolTekstTest");
     }
 
     private static List<string> CollectMTextContents(Database db, Transaction tr, string groupName)
@@ -523,7 +512,7 @@ public partial class Commands
         if (doc is null) return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var handles = new List<string>();
             using (var tr = db.TransactionManager.StartTransaction())
@@ -603,11 +592,7 @@ public partial class Commands
             }
             ed.WriteMessage($"\nBREED: orphan-DBText-blokken={orphan} legenda's-naast-elkaar={legendsLeft}/{ids.Count} -> {(orphan == 0 && legendsLeft == ids.Count ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nBREED: totaal -> {(all && orphan == 0 && legendsLeft == ids.Count ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nBREED error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaOldUpdateBroadTest");
     }
 
     [CommandMethod("NLCSLEGENDAOPMAAKMEETTEST", CommandFlags.Modal)]
@@ -617,7 +602,7 @@ public partial class Commands
         if (doc is null) return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var s = MTextFixtureSettings();
             s.DrawSwatchFrame = true;
@@ -662,8 +647,7 @@ public partial class Commands
             ed.WriteMessage($"\nOPMAAK: swatchbreedte verwacht={swW:0.###} gemeten={frameW:0.###} -> {(swOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nOPMAAK: body-MText wrapt (vaste breedte)={wrapSeen} -> {(wrapSeen ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nOPMAAK: totaal -> {(bodyOk && headOk && titleOk && swOk && wrapSeen ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nOPMAAK error: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaOpmaakMeetTest");
     }
 
     [CommandMethod("NLCSLEGENDAOLDREOPENSETUP", CommandFlags.Modal)]
@@ -673,7 +657,7 @@ public partial class Commands
         if (doc is null) return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = db.TransactionManager.StartTransaction();
             var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
@@ -690,8 +674,7 @@ public partial class Commands
             var (dbt, _) = CountTextInGroup(db, tr, group);
             tr.Commit();
             ed.WriteMessage($"\nHEROPEN: setup klaar, oude DBText={dbt} handles={handles.Count}. QSAVE, heropenen, dan NLCSLEGENDAOLDREOPENVERIFY.");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nHEROPEN setup error: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaOldReopenSetup");
     }
 
     [CommandMethod("NLCSLEGENDAOLDREOPENVERIFY", CommandFlags.Modal)]
@@ -701,7 +684,7 @@ public partial class Commands
         if (doc is null) return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             string id, group, scope; int dbtBefore, dbtAfter, mtAfter, handlesAfter, orphan; Point3d before, after;
             using (var tr = db.TransactionManager.StartTransaction())
@@ -733,8 +716,7 @@ public partial class Commands
             bool posOk = before.DistanceTo(after) < 0.5;
             bool ok = dbtBefore > 0 && dbtAfter == 0 && mtAfter > 0 && scope == "Selection" && handlesAfter == 2 && posOk && orphan == 0;
             ed.WriteMessage($"\nHEROPEN: na reopen+update DBText {dbtBefore}->{dbtAfter} MText={mtAfter} scope={scope} handles={handlesAfter} pos={posOk} orphan={orphan} -> {(ok ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nHEROPEN verify error: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaOldReopenVerify");
     }
 
     [CommandMethod("NLCSLEGENDAOLDUPDATETEST", CommandFlags.Modal)]
@@ -744,7 +726,7 @@ public partial class Commands
         if (doc is null) return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -797,10 +779,6 @@ public partial class Commands
             ed.WriteMessage($"\nOUD: geen orphan DBText in legenda-blokken={orphan} -> {(orphan == 0 ? "OK" : "FAIL")}");
             bool all = dbtBefore > 0 && dbtAfter == 0 && mtAfter > 0 && sameId && sameGroup && posOk && orphan == 0;
             ed.WriteMessage($"\nOUD: totaal -> {(all ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nOUD error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaOldUpdateTest");
     }
 }

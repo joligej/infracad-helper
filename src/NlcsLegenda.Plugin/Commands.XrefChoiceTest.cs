@@ -12,7 +12,7 @@ public partial class Commands
     public void XrefChoiceTest()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var db = doc.Database;
             string folder = Path.GetDirectoryName(db.Filename)!;
@@ -39,16 +39,15 @@ public partial class Commands
             }
             CheckXrefChoices(db);
             doc.Editor.WriteMessage("\nXREFCHOICE xref-inserts, opgeslagen keuzes en geneste KLIC-bronnen -> OK");
-        }
-        catch (System.Exception ex) { doc.Editor.WriteMessage("\nXREFCHOICE FAIL: " + ex); }
+        }, message => doc.Editor.WriteMessage(message), "XrefChoiceTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFCHOICEVERIFY", CommandFlags.Modal)]
     public void XrefChoiceVerify()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
-        try { CheckXrefChoices(doc.Database); doc.Editor.WriteMessage("\nXREFCHOICE na heropenen: bronkeuzes en KLIC-hoeveelheden -> OK"); }
-        catch (System.Exception ex) { doc.Editor.WriteMessage("\nXREFCHOICE FAIL: " + ex); }
+        DiagnosticRun.Execute(() =>
+        { CheckXrefChoices(doc.Database); doc.Editor.WriteMessage("\nXREFCHOICE na heropenen: bronkeuzes en KLIC-hoeveelheden -> OK"); }, message => doc.Editor.WriteMessage(message), "XrefChoiceVerify");
     }
 
     private static void CheckXrefChoices(Database db)

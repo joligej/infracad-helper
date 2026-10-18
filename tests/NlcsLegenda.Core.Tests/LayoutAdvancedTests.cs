@@ -119,7 +119,10 @@ public class LayoutAdvancedTests
                      "N-WE-VH-OPENVERHARDING_TEGEL-G",
                      "N-WE-VH-OPENVERHARDING_NATUURSTEEN-G"
                  })
-            if (NlcsLayerParser.TryParse(l, out var p)) parsed.Add(p!);
+        {
+            Assert.True(NlcsLayerParser.TryParse(l, out var p), "Ongeldige testlaag: " + l);
+            parsed.Add(p!);
+        }
 
         var entries = LegendGrouping.Build(parsed, new LegendSettings { SortMode = LegendSortMode.Naam });
 
@@ -132,7 +135,10 @@ public class LayoutAdvancedTests
     {
         var parsed = new List<NlcsLayerName>();
         foreach (var l in new[] { "N-WE-VH-OPENVERHARDING_TEGEL-G", "N-WE-VH-OPENVERHARDING_NATUURSTEEN-G" })
-            if (NlcsLayerParser.TryParse(l, out var p)) parsed.Add(p!);
+        {
+            Assert.True(NlcsLayerParser.TryParse(l, out var p), "Ongeldige testlaag: " + l);
+            parsed.Add(p!);
+        }
 
         var metrics = new Dictionary<string, LayerMetric>(StringComparer.OrdinalIgnoreCase)
         {

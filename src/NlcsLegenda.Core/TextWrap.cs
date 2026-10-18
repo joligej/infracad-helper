@@ -50,33 +50,34 @@ public static class TextWrap
             }
 
             var line = new System.Text.StringBuilder();
-            foreach (var word in paragraph.Split(' '))
+            int lineLength = 0;
+            foreach (var piece in paragraph.Split(' ').SelectMany(word => SplitWord(word, maxChars)))
             {
-                var piece = word;
-                while (piece.Length > maxChars)
-                {
-                    if (line.Length > 0)
-                    {
-                        result.Add(line.ToString());
-                        line.Clear();
-                    }
-                    result.Add(piece[..maxChars]);
-                    piece = piece[maxChars..];
-                }
-
-                int extra = line.Length == 0 ? piece.Length : line.Length + 1 + piece.Length;
-                if (extra > maxChars && line.Length > 0)
+                int length = new System.Globalization.StringInfo(piece).LengthInTextElements;
+                int extra = lineLength == 0 ? length : lineLength + 1 + length;
+                if (extra > maxChars && lineLength > 0)
                 {
                     result.Add(line.ToString());
                     line.Clear();
+                    lineLength = 0;
                 }
-
-                if (line.Length > 0)
-                    line.Append(' ');
+                if (lineLength > 0) { line.Append(' '); lineLength++; }
                 line.Append(piece);
+                lineLength += length;
             }
             result.Add(line.ToString());
         }
         return result;
+    }
+
+    private static IEnumerable<string> SplitWord(string word, int maxChars)
+    {
+        var positions = System.Globalization.StringInfo.ParseCombiningCharacters(word);
+        if (positions.Length == 0) { yield return string.Empty; yield break; }
+        for (int start = 0; start < positions.Length; start += maxChars)
+        {
+            int end = Math.Min(positions.Length, start + maxChars);
+            yield return word[positions[start]..(end == positions.Length ? word.Length : positions[end])];
+        }
     }
 }

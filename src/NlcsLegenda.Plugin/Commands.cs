@@ -342,7 +342,7 @@ public partial class Commands
         if (doc is null)
             return;
         var ed = doc.Editor;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var sidecar = Path.Combine(Path.GetTempPath(), "nlcs_batch_test.txt");
             if (!File.Exists(sidecar))
@@ -351,11 +351,7 @@ public partial class Commands
                 return;
             }
             RunBatch(ed, doc.Database, File.ReadAllText(sidecar).Trim());
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nNLCSBATCHTEST error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaBatchTest");
     }
 
     private void RunBatch(Editor ed, Database db, string folder)
@@ -1883,7 +1879,7 @@ public partial class Commands
         var ed = doc.Editor;
         var db = doc.Database;
 
-        try
+        DiagnosticRun.Execute(() =>
         {
             var settings = LoadGlobalDefaults();
             int rows = 0;
@@ -1929,11 +1925,7 @@ public partial class Commands
                 tr.Commit();
             }
             PurgePending(db);
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nNLCSTEST error: {ex}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaTest");
     }
 
     [CommandMethod("NLCSLEGENDAISOLATIETEST", CommandFlags.Modal)]
@@ -1945,7 +1937,7 @@ public partial class Commands
         var ed = doc.Editor;
         var db = doc.Database;
 
-        try
+        DiagnosticRun.Execute(() =>
         {
             string idA, idB, idC = string.Empty, firstKey = string.Empty, descKey = string.Empty;
             string bGeomBefore = string.Empty;
@@ -2053,11 +2045,7 @@ public partial class Commands
                 ed.WriteMessage($"\nISO: tekst A=\"{aText}\" B=\"{bText}\" -> {(descOk ? "OK" : "FAIL")}");
                 tr.Commit();
             }
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nISO error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaIsolatieTest");
     }
 
     private static LegendDefinition IsoDef(LegendRegistry reg, LegendSettings settings) => new()
@@ -2141,7 +2129,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = db.TransactionManager.StartTransaction();
             var reg = LegendStore.Load(db, tr);
@@ -2167,11 +2155,7 @@ public partial class Commands
             LegendStore.Save(db, tr, reg);
             tr.Commit();
             ed.WriteMessage("\nXREF: setup klaar. QSAVE, heropenen, dan NLCSLEGENDAXREFVERIFY.");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nXREF setup error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefSetup");
     }
 
     [CommandMethod("NLCSLEGENDAXREFVERIFY", CommandFlags.Modal)]
@@ -2182,7 +2166,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = db.TransactionManager.StartTransaction();
             var reg = LegendStore.Load(db, tr);
@@ -2216,11 +2200,7 @@ public partial class Commands
             ed.WriteMessage($"\nXREF: onbekend A={a.Settings.IsXrefIncluded("xref9")} B={b.Settings.IsXrefIncluded("xref9")} C={c.Settings.IsXrefIncluded("xref9")} -> {(fallback ? "OK" : "FAIL")}");
 
             tr.Commit();
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nXREF verify error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefVerify");
     }
 
     [CommandMethod("NLCSLEGENDAABCSETUP", CommandFlags.Modal)]
@@ -2233,7 +2213,7 @@ public partial class Commands
         var db = doc.Database;
 
         using var userSettings = new GlobalSettingsSnapshot();
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = db.TransactionManager.StartTransaction();
             var reg = LegendStore.Load(db, tr);
@@ -2292,31 +2272,20 @@ public partial class Commands
             LegendStore.Save(db, tr, reg);
             tr.Commit();
             ed.WriteMessage($"\nABC: setup klaar (A-selectie={handlesA.Count}, B-selectie={handlesB.Count}). QSAVE, heropenen, dan NLCSLEGENDAABCVERIFY.");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nABC setup error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaAbcSetup");
 
     }
 
     private string ExportCsv(Database db, Transaction tr, LegendDefinition def)
     {
-        try
-        {
-            var reg = LegendStore.Load(db, tr);
-            var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
-            ObjectId[]? selection = def.Scope == LegendScope.Selection
-                ? LegendManagement.ResolveHandles(db, def.SourceHandles, out _)
-                : null;
-            var entries = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, LoadCatalog(db), excluded).Entries;
-            return LegendExport.ToCsv(entries, def.Settings.QuantityDecimals,
-                def.Settings.UnitArea, def.Settings.UnitLength, def.Settings.UnitCount, def.Settings.Klic.Columns);
-        }
-        catch (Exception ex)
-        {
-            return "[export-fout: " + ex.Message + "]";
-        }
+        var reg = LegendStore.Load(db, tr);
+        var excluded = LegendManagement.CollectManagedIds(db, tr, reg);
+        ObjectId[]? selection = def.Scope == LegendScope.Selection
+            ? LegendManagement.ResolveHandles(db, def.SourceHandles, out _)
+            : null;
+        var entries = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, LoadCatalog(db), excluded).Entries;
+        return LegendExport.ToCsv(entries, def.Settings.QuantityDecimals,
+            def.Settings.UnitArea, def.Settings.UnitLength, def.Settings.UnitCount, def.Settings.Klic.Columns);
     }
 
     [CommandMethod("NLCSLEGENDAABCVERIFY", CommandFlags.Modal)]
@@ -2327,7 +2296,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             string fpBbefore = string.Empty, fpCbefore = string.Empty;
             using (var tr = db.TransactionManager.StartTransaction())
@@ -2399,11 +2368,7 @@ public partial class Commands
             PurgePending(db);
             bool isoOk = fpBbefore == fpBafter && fpCbefore == fpCafter;
             ed.WriteMessage($"\nABC: na A bewerken B/C-vingerafdruk {(isoOk ? "ongewijzigd" : "GEWIJZIGD")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nABC verify error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaAbcVerify");
     }
 
     [CommandMethod("NLCSLEGENDABLANCOTEST", CommandFlags.Modal)]
@@ -2414,7 +2379,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -2499,11 +2464,7 @@ public partial class Commands
             ed.WriteMessage($"\nBLANCO: entries IsBlank 1={b1.blanks} 5={b5.blanks} tekst=\"[blanco]\" -> {(blankOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nBLANCO: tekst-uit behoudt {bText.blanks} blanco-rijen -> {(textOffOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nBLANCO: totaal -> {(swatchOk && rowsOk && growOk && blankOk && textOffOk ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nBLANCO error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaBlancoTest");
     }
 
     [CommandMethod("NLCSLEGENDACUSTOMTEST", CommandFlags.Modal)]
@@ -2514,7 +2475,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             ObjectId line5;
             using (var tr = db.TransactionManager.StartTransaction())
@@ -2607,11 +2568,7 @@ public partial class Commands
                 PurgePending(db);
                 ed.WriteMessage($"\nCUSTOM: legenda gebouwd {result} met {rows} regels (incl. eigen lagen)");
             }
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nCUSTOM error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaCustomTest");
     }
 
     [CommandMethod("NLCSLEGENDAEIGENXREFTEST", CommandFlags.Modal)]
@@ -2627,75 +2584,78 @@ public partial class Commands
         string pathB = Path.Combine(dir, "eigen_xref_b.dwg");
         try
         {
-            CreateXrefLineDwg(pathA, "Eigen kabels", 5.0);
-            CreateXrefLineDwg(pathB, "Eigen kabels", 11.0);
-
-            using (var tr = db.TransactionManager.StartTransaction())
+            DiagnosticRun.Execute(() =>
             {
-                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
-                ObjectId host = lt.Has("Eigen kabels") ? lt["Eigen kabels"]
-                    : AddLayer(lt, tr, "Eigen kabels");
-                var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
-                var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
-                var l3 = new Line(new Point3d(0, 0, 0), new Point3d(3, 0, 0)) { LayerId = host };
-                ms.AppendEntity(l3); tr.AddNewlyCreatedDBObject(l3, true);
-                tr.Commit();
-            }
+                CreateXrefLineDwg(pathA, "Eigen kabels", 5.0);
+                CreateXrefLineDwg(pathB, "Eigen kabels", 11.0);
 
-            ObjectId xrefA = db.AttachXref(pathA, "EIGENXREFA");
-            ObjectId xrefB = db.AttachXref(pathB, "EIGENXREFB");
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
-                var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
-                foreach (var id in new[] { xrefA, xrefB })
+                using (var tr = db.TransactionManager.StartTransaction())
                 {
-                    var br = new BlockReference(Point3d.Origin, id);
-                    ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
+                    var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                    ObjectId host = lt.Has("Eigen kabels") ? lt["Eigen kabels"]
+                        : AddLayer(lt, tr, "Eigen kabels");
+                    var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+                    var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+                    var l3 = new Line(new Point3d(0, 0, 0), new Point3d(3, 0, 0)) { LayerId = host };
+                    ms.AppendEntity(l3); tr.AddNewlyCreatedDBObject(l3, true);
+                    tr.Commit();
                 }
-                tr.Commit();
-            }
 
-            LegendSettings Config(CustomSourceScope scope, string xref, bool includeXref,
-                bool? incA = null, bool? incB = null)
-            {
-                var s = LoadGlobalDefaults();
-                s.IncludeXrefLayers = includeXref;
-                if (incA is not null) s.XrefInclusion["EIGENXREFA"] = incA.Value;
-                if (incB is not null) s.XrefInclusion["EIGENXREFB"] = incB.Value;
-                s.CustomLayerRules.Add(new CustomLayerRule
+                ObjectId xrefA = db.AttachXref(pathA, "EIGENXREFA");
+                ObjectId xrefB = db.AttachXref(pathB, "EIGENXREFB");
+                using (var tr = db.TransactionManager.StartTransaction())
                 {
-                    Layer = "Eigen kabels", Element = "Kabel", Type = NlcsDrawType.Geometrie,
-                    Description = "Kabel", QuantityMode = CustomQuantityMode.Lengte,
-                    Scope = scope, XrefName = xref
-                });
-                return s;
-            }
+                    var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+                    var ms = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+                    foreach (var id in new[] { xrefA, xrefB })
+                    {
+                        var br = new BlockReference(Point3d.Origin, id);
+                        ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
+                    }
+                    tr.Commit();
+                }
 
-            double Length(LegendSettings s)
-            {
-                using var tr = db.TransactionManager.StartTransaction();
-                var e = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db)).Entries
-                    .FirstOrDefault(x => x.Element == "Kabel");
-                tr.Commit();
-                return e?.Metric.Length ?? -1;
-            }
+                LegendSettings Config(CustomSourceScope scope, string xref, bool includeXref,
+                    bool? incA = null, bool? incB = null)
+                {
+                    var s = LoadGlobalDefaults();
+                    s.IncludeXrefLayers = includeXref;
+                    if (incA is not null) s.XrefInclusion["EIGENXREFA"] = incA.Value;
+                    if (incB is not null) s.XrefInclusion["EIGENXREFB"] = incB.Value;
+                    s.CustomLayerRules.Add(new CustomLayerRule
+                    {
+                        Layer = "Eigen kabels",
+                        Element = "Kabel",
+                        Type = NlcsDrawType.Geometrie,
+                        Description = "Kabel",
+                        QuantityMode = CustomQuantityMode.Lengte,
+                        Scope = scope,
+                        XrefName = xref
+                    });
+                    return s;
+                }
 
-            double local = Length(Config(CustomSourceScope.Local, "", includeXref: true));
-            double specA = Length(Config(CustomSourceScope.SpecificXref, "EIGENXREFA", includeXref: true));
-            double any = Length(Config(CustomSourceScope.AnySource, "", includeXref: true));
-            double overruled = Length(Config(CustomSourceScope.SpecificXref, "EIGENXREFA",
-                includeXref: false, incA: false, incB: false));
+                double Length(LegendSettings s)
+                {
+                    using var tr = db.TransactionManager.StartTransaction();
+                    var e = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db)).Entries
+                        .FirstOrDefault(x => x.Element == "Kabel");
+                    tr.Commit();
+                    return e?.Metric.Length ?? -1;
+                }
 
-            bool ok = Math.Abs(local - 3) < 0.1 && Math.Abs(specA - 5) < 0.1
-                && Math.Abs(any - 19) < 0.1 && overruled < 0;
-            ed.WriteMessage($"\nEIGENXREF: lokaal={local:0.0} (verw 3) specifiekA={specA:0.0} (verw 5) " +
-                $"elkeBron={any:0.0} (verw 19) uitgesloten={(overruled < 0 ? "geen regel" : overruled.ToString("0.0"))} (verw geen regel)");
-            ed.WriteMessage($"\nEIGENXREF: matrix -> {(ok ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nEIGENXREF error: {ex.Message}");
+                double local = Length(Config(CustomSourceScope.Local, "", includeXref: true));
+                double specA = Length(Config(CustomSourceScope.SpecificXref, "EIGENXREFA", includeXref: true));
+                double any = Length(Config(CustomSourceScope.AnySource, "", includeXref: true));
+                double overruled = Length(Config(CustomSourceScope.SpecificXref, "EIGENXREFA",
+                    includeXref: false, incA: false, incB: false));
+
+                bool ok = Math.Abs(local - 3) < 0.1 && Math.Abs(specA - 5) < 0.1
+                    && Math.Abs(any - 19) < 0.1 && overruled < 0;
+                ed.WriteMessage($"\nEIGENXREF: lokaal={local:0.0} (verw 3) specifiekA={specA:0.0} (verw 5) " +
+                    $"elkeBron={any:0.0} (verw 19) uitgesloten={(overruled < 0 ? "geen regel" : overruled.ToString("0.0"))} (verw geen regel)");
+                ed.WriteMessage($"\nEIGENXREF: matrix -> {(ok ? "OK" : "FAIL")}");
+            }, message => ed.WriteMessage(message), "NlcsLegendaEigenXrefTest");
         }
         finally
         {
@@ -2735,80 +2695,82 @@ public partial class Commands
         string eqXref = Path.Join(dir, "any_eq.dwg");
         try
         {
-            CreateXrefLineDwg(divXref, "Div kabels", 6.0, colorIndex: 3);
-            CreateXrefLineDwg(eqXref, "Eq kabels", 6.0, colorIndex: 0);
+            DiagnosticRun.Execute(() =>
+            {
+                CreateXrefLineDwg(divXref, "Div kabels", 6.0, colorIndex: 3);
+                CreateXrefLineDwg(eqXref, "Eq kabels", 6.0, colorIndex: 0);
 
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
-                var divLayer = lt.Has("Div kabels") ? lt["Div kabels"] : AddLayer(lt, tr, "Div kabels", 1);
-                var eqLayer = lt.Has("Eq kabels") ? lt["Eq kabels"] : AddLayer(lt, tr, "Eq kabels");
-                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var l1 = new Line(new Point3d(0, 0, 0), new Point3d(4, 0, 0)) { LayerId = divLayer };
-                ms.AppendEntity(l1); tr.AddNewlyCreatedDBObject(l1, true);
-                var l2 = new Line(new Point3d(0, 50, 0), new Point3d(4, 50, 0)) { LayerId = eqLayer };
-                ms.AppendEntity(l2); tr.AddNewlyCreatedDBObject(l2, true);
-                tr.Commit();
-            }
-            ObjectId xDiv = db.AttachXref(divXref, "ANYDIV");
-            ObjectId xEq = db.AttachXref(eqXref, "ANYEQ");
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                foreach (var id in new[] { xDiv, xEq })
+                using (var tr = db.TransactionManager.StartTransaction())
                 {
-                    var br = new BlockReference(Point3d.Origin, id);
-                    ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
+                    var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForWrite);
+                    var divLayer = lt.Has("Div kabels") ? lt["Div kabels"] : AddLayer(lt, tr, "Div kabels", 1);
+                    var eqLayer = lt.Has("Eq kabels") ? lt["Eq kabels"] : AddLayer(lt, tr, "Eq kabels");
+                    var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                    var l1 = new Line(new Point3d(0, 0, 0), new Point3d(4, 0, 0)) { LayerId = divLayer };
+                    ms.AppendEntity(l1); tr.AddNewlyCreatedDBObject(l1, true);
+                    var l2 = new Line(new Point3d(0, 50, 0), new Point3d(4, 50, 0)) { LayerId = eqLayer };
+                    ms.AppendEntity(l2); tr.AddNewlyCreatedDBObject(l2, true);
+                    tr.Commit();
                 }
-                tr.Commit();
-            }
-
-            List<LegendEntry> Build(string layer, string element)
-            {
-                var s = LoadGlobalDefaults();
-                s.IncludeXrefLayers = true;
-                s.CustomLayerRules.Add(new CustomLayerRule
+                ObjectId xDiv = db.AttachXref(divXref, "ANYDIV");
+                ObjectId xEq = db.AttachXref(eqXref, "ANYEQ");
+                using (var tr = db.TransactionManager.StartTransaction())
                 {
-                    Layer = layer, Element = element, Type = NlcsDrawType.Geometrie,
-                    Description = element, QuantityMode = CustomQuantityMode.Lengte,
-                    Scope = CustomSourceScope.AnySource
-                });
-                using var tr = db.TransactionManager.StartTransaction();
-                var es = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db)).Entries
-                    .Where(e => e.Element.StartsWith(element, StringComparison.Ordinal)).ToList();
-                tr.Commit();
-                return es;
-            }
+                    var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                    foreach (var id in new[] { xDiv, xEq })
+                    {
+                        var br = new BlockReference(Point3d.Origin, id);
+                        ms.AppendEntity(br); tr.AddNewlyCreatedDBObject(br, true);
+                    }
+                    tr.Commit();
+                }
 
-            var div = Build("Div kabels", "Div kabel");
-            var eq = Build("Eq kabels", "Eq kabel");
+                List<LegendEntry> Build(string layer, string element)
+                {
+                    var s = LoadGlobalDefaults();
+                    s.IncludeXrefLayers = true;
+                    s.CustomLayerRules.Add(new CustomLayerRule
+                    {
+                        Layer = layer,
+                        Element = element,
+                        Type = NlcsDrawType.Geometrie,
+                        Description = element,
+                        QuantityMode = CustomQuantityMode.Lengte,
+                        Scope = CustomSourceScope.AnySource
+                    });
+                    using var tr = db.TransactionManager.StartTransaction();
+                    var es = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db)).Entries
+                        .Where(e => e.Element.StartsWith(element, StringComparison.Ordinal)).ToList();
+                    tr.Commit();
+                    return es;
+                }
 
-            bool divOk = div.Count == 2
-                && div.Any(e => Math.Abs(e.Metric.Length - 4) < 0.1)
-                && div.Any(e => Math.Abs(e.Metric.Length - 6) < 0.1);
-            bool eqOk = eq.Count == 1 && Math.Abs(eq[0].Metric.Length - 10) < 0.1;
+                var div = Build("Div kabels", "Div kabel");
+                var eq = Build("Eq kabels", "Eq kabel");
 
-            int issues = -1; int rows = 0;
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                var s = LoadGlobalDefaults();
-                s.IncludeXrefLayers = true;
-                s.CustomLayerRules.Add(new CustomLayerRule { Layer = "Div kabels", Element = "Div kabel", Type = NlcsDrawType.Geometrie, Description = "Div kabel", QuantityMode = CustomQuantityMode.Lengte, Scope = CustomSourceScope.AnySource });
-                var analysis = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db));
-                LegendBuilder.BuildBlock(db, tr, analysis, s, out rows, out var iss);
-                issues = iss.Count;
-                tr.Commit();
-            }
-            bool renderOk = issues == 0 && rows >= 2;
+                bool divOk = div.Count == 2
+                    && div.Any(e => Math.Abs(e.Metric.Length - 4) < 0.1)
+                    && div.Any(e => Math.Abs(e.Metric.Length - 6) < 0.1);
+                bool eqOk = eq.Count == 1 && Math.Abs(eq[0].Metric.Length - 10) < 0.1;
 
-            ed.WriteMessage($"\nEIGENANY: divergent regels={div.Count} lengtes=[{string.Join(",", div.Select(e => e.Metric.Length.ToString("0")))}] (verw 2: 4 en 6) -> {(divOk ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nEIGENANY: gelijk regels={eq.Count} lengte={(eq.Count > 0 ? eq[0].Metric.Length.ToString("0") : "-")} (verw 1: 10) -> {(eqOk ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nEIGENANY: divergent render rijen={rows} renderissues={issues} (verw 0) -> {(renderOk ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nEIGENANY: totaal -> {(divOk && eqOk && renderOk ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nEIGENANY error: {ex.Message}");
+                int issues = -1; int rows = 0;
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    var s = LoadGlobalDefaults();
+                    s.IncludeXrefLayers = true;
+                    s.CustomLayerRules.Add(new CustomLayerRule { Layer = "Div kabels", Element = "Div kabel", Type = NlcsDrawType.Geometrie, Description = "Div kabel", QuantityMode = CustomQuantityMode.Lengte, Scope = CustomSourceScope.AnySource });
+                    var analysis = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db));
+                    LegendBuilder.BuildBlock(db, tr, analysis, s, out rows, out var iss);
+                    issues = iss.Count;
+                    tr.Commit();
+                }
+                bool renderOk = issues == 0 && rows >= 2;
+
+                ed.WriteMessage($"\nEIGENANY: divergent regels={div.Count} lengtes=[{string.Join(",", div.Select(e => e.Metric.Length.ToString("0")))}] (verw 2: 4 en 6) -> {(divOk ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nEIGENANY: gelijk regels={eq.Count} lengte={(eq.Count > 0 ? eq[0].Metric.Length.ToString("0") : "-")} (verw 1: 10) -> {(eqOk ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nEIGENANY: divergent render rijen={rows} renderissues={issues} (verw 0) -> {(renderOk ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nEIGENANY: totaal -> {(divOk && eqOk && renderOk ? "OK" : "FAIL")}");
+            }, message => ed.WriteMessage(message), "NlcsLegendaEigenAnyTest");
         }
         finally
         {
@@ -2829,7 +2791,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -2913,11 +2875,7 @@ public partial class Commands
             PurgePending(db);
             bool ok = hatchCount >= 1 && blockCount >= 1 && sampleName == "ANSI31";
             ed.WriteMessage($"\nEIGENHATCH: gerenderde hatches={hatchCount} (verw >=1) symbolen={blockCount} (verw >=1) patroon={sampleName} (verw ANSI31) -> {(ok ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nEIGENHATCH error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaEigenHatchTest");
     }
 
     [CommandMethod("NLCSLEGENDAEIGENBATCHTEST", CommandFlags.Modal)]
@@ -2930,28 +2888,27 @@ public partial class Commands
         string dir = Path.Combine(Path.GetTempPath(), "nlcs_eigenbatch_" + Guid.NewGuid().ToString("N"));
         try
         {
-            Directory.CreateDirectory(dir);
-            string a = Path.Combine(dir, "a_met.dwg");
-            string b = Path.Combine(dir, "b_zonder.dwg");
-            CreateXrefLineDwg(a, "Eigen batchkabel", 8.0);
-            CreateXrefLineDwg(b, "Iets anders", 3.0);
-            string ha1 = Sha256(a), hb1 = Sha256(b);
+            DiagnosticRun.Execute(() =>
+            {
+                Directory.CreateDirectory(dir);
+                string a = Path.Combine(dir, "a_met.dwg");
+                string b = Path.Combine(dir, "b_zonder.dwg");
+                CreateXrefLineDwg(a, "Eigen batchkabel", 8.0);
+                CreateXrefLineDwg(b, "Iets anders", 3.0);
+                string ha1 = Sha256(a), hb1 = Sha256(b);
 
-            var settings = LoadGlobalDefaults();
-            settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen batchkabel", Element = "Batchkabel", Type = NlcsDrawType.Geometrie, Description = "Batchkabel", QuantityMode = CustomQuantityMode.Lengte });
+                var settings = LoadGlobalDefaults();
+                settings.CustomLayerRules.Add(new CustomLayerRule { Layer = "Eigen batchkabel", Element = "Batchkabel", Type = NlcsDrawType.Geometrie, Description = "Batchkabel", QuantityMode = CustomQuantityMode.Lengte });
 
-            var results = BatchExport.AnalyzeFolder(dir, settings, LoadCatalog(doc.Database));
-            var ra = results.FirstOrDefault(r => r.Drawing == "a_met.dwg");
-            var rb = results.FirstOrDefault(r => r.Drawing == "b_zonder.dwg");
-            var aEntry = ra?.Entries.FirstOrDefault(e => e.Element == "Batchkabel");
-            bool aOk = aEntry is not null && Math.Abs(aEntry.Metric.Length - 8) < 0.1;
-            bool bOk = rb is not null && !rb.Entries.Any(e => e.Element == "Batchkabel");
-            bool hashOk = Sha256(a) == ha1 && Sha256(b) == hb1;
-            ed.WriteMessage($"\nEIGENBATCH: A batchkabel={aEntry?.Metric.Length:0.0}m (verw 8) B geen eigen regel={bOk} bron-hashes ongewijzigd={hashOk} -> {(aOk && bOk && hashOk ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nEIGENBATCH error: {ex.Message}");
+                var results = BatchExport.AnalyzeFolder(dir, settings, LoadCatalog(doc.Database));
+                var ra = results.FirstOrDefault(r => r.Drawing == "a_met.dwg");
+                var rb = results.FirstOrDefault(r => r.Drawing == "b_zonder.dwg");
+                var aEntry = ra?.Entries.FirstOrDefault(e => e.Element == "Batchkabel");
+                bool aOk = aEntry is not null && Math.Abs(aEntry.Metric.Length - 8) < 0.1;
+                bool bOk = rb is not null && !rb.Entries.Any(e => e.Element == "Batchkabel");
+                bool hashOk = Sha256(a) == ha1 && Sha256(b) == hb1;
+                ed.WriteMessage($"\nEIGENBATCH: A batchkabel={aEntry?.Metric.Length:0.0}m (verw 8) B geen eigen regel={bOk} bron-hashes ongewijzigd={hashOk} -> {(aOk && bOk && hashOk ? "OK" : "FAIL")}");
+            }, message => ed.WriteMessage(message), "NlcsLegendaEigenBatchTest");
         }
         finally
         {
@@ -2974,7 +2931,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -3047,11 +3004,7 @@ public partial class Commands
                 && Math.Abs(s50.nlen - 7) < 0.1
                 && s0.refs == s50.refs;
             ed.WriteMessage($"\nEIGENUPD: rijen {s0.rows}/{s10.rows}/{s50.rows} eigen-lengte {s0.len:0.0}/{s10.len:0.0}/{s50.len:0.0} (verw 9) nlcs-lengte {s0.nlen:0.0}/{s10.nlen:0.0}/{s50.nlen:0.0} (verw 7) verweesde-blokken {s0.refs}/{s10.refs}/{s50.refs} (verw 0) -> {(ok ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nEIGENUPD error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaEigenUpdateTest");
     }
 
     [CommandMethod("NLCSLEGENDAEIGENZICHTBAARTEST", CommandFlags.Modal)]
@@ -3062,7 +3015,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using (var tr = db.TransactionManager.StartTransaction())
             {
@@ -3086,8 +3039,11 @@ public partial class Commands
                 s.IncludeInvisibleLayers = includeInvisible;
                 s.CustomLayerRules.Add(new CustomLayerRule
                 {
-                    Layer = "Eigen vis", Element = "Eigen vis element", Type = NlcsDrawType.Geometrie,
-                    Description = "Eigen vis", QuantityMode = CustomQuantityMode.Lengte
+                    Layer = "Eigen vis",
+                    Element = "Eigen vis element",
+                    Type = NlcsDrawType.Geometrie,
+                    Description = "Eigen vis",
+                    QuantityMode = CustomQuantityMode.Lengte
                 });
                 using var tr = db.TransactionManager.StartTransaction();
                 var es = DrawingAnalyzer.Analyze(db, tr, s, catalog: LoadCatalog(db)).Entries;
@@ -3100,11 +3056,7 @@ public partial class Commands
             bool ok = !off.eigen && !off.nlcs && on.eigen && on.nlcs;
             ed.WriteMessage($"\nEIGENZICHT: bevroren eigen={off.eigen} nlcs={off.nlcs} (verw false/false); " +
                 $"meenemen eigen={on.eigen} nlcs={on.nlcs} (verw true/true) -> {(ok ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nEIGENZICHT error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaEigenZichtbaarTest");
     }
 
     private static void CreateXrefLineDwg(string path, string layer, double length, short colorIndex = 0)
@@ -3181,7 +3133,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
             string pathA = Path.Combine(dir, "abc_xref_a.dwg");
@@ -3230,11 +3182,7 @@ public partial class Commands
                 tr.Commit();
             }
             ed.WriteMessage("\nABCX: setup klaar (2 xrefs gekoppeld). QSAVE, heropenen, dan NLCSLEGENDAABCXREFVERIFY.");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nABCX setup error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaAbcXrefSetup");
     }
 
     [CommandMethod("NLCSLEGENDAABCXREFVERIFY", CommandFlags.Modal)]
@@ -3245,7 +3193,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = db.TransactionManager.StartTransaction();
             var reg = LegendStore.Load(db, tr);
@@ -3276,11 +3224,7 @@ public partial class Commands
             ed.WriteMessage($"\nABCX: A=[{ea}] B=[{eb}] C=[{ec}]");
             ed.WriteMessage($"\nABCX: xref-isolatie A={(aOk ? "OK" : "FAIL")} B={(bOk ? "OK" : "FAIL")} C={(cOk ? "OK" : "FAIL")} -> {(aOk && bOk && cOk ? "OK" : "FAIL")}");
             tr.Commit();
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nABCX verify error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaAbcXrefVerify");
     }
 
     [CommandMethod("NLCSLEGENDACONSUMERTEST", CommandFlags.Modal)]
@@ -3291,7 +3235,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             int Count(Action<LegendSettings> tweak)
             {
@@ -3346,11 +3290,7 @@ public partial class Commands
             int exploded = Count(s => s.ExplodeOnPlace = true);
             int retained = Count(s => s.ExplodeOnPlace = false);
             ed.WriteMessage($"\nCONSUMER: exploderen={exploded} behouden={retained} -> {(exploded > 0 && retained > 0 ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nCONSUMER error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaConsumerTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFANALYSE", CommandFlags.Modal)]
@@ -3361,7 +3301,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             using var tr = db.TransactionManager.StartTransaction();
             var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
@@ -3406,11 +3346,7 @@ public partial class Commands
                 && both.Contains(a.Split(',')[0]) && both.Contains(b.Split(',')[0]);
             ed.WriteMessage($"\nXREFAN: isolatie (A!=B, beide in alles-aan) -> {(ok ? "OK" : "FAIL")}");
             tr.Commit();
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nXREFAN error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefAnalyse");
     }
 
     [CommandMethod("NLCSLEGENDAVIEWPORTTEST", CommandFlags.Modal)]
@@ -3422,7 +3358,7 @@ public partial class Commands
         var ed = doc.Editor;
         var db = doc.Database;
 
-        try
+        DiagnosticRun.Execute(() =>
         {
             string layoutName = "Model";
             using (var tr = db.TransactionManager.StartTransaction())
@@ -3453,11 +3389,7 @@ public partial class Commands
             {
                 LayoutManager.Current.CurrentLayout = originalLayout;
             }
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nVPTEST error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaViewportTest");
     }
 
     private void RunViewportScaleChecks(Editor ed, Database db)
@@ -3649,7 +3581,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             double scale = 200.0;
             if (double.TryParse(Environment.GetEnvironmentVariable("NLCS_MEET_SCALE"), out var s) && s > 0)
@@ -3753,20 +3685,20 @@ public partial class Commands
 
             var json = System.Text.Json.JsonSerializer.Serialize(new
             {
-                bron = Path.GetFileName(db.Filename), schaal = scale, insunits,
-                lijnSampleBreedteMm = swWmm, swatchKaderBreedteMm = frameWmm,
-                rijafstandMm = pitchMm, teksthoogtesMm = txtModes,
+                bron = Path.GetFileName(db.Filename),
+                schaal = scale,
+                insunits,
+                lijnSampleBreedteMm = swWmm,
+                swatchKaderBreedteMm = frameWmm,
+                rijafstandMm = pitchMm,
+                teksthoogtesMm = txtModes,
                 symbool = new { insertSchaal = symScale, paperBreedteMm = symPaperW, paperHoogteMm = symPaperH, aantal = symCount }
             }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             string outPath = Environment.GetEnvironmentVariable("NLCS_METING_OUT")
                 ?? Path.Join(Path.GetTempPath(), "nlcs-template-meting.json");
             File.WriteAllText(outPath, json);
             ed.WriteMessage($"\nMETEN: meting geschreven naar {outPath}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nMETEN error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaTemplateMeten");
     }
 
     [CommandMethod("NLCSLEGENDAPERFTEST", CommandFlags.Modal)]
@@ -3777,7 +3709,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var settings = LoadGlobalDefaults();
             settings.ExcludedDisciplines.Clear();
@@ -3826,11 +3758,7 @@ public partial class Commands
             ed.WriteMessage($"\nPERF: tree mediaan {Median(tTree):0.0} ms");
             ed.WriteMessage($"\nPERF: csv mediaan {Median(tCsv):0.0} ms");
             ed.WriteMessage($"\nPERF: json mediaan {Median(tJson):0.0} ms");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nPERF error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaPerfTest");
     }
 
     [CommandMethod("NLCSLEGENDAKLICATTRTEST", CommandFlags.Modal)]
@@ -3841,7 +3769,7 @@ public partial class Commands
             return;
         var ed = doc.Editor;
         var db = doc.Database;
-        try
+        DiagnosticRun.Execute(() =>
         {
             var settings = LoadGlobalDefaults();
             settings.ExcludedDisciplines.Clear();
@@ -3858,11 +3786,7 @@ public partial class Commands
             foreach (var e in fromDrawing.Take(6))
                 ed.WriteMessage($"\n  {e.Element} -> \"{e.Description}\"");
             tr.Commit();
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nKLICATTR error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaKlicAttrTest");
     }
 
     [CommandMethod("NLCSLEGENDALAAGNAAMTEST", CommandFlags.Modal)]
@@ -3874,7 +3798,7 @@ public partial class Commands
         var ed = doc.Editor;
         var db = doc.Database;
 
-        try
+        DiagnosticRun.Execute(() =>
         {
             const string src = "N-WE-KL-RENTEST-G";
             const string dst = "N-WE-KL-RENDONE-G";
@@ -3938,11 +3862,7 @@ public partial class Commands
                 ed.WriteMessage($"\nRENTEST: na merge dst weg={!lt.Has(dst)} mergeCount={c} -> {(ok ? "OK" : "FAIL")}");
                 tr.Commit();
             }
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nRENTEST error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaLaagnaamTest");
     }
 
     [CommandMethod("NLCSLEGENDADESCTEST", CommandFlags.Modal)]
@@ -3955,7 +3875,7 @@ public partial class Commands
         var db = doc.Database;
 
         using var userSettings = new GlobalSettingsSnapshot();
-        try
+        DiagnosticRun.Execute(() =>
         {
             string descKey = string.Empty;
             using (var tr = db.TransactionManager.StartTransaction())
@@ -4023,11 +3943,7 @@ public partial class Commands
             string g2 = TextOf(idG2);
             bool ok = g1after == "GLOBAL-V1" && g2 == "GLOBAL-V2";
             ed.WriteMessage($"\nDESC: na globaal V2 -> G1=\"{g1after}\" (verwacht GLOBAL-V1) G2=\"{g2}\" (verwacht GLOBAL-V2) -> {(ok ? "OK" : "FAIL")}");
-        }
-        catch (Exception ex)
-        {
-            ed.WriteMessage($"\nDESC error: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaDescTest");
     }
 
     [CommandMethod("NLCSLEGENDAUNDOSETUP", CommandFlags.Modal)]

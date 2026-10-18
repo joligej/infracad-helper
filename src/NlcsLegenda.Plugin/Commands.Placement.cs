@@ -10,9 +10,9 @@ public partial class Commands
     {
         var ms = (BlockTableRecord)tr.GetObject(
             SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-        using var pieces = new DBObjectCollection();
+        using var transient = new TransientObjects();
+        var pieces = transient.Items;
         var ids = new List<ObjectId>();
-        try
         {
             br.Explode(pieces);
             foreach (DBObject piece in pieces)
@@ -21,11 +21,6 @@ public partial class Commands
                     ids.Add(LegendBuilder.AppendEntity(ms, entity));
                     tr.AddNewlyCreatedDBObject(entity, true);
                 }
-        }
-        finally
-        {
-            foreach (DBObject piece in pieces)
-                if (piece.ObjectId.IsNull) piece.Dispose();
         }
         return ids;
     }

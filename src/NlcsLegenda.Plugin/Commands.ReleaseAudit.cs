@@ -37,7 +37,7 @@ public partial class Commands
         var db = doc.Database;
         var ed = doc.Editor;
         const string layerName = "N-WE-VH-ENTITYSTYLE-G";
-        try
+        DiagnosticRun.Execute(() =>
         {
             string path = Path.Join(Path.GetDirectoryName(db.Filename)!, "entity-style-source.dwg");
             using (var source = CreateXrefLineDatabase(path, layerName, 7, 7, out var lineId))
@@ -97,8 +97,7 @@ public partial class Commands
                 tr.Commit();
             }
             ed.WriteMessage("\nENTITYSTYLE echte rode/groene swatches blijven gelijk na laagwijziging -> OK");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nENTITYSTYLE FAIL: {ex}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaEntityStyleTest");
     }
 
     [CommandMethod("NLCSLEGENDAAUDITFIXTURE", CommandFlags.Modal)]
@@ -131,7 +130,7 @@ public partial class Commands
         var ed = doc.Editor;
         const string lineLayer = "N-WE-VH-DEPENDENCY-G";
         const string symbolLayer = "N-WE-VH-DEPENDENCY-S";
-        try
+        DiagnosticRun.Execute(() =>
         {
             string path = Path.Join(Path.GetDirectoryName(db.Filename)!, "dependency-source.dwg");
             using (var source = CreateXrefLineDatabase(path, lineLayer, 1, 5, out _, symbolLayerName: symbolLayer, symbolBlockName: "DEPENDENCY_SYMBOL"))
@@ -195,8 +194,8 @@ public partial class Commands
                 foreach (ObjectId id in block)
                 {
                     var entity = (Entity)tr.GetObject(id, OpenMode.ForRead);
-                    foreach (var dependency in new[] { entity.MaterialId, entity.ExtensionDictionary })
-                        if (!dependency.IsNull) RequireHostObjectId(db, dependency, entity.GetType().Name + " dependency");
+                    foreach (var dependency in new[] { entity.MaterialId, entity.ExtensionDictionary }.Where(id => !id.IsNull))
+                        RequireHostObjectId(db, dependency, entity.GetType().Name + " dependency");
                     foreach (ObjectId reactor in entity.GetPersistentReactorIds())
                         RequireHostObjectId(db, reactor, "reactor");
                     if (entity is Circle && entity.ColorIndex != 5)
@@ -212,8 +211,7 @@ public partial class Commands
                 ed.WriteMessage("\nDEPENDENCY SaveAs -> OK");
             }
             catch (System.Exception ex) { ed.WriteMessage($"\nDEPENDENCY SaveAs -> FAIL: {ex}"); }
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nDEPENDENCY FAIL: {ex}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaDependencyTest");
     }
     [CommandMethod("NLCSLEGENDASTABILITYTEST", CommandFlags.Modal)]
     public void NlcsLegendaStabilityTest()
@@ -222,7 +220,7 @@ public partial class Commands
         if (doc is null) return;
         var db = doc.Database;
         var ed = doc.Editor;
-        try
+        DiagnosticRun.Execute(() =>
         {
             string Snapshot()
             {
@@ -242,13 +240,10 @@ public partial class Commands
                         parts.Add($"{row.Element}|{row.RenderIdentity}|{row.Description}|{row.Metric.Count}|{row.Metric.Length:R}|{row.Metric.Area:R}");
                     var groups = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
                     var group = (Group)tr.GetObject(groups.GetAt(definition.GroupName), OpenMode.ForRead);
-                    foreach (ObjectId id in group.GetAllEntityIds())
+                    foreach (var reference in group.GetAllEntityIds().Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<BlockReference>())
                     {
-                        if (tr.GetObject(id, OpenMode.ForRead) is BlockReference reference)
-                        {
-                            var ownership = AssertLegendHostOwnership(db, tr, definition.GroupName, reference.BlockTableRecord);
-                            if (ownership.DbTexts != 0) throw new InvalidOperationException("DBText in legenda.");
-                        }
+                        var ownership = AssertLegendHostOwnership(db, tr, definition.GroupName, reference.BlockTableRecord);
+                        if (ownership.DbTexts != 0) throw new InvalidOperationException("DBText in legenda.");
                     }
                 }
                 tr.Commit();
@@ -294,7 +289,6 @@ public partial class Commands
                 ed.WriteMessage("\nSTABILITY orphan blocks=0 -> OK");
                 tr.Commit();
             }
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nSTABILITY FAIL: {ex}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaStabilityTest");
     }
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.32.4 - 2026-10-18
+
+- Opslag van de globale standaard herstelt bestanden via een tijdelijke kopie. Een opruimfout verbergt de oorspronkelijke fout niet meer; herstel- en opruimfouten worden samen gemeld.
+- Tijdelijke CAD-objecten, xref-kopieën en Map-tabellen krijgen een afzonderlijk opruimbereik. Eén mislukte sluiting houdt de overige bronnen niet meer open; objecten van de CAD-transactie blijven behouden.
+- CAD- en vensterproeven melden fouten op dezelfde manier, met testnaam en volledige foutinformatie. Een fouttekst kan niet meer als geslaagde CSV-export worden vergeleken. Vensterproeven lopen na een afzonderlijke mislukking door.
+- De KLIC-koppeling meldt ontbrekende Map-methoden expliciet. Gerichte foutafhandeling voorkomt dat programmeerfouten worden behandeld als ontbrekende symbolen of onmeetbare objecten.
+- Lagen, stijlen, attributen en testvoorbeelden gebruiken expliciete selectie. Ongeldige testlagen laten de proef mislukken. Tekstafbreking houdt gecombineerde letters en symbolen heel.
+
 ## 1.32.3 - 2026-10-18
 
 - Onleesbare instellingen- en omschrijvingenbestanden geven een foutmelding. Alleen een ontbrekend bestand gebruikt de beginwaarden; een leesfout wordt niet meer als een leeg profiel behandeld.

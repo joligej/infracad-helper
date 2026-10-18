@@ -134,7 +134,7 @@ public partial class Commands
             blockRecordId = btrId;
             tr.Commit();
         }
-        catch (System.Exception ex) { err = ex.ToString(); }
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException) { err = ex.ToString(); }
         return entryCount;
     }
 
@@ -308,7 +308,7 @@ public partial class Commands
         if (doc is null) return;
         var db = doc.Database; var ed = doc.Editor;
         string xpath = Path.Join(Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath(), "xrefrender_src.dwg");
-        try
+        DiagnosticRun.Execute(() =>
         {
             CreateXrefRenderDwg(xpath);
             AttachAndInsert(db, xpath, "KADER");
@@ -359,8 +359,7 @@ public partial class Commands
             ed.WriteMessage($"\nXREFRENDER hatch: ANSI31 schaal=1.5 hoek=45° -> {(hatchStyleOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nXREFRENDER ownership: entities={ownership.Entities} hatches={ownership.Hatches} hatchloops={hatchLoops} MText={ownership.MTexts} DBText={ownership.DbTexts} -> {(ownershipOk && hatchLoops > 0 ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nXREFRENDER: totaal -> {(parseOk && noDbErr && colorOk && ownershipOk && hatchLoops > 0 && symbolOk && hatchStyleOk ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nXREFRENDER fatale fout: {ex.GetType().Name}: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefRenderTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFVISIBILITYTEST", CommandFlags.Modal)]
@@ -402,7 +401,7 @@ public partial class Commands
             settings.IncludeInvisibleLayers = true;
             includedFrozen = AnalyzeXrefRows(db, settings);
         }
-        catch (System.Exception ex)
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException)
         {
             error = ex.GetType().Name + ": " + ex.Message;
         }
@@ -411,7 +410,7 @@ public partial class Commands
             if (!string.IsNullOrEmpty(dependentLayer))
             {
                 try { SetXrefLayerFlags(db, dependentLayer, isOff: false, isFrozen: false); }
-                catch (System.Exception ex) { error = "opruimen: " + ex.GetType().Name + ": " + ex.Message; }
+                catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException) { error += "; opruimen: " + ex; }
             }
         }
 
@@ -473,7 +472,7 @@ public partial class Commands
             ed.Command("_.-XREF", "_Reload", xrefName);
             restored = AnalyzeXrefRows(db, settings);
         }
-        catch (System.Exception ex)
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException)
         {
             error = ex.GetType().Name + ": " + ex.Message;
         }
@@ -482,7 +481,7 @@ public partial class Commands
             if (sourceMoved && File.Exists(unavailablePath) && !File.Exists(sourcePath))
             {
                 try { File.Move(unavailablePath, sourcePath); }
-                catch (System.Exception ex) { error = "xref-bron opruimen: " + ex.GetType().Name + ": " + ex.Message; }
+                catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException) { error += "; xref-bron opruimen: " + ex; }
             }
         }
 
@@ -507,7 +506,7 @@ public partial class Commands
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
         string inner = Path.Join(dir, "xref_inner.dwg");
         string outer = Path.Join(dir, "xref_outer.dwg");
-        try
+        DiagnosticRun.Execute(() =>
         {
             CreateNestedXrefDwgs(inner, outer);
             AttachAndInsert(db, outer, "OUTER");
@@ -539,8 +538,7 @@ public partial class Commands
             ed.WriteMessage($"\nXREFNESTED database: fout={err} -> {(noDbErr ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nXREFNESTED kleur: G={gColor}(rood=1) A={aColor}(groen=3) -> {(colorOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nXREFNESTED: totaal -> {(nestedNameOk && parseOk && noDbErr && colorOk ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nXREFNESTED fatale fout: {ex.GetType().Name}: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefNestedTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFSAVESETUP", CommandFlags.Modal)]
@@ -550,7 +548,7 @@ public partial class Commands
         if (doc is null) return;
         var db = doc.Database; var ed = doc.Editor;
         string xpath = Path.Join(Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath(), "xrefrender_src.dwg");
-        try
+        DiagnosticRun.Execute(() =>
         {
             CreateXrefRenderDwg(xpath);
             AttachAndInsert(db, xpath, "KADER");
@@ -558,8 +556,7 @@ public partial class Commands
             settings.IncludeXrefLayers = true;
             int entryCount = BuildPlaceXrefLegend(db, settings, out string err, out _, out _);
             ed.WriteMessage($"\nXREFSAVE setup: entries={entryCount} fout={err}. QSAVE, heropenen, dan NLCSLEGENDAXREFSAVEVERIFY.");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nXREFSAVE setup error: {ex.GetType().Name}: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefSaveSetup");
     }
 
     [CommandMethod("NLCSLEGENDAXREFSAVEVERIFY", CommandFlags.Modal)]
@@ -574,15 +571,14 @@ public partial class Commands
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var reg = LegendStore.Load(db, tr);
-                foreach (var def in reg.Legends.ToList())
-                    if (BuildManagedLegend(db, tr, reg, def, out _, out _) == UpdateResult.Updated)
-                        updated++;
+                updated += reg.Legends.ToList().Count(def =>
+                    BuildManagedLegend(db, tr, reg, def, out _, out _) == UpdateResult.Updated);
                 LegendStore.Save(db, tr, reg);
                 tr.Commit();
             }
             PurgePending(db);
         }
-        catch (System.Exception ex) { err = ex.ToString(); }
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException) { err = ex.ToString(); }
 
         string gColor = ReadAci(db, XrefGLayer), aColor = ReadAci(db, XrefALayer);
         bool noDbErr = err == "geen";
@@ -902,7 +898,7 @@ public partial class Commands
         var ed = doc.Editor;
         string dir = Path.GetDirectoryName(doc.Database.Filename) ?? Path.GetTempPath();
         const string layer = "N-WE-VH-WEG-G";
-        try
+        DiagnosticRun.Execute(() =>
         {
             string samePath = Path.Join(dir, "hostxref_same.dwg");
             string diffPath = Path.Join(dir, "hostxref_diff.dwg");
@@ -934,11 +930,7 @@ public partial class Commands
             ed.WriteMessage($"\nHOSTXREF verschillend: regels={differentRows.Count} rood={red:0.#} m groen={green:0.#} m -> {(differentOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nHOSTXREF export/info: gelijk={sameExportOk} verschillend={differentExportOk}");
             ed.WriteMessage($"\nHOSTXREF totaal: {(sameOk && differentOk && sameExportOk && differentExportOk ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nHOSTXREF fatale fout: {ex.GetType().Name}: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefHostTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFSPLITTEST", CommandFlags.Modal)]
@@ -949,7 +941,7 @@ public partial class Commands
         var db = doc.Database; var ed = doc.Editor;
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
         const string layer = "N-WE-VH-WEG-G";
-        try
+        DiagnosticRun.Execute(() =>
         {
             var a = Path.Join(dir, "split_a.dwg");
             var b = Path.Join(dir, "split_b.dwg");
@@ -983,8 +975,7 @@ public partial class Commands
             bool noErr = err == "geen";
             bool swatchOk = (c1 == "1" && c2 == "3") || (c1 == "3" && c2 == "1");
             ed.WriteMessage($"\nSPLIT: gebouwd regels={built} fout={err} swatchkleuren={c1}/{c2} -> {(noErr && swatchOk ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nSPLIT fatale fout: {ex.GetType().Name}: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefSplitTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFSTYLETEST", CommandFlags.Modal)]
@@ -995,7 +986,7 @@ public partial class Commands
         var db = doc.Database; var ed = doc.Editor;
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
         const string layer = "N-WE-VH-WEG-G";
-        try
+        DiagnosticRun.Execute(() =>
         {
             var thin1 = Path.Join(dir, "style_thin1.dwg");
             var thin2 = Path.Join(dir, "style_thin2.dwg");
@@ -1038,8 +1029,7 @@ public partial class Commands
             ed.WriteMessage($"\nSTYLE: dun-samen(10m)={thinOk} dik-apart(2m)={thickOk} aparte-render-id={styleSplitOk} -> {(rowsOk && thinOk && thickOk && styleSplitOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nSTYLE: echte swatches 0.25/1.00 mm={renderedStyleOk} fout={err} weights={string.Join("/", renderedWeights)} -> {(renderedStyleOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nSTYLE: totaal -> {(rowsOk && thinOk && thickOk && styleSplitOk && renderedStyleOk ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex) { ed.WriteMessage($"\nSTYLE fatale fout: {ex.GetType().Name}: {ex.Message}"); }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefStyleTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFSYMBOLTEST", CommandFlags.Modal)]
@@ -1052,7 +1042,7 @@ public partial class Commands
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
         const string layer = "N-WE-VH-WEG-G";
         const string symbolLayer = "N-WE-VH-WEG-S";
-        try
+        DiagnosticRun.Execute(() =>
         {
             string pathA = Path.Join(dir, "symbol_a.dwg");
             string pathB = Path.Join(dir, "symbol_b.dwg");
@@ -1181,11 +1171,7 @@ public partial class Commands
             ed.WriteMessage($"\nSYMBOL: export/info behouden vijf correcte rijen={exportOk}/{infoOk}");
             ed.WriteMessage($"\nSYMBOL: legenda gebouwd={built} geometrie={primitivesOk} bronlabels={textOk} rotatie/schaal/mirror={transformsOk} host-owned/MText-only={ownershipOk}; fout={error}");
             ed.WriteMessage($"\nSYMBOL totaal: {(totalOk ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nSYMBOL fatale fout: {ex.GetType().Name}: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefSymbolTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFHATCHTEST", CommandFlags.Modal)]
@@ -1197,7 +1183,7 @@ public partial class Commands
         var ed = doc.Editor;
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
         const string layer = "N-WE-VH-VERHARDING_ASFALT_ZWART-A";
-        try
+        DiagnosticRun.Execute(() =>
         {
             var fixtures = new[]
             {
@@ -1307,11 +1293,7 @@ public partial class Commands
             ed.WriteMessage($"\nHATCH: aantallen/export/info behouden {string.Join("/", ExportedCounts(rows))}={exportOk}/{infoOk}");
             ed.WriteMessage($"\nHATCH: gebouwd={built} werkelijke ANSI-patterns/hoeken/schalen={renderedPatternsOk} groen={renderedColorsOk} host-owned/MText-only={ownershipOk}; fout={error}");
             ed.WriteMessage($"\nHATCH totaal: {(totalOk ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nHATCH fatale fout: {ex.GetType().Name}: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefHatchTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFSAMPLECONFLICTTEST", CommandFlags.Modal)]
@@ -1324,7 +1306,7 @@ public partial class Commands
         string dir = Path.GetDirectoryName(db.Filename) ?? Path.GetTempPath();
         const string hatchLayer = "N-WE-VH-VERHARDING_ASFALT_ZWART-A";
         const string symbolLayer = "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-S";
-        try
+        DiagnosticRun.Execute(() =>
         {
             string hatchPath = Path.Join(dir, "sample_hatch_conflict.dwg");
             string symbolPath = Path.Join(dir, "sample_symbol_conflict.dwg");
@@ -1369,11 +1351,7 @@ public partial class Commands
             }
             ed.WriteMessage("\nSAMPLECONFLICT 2 patronen elk 100 m2; 2 symbolen elk 1; echte swatches -> OK");
             ed.WriteMessage("\nSAMPLECONFLICT totaal: OK");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nSAMPLECONFLICT fout: {ex.GetType().Name}: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefSampleConflictTest");
     }
 
     [CommandMethod("NLCSLEGENDAXREFRELOADSETUP", CommandFlags.Modal)]
@@ -1388,7 +1366,7 @@ public partial class Commands
         string replacementPath = Path.Join(dir, "reload_replacement.dwg");
         const string layerName = "N-WE-VH-WEG-G";
 
-        try
+        DiagnosticRun.Execute(() =>
         {
             int previousVisretain = System.Convert.ToInt32(AcAp.GetSystemVariable("VISRETAIN"));
             try
@@ -1412,11 +1390,7 @@ public partial class Commands
             {
                 AcAp.SetSystemVariable("VISRETAIN", previousVisretain);
             }
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nXREFRELOAD setup fout: {ex.GetType().Name}: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefReloadSetup");
     }
 
     [CommandMethod("NLCSLEGENDAXREFRELOADVERIFY", CommandFlags.Modal)]
@@ -1439,7 +1413,7 @@ public partial class Commands
         bool infoOk;
         string updateNote;
 
-        try
+        DiagnosticRun.Execute(() =>
         {
             int previousVisretain = System.Convert.ToInt32(AcAp.GetSystemVariable("VISRETAIN"));
             try
@@ -1522,11 +1496,7 @@ public partial class Commands
             ed.WriteMessage($"\nXREFRELOAD update: rijen={updatedRows} id/groep={identityOk} positie={positionOk} -> {(updatedRows == 1 && identityOk && positionOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nXREFRELOAD ownership: entities={ownership.Entities} MText={ownership.MTexts} DBText={ownership.DbTexts} tekst={textOk} -> {(ownershipOk && textOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nXREFRELOAD totaal: {(allOk ? "OK" : "FAIL")}");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nXREFRELOAD verify fout: {ex.GetType().Name}: {ex.Message}");
-        }
+        }, message => ed.WriteMessage(message), "NlcsLegendaXrefReloadVerify");
     }
 
     [CommandMethod("NLCSLEGENDAXREFPLACEMENTTEST", CommandFlags.Modal)]
@@ -1569,215 +1539,214 @@ public partial class Commands
         HostApplicationServices.WorkingDatabase = db;
         try
         {
-            string a = Path.Join(dir, "placement_a.dwg");
-            string b = Path.Join(dir, "placement_b.dwg");
-            string c = Path.Join(dir, "placement_c.dwg");
-            using var sourceDb = CreateXrefLineDatabase(
-                a, layer, 1, 5.0, out var sourceLineId,
-                symbolLayerName: symbolLayer, symbolBlockName: symbolBlock);
-            CreateXrefLineDwg(b, layer, 1, 7.0, symbolLayerName: symbolLayer, symbolBlockName: symbolBlock);
-            CreateXrefLineDwg(c, layer, 3, 3.0, symbolLayerName: symbolLayer, symbolBlockName: symbolBlock);
-            AttachAndInsert(db, a, "PLACEMENTA");
-            AttachAndInsert(db, b, "PLACEMENTB");
-            AttachAndInsert(db, c, "PLACEMENTC");
-
-            bool sourceDatabaseOk = sourceLineId.Database == sourceDb && sourceDb != db;
-            string error = "geen";
-            string redLayer = string.Empty, greenLayer = string.Empty, groupName = string.Empty;
-            int analysisRows = 0, renderedRows = 0;
-            double redLength = 0, greenLength = 0;
-            bool provenanceOk = false, actualTextOk = false, customHeightsOk = false, symbolOk = false;
-            (int Members, int Entities, int Hatches, int MTexts, int DbTexts) ownership = default;
-            (int Members, int Entities, int Hatches, int MTexts, int DbTexts) explodedOwnership = default;
-            (int dbText, int mText) explodedText = default;
-            bool explodedPlacementOk = false;
-            string explodedError = "geen";
-
-            try
+            DiagnosticRun.Execute(() =>
             {
-                using var tr = db.TransactionManager.StartTransaction();
-                var registry = LegendStore.Load(db, tr);
-                var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
-                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded);
-                var rows = analysis.Entries.Where(entry => entry.GeometryLayer is not null).ToList();
-                analysisRows = rows.Count;
-                var red = rows.SingleOrDefault(entry => EntryAci(analysis, entry) == "1");
-                var green = rows.SingleOrDefault(entry => EntryAci(analysis, entry) == "3");
-                if (red is null || green is null)
-                    throw new InvalidOperationException("Verwachte rode en groene render-partitie ontbreekt.");
+                string a = Path.Join(dir, "placement_a.dwg");
+                string b = Path.Join(dir, "placement_b.dwg");
+                string c = Path.Join(dir, "placement_c.dwg");
+                using var sourceDb = CreateXrefLineDatabase(
+                    a, layer, 1, 5.0, out var sourceLineId,
+                    symbolLayerName: symbolLayer, symbolBlockName: symbolBlock);
+                CreateXrefLineDwg(b, layer, 1, 7.0, symbolLayerName: symbolLayer, symbolBlockName: symbolBlock);
+                CreateXrefLineDwg(c, layer, 3, 3.0, symbolLayerName: symbolLayer, symbolBlockName: symbolBlock);
+                AttachAndInsert(db, a, "PLACEMENTA");
+                AttachAndInsert(db, b, "PLACEMENTB");
+                AttachAndInsert(db, c, "PLACEMENTC");
 
-                redLength = red.Metric.Length;
-                greenLength = green.Metric.Length;
-                redLayer = red.GeometryLayer!;
-                greenLayer = green.GeometryLayer!;
-                var redSources = red.SourceLayers.Select(source => source.SourceIdentity)
-                    .ToHashSet(System.StringComparer.OrdinalIgnoreCase);
-                var greenSources = green.SourceLayers.Select(source => source.SourceIdentity)
-                    .ToHashSet(System.StringComparer.OrdinalIgnoreCase);
-                provenanceOk = redSources.SetEquals(new[] { "PLACEMENTA", "PLACEMENTB" })
-                    && greenSources.SetEquals(new[] { "PLACEMENTC" })
-                    && red.RenderIdentity != green.RenderIdentity;
+                bool sourceDatabaseOk = sourceLineId.Database == sourceDb && sourceDb != db;
+                string error = "geen";
+                string redLayer = string.Empty, greenLayer = string.Empty, groupName = string.Empty;
+                int analysisRows = 0, renderedRows = 0;
+                double redLength = 0, greenLength = 0;
+                bool provenanceOk = false, actualTextOk = false, customHeightsOk = false, symbolOk = false;
+                (int Members, int Entities, int Hatches, int MTexts, int DbTexts) ownership = default;
+                (int Members, int Entities, int Hatches, int MTexts, int DbTexts) explodedOwnership = default;
+                (int dbText, int mText) explodedText = default;
+                bool explodedPlacementOk = false;
+                string explodedError = "geen";
 
-                var blockId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out renderedRows, out var issues);
-                if (issues.Count > 0)
-                    throw new InvalidOperationException("Tekenfouten in legenda: "
-                        + string.Join("; ", issues.Select(issue =>
-                            $"{issue.Entry} [{issue.SourceLayer}; {issue.Kind}]: {issue.Reason}")));
-                var modelSpace = (BlockTableRecord)tr.GetObject(
-                    SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                using var preview = new BlockReference(Point3d.Origin, blockId);
-                modelSpace.AppendEntity(preview);
-                tr.AddNewlyCreatedDBObject(preview, true);
-                var placementPoint = new Point3d(200, 0, 0);
-                if (!HostEnvironment.IsCoreConsole)
+                try
                 {
-                    var pointPrompt = ed.GetPoint("\nPlaats de xref-legenda (acceptance):");
-                    if (pointPrompt.Status != PromptStatus.OK)
-                        throw new InvalidOperationException("De plaatsing is geannuleerd.");
-                    placementPoint = pointPrompt.Value;
-                }
-                var definition = PlaceLegendAtPoint(
-                    tr, db, registry, settings, selection, blockId, preview, placementPoint);
-                groupName = definition.GroupName;
-                ownership = AssertLegendHostOwnership(db, tr, groupName, blockId);
+                    using var tr = db.TransactionManager.StartTransaction();
+                    var registry = LegendStore.Load(db, tr);
+                    var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+                    var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded);
+                    var rows = analysis.Entries.Where(entry => entry.GeometryLayer is not null).ToList();
+                    analysisRows = rows.Count;
+                    var red = rows.SingleOrDefault(entry => EntryAci(analysis, entry) == "1");
+                    var green = rows.SingleOrDefault(entry => EntryAci(analysis, entry) == "3");
+                    if (red is null || green is null)
+                        throw new InvalidOperationException("Verwachte rode en groene render-partitie ontbreekt.");
 
-                var legendBlock = (BlockTableRecord)tr.GetObject(blockId, OpenMode.ForRead);
-                int symbolPrimitives = 0, symbolTexts = 0;
-                foreach (ObjectId id in legendBlock)
+                    redLength = red.Metric.Length;
+                    greenLength = green.Metric.Length;
+                    redLayer = red.GeometryLayer!;
+                    greenLayer = green.GeometryLayer!;
+                    var redSources = red.SourceLayers.Select(source => source.SourceIdentity)
+                        .ToHashSet(System.StringComparer.OrdinalIgnoreCase);
+                    var greenSources = green.SourceLayers.Select(source => source.SourceIdentity)
+                        .ToHashSet(System.StringComparer.OrdinalIgnoreCase);
+                    provenanceOk = redSources.SetEquals(new[] { "PLACEMENTA", "PLACEMENTB" })
+                        && greenSources.SetEquals(new[] { "PLACEMENTC" })
+                        && red.RenderIdentity != green.RenderIdentity;
+
+                    var blockId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out renderedRows, out var issues);
+                    if (issues.Count > 0)
+                        throw new InvalidOperationException("Tekenfouten in legenda: "
+                            + string.Join("; ", issues.Select(issue =>
+                                $"{issue.Entry} [{issue.SourceLayer}; {issue.Kind}]: {issue.Reason}")));
+                    var modelSpace = (BlockTableRecord)tr.GetObject(
+                        SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                    using var preview = new BlockReference(Point3d.Origin, blockId);
+                    modelSpace.AppendEntity(preview);
+                    tr.AddNewlyCreatedDBObject(preview, true);
+                    var placementPoint = new Point3d(200, 0, 0);
+                    if (!HostEnvironment.IsCoreConsole)
+                    {
+                        var pointPrompt = ed.GetPoint("\nPlaats de xref-legenda (acceptance):");
+                        if (pointPrompt.Status != PromptStatus.OK)
+                            throw new InvalidOperationException("De plaatsing is geannuleerd.");
+                        placementPoint = pointPrompt.Value;
+                    }
+                    var definition = PlaceLegendAtPoint(
+                        tr, db, registry, settings, selection, blockId, preview, placementPoint);
+                    groupName = definition.GroupName;
+                    ownership = AssertLegendHostOwnership(db, tr, groupName, blockId);
+
+                    var legendBlock = (BlockTableRecord)tr.GetObject(blockId, OpenMode.ForRead);
+                    int symbolPrimitives = 0, symbolTexts = 0;
+                    foreach (ObjectId id in legendBlock)
+                    {
+                        var entity = tr.GetObject(id, OpenMode.ForRead);
+                        if (entity is Circle)
+                            symbolPrimitives++;
+                        else if (entity is MText text
+                            && text.Contents.Contains("XREF-PLACEMENT-SYMBOL", System.StringComparison.Ordinal))
+                            symbolTexts++;
+                    }
+                    symbolOk = symbolPrimitives > 0 && symbolTexts > 0;
+
+                    var blockTexts = ReadLegendBlockTexts(tr, blockId);
+                    actualTextOk = blockTexts.Any(text => text.Contains("12 m", System.StringComparison.Ordinal))
+                        && blockTexts.Any(text => text.Contains("3 m", System.StringComparison.Ordinal));
+                    var block = (BlockTableRecord)tr.GetObject(blockId, OpenMode.ForRead);
+                    var mtexts = block.Cast<ObjectId>()
+                        .Select(id => tr.GetObject(id, OpenMode.ForRead))
+                        .OfType<MText>()
+                        .ToList();
+                    bool hasBody = mtexts.Any(text => text.Contents.Contains(red.Description, System.StringComparison.OrdinalIgnoreCase)
+                        && System.Math.Abs(text.TextHeight - settings.ToModel(3.0)) < 1e-8);
+                    bool hasHeader = mtexts.Any(text => text.Contents.Contains(settings.LabelNieuw, System.StringComparison.OrdinalIgnoreCase)
+                        && System.Math.Abs(text.TextHeight - settings.ToModel(4.0)) < 1e-8);
+                    bool hasTitle = mtexts.Any(text => text.Contents.Contains(settings.Title, System.StringComparison.Ordinal)
+                        && System.Math.Abs(text.TextHeight - settings.ToModel(6.0)) < 1e-8);
+                    var redSwatch = block.Cast<ObjectId>()
+                        .Select(id => tr.GetObject(id, OpenMode.ForRead))
+                        .OfType<Polyline>()
+                        .Single(polyline => polyline.NumberOfVertices == 2
+                            && polyline.Layer.Equals(redLayer, System.StringComparison.OrdinalIgnoreCase));
+                    double swatchCenterY = (redSwatch.GetPoint2dAt(0).Y + redSwatch.GetPoint2dAt(1).Y) / 2.0;
+                    var bodyText = mtexts
+                        .Where(text => text.Contents.Contains(red.Description, System.StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(text => System.Math.Abs(text.Location.Y - swatchCenterY))
+                        .First();
+                    var bodyExtents = bodyText.GeometricExtents;
+                    double mmPerModelUnit = 1.0 / settings.ToModel(1.0);
+                    double anchorDeviationMm = System.Math.Abs(bodyText.Location.Y
+                        - Math.Max(bodyText.TextHeight * (1 - 0.28388973), bodyText.ActualHeight / 2) - swatchCenterY) * mmPerModelUnit;
+                    double extentsDeviationMm = System.Math.Abs(
+                        (bodyExtents.MinPoint.Y + bodyExtents.MaxPoint.Y) / 2.0 - swatchCenterY) * mmPerModelUnit;
+                    bool mtextPositionOk = anchorDeviationMm < 1e-6 && bodyText.Attachment == AttachmentPoint.TopLeft
+                        && extentsDeviationMm <= settings.TextHeightMm * 0.22;
+                    customHeightsOk = hasBody && hasHeader && hasTitle && mtextPositionOk;
+                    tr.Commit();
+                    ed.WriteMessage($"\nPLACEMENT MText-verticaal: ankerafwijking={anchorDeviationMm:0.###} mm extentsafwijking={extentsDeviationMm:0.###} mm -> {(mtextPositionOk ? "OK" : "FAIL")}");
+                }
+                catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException)
                 {
-                    var entity = tr.GetObject(id, OpenMode.ForRead);
-                    if (entity is Circle)
-                        symbolPrimitives++;
-                    else if (entity is MText text
-                        && text.Contents.Contains("XREF-PLACEMENT-SYMBOL", System.StringComparison.Ordinal))
-                        symbolTexts++;
+                    error = ex.GetType().Name + ": " + ex.Message;
+                    customHeightsOk = false;
                 }
-                symbolOk = symbolPrimitives > 0 && symbolTexts > 0;
 
-                var blockTexts = ReadLegendBlockTexts(tr, blockId);
-                actualTextOk = blockTexts.Any(text => text.Contains("12 m", System.StringComparison.Ordinal))
-                    && blockTexts.Any(text => text.Contains("3 m", System.StringComparison.Ordinal));
-                var block = (BlockTableRecord)tr.GetObject(blockId, OpenMode.ForRead);
-                var mtexts = block.Cast<ObjectId>()
-                    .Select(id => tr.GetObject(id, OpenMode.ForRead))
-                    .OfType<MText>()
-                    .ToList();
-                bool hasBody = mtexts.Any(text => text.Contents.Contains(red.Description, System.StringComparison.OrdinalIgnoreCase)
-                    && System.Math.Abs(text.TextHeight - settings.ToModel(3.0)) < 1e-8);
-                bool hasHeader = mtexts.Any(text => text.Contents.Contains(settings.LabelNieuw, System.StringComparison.OrdinalIgnoreCase)
-                    && System.Math.Abs(text.TextHeight - settings.ToModel(4.0)) < 1e-8);
-                bool hasTitle = mtexts.Any(text => text.Contents.Contains(settings.Title, System.StringComparison.Ordinal)
-                    && System.Math.Abs(text.TextHeight - settings.ToModel(6.0)) < 1e-8);
-                var redSwatch = block.Cast<ObjectId>()
-                    .Select(id => tr.GetObject(id, OpenMode.ForRead))
-                    .OfType<Polyline>()
-                    .Single(polyline => polyline.NumberOfVertices == 2
-                        && polyline.Layer.Equals(redLayer, System.StringComparison.OrdinalIgnoreCase));
-                double swatchCenterY = (redSwatch.GetPoint2dAt(0).Y + redSwatch.GetPoint2dAt(1).Y) / 2.0;
-                var bodyText = mtexts
-                    .Where(text => text.Contents.Contains(red.Description, System.StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(text => System.Math.Abs(text.Location.Y - swatchCenterY))
-                    .First();
-                var bodyExtents = bodyText.GeometricExtents;
-                double mmPerModelUnit = 1.0 / settings.ToModel(1.0);
-                double anchorDeviationMm = System.Math.Abs(bodyText.Location.Y
-                    - Math.Max(bodyText.TextHeight * (1 - 0.28388973), bodyText.ActualHeight / 2) - swatchCenterY) * mmPerModelUnit;
-                double extentsDeviationMm = System.Math.Abs(
-                    (bodyExtents.MinPoint.Y + bodyExtents.MaxPoint.Y) / 2.0 - swatchCenterY) * mmPerModelUnit;
-                bool mtextPositionOk = anchorDeviationMm < 1e-6 && bodyText.Attachment == AttachmentPoint.TopLeft
-                    && extentsDeviationMm <= settings.TextHeightMm * 0.22;
-                customHeightsOk = hasBody && hasHeader && hasTitle && mtextPositionOk;
-                tr.Commit();
-                ed.WriteMessage($"\nPLACEMENT MText-verticaal: ankerafwijking={anchorDeviationMm:0.###} mm extentsafwijking={extentsDeviationMm:0.###} mm -> {(mtextPositionOk ? "OK" : "FAIL")}");
-            }
-            catch (System.Exception ex)
-            {
-                error = ex.GetType().Name + ": " + ex.Message;
-                customHeightsOk = false;
-            }
+                try
+                {
+                    var explodedSettings = settings.Clone();
+                    explodedSettings.ExplodeOnPlace = true;
+                    using var tr = db.TransactionManager.StartTransaction();
+                    var registry = LegendStore.Load(db, tr);
+                    var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+                    var analysis = DrawingAnalyzer.Analyze(db, tr, explodedSettings, selection, LoadCatalog(db), excluded);
+                    var blockId = LegendBuilder.BuildBlock(db, tr, analysis, explodedSettings, out int explodedRows, out var issues);
+                    if (issues.Count > 0)
+                        throw new InvalidOperationException("Tekenfouten in geëxplodeerde legenda: "
+                            + string.Join("; ", issues.Select(issue =>
+                                $"{issue.Entry} [{issue.SourceLayer}; {issue.Kind}]: {issue.Reason}")));
+                    var modelSpace = (BlockTableRecord)tr.GetObject(
+                        SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                    using var preview = new BlockReference(Point3d.Origin, blockId);
+                    modelSpace.AppendEntity(preview);
+                    tr.AddNewlyCreatedDBObject(preview, true);
+                    var definition = PlaceLegendAtPoint(
+                        tr, db, registry, explodedSettings, selection, blockId, preview, new Point3d(400, 0, 0));
+                    explodedOwnership = AssertLegendHostOwnership(db, tr, definition.GroupName, blockId);
+                    explodedText = CountTextInGroup(db, tr, definition.GroupName);
+                    explodedPlacementOk = explodedRows == 2
+                        && explodedOwnership.Members > 0 && explodedOwnership.Entities > 0
+                        && explodedOwnership.MTexts > 0 && explodedOwnership.DbTexts == 0
+                        && explodedText.dbText == 0 && explodedText.mText > 0;
+                }
+                catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException)
+                {
+                    explodedError = ex.GetType().Name + ": " + ex.Message;
+                }
 
-            try
-            {
-                var explodedSettings = settings.Clone();
-                explodedSettings.ExplodeOnPlace = true;
-                using var tr = db.TransactionManager.StartTransaction();
-                var registry = LegendStore.Load(db, tr);
-                var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
-                var analysis = DrawingAnalyzer.Analyze(db, tr, explodedSettings, selection, LoadCatalog(db), excluded);
-                var blockId = LegendBuilder.BuildBlock(db, tr, analysis, explodedSettings, out int explodedRows, out var issues);
-                if (issues.Count > 0)
-                    throw new InvalidOperationException("Tekenfouten in geëxplodeerde legenda: "
-                        + string.Join("; ", issues.Select(issue =>
-                            $"{issue.Entry} [{issue.SourceLayer}; {issue.Kind}]: {issue.Reason}")));
-                var modelSpace = (BlockTableRecord)tr.GetObject(
-                    SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                using var preview = new BlockReference(Point3d.Origin, blockId);
-                modelSpace.AppendEntity(preview);
-                tr.AddNewlyCreatedDBObject(preview, true);
-                var definition = PlaceLegendAtPoint(
-                    tr, db, registry, explodedSettings, selection, blockId, preview, new Point3d(400, 0, 0));
-                explodedOwnership = AssertLegendHostOwnership(db, tr, definition.GroupName, blockId);
-                explodedText = CountTextInGroup(db, tr, definition.GroupName);
-                explodedPlacementOk = explodedRows == 2
-                    && explodedOwnership.Members > 0 && explodedOwnership.Entities > 0
-                    && explodedOwnership.MTexts > 0 && explodedOwnership.DbTexts == 0
-                    && explodedText.dbText == 0 && explodedText.mText > 0;
-            }
-            catch (System.Exception ex)
-            {
-                explodedError = ex.GetType().Name + ": " + ex.Message;
-            }
+                string redAci = string.IsNullOrEmpty(redLayer) ? "geen" : ReadAci(db, redLayer);
+                string greenAci = string.IsNullOrEmpty(greenLayer) ? "geen" : ReadAci(db, greenLayer);
+                bool rowsOk = analysisRows == 2 && renderedRows == 2
+                    && System.Math.Abs(redLength - 12.0) < 0.01
+                    && System.Math.Abs(greenLength - 3.0) < 0.01;
+                bool ownershipOk = ownership.Members > 0 && ownership.Entities > 0
+                    && ownership.MTexts > 0 && ownership.DbTexts == 0;
+                bool colorsOk = redAci == "1" && greenAci == "3";
+                bool placementOk = error == "geen" && explodedError == "geen" && sourceDatabaseOk && enterDefault
+                    && rowsOk && provenanceOk && actualTextOk && customHeightsOk && ownershipOk && colorsOk && symbolOk;
 
-            string redAci = string.IsNullOrEmpty(redLayer) ? "geen" : ReadAci(db, redLayer);
-            string greenAci = string.IsNullOrEmpty(greenLayer) ? "geen" : ReadAci(db, greenLayer);
-            bool rowsOk = analysisRows == 2 && renderedRows == 2
-                && System.Math.Abs(redLength - 12.0) < 0.01
-                && System.Math.Abs(greenLength - 3.0) < 0.01;
-            bool ownershipOk = ownership.Members > 0 && ownership.Entities > 0
-                && ownership.MTexts > 0 && ownership.DbTexts == 0;
-            bool colorsOk = redAci == "1" && greenAci == "3";
-            bool placementOk = error == "geen" && explodedError == "geen" && sourceDatabaseOk && enterDefault
-                && rowsOk && provenanceOk && actualTextOk && customHeightsOk && ownershipOk && colorsOk && symbolOk;
+                ed.WriteMessage($"\nPLACEMENT Enter/default: selection={(selection is null ? "null" : selection.Length.ToString())} -> {(enterDefault ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nPLACEMENT bronnen: bron-db-eigen={sourceDatabaseOk} A+B rood={redLength:0.#} m C groen={greenLength:0.#} m -> {(provenanceOk ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nPLACEMENT rijen/hoeveelheden: analyse={analysisRows} gebouwd={renderedRows} rood={redAci}/{redLength:0.#} m groen={greenAci}/{greenLength:0.#} m tekst={actualTextOk} -> {(rowsOk && colorsOk && actualTextOk ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nPLACEMENT ownership: group={ownership.Members} entities={ownership.Entities} hatches={ownership.Hatches} MText={ownership.MTexts} DBText={ownership.DbTexts} -> {(ownershipOk ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nPLACEMENT xref-symbool: primitives/text={symbolOk} -> {(symbolOk ? "OK" : "FAIL")}");
+                ed.WriteMessage($"\nPLACEMENT xref exploded: group={explodedOwnership.Members} entities={explodedOwnership.Entities} MText={explodedText.mText} DBText={explodedText.dbText} host-owned={explodedOwnership.DbTexts == 0} -> {(explodedPlacementOk ? "OK" : "FAIL")}; fout={explodedError}");
+                ed.WriteMessage($"\nPLACEMENT custom text height 3/4/6 mm: {(customHeightsOk ? "OK" : "FAIL")}; fout={error}");
 
-            ed.WriteMessage($"\nPLACEMENT Enter/default: selection={(selection is null ? "null" : selection.Length.ToString())} -> {(enterDefault ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nPLACEMENT bronnen: bron-db-eigen={sourceDatabaseOk} A+B rood={redLength:0.#} m C groen={greenLength:0.#} m -> {(provenanceOk ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nPLACEMENT rijen/hoeveelheden: analyse={analysisRows} gebouwd={renderedRows} rood={redAci}/{redLength:0.#} m groen={greenAci}/{greenLength:0.#} m tekst={actualTextOk} -> {(rowsOk && colorsOk && actualTextOk ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nPLACEMENT ownership: group={ownership.Members} entities={ownership.Entities} hatches={ownership.Hatches} MText={ownership.MTexts} DBText={ownership.DbTexts} -> {(ownershipOk ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nPLACEMENT xref-symbool: primitives/text={symbolOk} -> {(symbolOk ? "OK" : "FAIL")}");
-            ed.WriteMessage($"\nPLACEMENT xref exploded: group={explodedOwnership.Members} entities={explodedOwnership.Entities} MText={explodedText.mText} DBText={explodedText.dbText} host-owned={explodedOwnership.DbTexts == 0} -> {(explodedPlacementOk ? "OK" : "FAIL")}; fout={explodedError}");
-            ed.WriteMessage($"\nPLACEMENT custom text height 3/4/6 mm: {(customHeightsOk ? "OK" : "FAIL")}; fout={error}");
-
-            bool rollbackAttempted = false;
-            bool rollbackCaught = false;
-            string rollbackError = string.Empty;
-            var beforeRollback = ReadPlacementFingerprint(db);
-            try
-            {
-                using var tr = db.TransactionManager.StartTransaction();
-                var registry = LegendStore.Load(db, tr);
-                var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
-                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded);
-                var blockId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _, out _);
-                var modelSpace = (BlockTableRecord)tr.GetObject(
-                    SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                using var preview = new BlockReference(Point3d.Origin, blockId);
-                modelSpace.AppendEntity(preview);
-                tr.AddNewlyCreatedDBObject(preview, true);
-                PlaceLegendAtPoint(tr, db, registry, settings, selection, blockId, preview, new Point3d(300, 0, 0));
-                rollbackAttempted = true;
-                throw new InvalidOperationException(rollbackMarker);
-            }
-            catch (InvalidOperationException ex) when (ex.Message == rollbackMarker) { rollbackCaught = true; }
-            catch (System.Exception ex) { rollbackError = ex.GetType().Name + ": " + ex.Message; }
-            bool rollbackOk = rollbackAttempted && rollbackCaught && rollbackError.Length == 0
-                && beforeRollback == ReadPlacementFingerprint(db);
-            ed.WriteMessage($"\nPLACEMENT rollback: {(rollbackOk ? "atomic" : "FAIL")} fout={rollbackError}");
-            ed.WriteMessage($"\nPLACEMENT totaal: {(placementOk && explodedPlacementOk && rollbackOk ? "OK" : "FAIL")}; group={groupName}");
-            ed.WriteMessage($"\nPLACEMENT hostbestand na SAVEAS: {hostPath}");
-        }
-        catch (System.Exception ex)
-        {
-            ed.WriteMessage($"\nPLACEMENT fatale fout: {ex.GetType().Name}: {ex.Message}");
+                bool rollbackAttempted = false;
+                bool rollbackCaught = false;
+                string rollbackError = string.Empty;
+                var beforeRollback = ReadPlacementFingerprint(db);
+                try
+                {
+                    using var tr = db.TransactionManager.StartTransaction();
+                    var registry = LegendStore.Load(db, tr);
+                    var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+                    var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, LoadCatalog(db), excluded);
+                    var blockId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _, out _);
+                    var modelSpace = (BlockTableRecord)tr.GetObject(
+                        SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+                    using var preview = new BlockReference(Point3d.Origin, blockId);
+                    modelSpace.AppendEntity(preview);
+                    tr.AddNewlyCreatedDBObject(preview, true);
+                    PlaceLegendAtPoint(tr, db, registry, settings, selection, blockId, preview, new Point3d(300, 0, 0));
+                    rollbackAttempted = true;
+                    throw new InvalidOperationException(rollbackMarker);
+                }
+                catch (InvalidOperationException ex) when (ex.Message == rollbackMarker) { rollbackCaught = true; }
+                catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException) { rollbackError = ex.GetType().Name + ": " + ex.Message; }
+                bool rollbackOk = rollbackAttempted && rollbackCaught && rollbackError.Length == 0
+                    && beforeRollback == ReadPlacementFingerprint(db);
+                ed.WriteMessage($"\nPLACEMENT rollback: {(rollbackOk ? "atomic" : "FAIL")} fout={rollbackError}");
+                ed.WriteMessage($"\nPLACEMENT totaal: {(placementOk && explodedPlacementOk && rollbackOk ? "OK" : "FAIL")}; group={groupName}");
+                ed.WriteMessage($"\nPLACEMENT hostbestand na SAVEAS: {hostPath}");
+            }, message => ed.WriteMessage(message), "NlcsLegendaXrefPlacementTest");
         }
         finally
         {
@@ -1894,7 +1863,7 @@ public partial class Commands
             ed.WriteMessage($"\nPLACEMENTVERIFY ownership: entities={ownership.Entities} MText={ownership.MTexts} DBText={ownership.DbTexts} groups={fingerprint.Groups} blocks={fingerprint.LegendBlocks} -> {(ownershipOk && blocksOk ? "OK" : "FAIL")}");
             ed.WriteMessage($"\nPLACEMENTVERIFY totaal: {(allOk ? "OK" : "FAIL")}; fout={error}");
         }
-        catch (System.Exception ex)
+        catch (System.Exception ex) when (ex is Autodesk.AutoCAD.Runtime.Exception or InvalidOperationException or ArgumentException or IOException or UnauthorizedAccessException)
         {
             error = ex.GetType().Name + ": " + ex.Message;
             ed.WriteMessage($"\nPLACEMENTVERIFY fout: {error}");

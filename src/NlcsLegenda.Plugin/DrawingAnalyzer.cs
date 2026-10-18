@@ -90,9 +90,8 @@ public static class DrawingAnalyzer
 
         if (selection is not null)
         {
-            foreach (var id in selection)
-                if (tr.GetObject(id, OpenMode.ForRead) is Entity ent)
-                    Process(ent, tr, c, settings, path, 0, Matrix3d.Identity, sourceXref: string.Empty);
+            foreach (var entity in selection.Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>())
+                Process(entity, tr, c, settings, path, 0, Matrix3d.Identity, sourceXref: string.Empty);
         }
         else
         {
@@ -590,9 +589,8 @@ public static class DrawingAnalyzer
         foreach (var logical in samples.GroupBy(x => x.Parsed.GroupKey + "\u0001" + x.Parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + x.Parsed.KlicGroupKey).OrderBy(x => x.Key, StringComparer.Ordinal))
         {
             var bundles = new List<(List<LayerSample> Layers, string Signature)>();
-            foreach (var source in logical.GroupBy(x => x.Parsed.SourceIdentity, StringComparer.OrdinalIgnoreCase))
+            foreach (var layers in logical.GroupBy(x => x.Parsed.SourceIdentity, StringComparer.OrdinalIgnoreCase).Select(source => source.ToList()))
             {
-                var layers = source.ToList();
                 var byType = layers.GroupBy(x => x.Parsed.DrawType).ToList();
                 if (byType.Any(type => type.Select(x => x.Signature).Distinct(StringComparer.Ordinal).Count() > 1))
                 {
@@ -638,10 +636,8 @@ public static class DrawingAnalyzer
                     if (rep.Symbol is not null) c.SymbolSamples[key] = rep.Symbol;
                     if (rep.Description is not null) c.CustomDesc[key] = rep.Description;
                     var attributes = new Dictionary<string, int>(StringComparer.Ordinal);
-                    foreach (var member in members)
-                        if (member.Attributes is not null)
-                            foreach (var item in member.Attributes)
-                                attributes[item.Key] = attributes.GetValueOrDefault(item.Key) + item.Value;
+                    foreach (var item in members.Select(m => m.Attributes).OfType<Dictionary<string, int>>().SelectMany(a => a))
+                        attributes[item.Key] = attributes.GetValueOrDefault(item.Key) + item.Value;
                     if (attributes.Count > 0) c.AttrOms[key] = attributes;
                 }
                 partition++;
@@ -1013,14 +1009,12 @@ public static class DrawingAnalyzer
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-        foreach (var layer in layers)
+        foreach (var layer in layers.Where(layer => !result.ContainsKey(layer.EffectiveRenderLayerName)))
         {
-            if (result.ContainsKey(layer.EffectiveRenderLayerName)) continue;
             var sources = new[] { layer.Raw }.Concat(layer.SourceLayers.Select(x => x.SourceLayerName)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase);
-            foreach (var source in sources)
+            foreach (var source in sources.Where(lt.Has))
             {
-                if (!lt.Has(source)) continue;
                 var record = (LayerTableRecord)tr.GetObject(lt[source], OpenMode.ForRead);
                 if (string.IsNullOrWhiteSpace(record.Description)) continue;
                 var description = LayerDescription.Clean(record.Description, layer);

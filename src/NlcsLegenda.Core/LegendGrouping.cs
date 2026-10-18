@@ -65,9 +65,8 @@ public static class LegendGrouping
 
             var metric = LayerMetric.Empty;
             if (metrics is not null)
-                foreach (var layer in group)
-                    if (metrics.TryGetValue(layer.EffectiveRenderLayerName, out var m))
-                        metric += m;
+                foreach (var contribution in group.Select(layer => metrics.GetValueOrDefault(layer.EffectiveRenderLayerName)))
+                    metric += contribution;
 
             string? blockName = null;
             if (symbolBlock is not null && byType.TryGetValue(NlcsDrawType.Symbool, out var symLayer))
