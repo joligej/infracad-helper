@@ -26,6 +26,7 @@ internal static class Program
             DiagnosticRun.Execute(() => CheckXrefControls(), Errors.Add, "CheckXrefControls");
             DiagnosticRun.Execute(() => CheckOverview(), Errors.Add, "CheckOverview");
             DiagnosticRun.Execute(() => CheckOverviewLoading(), Errors.Add, "CheckOverviewLoading");
+            DiagnosticRun.Execute(CheckOverviewFatalError, Errors.Add);
             DiagnosticRun.Execute(() => CheckKlic(args.FirstOrDefault()), Errors.Add, "CheckKlic");
             DiagnosticRun.Execute(() => CheckNestedEditors(), Errors.Add, "CheckNestedEditors");
             DiagnosticRun.Execute(() => CheckCustomizationRoundtrip(), Errors.Add, "CheckCustomizationRoundtrip");
@@ -79,6 +80,28 @@ internal static class Program
             image.Save(Path.Join(output, $"examples-{scale:0.00}.png"));
         }
         form.Close();
+    }
+
+    private static void CheckOverviewFatalError()
+    {
+        var legend = new OverviewLegend { Id = "fatal", Name = "Proef", Settings = new(), Entries = new[] { Entry("Bestaand") } };
+        bool fail = false;
+        var error = new OutOfMemoryException("simulatie");
+        using var dialog = new OverviewDialog(new[] { legend }, _ => null,
+            _ => fail ? throw error : legend.Entries);
+        fail = true;
+        legend.NeedsAnalysis = true;
+        bool propagated = false;
+        try
+        {
+            typeof(OverviewDialog).GetMethod("LoadLegend", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                .Invoke(dialog, null);
+        }
+        catch (System.Reflection.TargetInvocationException ex) when (ReferenceEquals(ex.InnerException, error))
+        { propagated = true; }
+        Check(propagated, "Overzicht behandelt geheugenuitputting niet als een gewone bronfout");
+        Check(!dialog.UseWaitCursor, "Wachtcursor hersteld na ernstige bronfout");
+        Check(legend.Entries.Single().Description == "Bestaand", "Ernstige bronfout overschrijft de bestaande lijst niet");
     }
 
     private static void CheckSettingsSave()

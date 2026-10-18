@@ -205,12 +205,11 @@ public partial class Commands
                 ed.WriteMessage($"\nDEPENDENCY rows={built} entities={count} -> OK");
                 tr.Commit();
             }
-            try
+            DiagnosticRun.Execute(() =>
             {
                 db.SaveAs(Path.Join(Path.GetDirectoryName(db.Filename)!, "programmatic-save.dwg"), DwgVersion.Current);
                 ed.WriteMessage("\nDEPENDENCY SaveAs -> OK");
-            }
-            catch (System.Exception ex) { ed.WriteMessage($"\nDEPENDENCY SaveAs -> FAIL: {ex}"); }
+            }, message => ed.WriteMessage(message), "DEPENDENCY SaveAs");
         }, message => ed.WriteMessage(message), "NlcsLegendaDependencyTest");
     }
     [CommandMethod("NLCSLEGENDASTABILITYTEST", CommandFlags.Modal)]

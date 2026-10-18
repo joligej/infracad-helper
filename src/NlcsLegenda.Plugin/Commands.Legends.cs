@@ -145,7 +145,7 @@ public partial class Commands
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDABEHEER fout: {ex.Message}");
         }
@@ -398,7 +398,7 @@ public partial class Commands
                     : "\nBron aangepast en legenda bijgewerkt.")
                 : $"\nGeen inhoud om te tekenen ({note}); bron en legenda blijven ongewijzigd.");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nBron aanpassen mislukt: {ex.Message}");
         }
@@ -436,7 +436,7 @@ public partial class Commands
                 : "\nInstellingen toegepast en legenda bijgewerkt.");
             return null;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nToepassen mislukt: {ex.Message}");
             return "Toepassen mislukt: " + ex.Message;
@@ -502,7 +502,7 @@ public partial class Commands
             if (reason is not null)
                 ed.WriteMessage($"\nReden: {reason}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAELEMENT fout: {ex.Message}");
         }

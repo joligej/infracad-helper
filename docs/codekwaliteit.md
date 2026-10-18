@@ -27,10 +27,12 @@ worden niet handmatig gesloten om het aantal te verlagen.
 
 ## Overblijvende foutgrenzen
 
-Vensters moeten een mislukte bewerking melden en open blijven. Het opbouwen van
-een legendaregel voegt context toe en geeft de fout daarna door, zodat de
-transactie terugdraait. Deze foutgrenzen krijgen een andere behandeling dan een
-stille terugval die een fout als een geldig resultaat presenteert.
+Vensters melden gewone bewerkingsfouten en blijven open. Ernstige geheugen- en
+procesfouten passeren deze foutgrens, ook wanneer ze in een andere uitzondering
+zijn verpakt. Het opbouwen van een legendaregel voegt alleen aan gewone fouten
+context toe en geeft ze daarna door, zodat de transactie terugdraait. Een
+vensterproef controleert afzonderlijk dat geheugenuitputting wordt doorgegeven,
+de wachtcursor wordt hersteld en de bestaande lijst behouden blijft.
 
 ## Validatie
 

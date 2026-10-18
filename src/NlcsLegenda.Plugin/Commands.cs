@@ -151,7 +151,7 @@ public partial class Commands
 
             PurgeTempBlock(db, btrId);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nFout bij genereren legenda: {ex.Message}");
         }
@@ -208,7 +208,7 @@ public partial class Commands
             ed.WriteMessage(BuildInfoReport(analysis, settings, "alle tekeningen (globaal)"));
             tr.Commit();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAINFO fout: {ex.Message}");
         }
@@ -292,7 +292,7 @@ public partial class Commands
 
             ed.WriteMessage($"\n{entries.Count} regel(s) geëxporteerd naar:\n  {csvPath}\n  {jsonPath}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAEXPORT fout: {ex.Message}");
         }
@@ -329,7 +329,7 @@ public partial class Commands
             }
             RunBatch(ed, doc.Database, dialog.SelectedPath);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDABATCH fout: {ex.Message}");
         }
@@ -549,7 +549,7 @@ public partial class Commands
 
             ed.WriteMessage($"\nViewport (1:{settings.Scale:0}) geplaatst in de huidige layout.");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAVIEWPORT fout: {ex.Message}");
         }
@@ -615,7 +615,7 @@ public partial class Commands
                     break;
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAUPDATE fout: {ex.Message}");
         }
@@ -644,7 +644,7 @@ public partial class Commands
                 $"\n  {ConfigPath}" +
                 $"\n  {DescriptionsPath}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDACONFIG fout: {ex.Message}");
         }
@@ -690,7 +690,7 @@ public partial class Commands
                 return;
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAOPTIES fout: {ex.Message}");
         }
@@ -751,7 +751,7 @@ public partial class Commands
             }
             Apply();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAOMSCHRIJVINGEN fout: {ex.Message}");
         }
@@ -814,7 +814,7 @@ public partial class Commands
             ed.WriteMessage($"\n{key} {(nowExcluded ? "uitgevinkt" : "weer opgenomen")}.");
             ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAUITVINKEN fout: {ex.Message}");
         }
@@ -928,7 +928,7 @@ public partial class Commands
             ed.WriteMessage($"\nRegel \"{manual.Description}\" toegevoegd.");
             ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDATOEVOEGEN fout: {ex.Message}");
         }
@@ -1017,7 +1017,7 @@ public partial class Commands
                 return;
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDASAMENSTELLEN fout: {ex.Message}");
         }
@@ -1122,7 +1122,7 @@ public partial class Commands
 
             ApplyTargetSettings(ed, db, target, settings, "Xref-keuze");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAXREFS fout: {ex.Message}");
         }
@@ -1199,7 +1199,7 @@ public partial class Commands
             }
             ApplyTargetSettings(ed, db, target, settings, "Eigen statussen");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDASTATUS fout: {ex.Message}");
         }
@@ -1244,7 +1244,7 @@ public partial class Commands
                 case "Exporteren": PresetExport(ed); break;
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAPRESET fout: {ex.Message}");
         }
@@ -1705,7 +1705,7 @@ public partial class Commands
             }
             Apply();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDATEKST fout: {ex.Message}");
         }
@@ -1810,7 +1810,7 @@ public partial class Commands
             }
             ed.WriteMessage($"\nLaag hernoemd naar \"{target}\". Gebruik U om terug te draaien.");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDALAAGNAAM fout: {ex.Message}");
         }
@@ -4300,7 +4300,7 @@ public partial class Commands
                 ed.WriteMessage("\n  \u2192 instellingen bijgewerkt.");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nInstellingen bewerken mislukt: {ex.Message}");
         }
@@ -4322,7 +4322,7 @@ public partial class Commands
             dialog.ApplyRequested += (_, _) => Apply();
             if (AcWindows.ShowModalDialog(dialog) == WinForms.DialogResult.OK) Apply();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nOmschrijvingen bewerken mislukt: {ex.Message}");
         }

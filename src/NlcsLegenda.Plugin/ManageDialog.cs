@@ -160,7 +160,7 @@ internal sealed class LegendManageDialog : LegendDialog
             if (SaveChanges?.Invoke() is not { } error) return true;
             Warn(error);
         }
-        catch (Exception ex) { Warn(ex.Message); }
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { Warn(ex.Message); }
         return false;
     }
 

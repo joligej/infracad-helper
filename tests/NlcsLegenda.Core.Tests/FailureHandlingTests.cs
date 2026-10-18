@@ -22,12 +22,20 @@ public sealed class FailureHandlingTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void FatalErrorsAreNeverReportedAsOrdinaryTestFailures(bool wrapped)
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void FatalErrorsAreNeverReportedAsOrdinaryTestFailures(int wrapper)
     {
         Exception error = new OutOfMemoryException("simulatie");
-        if (wrapped) error = new TargetInvocationException(error);
+        error = wrapper switch
+        {
+            1 => new TargetInvocationException(error),
+            2 => new InvalidOperationException("context", error),
+            3 => new AggregateException(new IOException("opruimen"), error),
+            _ => error
+        };
         var messages = new List<string>();
         Assert.Same(error, Record.Exception(() => DiagnosticRun.Execute(() => throw error, messages.Add)));
         Assert.Empty(messages);

@@ -10,6 +10,6 @@ public static class ExceptionSafety
         AggregateException aggregate => aggregate.InnerExceptions.Any(IsFatal),
         TargetInvocationException { InnerException: { } inner } => IsFatal(inner),
         TypeInitializationException { InnerException: { } inner } => IsFatal(inner),
-        _ => false
+        _ => error.InnerException is { } cause && IsFatal(cause)
     };
 }

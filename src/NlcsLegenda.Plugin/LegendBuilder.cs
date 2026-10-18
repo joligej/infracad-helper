@@ -174,7 +174,7 @@ public static class LegendBuilder
                             symbols.GetValueOrDefault(item.Entry!));
                         rowCount++;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
                     {
                         throw new InvalidOperationException(
                             $"Legenda niet gewijzigd: '{item.Entry!.Description}' ({item.Entry.PrimaryLayer}) kon niet worden getekend.", ex);
