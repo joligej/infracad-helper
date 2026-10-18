@@ -12,8 +12,8 @@ internal class LegendDialog : Form
 
     protected override void Dispose(bool disposing)
     {
-        try { base.Dispose(disposing); }
-        finally { if (disposing) _resources.Dispose(); }
+        using var resources = disposing ? _resources : null;
+        base.Dispose(disposing);
     }
 
     public LegendDialog()

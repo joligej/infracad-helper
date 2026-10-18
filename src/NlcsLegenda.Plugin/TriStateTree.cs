@@ -17,7 +17,6 @@ internal sealed class TriStateTree : TreeView
         ShowNodeToolTips = true;
         ShowPlusMinus = true;
         FullRowSelect = false;
-        bool ready = false;
         try
         {
             StateImageList = _images.Own(new ImageList { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit });
@@ -29,11 +28,11 @@ internal sealed class TriStateTree : TreeView
                 DrawGlyph(bitmap, state);
                 StateImageList.Images.Add(bitmap);
             }
-            ready = true;
         }
-        finally
+        catch
         {
-            if (!ready) _images.Dispose();
+            _images.Dispose();
+            throw;
         }
     }
 
@@ -110,8 +109,8 @@ internal sealed class TriStateTree : TreeView
 
     protected override void Dispose(bool disposing)
     {
-        try { base.Dispose(disposing); }
-        finally { if (disposing) _images.Dispose(); }
+        using var resources = disposing ? _images : null;
+        base.Dispose(disposing);
     }
 
     private static void DrawGlyph(Bitmap bmp, System.Windows.Forms.VisualStyles.CheckBoxState state)
