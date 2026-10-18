@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.32.2 - 2026-10-18
+
+- Profielen kunnen weer afzonderlijk worden opgeslagen en geladen voor een bestaande legenda of de globale standaard, ook zonder geplaatste legenda. De melding dat een profiel is geladen verschijnt pas na geslaagd toepassen.
+- Overzicht leest alleen de gekozen legenda en onthoudt de gelezen lijst zolang het venster openstaat. Vernieuwen leest de bron opnieuw. Een bronfout blokkeert de overige legenda’s niet; een onleesbare lijst kan niet worden geëxporteerd. Toepassen ververst ook de tekening direct. Lege informatiekolommen blijven verborgen en de lijst wordt in één keer gevuld.
+- CSV bevat nu ook de volledige legenda-omschrijving en bronlagen. JSON bevat daarnaast een lijst met bronlagen. Xref-herkomst en de aangevulde KLIC-tekst blijven zo beschikbaar bij gewone export en batch-export; bestaande velden behouden hun betekenis.
+- De GitHub-startpagina is ingekort met actuele vensterbeelden. Installatie, handleiding en probleemoplossing hebben eigen pagina’s. Help in de plugin en het bugformulier sluiten daarop aan.
+
 ## 1.32.1 - 2026-10-18
 
 - Lokale instellingen en globale standaard hebben afzonderlijke knoppen. Lokale instellingen vallen niet meer terug op de globale standaard wanneer er geen legenda aanwezig is.

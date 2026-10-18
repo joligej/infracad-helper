@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Handleiding en problemen oplossen
+    url: https://github.com/joligej/infracad-helper/blob/main/docs/problemen-oplossen.md
+    about: Uitleg over instellingen, xrefs, KLIC, opmaak en installatie.
+  - name: Beveiligingsprobleem melden
+    url: https://github.com/joligej/infracad-helper/security
+    about: Lees het beveiligingsbeleid voordat je gevoelige informatie deelt.

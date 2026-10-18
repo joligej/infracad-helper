@@ -13,6 +13,7 @@ internal sealed class OverviewLegend
     public required LegendSettings Settings { get; init; }
     public required IReadOnlyList<LegendEntry> Entries { get; set; }
     public bool Changed { get; set; }
+    public bool NeedsAnalysis { get; set; }
     public override string ToString() => Name;
 }
 
@@ -31,6 +32,12 @@ internal sealed class OverviewDialog : LegendDialog
         MultiSelect = false,
         SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         RowHeadersVisible = false,
+        ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
+        BackgroundColor = SystemColors.Window,
+        GridColor = SystemColors.ControlLight,
+        BorderStyle = BorderStyle.FixedSingle,
+        CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+        DefaultCellStyle = { Padding = new Padding(4, 3, 4, 3) },
         AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
         AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells
     };
@@ -46,6 +53,9 @@ internal sealed class OverviewDialog : LegendDialog
     private readonly Dictionary<(LegendEntry, string), string> _fieldValues = new();
     private readonly Func<string, IReadOnlyList<LegendExample>>? _loadExamples;
     private bool _loading;
+    private string? _analysisError;
+    private readonly List<Button> _actions = new();
+    private readonly Button _example;
     private OverviewLegend Current => _legends[_legend.SelectedIndex];
 
     public OverviewDialog(IReadOnlyList<OverviewLegend> legends, Func<IReadOnlyList<OverviewLegend>, string?> save,
@@ -71,15 +81,18 @@ internal sealed class OverviewDialog : LegendDialog
         top.Controls.Add(_sort);
         _sort.Items.AddRange(Enum.GetNames<LegendSortMode>());
         var tools = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8) };
-        void ActionButton(string title, Action action)
+        Button ActionButton(string title, Action action)
         {
             var button = new Button { Text = title, AutoSize = true, Padding = new Padding(4) };
             button.Click += (_, _) => action(); tools.Controls.Add(button);
+            return button;
         }
-        ActionButton("Voorbeeld…", EditExample);
-        ActionButton("KLIC-instellingen…", EditKlic);
-        ActionButton("KLIC-details…", ShowKlicDetails);
-        ActionButton("Exporteer lijst…", ExportVisible);
+        ActionButton("Vernieuwen", () => { Current.NeedsAnalysis = true; LoadLegend(); }).Enabled = _analyze is not null;
+        _example = ActionButton("Voorbeeld…", EditExample);
+        _actions.Add(_example);
+        _actions.Add(ActionButton("KLIC-instellingen…", EditKlic));
+        _actions.Add(ActionButton("KLIC-details…", ShowKlicDetails));
+        _actions.Add(ActionButton("Exporteer lijst…", ExportVisible));
         var filters = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 0, 8, 4) };
         _field.Items.Add("Alle zichtbare velden");
         _field.Items.AddRange(KlicFields.All.Cast<object>().ToArray());
@@ -134,10 +147,24 @@ internal sealed class OverviewDialog : LegendDialog
 
     private void LoadLegend()
     {
+        _analysisError = null;
+        if (Current.NeedsAnalysis && _analyze is not null)
+        {
+            UseWaitCursor = true;
+            try
+            {
+                Current.Entries = _analyze(Current);
+                Current.NeedsAnalysis = false;
+            }
+            catch (Exception ex) { _analysisError = "Bronnen niet gelezen: " + ex.Message + " Kies Vernieuwen om opnieuw te proberen."; }
+            finally { UseWaitCursor = false; }
+        }
         _loading = true;
         _sort.SelectedItem = Current.Settings.SortMode.ToString();
-        _sort.Enabled = Current.Id.Length > 0;
+        _sort.Enabled = Current.Id.Length > 0 && _analysisError is null;
         _loading = false;
+        foreach (var action in _actions) action.Enabled = _analysisError is null;
+        _example.Enabled &= Current.Id.Length > 0;
         ConfigureColumns();
         LoadEntries();
     }
@@ -151,7 +178,14 @@ internal sealed class OverviewDialog : LegendDialog
             {
                 HeaderText = name,
                 MinimumWidth = 100,
-                FillWeight = name == "Omschrijving" ? 240 : 120,
+                FillWeight = name is "Omschrijving" or "Bronlagen" ? 240 : 120,
+                Visible = name switch
+                {
+                    "Netbeheerder" => Current.Entries.Any(e => e.Netbeheerders.Count > 0),
+                    "Samengevoegd" => Current.Entries.Any(e => e.MergedMembers.Count > 0),
+                    "Broncontrole" => Current.Entries.Any(e => e.Metric.HasUnknownArea || KlicSummary.Issues(e.KlicObjects).Length > 0),
+                    _ => true
+                },
                 SortMode = DataGridViewColumnSortMode.NotSortable,
                 DefaultCellStyle = { WrapMode = DataGridViewTriState.True }
             });
@@ -159,7 +193,7 @@ internal sealed class OverviewDialog : LegendDialog
 
     private void LoadEntries()
     {
-        _entries = LegendGrouping.Sort(Current.Entries, Current.Settings);
+        _entries = _analysisError is null ? LegendGrouping.Sort(Current.Entries, Current.Settings) : new();
         _rowValues.Clear();
         _fieldValues.Clear();
         _moves.Visible = Current.Id.Length > 0 && Current.Settings.SortMode == LegendSortMode.Handmatig;
@@ -174,7 +208,8 @@ internal sealed class OverviewDialog : LegendDialog
     {
         _grid.Rows.Clear();
         _visible.Clear();
-        _moves.Enabled = Current.Id.Length > 0 && Current.Settings.SortMode == LegendSortMode.Handmatig && _filter.Text.Length == 0 && !_issuesOnly.Checked;
+        _moves.Enabled = _analysisError is null && Current.Id.Length > 0 && Current.Settings.SortMode == LegendSortMode.Handmatig && _filter.Text.Length == 0 && !_issuesOnly.Checked;
+        var rows = new List<DataGridViewRow>();
         foreach (var entry in _entries)
         {
             var values = RowValues(entry);
@@ -182,11 +217,15 @@ internal sealed class OverviewDialog : LegendDialog
             string search = _field.SelectedItem is KlicField field ? FieldValue(entry, field.Key) : string.Join(" ", values);
             if (_filter.Text.Trim().Length > 0 && !search.Contains(_filter.Text.Trim(), StringComparison.CurrentCultureIgnoreCase)) continue;
             _visible.Add(entry);
-            _grid.Rows.Add(values.Cast<object>().ToArray());
+            var row = new DataGridViewRow();
+            row.CreateCells(_grid, values.Cast<object>().ToArray());
+            rows.Add(row);
         }
+        _grid.Rows.AddRange(rows.ToArray());
         _summary.Text = $"{_visible.Count} van {_entries.Count} regels · voorkeursbron: {KlicFields.SourceLabel(Current.Settings.Klic.PreferredSource)}. "
             + (Current.Id.Length == 0 ? "Voorbeeld; instellingen worden niet opgeslagen." : "Wijzigingen gelden alleen voor deze legenda.")
             + (_filter.Text.Length > 0 || _issuesOnly.Checked ? " Filter geldt voor deze lijst en export; wis het filter om regels te verplaatsen." : "");
+        if (_analysisError is not null) _summary.Text = _analysisError;
         if (_grid.Rows.Count > 0) _grid.CurrentCell = _grid.Rows[Math.Clamp(selected, 0, _grid.Rows.Count - 1)].Cells[1];
     }
 

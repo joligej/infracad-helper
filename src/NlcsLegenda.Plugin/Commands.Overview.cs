@@ -18,24 +18,23 @@ public partial class Commands
             using (var tr = doc.Database.TransactionManager.StartTransaction())
             {
                 var registry = LegendManagement.ActiveRegistry(doc.Database, tr, LegendStore.Load(doc.Database, tr));
-                var excluded = LegendManagement.CollectManagedIds(doc.Database, tr, registry);
                 foreach (var legend in registry.Legends)
-                {
-                    var selected = legend.Scope == LegendScope.Selection
-                        ? LegendManagement.ResolveHandles(doc.Database, legend.SourceHandles, out _).Where(id => !excluded.Contains(id)).ToArray() : null;
-                    var entries = selected is { Length: 0 } ? Array.Empty<LegendEntry>()
-                        : DrawingAnalyzer.Analyze(doc.Database, tr, legend.Settings, selected, DescriptionCatalog.Default(), excluded).Entries;
-                    items.Add(new OverviewLegend { Id = legend.Id, Name = legend.Name, Settings = legend.Settings.Clone(), Entries = entries });
-                }
+                    items.Add(new OverviewLegend { Id = legend.Id, Name = legend.Name, Settings = legend.Settings.Clone(),
+                        Entries = Array.Empty<LegendEntry>(), NeedsAnalysis = true });
                 if (items.Count == 0)
                 {
                     var settings = LoadGlobalDefaults();
-                    var analysis = DrawingAnalyzer.Analyze(doc.Database, tr, settings, catalog: LoadCatalog(doc.Database), excludedIds: excluded);
-                    items.Add(new OverviewLegend { Id = "", Name = "Hele tekening (voorbeeld)", Settings = settings, Entries = analysis.Entries });
+                    items.Add(new OverviewLegend { Id = "", Name = "Hele tekening (voorbeeld)", Settings = settings,
+                        Entries = Array.Empty<LegendEntry>(), NeedsAnalysis = true });
                 }
                 tr.Commit();
             }
-            using var dialog = new OverviewDialog(items, changed => SaveOverviewOrder(doc.Database, changed), item => AnalyzeOverview(doc.Database, item), path =>
+            using var dialog = new OverviewDialog(items, changed =>
+            {
+                var error = SaveOverviewOrder(doc.Database, changed);
+                if (error is null) { doc.Editor.Regen(); AcApp.UpdateScreen(); }
+                return error;
+            }, item => AnalyzeOverview(doc.Database, item), path =>
             { using var tr = doc.Database.TransactionManager.StartTransaction(); using var library = new ExampleLibrary(path, doc.Database, tr); return library.Examples; });
             AcWindows.ShowModalDialog(dialog);
         }
