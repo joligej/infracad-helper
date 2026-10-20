@@ -325,8 +325,8 @@ public static class LegendBuilder
                 || color.ColorMethod == ColorMethod.ByAci && color.ColorIndex is >= 1 and <= 255))
                 colors.Add(DrawingAnalyzer.ColorSignature(color));
         }
-        foreach (var sample in entry.LayersByType.Values.Where(analysis.HatchSamples.ContainsKey).Select(k => analysis.HatchSamples[k]))
-            if (!sample.IsSolid) AddBackground(expected, sample.BackgroundColor);
+        foreach (var sample in entry.LayersByType.Values.Where(analysis.HatchSamples.ContainsKey).Select(k => analysis.HatchSamples[k]).Where(sample => !sample.IsSolid))
+            AddBackground(expected, sample.BackgroundColor);
         if (expected.Count == 0) return true;
         var actual = new HashSet<string>();
         var path = new HashSet<ObjectId>();
