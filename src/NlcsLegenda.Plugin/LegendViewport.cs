@@ -12,17 +12,16 @@ internal static class LegendViewport
     {
         if (viewport.ExtensionDictionary.IsNull) viewport.CreateExtensionDictionary();
         var dictionary = (DBDictionary)tr.GetObject(viewport.ExtensionDictionary, OpenMode.ForWrite);
-        Xrecord record;
-        if (dictionary.Contains(Key)) record = (Xrecord)tr.GetObject(dictionary.GetAt(Key), OpenMode.ForWrite);
+        using var data = new ResultBuffer(new TypedValue((int)DxfCode.Text, legendId),
+            new TypedValue((int)DxfCode.Int16, (short)(automatic ? 1 : 0)));
+        if (dictionary.Contains(Key))
+            ((Xrecord)tr.GetObject(dictionary.GetAt(Key), OpenMode.ForWrite)).Data = data;
         else
         {
-            record = new Xrecord();
+            using var record = new Xrecord { Data = data };
             dictionary.SetAt(Key, record);
             tr.AddNewlyCreatedDBObject(record, true);
         }
-        using var data = new ResultBuffer(new TypedValue((int)DxfCode.Text, legendId),
-            new TypedValue((int)DxfCode.Int16, (short)(automatic ? 1 : 0)));
-        record.Data = data;
     }
 
     private static (string Id, bool Automatic)? Read(Viewport viewport, Transaction tr)

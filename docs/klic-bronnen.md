@@ -49,8 +49,11 @@ De plugin controleert daarmee niet de werkelijke ligging in het terrein.
 
 ## Regels samenvoegen of uitsplitsen
 
-Onder **Groepering** in Instellingen kun je samenvoegen op soort, specificatie (spanning/druk),
-uitvoering, volgnummer en netbeheerder. Soort, specificatie, uitvoering en volgnummer komen
+In **Instellingen → Inhoud** betekent een aangevinkt samenvoegkenmerk dat dit kenmerk niet
+wordt vergeleken. **Soorten samenvoegen** staat standaard uit: gas en water blijven
+verschillende soorten. Voor nieuwe KLIC-legenda's staan specificatie (spanning/druk),
+uitvoering, volgnummer en netbeheerder standaard aan. Overige lagen hebben aparte keuzes,
+standaard allemaal uit. Soort, specificatie, uitvoering en volgnummer komen
 uit de NLCS-laagnaam; de netbeheerder komt uit de objectgegevens. DATA2 bewijst dus niet wie
 de netbeheerder is. Hoeveelheden worden opgeteld; zichtbaar verschillende symbolen of
 arceringen blijven gescheiden.
@@ -65,7 +68,10 @@ Elke legenda bewaart haar eigen keuzes. In Overzicht kun je de volgorde op **Han
 zetten en regels verplaatsen. Bij een actief filter is verplaatsen uitgeschakeld. Bestaande
 regels behouden hun plaats bij bijwerken; nieuwe combinaties worden achteraan toegevoegd.
 Eigen regels met dezelfde omschrijving maar verschillende voorbeelden houden elk hun positie.
-Handmatige en blanco regels worden niet samengevoegd. Handmatige regels volgen het statusfilter;
+Eigen en blanco regels vallen buiten automatisch samenvoegen. **Overzicht → Samenvoegen**
+kan zelf gekozen regels combineren met één hoofdobject voor titel en weergave; blanco
+regels en verschillende eenheden worden geweigerd. **Samenvoeging opheffen** maakt
+de handmatige groep weer los. Eigen regels volgen het statusfilter;
 een toewijzing aan een eigen status heeft voorrang op dat filter.
 
 ## Symbolen en attributen
