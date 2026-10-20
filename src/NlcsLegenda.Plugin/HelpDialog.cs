@@ -33,10 +33,13 @@ internal sealed class HelpDialog : LegendDialog
             "Overzicht leest alleen de gekozen legenda. Vernieuwen leest de bron opnieuw.\n\n" +
             "Kies Handmatig en verplaats regels met de knoppen of Alt+↑ / Alt+↓.\n" +
             "Toepassen werkt de legenda bij; Opslaan sluit het venster. Elke legenda\n" +
-            "onthoudt haar eigen volgorde, ook na opnieuw openen."),
+            "onthoudt haar eigen volgorde, ook na opnieuw openen.\n\n" +
+            "Selecteer meerdere regels met Ctrl of Shift en kies Samenvoegen.\n" +
+            "Het hoofdobject bepaalt de titel en weergave. Samenvoeging opheffen draait dit terug."),
         ("KLIC-groepering",
-            "Onder Groepering kies je welke eigenschappen je wilt samenvoegen: soort,\n" +
-            "spanning/druk, uitvoering, volgnummer en netbeheerder. Hoeveelheden tellen op.\n\n" +
+            "Een aangevinkt kenmerk wordt niet vergeleken. Soorten samenvoegen staat uit.\n" +
+            "Spanning/druk, uitvoering, volgnummer en netbeheerder staan voor KLIC aan.\n" +
+            "Kleur, lijn en symbool moeten gelijk blijven. Overige lagen hebben eigen keuzes.\n\n" +
             "Netbeheerders worden uit de InfraCAD-metadata van de bron gelezen.\n" +
             "Samenstellen toont de afzonderlijke bronregels om aan of uit te zetten."),
         ("KLIC-gegevens",
@@ -50,9 +53,11 @@ internal sealed class HelpDialog : LegendDialog
             "gegevens. Niet-leesbare bronnen worden gemeld.\n\n" +
             "Een nulwaarde is geen gemeten diepte. Een standaarddiepte is apart benoemd."),
         ("Samenstellen en zoeken",
-            "Samenstellen toont de bronregels en eigen regels. Zoek op een deel van de laagnaam\n" +
+            "Samenstellen heeft aparte tabbladen voor bronregels en eigen regels. Zoek op woorden of een deel van de laagnaam\n" +
             "of omschrijving; * kan meerdere delen combineren. Een groepsvinkje verandert\n" +
             "tijdens zoeken alleen de zichtbare resultaten.\n\n" +
+            "In tekening uitsluiten: klik meerdere objecten, ook binnen xrefs.\n" +
+            "Enter past toe; Escape annuleert de aanklikronde. De bronobjecten blijven staan.\n\n" +
             "Laag toevoegen opent een doorzoekbare lijst. Een eigen regel heeft geen gemeten\n" +
             "hoeveelheid. Koppel een Eigen laag als de brongeometrie wel moet meetellen."),
         ("Voorbeelden",

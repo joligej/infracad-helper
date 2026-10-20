@@ -66,6 +66,7 @@ public partial class Commands
                 if (active.FindById(item.Id) is null) return "Een legenda is niet meer aanwezig. Open Overzicht opnieuw.";
                 var target = registry.FindById(item.Id)!;
                 target.Settings.Klic = item.Settings.Klic.Clone();
+                target.Settings.ManualMergeGroups = item.Settings.ManualMergeGroups.Select(g => g.Clone()).ToList();
                 target.Settings.ExampleLibraryPath = item.Settings.ExampleLibraryPath;
                 target.Settings.ExampleOverrides = new Dictionary<string, string>(item.Settings.ExampleOverrides, StringComparer.Ordinal);
                 target.Settings.ManualEntries = item.Settings.ManualEntries.Select(e => e.Clone()).ToList();
@@ -77,7 +78,7 @@ public partial class Commands
             LegendStore.Save(db, tr, registry);
             tr.Commit();
         }
-        catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex)) { return $"De volgorde is niet opgeslagen: {ex.Message}"; }
+        catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex)) { return $"De wijzigingen zijn niet opgeslagen: {ex.Message}"; }
         PurgePending(db);
         return null;
     }

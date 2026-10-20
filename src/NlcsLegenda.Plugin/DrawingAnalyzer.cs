@@ -6,6 +6,9 @@ namespace NlcsLegenda.Plugin;
 
 public sealed class AnalysisResult
 {
+    public IReadOnlyDictionary<string, IReadOnlySet<ObjectId>> EntryObjects { get; init; } =
+        new Dictionary<string, IReadOnlySet<ObjectId>>();
+
     public IReadOnlyList<LegendEntry> Entries { get; init; } = Array.Empty<LegendEntry>();
 
     public IReadOnlyDictionary<string, HatchSample> HatchSamples { get; init; } =
@@ -50,6 +53,8 @@ public static class DrawingAnalyzer
 {
     private sealed class Collector
     {
+        public bool TrackSources;
+        public readonly Dictionary<string, HashSet<ObjectId>> Objects = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, LayerDisplayStyle> Styles = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, NlcsLayerName> Parsed = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, HatchSample> Hatches = new(StringComparer.OrdinalIgnoreCase);
@@ -71,17 +76,18 @@ public static class DrawingAnalyzer
     }
 
     private const int MaxDepth = 16;
+    private static readonly HashSet<ObjectId> EmptyObjectIds = new();
 
     public static AnalysisResult Analyze(
         Database db, Transaction tr, LegendSettings settings,
         IReadOnlyCollection<ObjectId>? selection = null,
         DescriptionCatalog? catalog = null,
         IReadOnlyCollection<ObjectId>? excludedIds = null,
-        Action<double, double>? reportTimings = null)
+        Action<double, double>? reportTimings = null, bool trackSources = false)
     {
         var timer = reportTimings is null ? null : System.Diagnostics.Stopwatch.StartNew();
         using var klic = new KlicSourceMetadata(settings.Klic, db, tr);
-        var c = new Collector { Klic = klic };
+        var c = new Collector { Klic = klic, TrackSources = trackSources };
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (excludedIds is { Count: > 0 })
             c.Excluded = new HashSet<ObjectId>(excludedIds);
@@ -134,7 +140,10 @@ public static class DrawingAnalyzer
             RenderId,
             name => c.CustomDesc.ContainsKey(name) ? DescriptionSource.EigenKoppeling : (DescriptionSource?)null,
             name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.RenderIdentity : null,
-            name => c.KlicObjects.TryGetValue(name, out var objects) ? objects : Array.Empty<KlicObjectData>());
+            name => c.KlicObjects.TryGetValue(name, out var objects) ? objects : Array.Empty<KlicObjectData>(),
+            name => c.Styles.TryGetValue(name, out var style) ? $"{style.Color} / {LayerNaming.LocalName(style.Linetype)}" : null,
+            name => c.SymbolSamples.ContainsKey(name) ? "" : renderIds.GetValueOrDefault(name)
+                + "|" + HatchSignature(c.Hatches.GetValueOrDefault(name), sourceScale: true));
 
         if (timer is not null)
         {
@@ -144,6 +153,9 @@ public static class DrawingAnalyzer
         return new AnalysisResult
         {
             Entries = entries,
+            EntryObjects = !trackSources ? new Dictionary<string, IReadOnlySet<ObjectId>>() : entries.GroupBy(LegendSettings.SelectionKey).ToDictionary(g => g.Key,
+                g => (IReadOnlySet<ObjectId>)g.SelectMany(e => e.LayersByType.Values)
+                    .SelectMany(k => c.Objects.GetValueOrDefault(k) ?? new()).ToHashSet()),
             HatchSamples = c.Hatches,
             SymbolSamples = c.SymbolSamples,
             LayerStyles = c.Styles,
@@ -297,6 +309,11 @@ public static class DrawingAnalyzer
         string key = parsed.GroupKey + "\u0001" + parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + parsed.KlicGroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
         (rule is null ? c.NlcsSourceLayers : c.CustomSourceLayers).Add(layerName);
         c.Parsed[key] = parsed;
+        if (c.TrackSources)
+        {
+            if (!c.Objects.TryGetValue(key, out var sourceObjects)) c.Objects[key] = sourceObjects = new();
+            sourceObjects.Add(ent.ObjectId);
+        }
         if (metadata.HasData || metadata.ReadIssues.Count > 0 || ElementProperties.IsKlic(parsed.Discipline, parsed.Hoofdgroep))
         {
             if (!c.KlicObjects.TryGetValue(key, out var objects)) c.KlicObjects.Add(key, objects = new());
@@ -434,7 +451,7 @@ public static class DrawingAnalyzer
         return string.Join(";", parts);
     }
 
-    private static string ColorSignature(Autodesk.AutoCAD.Colors.Color color) =>
+    internal static string ColorSignature(Autodesk.AutoCAD.Colors.Color color) =>
         color.ColorMethod == Autodesk.AutoCAD.Colors.ColorMethod.ByAci && color.ColorIndex == 7
             ? "foreground" : color.ColorMethod == Autodesk.AutoCAD.Colors.ColorMethod.None
                 ? "none" : color.ColorValue.ToArgb().ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -572,7 +589,7 @@ public static class DrawingAnalyzer
 
     private sealed record LayerSample(NlcsLayerName Parsed, string Signature, LayerMetric Metric,
         HatchSample? Hatch, SymbolSample? Symbol, LayerDisplayStyle Style, string? Description,
-        Dictionary<string, int>? Attributes, IReadOnlyList<KlicObjectData> KlicObjects);
+        Dictionary<string, int>? Attributes, IReadOnlyList<KlicObjectData> KlicObjects, IReadOnlySet<ObjectId> Objects);
 
     private static void CoalesceNlcsSources(Collector c)
     {
@@ -580,8 +597,10 @@ public static class DrawingAnalyzer
             SampleSignature(c.Styles[key], c.Hatches.GetValueOrDefault(key), c.SymbolSamples.GetValueOrDefault(key)),
             c.Metrics.GetValueOrDefault(key), c.Hatches.GetValueOrDefault(key), c.SymbolSamples.GetValueOrDefault(key),
             c.Styles[key], c.CustomDesc.GetValueOrDefault(key), c.AttrOms.GetValueOrDefault(key),
-            c.KlicObjects.TryGetValue(key, out var objects) ? objects : Array.Empty<KlicObjectData>())).ToList();
+            c.KlicObjects.TryGetValue(key, out var objects) ? objects : Array.Empty<KlicObjectData>(),
+            c.Objects.GetValueOrDefault(key) ?? EmptyObjectIds)).ToList();
         c.Parsed.Clear(); c.Metrics.Clear(); c.Hatches.Clear(); c.SymbolSamples.Clear();
+        c.Objects.Clear();
         c.Styles.Clear(); c.CustomDesc.Clear(); c.AttrOms.Clear(); c.NlcsRawKeys.Clear(); c.KlicObjects.Clear();
 
         foreach (var logical in samples.GroupBy(x => x.Parsed.GroupKey + "\u0001" + x.Parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + x.Parsed.KlicGroupKey).OrderBy(x => x.Key, StringComparer.Ordinal))
@@ -630,6 +649,7 @@ public static class DrawingAnalyzer
                     c.KlicObjects[key] = KlicSummary.Combine(members.SelectMany(x => x.KlicObjects)).ToList();
                     c.Metrics[key] = members.Aggregate(LayerMetric.Empty, (total, x) => total + x.Metric);
                     c.Styles[key] = rep.Style;
+                    if (c.TrackSources) c.Objects[key] = members.SelectMany(m => m.Objects).ToHashSet();
                     if (rep.Hatch is not null) c.Hatches[key] = rep.Hatch;
                     if (rep.Symbol is not null) c.SymbolSamples[key] = rep.Symbol;
                     if (rep.Description is not null) c.CustomDesc[key] = rep.Description;
@@ -643,17 +663,18 @@ public static class DrawingAnalyzer
         }
     }
 
-    private static string HatchSignature(HatchSample? hatch)
+    private static string HatchSignature(HatchSample? hatch, bool sourceScale = false)
     {
         if (hatch is null)
             return string.Empty;
+        double factor = sourceScale ? 1 : hatch.ScaleForLegend(hatch.TargetScale);
         return string.Join(":", "H",
             hatch.PatternType,
             hatch.PatternName.Trim().ToUpperInvariant(),
-            NumberSignature(hatch.PatternScale * hatch.ScaleForLegend(hatch.TargetScale)),
+            NumberSignature(hatch.PatternScale * factor),
             NumberSignature(hatch.PatternAngle),
-            NumberSignature(hatch.PatternSpace * hatch.ScaleForLegend(hatch.TargetScale)), hatch.PatternDouble,
-            hatch.IsSolid, hatch.DefinitionSignature(hatch.ScaleForLegend(hatch.TargetScale)),
+            NumberSignature(hatch.PatternSpace * factor), hatch.PatternDouble,
+            hatch.IsSolid, hatch.DefinitionSignature(factor),
             hatch.Color is null ? string.Empty : ColorSignature(hatch.Color),
             hatch.BackgroundColor is null ? string.Empty : ColorSignature(hatch.BackgroundColor),
             hatch.Transparency.Signature);

@@ -66,6 +66,7 @@ public partial class Commands
         }
 
         FinalizePlacement(tr, db, br, def.Settings, def.GroupName);
+        LegendViewport.Sync(db, tr, def);
         return UpdateResult.Updated;
     }
 

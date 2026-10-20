@@ -78,7 +78,7 @@ public partial class Commands
             }
             settings.SamenvoegenNummer = true;
             var data = BuildCompositionItems(db, settings).Where(i => i.Group == "DATA").ToList();
-            Check("samengevoegde KLIC houdt alle bronkeuzes", data.Count == 2 && data.Any(i => i.Key.EndsWith("DATA2")));
+            Check("samengevoegde KLIC houdt alle bronkeuzes", data.Count == 2 && data.Any(i => i.Key.Contains("|DATA2|")));
             var tree = CompositionTree.Build(data.Select(i => (i.Key, i.Label, i.Group)), settings.ExcludedEntries);
             tree.SetGroup(tree.Groups.Single(), false);
             Check("DATA in een klik uit", tree.ExcludedKeys().Count == 2);

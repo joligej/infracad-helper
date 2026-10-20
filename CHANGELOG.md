@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.33.0 - 2026-10-20
+
+- Nieuwe legenda's gebruiken de TAUW-maatvoering. Een globaal profiel met de oude standaardmaten wordt gericht bijgewerkt; eigen maatvoering en lokale instellingen blijven behouden.
+- Legenda-viewports blijven gekoppeld aan hun legenda en volgen schaalwijzigingen. Met Viewport → Bestaand kan ook een eerder geplaatst venster worden gekoppeld.
+- Automatische templatevoorbeelden mogen de bronkleuren niet vervangen. Verschillende kleurvarianten blijven afzonderlijke regels en zijn nu ook afzonderlijk te kiezen in Samenstellen. Expliciet gekozen voorbeelden blijven leidend.
+- Opmerkingen gebruikt white (ACI 7). Tekeningnotities, de KLIC-waarschuwing, beide samen of eigen tekst zijn te kiezen en daarna vrij te bewerken.
+- Samenvoegen betekent steeds: het aangevinkte kenmerk niet vergelijken. Voor nieuwe KLIC-legenda's staan spanning/druk, uitvoering, volgnummer en netbeheerder aan; soorten samenvoegen staat uit. Overige lagen hebben afzonderlijke keuzes, standaard allemaal uit.
+- Overzicht kan geselecteerde regels handmatig samenvoegen. Het gekozen hoofdobject bepaalt titel en weergave; hoeveelheden worden opgeteld. Samenvoegen is omkeerbaar. Verschillende eenheden worden niet op één hoop gegooid.
+- Samenstellen heeft aparte tabbladen voor tekeningregels en eigen regels. Zoeken ondersteunt losse woorden in willekeurige volgorde en `*` tussen tekstdelen. Opnemen en uitsluiten kunnen op alle zoekresultaten tegelijk.
+- In tekening uitsluiten blijft actief voor meerdere objecten, ook binnen xrefs. Enter past de uitsluitingen toe; Escape annuleert. Bronobjecten blijven staan.
+
+
 ## 1.32.5 - 2026-10-18
 
 - Samenstellen geeft de eigen aankruisafbeeldingen en afbeeldingslijst bij sluiten vrij, ook als het venster nog niet is getoond.

@@ -17,7 +17,8 @@ public static class LegendGrouping
         Func<string, string?>? renderIdentity = null,
         Func<string, DescriptionSource?>? descriptionSourceOf = null,
         Func<string, string?>? symbolRenderIdentity = null,
-        Func<string, IReadOnlyList<KlicObjectData>>? klicObjects = null)
+        Func<string, IReadOnlyList<KlicObjectData>>? klicObjects = null,
+        Func<string, string?>? appearanceLabel = null, Func<string, string?>? selectionIdentity = null)
     {
         // eigen legendateksten boven de catalogus
         var descriptions = catalog ?? DescriptionCatalog.Default();
@@ -90,7 +91,9 @@ public static class LegendGrouping
                 SourceLayers = group.SelectMany(layer => layer.SourceLayers.Count > 0
                     ? layer.SourceLayers
                     : new[] { layer.Source }).Distinct().ToArray(),
-                RenderIdentity = RenderId(byType, renderIdentity, blockName, symbolRenderIdentity)
+                RenderIdentity = renderIdentity is null ? representative.RenderIdentity : RenderId(byType, renderIdentity, blockName, symbolRenderIdentity),
+                SelectionIdentity = selectionIdentity is null ? "" : RenderId(byType, selectionIdentity, blockName, symbolRenderIdentity),
+                AppearanceLabel = string.Join(", ", byType.Values.Select(k => appearanceLabel?.Invoke(k)).Where(t => !string.IsNullOrEmpty(t)).Distinct())
             });
         }
 
@@ -112,7 +115,8 @@ public static class LegendGrouping
             entries.Add(custom is null ? basic : blank.ToLegendEntry(custom));
         }
 
-        return Sort(Merge(entries, settings), settings);
+        entries.RemoveAll(e => settings.IsEntryExcluded(LegendSettings.SelectionKey(e)));
+        return Sort(ManualMergeGroup.Apply(Merge(entries, settings), settings.ManualMergeGroups), settings);
     }
 
     private static string RenderId(
@@ -141,7 +145,7 @@ public static class LegendGrouping
     private static List<LegendEntry> Merge(List<LegendEntry> entries, LegendSettings settings)
     {
         bool mergeStatus = settings.MergeIdenticalStatuses;
-        if (settings.MergedDimensions.Count == 0 && !mergeStatus)
+        if (settings.MergedDimensions.Count == 0 && settings.NonKlicMergedDimensions.Count == 0 && !mergeStatus)
             return entries;
 
         // blanco en handmatige regels buiten de samenvoeging
@@ -156,8 +160,9 @@ public static class LegendGrouping
                 ? "R:" + e.RenderIdentity
                 : e.StatusGroupId;
             var renderPart = e.RenderIdentity.Length > 0 ? e.RenderIdentity : string.Empty;
-            var content = ElementProperties.IsKlic(e.Discipline, e.Hoofdgroep)
-                ? props.MergeKey(settings.MergedDimensions) : e.Element;
+            var dimensions = ElementProperties.IsKlic(e.Discipline, e.Hoofdgroep)
+                ? (IReadOnlyCollection<GroupDimension>)settings.MergedDimensions : settings.NonKlicMergedDimensions;
+            var content = props.MergeKey(dimensions);
             return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{content}|{e.KlicGroupKey}|{renderPart}";
         }
 
@@ -185,9 +190,9 @@ public static class LegendGrouping
         return merged;
     }
 
-    private static LegendEntry Combine(List<LegendEntry> group)
+    internal static LegendEntry Combine(List<LegendEntry> group, LegendEntry? main = null, string manualId = "")
     {
-        var rep = group.OrderBy(e => ElementProperties.From(e.Element).Nummer.Length == 0 ? 0 : 1)
+        var rep = main ?? group.OrderBy(e => ElementProperties.From(e.Element).Nummer.Length == 0 ? 0 : 1)
                        .ThenBy(e => e.Element, StringComparer.OrdinalIgnoreCase).First();
         var metric = LayerMetric.Empty;
         foreach (var e in group) metric += e.Metric;
@@ -209,7 +214,11 @@ public static class LegendGrouping
             Metric = metric,
             SymbolBlockName = rep.SymbolBlockName,
             RenderIdentity = rep.RenderIdentity,
-            MergedMembers = group.Select(e => e.Element).ToList()
+            ManualHatchPattern = rep.ManualHatchPattern,
+            ManualMergeId = manualId,
+            AppearanceLabel = rep.AppearanceLabel,
+            SelectionIdentity = rep.SelectionIdentity,
+            MergedMembers = group.SelectMany(e => e.MergedMembers.Count > 0 ? e.MergedMembers : new[] { e.Element }).Distinct().ToList()
         };
     }
 

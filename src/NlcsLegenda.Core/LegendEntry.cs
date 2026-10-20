@@ -74,6 +74,12 @@ public sealed class LegendEntry
 
     public string RenderIdentity { get; init; } = string.Empty;
 
+    public string SelectionIdentity { get; init; } = string.Empty;
+
+    public string AppearanceLabel { get; init; } = string.Empty;
+
+    public string ManualMergeId { get; init; } = string.Empty;
+
     public IReadOnlyList<string> MergedMembers { get; init; } = System.Array.Empty<string>();
 
     public QuantityKind QuantityType

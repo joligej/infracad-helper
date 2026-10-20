@@ -36,6 +36,7 @@ public class KlicGroupingTests
     private static LegendSettings KlicSettings()
     {
         var s = new LegendSettings();
+        s.MergedDimensions.Clear();
         s.ExcludedHoofdgroepen.Clear();
         s.ExcludedDisciplines.Clear();
         return s;

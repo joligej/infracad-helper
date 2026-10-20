@@ -54,12 +54,14 @@ internal sealed class LegendManageDialog : LegendDialog
     private BindingList<ManualRow> _rows = new();
     private readonly IReadOnlyList<EntryCheckItem> _allEntries;
 
+    public bool PickObjectsRequested { get; private set; }
+
     public event EventHandler? ApplyRequested;
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Func<string?>? SaveChanges { get; set; }
 
     public LegendManageDialog(IReadOnlyList<EntryCheckItem> allEntries, LegendSettings initial,
-        IReadOnlyList<ManualEntry>? layerChoices = null, bool addLayer = false)
+        IReadOnlyList<ManualEntry>? layerChoices = null, bool addLayer = false, bool allowPicking = false)
     {
         _allEntries = allEntries;
 
@@ -73,32 +75,32 @@ internal sealed class LegendManageDialog : LegendDialog
         ShowIcon = false;
         MinimizeBox = false;
 
-        var split = new SplitContainer
-        {
-            Dock = DockStyle.Fill,
-            Orientation = Orientation.Horizontal,
-            Panel1MinSize = 120,
-            Panel2MinSize = 120
-        };
-        Load += (_, _) =>
-        {
-            try
-            {
-                int wanted = (int)(split.Height * 0.5);
-                split.SplitterDistance = Math.Min(
-                    Math.Max(wanted, split.Panel1MinSize),
-                    Math.Max(split.Height - split.Panel2MinSize - split.SplitterWidth, split.Panel1MinSize));
-            }
-            catch (ArgumentException) { /* standaardverdeling bij te weinig ruimte */ }
-        };
+        var tabs = new TabControl { Dock = DockStyle.Fill };
+        var drawingTab = new TabPage("Tekening");
+        var customTab = new TabPage("Eigen regels");
+        tabs.TabPages.Add(drawingTab);
+        tabs.TabPages.Add(customTab);
 
-        var topGroup = new GroupBox { Text = "NLCS-regels (vink uit wat je niet wilt)", Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var topGroup = new GroupBox { Text = "Regels in de legenda", Dock = DockStyle.Fill, Padding = new Padding(8) };
         _tree = new TriStateTree { Dock = DockStyle.Fill };
-        _filter = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Zoek in omschrijving of laagnaam…" };
+        _filter = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Zoek woorden in omschrijving of laagnaam; * voor tussenliggende tekens…" };
         _filter.TextChanged += (_, _) => _tree.SetModel(_tree.Model, _filter.Text);
+        var selectionBar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
+        foreach (var (caption, included) in new[] { ("Resultaten opnemen", true), ("Resultaten uitsluiten", false) })
+        {
+            var button = new Button { Text = caption, AutoSize = true };
+            button.Click += (_, _) =>
+            {
+                foreach (var group in _tree.Model.Filter(_filter.Text))
+                    foreach (var leaf in _tree.Model.VisibleLeaves(group, _filter.Text)) leaf.Included = included;
+                _tree.SetModel(_tree.Model, _filter.Text);
+            };
+            selectionBar.Controls.Add(button);
+        }
         topGroup.Controls.Add(_tree);
+        topGroup.Controls.Add(selectionBar);
         topGroup.Controls.Add(_filter);
-        split.Panel1.Controls.Add(topGroup);
+        drawingTab.Controls.Add(topGroup);
 
         var bottomGroup = new GroupBox { Text = "Eigen regels", Dock = DockStyle.Fill, Padding = new Padding(8) };
         _grid = BuildGrid();
@@ -109,6 +111,7 @@ internal sealed class LegendManageDialog : LegendDialog
         var add = new Button { Text = "Laag toevoegen…", AutoSize = true, Margin = new Padding(0, 4, 8, 0), Enabled = layerChoices is { Count: > 0 } };
         add.Click += (_, _) =>
         {
+            tabs.SelectedTab = customTab;
             using var picker = new LayerChoiceDialog(layerChoices!);
             if (picker.ShowDialog(this) != DialogResult.OK || picker.Selected is not { } selected) return;
             _grid.EndEdit();
@@ -119,9 +122,14 @@ internal sealed class LegendManageDialog : LegendDialog
         if (addLayer) Shown += (_, _) => BeginInvoke(new Action(add.PerformClick));
         bottomGroup.Controls.Add(_grid);
         bottomGroup.Controls.Add(removeBar);
-        split.Panel2.Controls.Add(bottomGroup);
+        customTab.Controls.Add(bottomGroup);
 
         var buttons = new ButtonBar(withApply: true);
+        if (allowPicking) buttons.AddExtra("In tekening uitsluiten…").Click += (_, _) =>
+        {
+            PickObjectsRequested = true;
+            DialogResult = DialogResult.OK;
+        };
         buttons.Apply!.Click += (_, _) =>
         {
             if (ValidationError() is { } err)
@@ -147,7 +155,7 @@ internal sealed class LegendManageDialog : LegendDialog
             e.Cancel = !Save();
         };
 
-        Controls.Add(split);
+        Controls.Add(tabs);
         Controls.Add(buttons);
 
         LoadFrom(initial);
@@ -334,7 +342,7 @@ internal sealed class LayerChoiceDialog : LegendDialog
         void Filter()
         {
             _list.Rows.Clear();
-            foreach (var choice in _choices.Where(c => LayerSearch.Matches(c.Layer, search.Text) || LayerSearch.Matches(c.Description, search.Text)))
+            foreach (var choice in _choices.Where(c => LayerSearch.Matches(c.Layer + " " + c.Description, search.Text)))
                 _list.Rows[_list.Rows.Add(choice.Layer, choice.Description)].Tag = choice;
             buttons.Ok.Enabled = _list.Rows.Count > 0;
         }

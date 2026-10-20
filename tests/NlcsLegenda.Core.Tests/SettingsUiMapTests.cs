@@ -95,6 +95,8 @@ public class SettingsUiMapTests
 
         [nameof(LegendSettings.IncludedStatuses)] = new("Inhoud > Statussen", Binding.CheckBox),
         [nameof(LegendSettings.IncludedDrawTypes)] = new("Inhoud > Elementsoorten", Binding.CheckBox),
+        [nameof(LegendSettings.ManualMergeGroups)] = new("Overzicht > Samenvoegen", Binding.CheckBox),
+        [nameof(LegendSettings.NonKlicMergedDimensions)] = new("Inhoud > Samenvoegen", Binding.CheckBox),
         [nameof(LegendSettings.MergedDimensions)] = new("Inhoud > KLIC-groepering", Binding.CheckBox),
         [nameof(LegendSettings.ExcludedEntries)] = new("Inhoud > Samenstellen", Binding.Subdialog),
         [nameof(LegendSettings.ManualEntries)] = new("Inhoud > Samenstellen", Binding.Subdialog),
