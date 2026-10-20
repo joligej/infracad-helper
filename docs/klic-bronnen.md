@@ -81,3 +81,11 @@ Per symboollaag wordt de meest voorkomende niet-lege omschrijving gebruikt. `TYP
 meestal het laag-element; `LABEL` is doorgaans een objectidentificatie. Zijn deze attributen
 leeg, dan kan de generieke tekst `TYPE \ LABEL \ OMSCHRIJVING` worden weggelaten via
 **KLIC-placeholdertekst weglaten**. Werkelijke objectgegevens blijven beschikbaar in KLIC-details.
+
+## Controle in Civil 3D/Map
+
+Open een kopie van een KLIC-brontekening met Object Data en voer
+`NLCSLEGENDAMAPDATATEST` uit. De proef analyseert drie keer, waarvan eenmaal met
+materiaal en diameter als groepering. Object Data, hoeveelheden en de gedeelde
+Map-tabellen moeten daarna nog gelijk en leesbaar zijn. De proef wijzigt de bron
+niet. Core Console kan deze controle niet uitvoeren.

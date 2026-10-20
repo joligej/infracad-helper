@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.33.2 - 2026-10-20
+
+- Object Data blijft beschikbaar na het maken of bijwerken van een legenda. De plug-in ruimde de gedeelde Map-tabellenverzameling op, waardoor een volgende analyse of Map-bewerking kon mislukken. Alleen de eigen tijdelijke Map-objecten worden nu vrijgegeven.
+- Een nieuwe Civil 3D/Map-proef leest dezelfde tekening drie keer, controleert de tabellen na iedere analyse en vergelijkt objectgegevens en hoeveelheden bij groeperen. Deze controle vereist de volledige CAD-host en wordt niet als Core Console-test meegeteld.
+
 ## 1.33.1 - 2026-10-20
 
 - KLIC-samenvoeging herkent een bekende netbeheerder ook als die achter in de laagnaam staat. Spanning, druk en uitvoering blijven daardoor afzonderlijk instelbaar. De beheerder wordt niet dubbel in de legenda vermeld; bronlagen en hoeveelheden blijven behouden.
