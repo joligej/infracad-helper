@@ -21,6 +21,20 @@ De eerder waargenomen GDI+-melding ontstond in
 `Autodesk.AutoCAD.LayerManager.MultiTreeView.OnDrawNode`. Een verband met deze
 resourcelekken is niet aangetoond; deze release claimt geen reparatie van die hostmelding.
 
+## Map-project in 1.33.2
+
+Een proef in Civil 3D 2027 vond een fout in het Map-resourcebeheer: na de eerste
+analyse was `ProjectModel.ODTables` vrijgegeven. Een volgende Map-uitlezing kon
+daardoor falen. Deze verzameling hoort bij het gedeelde Map-project; de plugin
+laat haar voortaan in leven en ruimt alleen eigen tijdelijke wrappers op.
+
+Op dezelfde KLIC-bron zijn 76.704 Object Data-records en 745.963 veldwaarden
+vergeleken met de rechtstreeks aangeroepen Map-API. Drie opeenvolgende analyses,
+waaronder groeperen op materiaal en diameter, behouden records en hoeveelheden.
+De afzonderlijke GUI-proeven met en zonder de plugin sloten normaal af, na tien
+keer het lagenvenster openen en sluiten. De oude GDI+-melding trad daarbij niet
+op; daarmee is haar oorzaak nog niet bewezen of definitief verholpen.
+
 ## Wijzigingen in 1.32.4
 
 - Globale instellingen worden eerst volledig voorbereid. Bij een mislukte

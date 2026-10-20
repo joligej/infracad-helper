@@ -2,7 +2,7 @@
 
   <!-- gedeelde versie voor dll, bundel en release -->
   <PropertyGroup>
-    <VersionPrefix>1.33.1</VersionPrefix>
+    <VersionPrefix>1.33.2</VersionPrefix>
     <Authors>joligej</Authors>
     <Company>infracad-helper</Company>
     <Product>NLCS Legenda</Product>

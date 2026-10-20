@@ -173,9 +173,9 @@ internal sealed class KlicAttachedData : IDisposable
     public void Dispose()
     {
         using var cleanup = new ResourceScope();
-        if (_odTables is IDisposable tables) cleanup.Own(tables);
         foreach (var table in _tables.Select(table => table.Table).OfType<IDisposable>()) cleanup.Own(table);
         _tables.Clear();
+        // tabellenverzameling eigendom van het map-project
         _odTables = null;
     }
 }
