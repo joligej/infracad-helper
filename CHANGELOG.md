@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.33.4 - 2026-10-20
+
+- Object Data uit een alleen-lezen xref blijft beschikbaar. Alleen de tijdelijke bronkopie krijgt een verwijderbaar bestandskenmerk; de originele xref blijft alleen-lezen en wordt niet gewijzigd. Zo mislukt de uitlezing niet meer bij het opruimen van de kopie.
+
 ## 1.33.3 - 2026-10-20
 
 - KLIC Object Data wordt nu ook uit directe en geneste xrefs gelezen. Waarden blijven gekoppeld aan het oorspronkelijke bronobject; de hoofdtekening hoeft geen eigen Object Data-tabellen te bevatten.
