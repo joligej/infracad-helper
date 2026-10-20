@@ -23,7 +23,7 @@ internal sealed class KlicSourceMetadata : IDisposable
         var database = entity.ObjectId.OriginalDatabase;
         var ownerTransaction = database == _database ? _transaction : null;
         if (!_sources.TryGetValue(database, out var source))
-            _sources.Add(database, source = new Source(database, ownerTransaction));
+            _sources.Add(database, source = new Source(database, ownerTransaction, _database));
         string handle = entity.ObjectId.NonForwardedHandle.ToString();
         if (!source.Objects.TryGetValue(handle, out var data))
         {
@@ -64,7 +64,7 @@ internal sealed class KlicSourceMetadata : IDisposable
         public readonly IReadOnlyDictionary<string, IReadOnlyList<KlicRecord>> Embedded;
         public readonly Dictionary<string, KlicObjectData> Objects = new(StringComparer.OrdinalIgnoreCase);
         public readonly KlicAttachedData Attached;
-        public Source(Database db, Transaction? ownerTransaction)
+        public Source(Database db, Transaction? ownerTransaction, Database mapDatabase)
         {
             try
             {
@@ -79,7 +79,7 @@ internal sealed class KlicSourceMetadata : IDisposable
             {
                 throw new InvalidOperationException("KLIC-gegevens kunnen niet betrouwbaar worden gelezen. Controleer de InfraCAD-brongegevens.", ex);
             }
-            Attached = new KlicAttachedData(db);
+            Attached = new KlicAttachedData(db, mapDatabase);
         }
     }
 

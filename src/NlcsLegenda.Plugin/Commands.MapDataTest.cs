@@ -17,7 +17,7 @@ public partial class Commands
         DiagnosticRun.Execute(() =>
         {
             if (HostEnvironment.IsCoreConsole)
-                throw new InvalidOperationException("Deze proef vereist een geopende KLIC-bron in Civil 3D/Map.");
+                throw new InvalidOperationException("Deze proef vereist een geopende KLIC-tekening of hoofdtekening met KLIC-xrefs in Civil 3D/Map.");
             var map = AppDomain.CurrentDomain.GetAssemblies().Single(a => a.GetName().Name == "ManagedMapApi");
             var application = map.GetType("Autodesk.Gis.Map.HostMapApplicationServices", true)!
                 .GetProperty("Application")!.GetValue(null)!;
@@ -27,21 +27,24 @@ public partial class Commands
             var getNames = tables.GetType().GetMethod("GetTableNames")!;
             string[] Names() => ((IEnumerable)getNames.Invoke(tables, null)!).Cast<string>().Order().ToArray();
             var names = Names();
+            int documents = AcApp.DocumentManager.Count;
             string[]? expected = null;
             int objects = 0, records = 0;
             double? length = null;
             using var tr = doc.Database.TransactionManager.StartTransaction();
             for (int pass = 0; pass < 3; pass++)
             {
-                var settings = new LegendSettings { IncludeInvisibleLayers = true };
+                var settings = new LegendSettings { IncludeInvisibleLayers = true, IncludeXrefLayers = true };
                 settings.Klic.PreferredSource = KlicSource.ObjectData;
                 if (pass == 1) settings.Klic.GroupFields = new() { "Materiaal", "DiameterM" };
                 var result = DrawingAnalyzer.Analyze(doc.Database, tr, settings);
                 var data = result.Entries.SelectMany(e => e.KlicObjects).DistinctBy(o => o.Identity).ToArray();
                 var values = data.SelectMany(o => o.Records.Where(r => r.Source == KlicSource.ObjectData)
-                    .Select(r => JsonSerializer.Serialize(new { o.Handle, r.Table, Values = r.Values.OrderBy(v => v.Key) }))).Order().ToArray();
+                    .Select(r => JsonSerializer.Serialize(new { o.Identity, r.Table, Values = r.Values.OrderBy(v => v.Key) }))).Order().ToArray();
                 if (values.Length == 0 || data.Any(o => o.ReadIssues.Count > 0))
                     throw new InvalidOperationException("Geen foutloos leesbare Object Data gevonden.");
+                if (AcApp.DocumentManager.Count != documents || AcApp.DocumentManager.MdiActiveDocument != doc)
+                    throw new InvalidOperationException("Documentcontext na de analyse niet behouden.");
                 if (!names.SequenceEqual(Names()))
                     throw new InvalidOperationException("Map-tabellen na de analyse niet behouden.");
                 if (expected is not null && !expected.SequenceEqual(values))
