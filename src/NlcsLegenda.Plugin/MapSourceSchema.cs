@@ -30,6 +30,7 @@ internal static class MapSourceSchema
         {
             string path = Path.Join(folder.FullName, "schema.dwg");
             File.Copy(source.Filename, path);
+            File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
             document = AcApp.DocumentManager.Open(path, true);
             if (document.Database.FingerprintGuid != source.FingerprintGuid || document.Database.VersionGuid != source.VersionGuid)
                 throw new InvalidOperationException("De xref-bron is na het laden gewijzigd. Herlaad deze xref om de Object Data opnieuw te lezen.");
