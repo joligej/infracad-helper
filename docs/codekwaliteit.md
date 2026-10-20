@@ -21,6 +21,22 @@ De eerder waargenomen GDI+-melding ontstond in
 `Autodesk.AutoCAD.LayerManager.MultiTreeView.OnDrawNode`. Een verband met deze
 resourcelekken is niet aangetoond; deze release claimt geen reparatie van die hostmelding.
 
+## Object Data uit xrefs in 1.33.3
+
+De Map-lezer van de hoofdtekening leest de oorspronkelijke objecten uit directe
+en geneste xrefs. De hoofdtekening hoeft zelf geen Object Data-tabellen te hebben.
+Velddefinities worden eenmalig uit een alleen-lezen bronkopie gehaald en bij een
+andere bronversie of gewijzigde tabeldefinitie opnieuw gelezen. De bronkopie wordt
+gesloten en verwijderd; de actieve tekening en werkdatabase worden hersteld.
+
+In Civil 3D 2027 zijn 76.704 records met 745.963 veldwaarden onafhankelijk
+vergeleken met de rechtstreeks aangeroepen Map-API. Met dezelfde bron ook in een
+geneste xref worden 153.408 records gevonden. Herhaald analyseren, materiaal- en
+diametergroepering, uitsluiten en herladen behouden de verwachte hoeveelheden.
+De vaste Map-proef controleert bovendien drie analyses achter elkaar en behoud
+van de geopende documenten. Deze hostcontrole geldt voor Civil 3D 2027; de builds
+voor 2025 en 2026 bewijzen op zichzelf geen Map-acceptatie in die hosts.
+
 ## Map-project in 1.33.2
 
 Een proef in Civil 3D 2027 vond een fout in het Map-resourcebeheer: na de eerste

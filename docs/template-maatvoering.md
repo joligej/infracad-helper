@@ -103,8 +103,13 @@ heropenen en vijftig keer bijwerken uit. De referentie blijft buiten git.
 
 Op 20 oktober 2026 zijn alle 266 voorbeelden uit de lokale referentie naast hun
 geplotte uitvoer gezet. De lokale bibliotheek is gecorrigeerd voor ontbrekende
-annotaties, extra randen en de tekenvolgorde van afdekvlakken. Deze bedrijfseigen
-DWG blijft buiten de openbare repository en installer.
+annotaties en de tekenvolgorde van afdekvlakken. De dertien afdrukbare kaders
+bij de opbreekvoorbeelden blijven behouden; niet-afdrukbare hulpkaders worden
+weggelaten. Ook drie bijschriften net buiten hun voorbeeldvak zijn meegenomen,
+waaronder diameter en materiaal bij de HWA-rioolstreng. De geometrie wordt
+rechtstreeks uit de bron overgenomen, met behoud van geneste blokken en
+tekenvolgorde. Tekst wordt omgezet naar MText. Deze bedrijfseigen DWG blijft
+buiten de openbare repository en installer.
 
 Een samengesteld templatevoorbeeld is via **Overzicht → Voorbeeld** als één geheel
 te kiezen. Bij automatische bronanalyse blijven verschillende NLCS-elementen en
@@ -117,3 +122,12 @@ De proeven `NLCSLEGENDAEXAMPLEAPPEARANCETEST` en
 `NLCSLEGENDAEXAMPLEREVISIONTEST` controleren bronvorm, achtergrondkleur,
 bibliotheekupdates, gelijknamige blokken en behoud van andere legenda's.
 De tweede proef heeft ook een controle na opslaan en heropenen.
+
+De controle omvat elf bronoverzichten, vijftien vergelijkingsbladen met alle
+266 voorbeelden en negen complete legenda's. De vergelijkingsbladen zetten
+bron, automatische analyse en expliciet gekozen voorbeeld naast elkaar op
+gelijke schaal. De complete legenda's zijn op hun eigen modelschaal geplot;
+extra blokschaling zou ook lijnpatronen beïnvloeden. Een bronblad met meerdere
+schaalvarianten is daarom geen pixelreferentie voor iedere schaal tegelijk.
+Grote symbolen en lange teksten krijgen zo nodig meer ruimte. Projectgebonden
+toelichtingen en soortenlijsten worden niet als objectbeschrijving geraden.
