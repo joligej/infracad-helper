@@ -27,7 +27,7 @@ public sealed class ElementProperties
 
     public static ElementProperties From(string element, string netbeheerder = "")
     {
-        var e = (element ?? string.Empty).Trim().ToUpperInvariant();
+        var e = WithoutProviderSuffix(element, netbeheerder).ToUpperInvariant();
         string uitvoering = string.Empty;
         foreach (var u in Uitvoeringen)
         {
@@ -72,6 +72,25 @@ public sealed class ElementProperties
             Netbeheerder = netbeheerder.Trim().ToUpperInvariant()
         };
     }
+
+    internal static string WithoutProviderSuffix(string? text, string? provider)
+    {
+        var value = (text ?? string.Empty).Trim();
+        var known = ProviderKey(provider ?? string.Empty);
+        if (known.Length == 0) return value;
+        // alleen een volledige, bekende beheerder aan het einde
+        for (int i = 1; i < value.Length; i++)
+        {
+            if (char.IsLetterOrDigit(value[i - 1]) || !char.IsLetterOrDigit(value[i])) continue;
+            if (ProviderKey(value[i..]) != known) continue;
+            var prefix = value[..i].TrimEnd(' ', '_', '(', ';', ',');
+            if (prefix.Length > 0) return prefix;
+        }
+        return value;
+    }
+
+    private static string ProviderKey(string value) =>
+        new(value.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
     public string Value(GroupDimension dim) => dim switch
     {

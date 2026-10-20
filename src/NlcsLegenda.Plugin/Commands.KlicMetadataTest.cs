@@ -17,11 +17,12 @@ public partial class Commands
         using var db = new Database(true, true);
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            var layerId = ReviewLayer(db, tr, "B-WE-KL-DATA-G");
             var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
             var xml = new XElement("KLIC");
             foreach (var (length, provider, material, diameter) in new[] { (3d, first, "PE", "0.11"), (5d, second, "PVC", "0.16"), (2d, "", "", "0") })
             {
+                var suffix = provider.Length == 0 ? "" : "_" + provider.Replace(".", "").ToUpperInvariant();
+                var layerId = ReviewLayer(db, tr, "B-WE-KL-DATA" + suffix + "-G");
                 using var line = new Line(Point3d.Origin, new Point3d(length, 0, 0)) { LayerId = layerId };
                 model.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                 xml.Add(new XElement("KLIC_Administratief", new XElement("Handle", line.Handle.ToString()), new XElement("Netbeheerder", provider)));

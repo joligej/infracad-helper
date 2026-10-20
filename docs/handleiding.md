@@ -204,7 +204,10 @@ Dit staat standaard **uit**, zowel voor KLIC als voor overige lagen. Verschillen
 kleuren, lijnpatronen en symbolen blijven bij automatisch samenvoegen altijd apart.
 
 Voor nieuwe KLIC-legenda's staan **Spanning/druk**, **Uitvoering**, **Volgnummer**
-en **Netbeheerders samenvoegen** standaard aan. Een oud globaal profiel zonder
+en **Netbeheerders samenvoegen** standaard aan. Een beheerder achter in de laagnaam
+wordt herkend via de KLIC-gegevens, ook als punten of spaties anders zijn geschreven.
+Zonder die gegevens wordt geen beheerder uit een laagnaam geraden.
+Een oud globaal profiel zonder
 samenvoegkeuzes krijgt deze beginwaarden eenmaal mee; daarna worden ook bewust
 uitgeschakelde keuzes behouden. Bestaande legenda's houden hun lokale keuzes.
 **Overige lagen** heeft een eigen groep vinkjes, standaard allemaal uit. Binnen

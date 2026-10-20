@@ -2,6 +2,8 @@
 
 ## 1.33.1 - 2026-10-20
 
+- KLIC-samenvoeging herkent een bekende netbeheerder ook als die achter in de laagnaam staat. Spanning, druk en uitvoering blijven daardoor afzonderlijk instelbaar. De beheerder wordt niet dubbel in de legenda vermeld; bronlagen en hoeveelheden blijven behouden.
+
 - Automatische bibliotheekkeuzes vervangen geen bemonsterde bronsymbolen meer. Vorm, maat en rotatie blijven behouden; een bewust gekozen voorbeeld blijft mogelijk.
 - Bij automatische arceringsvoorbeelden wordt ook de achtergrondkleur vergeleken. Een gelijke lijnkleur is niet genoeg om een afwijkende vulling over te nemen.
 - Bijwerken leest een gewijzigde voorbeeldenbibliotheek opnieuw. Geïmporteerde voorbeelden krijgen eigen blokken en stijlen, zodat gelijknamige hostobjecten de weergave niet veranderen. Andere geplaatste legenda's blijven gelijk.
