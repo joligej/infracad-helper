@@ -11,6 +11,8 @@ public partial class Commands
         var probe = settings.Clone();
         probe.ExcludedEntries.Clear();
         probe.MergedDimensions.Clear();
+        probe.NonKlicMergedDimensions.Clear();
+        probe.ManualMergeGroups.Clear();
         probe.MergeIdenticalStatuses = false;
         probe.ManualEntries.Clear();
         probe.BlankEntries.Clear();
@@ -31,8 +33,8 @@ public partial class Commands
         var catalog = legendId is null ? LoadGlobalCatalog() : DescriptionCatalog.Default();
         var analysis = DrawingAnalyzer.Analyze(db, tr, probe, selection, catalog, excluded);
         var items = analysis.Entries
-            .Select(e => new EntryCheckItem(LegendSettings.EntryKey(e),
-                $"[{e.Status.DisplayName()}] {e.DisplayDescription}", EntryGroupLabel(e),
+            .Select(e => new EntryCheckItem(LegendSettings.SelectionKey(e),
+                $"[{e.Status.DisplayName()}] {e.DisplayDescription}" + AppearanceLabel(e, analysis), EntryGroupLabel(e),
                 string.Join(" ", e.SourceLayers.Select(l => l.SourceLayerName).Concat(e.LayersByType.Values))))
             .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First())
@@ -41,6 +43,13 @@ public partial class Commands
             .ToList();
         tr.Commit();
         return items;
+    }
+
+    private static string AppearanceLabel(LegendEntry entry, AnalysisResult analysis)
+    {
+        var styles = entry.LayersByType.Values.Where(analysis.LayerStyles.ContainsKey).Select(k => analysis.LayerStyles[k]);
+        var labels = styles.Select(s => $"{s.Color} / {LayerNaming.LocalName(s.Linetype)}").Distinct().ToArray();
+        return labels.Length == 0 ? "" : " — " + string.Join(", ", labels);
     }
 
     private static IReadOnlyList<ManualEntry> BuildLayerChoices(Database db, LegendSettings settings)

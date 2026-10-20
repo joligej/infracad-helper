@@ -138,7 +138,16 @@ public sealed class LegendSettings
 
 
     [Browsable(false)]
-    public HashSet<GroupDimension> MergedDimensions { get; set; } = new();
+    public HashSet<GroupDimension> MergedDimensions { get; set; } = DefaultKlicMergeDimensions();
+
+    public static HashSet<GroupDimension> DefaultKlicMergeDimensions() =>
+        new() { GroupDimension.Specificatie, GroupDimension.Uitvoering, GroupDimension.Nummer, GroupDimension.Netbeheerder };
+
+    [Browsable(false)]
+    public List<GroupDimension> NonKlicMergedDimensions { get; set; } = new();
+
+    [Browsable(false)]
+    public List<ManualMergeGroup> ManualMergeGroups { get; set; } = new();
 
     [Category("Groepering"), DisplayName("Soort samenvoegen"), JsonIgnore,
      Description("Voegt kabels/leidingen samen ongeacht de soort (bijv. alle KL in één regel).")]
@@ -429,7 +438,20 @@ public sealed class LegendSettings
         return names.Length == 0 ? basic : basic + "|" + System.Text.Json.JsonSerializer.Serialize(names);
     }
 
-    public bool IsEntryExcluded(string key) => ExcludedEntries.Contains(key) || ExcludedEntries.Contains(WithoutKlicGroup(key)) || ExcludedEntries.Contains(BaseEntryKey(key));
+    public static string SelectionKey(LegendEntry entry) => entry.RenderIdentity.Length == 0 ? EntryKey(entry)
+        : EntryKey(entry) + "|STYLE:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(entry.SelectionIdentity.Length > 0 ? entry.SelectionIdentity : entry.RenderIdentity)));
+
+    internal static string WithoutStyle(string key) => key.Split("|STYLE:", 2, StringSplitOptions.None)[0];
+
+    public static bool MatchesExclusion(string key, string excluded) =>
+        new[] { key, WithoutStyle(key), WithoutKlicGroup(WithoutStyle(key)), BaseEntryKey(key) }
+            .Contains(excluded, StringComparer.OrdinalIgnoreCase);
+
+    public bool IsEntryExcluded(string key) => ExcludedEntries.Contains(key)
+        || ExcludedEntries.Contains(WithoutStyle(key))
+        || ExcludedEntries.Contains(WithoutKlicGroup(WithoutStyle(key)))
+        || ExcludedEntries.Contains(BaseEntryKey(key));
 
     internal static string BaseEntryKey(string key) => string.Join("|", key.Split('|').Take(4));
 
@@ -488,6 +510,8 @@ public sealed class LegendSettings
         XrefInclusion = new Dictionary<string, bool>(other.XrefInclusion, StringComparer.OrdinalIgnoreCase);
         ManualEntryOrder = new List<string>(other.ManualEntryOrder);
         ManualEntries = other.ManualEntries.Select(m => m.Clone()).ToList();
+        ManualMergeGroups = other.ManualMergeGroups.Select(m => m.Clone()).ToList();
+        NonKlicMergedDimensions = new(other.NonKlicMergedDimensions);
         BlankEntries = other.BlankEntries.Select(b => b.Clone()).ToList();
         CustomStatuses = other.CustomStatuses.Select(cs => cs.Clone()).ToList();
         CustomLayerRules = other.CustomLayerRules.Select(r => r.Clone()).ToList();
@@ -546,7 +570,7 @@ public sealed class LegendSettings
         p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
-            or nameof(CustomLayerRules) or nameof(BlankEntries)
+            or nameof(CustomLayerRules) or nameof(BlankEntries) or nameof(ManualMergeGroups) or nameof(NonKlicMergedDimensions)
             or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder) or nameof(Klic) or nameof(ExampleOverrides);
 
     [JsonIgnore, Browsable(false)]
@@ -619,7 +643,10 @@ public sealed class LegendSettings
         BlankEntries ??= new List<BlankEntry>();
         CustomStatuses ??= new List<CustomStatus>();
         CustomLayerRules ??= new List<CustomLayerRule>();
-        MergedDimensions ??= new HashSet<GroupDimension>();
+        MergedDimensions ??= DefaultKlicMergeDimensions();
+        NonKlicMergedDimensions = (NonKlicMergedDimensions ?? new()).Where(d => Enum.IsDefined(d)).Distinct().ToList();
+        ManualMergeGroups = (ManualMergeGroups ?? new()).Where(m => m is not null && m.IsValid)
+            .Select(m => m.Clone()).ToList();
         ExcludedDisciplines = ToCi(ExcludedDisciplines);
         ExcludedHoofdgroepen = ToCi(ExcludedHoofdgroepen);
         ExcludedEntries = ToCi(ExcludedEntries);

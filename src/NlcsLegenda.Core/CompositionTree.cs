@@ -48,7 +48,7 @@ public sealed class CompositionTree
         var expanded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in excluded)
         {
-            var members = available.Where(i => (string.Equals(LegendSettings.BaseEntryKey(i.Key), key, StringComparison.OrdinalIgnoreCase) || string.Equals(LegendSettings.WithoutKlicGroup(i.Key), key, StringComparison.OrdinalIgnoreCase))).Select(i => i.Key).ToArray();
+            var members = available.Where(i => LegendSettings.MatchesExclusion(i.Key, key)).Select(i => i.Key).ToArray();
             if (members.Length == 0) expanded.Add(key);
             else expanded.UnionWith(members);
         }
@@ -94,8 +94,7 @@ public sealed class CompositionTree
     }
 
     public IEnumerable<Leaf> VisibleLeaves(Group group, string? text) =>
-        LayerSearch.Matches(group.Label, text) ? group.Leaves : group.Leaves.Where(l =>
-            LayerSearch.Matches(l.Label, text) || LayerSearch.Matches(l.SearchText, text));
+        group.Leaves.Where(l => LayerSearch.Matches(group.Label + " " + l.Label + " " + l.SearchText, text));
 
     public IEnumerable<Group> Filter(string? text) => Groups.Where(g => VisibleLeaves(g, text).Any());
 }

@@ -29,13 +29,13 @@ Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitle
 
 | Onderdeel | Mogelijkheden |
 | --- | --- |
-| Inhoud | Regels aan- of uitzetten, door lagen zoeken en eigen regels toevoegen |
-| Volgorde en teksten | Handmatig ordenen, eigen omschrijvingen en statussen |
+| Inhoud | Regels en kleurvarianten kiezen, door lagen zoeken, objecten aanklikken om uit te sluiten |
+| Volgorde en teksten | Handmatig ordenen, samenvoegen met een hoofdobject, eigen omschrijvingen en statussen |
 | Opmaak | Schaal, maten, kolommen, notities, hoeveelheden en schaalbalk |
 | Voorbeelden | Bronweergave of een volledig voorbeeld uit een DWG-bibliotheek |
 | Xrefs | Per koppeling kiezen of die meetelt, ook bij geneste bronnen |
 | KLIC | Netbeheerders en objectgegevens lezen; regels samenvoegen of uitsplitsen |
-| Uitvoer | Een viewport op schaal, CSV/JSON of een uittrekstaat van een map |
+| Uitvoer | Een gekoppelde viewport die de legenda-schaal volgt, CSV/JSON of een uittrekstaat van een map |
 
 Elke legenda bewaart haar eigen bron en instellingen in de DWG. **Toepassen**
 werkt de gekozen legenda meteen bij; **Opslaan** sluit daarna het venster.

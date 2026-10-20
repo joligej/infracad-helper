@@ -33,7 +33,7 @@ internal static class DocumentationImages
         var checks = entries.Select(e => new EntryCheckItem(LegendSettings.EntryKey(e), e.Description,
             e.Status.DisplayName(), string.Join(" ", e.SourceLayers.Select(s => s.SourceLayerName)))).ToArray();
         using (var form = new LegendManageDialog(checks, new LegendSettings(), new[] {
-            new ManualEntry { Layer = "PROJECT_GRENS", Description = "Werkgrens", Type = NlcsDrawType.Geometrie } }))
+            new ManualEntry { Layer = "PROJECT_GRENS", Description = "Werkgrens", Type = NlcsDrawType.Geometrie } }, allowPicking: true))
             Capture(form, directory, "samenstellen.png", new Size(840, 600), f =>
                 Descendants(f).OfType<TextBox>().Single().Text = "-kl-");
         Console.WriteLine("Drie documentatiebeelden geschreven met synthetische gegevens.");

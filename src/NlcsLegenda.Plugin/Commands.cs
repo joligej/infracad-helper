@@ -459,6 +459,31 @@ public partial class Commands
                 }
             }
 
+            if (target is not null)
+            {
+                var mode = new PromptKeywordOptions("\nLegenda-venster [Nieuw/Bestaand] <Nieuw>:") { AllowNone = true };
+                mode.Keywords.Add("Nieuw"); mode.Keywords.Add("Bestaand"); mode.Keywords.Default = "Nieuw";
+                var answer = ed.GetKeywords(mode);
+                if (answer.Status == PromptStatus.Cancel) return;
+                if (answer.StringResult == "Bestaand")
+                {
+                    var pick = new PromptEntityOptions("\nSelecteer het bestaande legenda-venster:");
+                    pick.SetRejectMessage("\nSelecteer een viewport op deze layout.");
+                    pick.AddAllowedClass(typeof(Viewport), exactMatch: true);
+                    var result = ed.GetEntity(pick);
+                    if (result.Status != PromptStatus.OK) return;
+                    using var existing = db.TransactionManager.StartTransaction();
+                    var viewport = (Viewport)existing.GetObject(result.ObjectId, OpenMode.ForWrite);
+                    if (viewport.Number == 1) return;
+                    LegendViewport.Link(viewport, existing, target.Id, automatic: false);
+                    bool fits = LegendViewport.Align(viewport, settings, new Extents3d(min, max), automatic: false);
+                    existing.Commit();
+                    if (!fits) ed.WriteMessage("\nHet kader is te klein voor deze schaal; vergroot het kader of maak een automatisch venster.");
+                    ed.WriteMessage($"\nLegenda-venster gekoppeld op 1:{settings.Scale:g}.");
+                    return;
+                }
+            }
+
             double mw = max.X - min.X;
             double mh = max.Y - min.Y;
             double paperPerModel = 1000.0 / settings.Scale;
@@ -541,6 +566,12 @@ public partial class Commands
                 catch (Autodesk.AutoCAD.Runtime.Exception ex)
                 {
                     ed.WriteMessage($"\nViewport geplaatst, maar niet geactiveerd: {ex.Message}");
+                }
+                vp.CustomScale = paperPerModel;
+                if (target is not null)
+                {
+                    LegendViewport.Link(vp, tr, target.Id, !settings.ViewportManual);
+                    LegendViewport.Align(vp, settings, new Extents3d(min, max), automatic: false);
                 }
                 vp.Locked = true;
 
@@ -769,55 +800,63 @@ public partial class Commands
 
         try
         {
-            var peo = new PromptEntityOptions("\nSelecteer een NLCS-object om uit/aan te vinken [Lijst]", "Lijst");
-            peo.SetRejectMessage("\nGeen geldig object.");
-            var per = ed.GetEntity(peo);
-            if (per.Status == PromptStatus.Keyword && per.StringResult == "Lijst")
-            {
-                NlcsLegendaSamenstellenInteractive();
-                return;
-            }
-            if (per.Status != PromptStatus.OK)
-            {
-                ed.WriteMessage("\nGeannuleerd.");
-                return;
-            }
+            if (!ResolveMutationTarget(ed, db, out var target)) return;
+            PickExclusions(ed, db, target);
 
-            string layerName;
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                layerName = ((Entity)tr.GetObject(per.ObjectId, OpenMode.ForRead)).Layer;
-                tr.Commit();
-            }
-
-            if (!NlcsLayerParser.TryParse(layerName, out var layer))
-            {
-                ed.WriteMessage($"\n\"{layerName}\" is geen NLCS-laag.");
-                return;
-            }
-
-            var key = LegendSettings.EntryKey(layer!);
-            if (!ResolveMutationTarget(ed, db, out var target)) { ed.WriteMessage("\nGeannuleerd."); return; }
-            var settings = GetTargetSettings(db, target);
-
-            bool nowExcluded;
-            if (settings.ExcludedEntries.Contains(key))
-            {
-                settings.ExcludedEntries.Remove(key);
-                nowExcluded = false;
-            }
-            else
-            {
-                settings.ExcludedEntries.Add(key);
-                nowExcluded = true;
-            }
-            ed.WriteMessage($"\n{key} {(nowExcluded ? "uitgevinkt" : "weer opgenomen")}.");
-            ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
         }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             ed.WriteMessage($"\nNLCSLEGENDAUITVINKEN fout: {ex.Message}");
         }
+    }
+
+    private void PickExclusions(Editor ed, Database db, MutationTarget target)
+    {
+        var settings = GetTargetSettings(db, target);
+        var probe = settings.Clone();
+        probe.ExcludedEntries.Clear();
+        probe.MergedDimensions.Clear();
+        probe.NonKlicMergedDimensions.Clear();
+        probe.ManualMergeGroups.Clear();
+        probe.MergeIdenticalStatuses = false;
+        AnalysisResult analysis;
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            var registry = LegendStore.Load(db, tr);
+            var definition = registry.FindById(target.LegendId)!;
+            var managed = LegendManagement.CollectManagedIds(db, tr, registry);
+            var selection = definition.Scope == LegendScope.Selection
+                ? LegendManagement.ResolveHandles(db, definition.SourceHandles, out _).Where(id => !managed.Contains(id)).ToArray()
+                : null;
+            analysis = DrawingAnalyzer.Analyze(db, tr, probe, selection, DescriptionCatalog.Default(), managed, trackSources: true);
+        }
+        var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (true)
+        {
+            var choice = new PromptNestedEntityOptions("\nKlik een object om uit de legenda te sluiten; Enter = toepassen:") { AllowNone = true };
+            var pick = ed.GetNestedEntity(choice);
+            if (pick.Status == PromptStatus.Cancel) { ed.WriteMessage("\nGeannuleerd; niets gewijzigd."); return; }
+            if (pick.Status != PromptStatus.OK) break;
+            var ids = pick.GetContainers().Append(pick.ObjectId).ToHashSet();
+            var candidates = analysis.Entries.Where(e =>
+                analysis.EntryObjects.TryGetValue(LegendSettings.SelectionKey(e), out var sources) && sources.Any(ids.Contains)).ToList();
+            if (candidates.Count == 0) { ed.WriteMessage("\nDit object hoort niet bij een opgenomen legendaregel."); continue; }
+            // dezelfde bron kan in meerdere blokinvoegingen anders worden weergegeven
+            if (candidates.Count > 1)
+            {
+                using var choose = new MainEntryDialog(candidates, excluding: true);
+                choose.Text = "Welke regel uitsluiten?";
+                if (AcWindows.ShowModalDialog(choose) != WinForms.DialogResult.OK || choose.Selected is null) continue;
+                candidates = new() { choose.Selected };
+            }
+            var entry = candidates[0];
+            excluded.Add(LegendSettings.SelectionKey(entry));
+            ed.WriteMessage($"\nUitgesloten: {entry.DisplayDescription} — {entry.AppearanceLabel}");
+        }
+        if (excluded.Count == 0) return;
+        settings.ExcludedEntries.UnionWith(excluded);
+        ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
+
     }
 
     [CommandMethod("NLCSLEGENDATOEVOEGEN", CommandFlags.Modal)]
@@ -1004,7 +1043,7 @@ public partial class Commands
 
             var items = BuildCompositionItems(db, settings, target.IsGlobal ? null : target.LegendId);
 
-            using var dialog = new LegendManageDialog(items, settings, BuildLayerChoices(db, settings), addLayer);
+            using var dialog = new LegendManageDialog(items, settings, BuildLayerChoices(db, settings), addLayer, allowPicking: true);
             dialog.SaveChanges = () =>
             {
                 settings.ExcludedEntries = dialog.ExcludedKeys;
@@ -1016,6 +1055,7 @@ public partial class Commands
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
+            if (dialog.PickObjectsRequested) PickExclusions(ed, db, target);
         }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {

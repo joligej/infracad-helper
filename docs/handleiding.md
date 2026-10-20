@@ -32,7 +32,12 @@ tekst daarom aan via de instellingen of `NLCSLEGENDATEKST`. Is er één legenda,
 direct; bij meerdere klik je de gewenste legenda aan (of kies je uit een lijst). Een
 selectielegenda wordt daarbij opnieuw van diezelfde selectie opgebouwd, niet van de hele
 tekening. `NLCSLEGENDAVIEWPORT` maakt in
-de paper space een viewport rond de gekozen legenda op de ingestelde schaal.
+de paper space een viewport rond de gekozen legenda op de ingestelde schaal. Dit venster
+blijft gekoppeld: bij een schaalwijziging van de legenda volgt de viewport automatisch en
+blijft hij vergrendeld. Automatisch gemaakte kaders groeien mee; een handmatig getekend
+kader houdt zijn papierafmetingen. De marge wordt zo nodig verkleind; een te klein
+kader geeft een melding zonder de schaal te veranderen. Kies **Bestaand** om een oud legenda-venster eenmalig te
+koppelen. Andere viewports worden niet aangepast.
 
 ### Instellingen
 
@@ -77,6 +82,10 @@ De hulpkaders zijn in modelruimte zichtbaar en worden niet geplot; een buitenkad
 standaard uit. Een lege tekststijl kiest `NLCS-ISO` met lettertype `NLCS-ISO.ttf`. Ontbreekt dat lettertype, installeer
 het of kies in Instellingen een bestaande tekststijl.
 
+Nieuwe legenda's beginnen met de TAUW-maatvoering. Een globaal profiel met de herkenbare
+oude standaardmaten (20 × 8 mm, regelafstand 11 mm, kolom 75 mm) wordt bij het lezen
+bijgewerkt. Eigen maten blijven behouden.
+
 Bestaande legenda's houden hun opgeslagen instellingen. Kies **Instellingen → Legenda → Templateopmaak herstellen** om
 de maatvoering bij te werken. Eigen teksten, bronnen, filters en de gekozen schaal blijven
 behouden. De standaardmaatvoering staat in [Maatvoering](template-maatvoering.md).
@@ -88,18 +97,22 @@ een kolom *Tekening*; een tekening die niet leesbaar is, wordt overgeslagen en g
 
 Kan AutoCAD het oppervlak van een bronarcering niet bepalen, dan verschijnt `? m²` in de legenda en bij het oppervlaktetotaal. **Overzicht → Broncontrole** vermeldt de laag en het object. CSV en JSON laten het numerieke oppervlak leeg en nemen die melding mee. Herstel de broncontour en werk de legenda bij om weer een volledig oppervlak te krijgen.
 
-Niet elke NLCS-laag hoeft in de legenda. Met `NLCSLEGENDAUITVINKEN` klik je een
-element aan om die regel weg te laten (of weer terug te zetten). Heb je een eigen laag
-die er juist wél bij hoort, dan maak je met `NLCSLEGENDATOEVOEGEN` een regel aan: je
-kiest het type (lijn, vlak, arcering, vlakvulling of symbool), de laag en de
-omschrijving. In `NLCSLEGENDASAMENSTELLEN` staat dit bij elkaar in één venster. Het uitvinken
-en de eigen regels horen bij de gekozen legenda, of bij de expliciet geopende globale
-standaard. **Laag toevoegen** biedt een lijst met lokale lagen en een voorgestelde
-omschrijving, type en waar beschikbaar een blok of patroon. Je kunt die gegevens aanpassen.
-Zoeken werkt op elk deel van de laagnaam of omschrijving, zonder hoofdletterverschil;
-`*` kan delen combineren. De bronlijst bovenaan zoekt ook in xref-lagen. Tijdens het
-filteren schakelt een groepsvinkje alleen de zichtbare resultaten om. Via **Lijst** in
-`NLCSLEGENDATOEVOEGEN` en `NLCSLEGENDAUITVINKEN` open je hetzelfde venster.
+Niet elk element hoeft in de legenda. Kies **Samenstellen → In tekening uitsluiten**
+of start `NLCSLEGENDAUITVINKEN`. Klik achter elkaar de ongewenste objecten aan, ook
+binnen xrefs. Enter past de keuzes toe en bouwt de legenda één keer opnieuw op.
+Escape annuleert de aanklikronde. De bronobjecten blijven staan. Een uitgesloten
+regel kun je via Samenstellen weer opnemen.
+
+**Samenstellen** heeft twee tabbladen: **Tekening** voor gevonden bronregels en
+**Eigen regels** voor zelf toegevoegde regels. De wijzigingen horen bij de gekozen
+legenda. **Laag toevoegen** biedt lokale lagen met een voorgestelde omschrijving,
+type en waar mogelijk blok of patroon; deze gegevens zijn vrij aanpasbaar.
+
+Zoeken werkt op elk deel van omschrijving of laagnaam, inclusief xref-namen.
+`fiets asfalt` zoekt beide woorden, ongeacht de volgorde. `*asfalt*fiets*` zoekt
+die delen achter elkaar. **Resultaten opnemen** en **Resultaten uitsluiten**
+werken alleen op de zichtbare zoekresultaten. Kleurvarianten staan afzonderlijk
+in de lijst en behouden hun eigen keuze.
 
 ![Samenstellen met een zoekfilter op kabel- en leidinglagen](samenstellen.png)
 
@@ -179,15 +192,28 @@ voorrang krijgt. Ontbreekt een veld in die bron, dan wordt een andere beschikbar
 Een aanwezige lege waarde wordt niet stilzwijgend vervangen. Nulwaarden geven geen gemeten
 diepte aan; een standaarddiepte is apart benoemd. Zie [KLIC-gegevens](klic-bronnen.md).
 
-Voor KLIC-tekeningen (kabels en leidingen) kun je regels samenvoegen op een eigenschap.
-Onder *Groepering* in de instellingen zet je los aan of je samenvoegt op soort, spanning/druk,
-uitvoering (mantelbuis/hulpstuk), volgnummer of netbeheerder. Zo worden bijvoorbeeld DATA, DATA2 en DATA3
-één regel, of hoog- en laagspanning samen. De hoeveelheden tellen op en het is omkeerbaar:
-zet je de groepering uit, dan staat elke laag weer apart. Generieke placeholdertekst uit
-KLIC-symbolen (zoals "TYPE \ LABEL \ OMSCHRIJVING") wordt standaard weggelaten; echte tekst
-blijft staan.
+Bij samenvoegen betekent een aangevinkt kenmerk: **niet vergelijken**.
+**Soorten samenvoegen** negeert bijvoorbeeld het verschil tussen gas en water.
+Dit staat standaard **uit**, zowel voor KLIC als voor overige lagen. Verschillende
+kleuren, lijnpatronen en symbolen blijven bij automatisch samenvoegen altijd apart.
 
-Onder *Groepering* staat ook *Gelijke statussen samenvoegen*. Die voegt dezelfde regel uit
+Voor nieuwe KLIC-legenda's staan **Spanning/druk**, **Uitvoering**, **Volgnummer**
+en **Netbeheerders samenvoegen** standaard aan. Een oud globaal profiel zonder
+samenvoegkeuzes krijgt deze beginwaarden eenmaal mee; daarna worden ook bewust
+uitgeschakelde keuzes behouden. Bestaande legenda's houden hun lokale keuzes.
+**Overige lagen** heeft een eigen groep vinkjes, standaard allemaal uit. Binnen
+beide groepen blijven discipline en hoofdgroep aparte grenzen.
+
+Selecteer in **Overzicht** meerdere regels met Ctrl of Shift en kies **Samenvoegen…**
+om zelf een groep te maken. Kies vervolgens het **hoofdobject**: daarvan komen
+de titel, kleur, lijn en het symbool. Deze handmatige keuze mag verschillende
+kleuren verbinden. Hoeveelheden met dezelfde eenheid worden opgeteld.
+**Samenvoeging opheffen** brengt de afzonderlijke regels terug. Een bestaande
+handmatige groep moet eerst worden opgeheven voordat je er een andere groep van maakt.
+Als het hoofdobject uit de bron verdwijnt, worden de overgebleven regels afzonderlijk
+weergegeven. Generieke KLIC-placeholdertekst wordt standaard weggelaten.
+
+Bij de statussen staat ook *Gelijke statussen samenvoegen*. Die voegt dezelfde regel uit
 verschillende statussen samen, maar alleen als lijn, vlak, arcering en symbool er precies
 hetzelfde uitzien. Standaard staat dit uit, omdat de status in NLCS meestal juist de kleur
 bepaalt.
@@ -291,3 +317,15 @@ Zonder die keuze wordt niet willekeurig een legenda gekozen.
 Core Console heeft niet alle objectondersteuning van Civil 3D/Map. Controleer
 KLIC-proxyobjecten en Object Data daarom in de volledige host; zie
 [KLIC-gegevens](klic-bronnen.md).
+
+### Bronkleuren en opmerkingen
+
+De legenda leest kleuren van de objecten en lagen, inclusief xref-laagkleuren.
+Een automatisch templatevoorbeeld wordt alleen gebruikt als zijn kleuren bij de
+bron passen. Anders blijft de bronweergave behouden. Een via **Overzicht → Voorbeeld**
+expliciet gekozen voorbeeld gebruikt wel zijn eigen weergave.
+
+De opmerkingenkop is **white (ACI 7)**. In **Opmerkingen** kies je tekeningnotities,
+de KLIC-waarschuwing, beide samen of eigen tekst. Klik **Tekst overnemen** en pas
+de tekst aan. De algemene teksten komen uit de TAUW-template; projectspecifieke
+beplantingslijsten worden niet als algemene standaard overgenomen.

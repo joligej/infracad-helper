@@ -29,7 +29,7 @@ internal sealed class OverviewDialog : LegendDialog
         ReadOnly = true,
         AllowUserToAddRows = false,
         AllowUserToDeleteRows = false,
-        MultiSelect = false,
+        MultiSelect = true,
         SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         RowHeadersVisible = false,
         ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
@@ -93,6 +93,8 @@ internal sealed class OverviewDialog : LegendDialog
         _actions.Add(ActionButton("KLIC-instellingen…", EditKlic));
         _actions.Add(ActionButton("KLIC-details…", ShowKlicDetails));
         _actions.Add(ActionButton("Exporteer lijst…", ExportVisible));
+        _actions.Add(ActionButton("Samenvoegen…", MergeSelected));
+        _actions.Add(ActionButton("Samenvoeging opheffen", UnmergeSelected));
         var filters = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 0, 8, 4) };
         _field.Items.Add("Alle zichtbare velden");
         _field.Items.AddRange(KlicFields.All.Cast<object>().ToArray());
@@ -172,7 +174,7 @@ internal sealed class OverviewDialog : LegendDialog
     private void ConfigureColumns()
     {
         _grid.Columns.Clear();
-        foreach (var name in new[] { "Status", "Omschrijving", "Netbeheerder", "Soort", "Hoeveelheid", "Bronlagen", "Samengevoegd" }
+        foreach (var name in new[] { "Status", "Omschrijving", "Weergave", "Netbeheerder", "Soort", "Hoeveelheid", "Bronlagen", "Samengevoegd" }
             .Concat(Current.Settings.Klic.Columns.Select(k => KlicFields.Find(k)!.Label)).Concat(new[] { "Broncontrole" }))
             _grid.Columns.Add(new DataGridViewTextBoxColumn
             {
@@ -181,6 +183,7 @@ internal sealed class OverviewDialog : LegendDialog
                 FillWeight = name is "Omschrijving" or "Bronlagen" ? 240 : 120,
                 Visible = name switch
                 {
+                    "Weergave" => Current.Entries.Any(e => e.AppearanceLabel.Length > 0),
                     "Netbeheerder" => Current.Entries.Any(e => e.Netbeheerders.Count > 0),
                     "Samengevoegd" => Current.Entries.Any(e => e.MergedMembers.Count > 0),
                     "Broncontrole" => Current.Entries.Any(e => e.Metric.HasUnknownArea || KlicSummary.Issues(e.KlicObjects).Length > 0),
@@ -215,7 +218,7 @@ internal sealed class OverviewDialog : LegendDialog
             var values = RowValues(entry);
             if (_issuesOnly.Checked && values[^1].Length == 0) continue;
             string search = _field.SelectedItem is KlicField field ? FieldValue(entry, field.Key) : string.Join(" ", values);
-            if (_filter.Text.Trim().Length > 0 && !search.Contains(_filter.Text.Trim(), StringComparison.CurrentCultureIgnoreCase)) continue;
+            if (!LayerSearch.Matches(search, _filter.Text)) continue;
             _visible.Add(entry);
             var row = new DataGridViewRow();
             row.CreateCells(_grid, values.Cast<object>().ToArray());
@@ -233,7 +236,7 @@ internal sealed class OverviewDialog : LegendDialog
     {
         if (_rowValues.TryGetValue(entry, out var cached)) return cached;
         var issues = LayerMetric.MergeIssues(KlicSummary.Issues(entry.KlicObjects), entry.Metric.AreaIssue) ?? string.Empty;
-        var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, string.Join(", ", entry.Netbeheerders),
+        var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, entry.AppearanceLabel, string.Join(", ", entry.Netbeheerders),
                 string.Join(", ", entry.LayersByType.Keys), entry.QuantityText(Current.Settings.QuantityDecimals, Current.Settings.UnitArea, Current.Settings.UnitLength, Current.Settings.UnitCount),
                 string.Join(Environment.NewLine, entry.SourceLayers.Select(s => s.SourceLayerName).Distinct()), string.Join(", ", entry.MergedMembers) };
         values.AddRange(Current.Settings.Klic.Columns.Select(k => KlicSummary.Field(entry.KlicObjects, k)));
@@ -262,6 +265,52 @@ internal sealed class OverviewDialog : LegendDialog
         Current.Settings.ManualEntryOrder = LegendOrder.Remember(Current.Settings.ManualEntryOrder, _entries);
         Current.Changed = true;
         FillGrid(to);
+    }
+
+    private List<LegendEntry> SelectedEntries() => _grid.SelectedRows.Cast<DataGridViewRow>()
+        .OrderBy(r => r.Index).Select(r => _visible[r.Index]).ToList();
+
+    private void MergeSelected()
+    {
+        if (Current.Id.Length == 0 || _analyze is null) return;
+        var selected = SelectedEntries();
+        if (selected.Count < 2)
+        {
+            MessageBox.Show(this, "Selecteer minstens twee regels met Ctrl of Shift.", "Samenvoegen");
+            return;
+        }
+        using var picker = new MainEntryDialog(selected);
+        if (picker.ShowDialog(this) != DialogResult.OK || picker.Selected is not { } main) return;
+        ChangeMerges(() => Current.Settings.ManualMergeGroups.Add(ManualMergeGroup.Create(selected, main)));
+    }
+
+    private void UnmergeSelected()
+    {
+        if (Current.Id.Length == 0 || _analyze is null) return;
+        var ids = SelectedEntries().Select(e => e.ManualMergeId).Where(id => id.Length > 0).ToHashSet();
+        if (ids.Count == 0)
+        {
+            MessageBox.Show(this, "Selecteer een handmatig samengevoegde regel. Automatisch samenvoegen pas je aan in Instellingen > Inhoud.", "Samenvoeging opheffen");
+            return;
+        }
+        ChangeMerges(() => Current.Settings.ManualMergeGroups.RemoveAll(g => ids.Contains(g.Id)));
+    }
+
+    private void ChangeMerges(Action change)
+    {
+        var previous = Current.Settings.Clone();
+        try
+        {
+            change();
+            Current.Entries = _analyze!(Current);
+            Current.Changed = true;
+            ConfigureColumns(); LoadEntries();
+        }
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
+        {
+            Current.Settings.CopyFrom(previous);
+            MessageBox.Show(this, ex.Message, "Samenvoegen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private void EditExample()
@@ -352,5 +401,38 @@ internal sealed class OverviewDialog : LegendDialog
         }
         foreach (var legend in changed) legend.Changed = false;
         return true;
+    }
+}
+
+
+internal sealed class MainEntryDialog : LegendDialog
+{
+    private readonly DataGridView _list;
+    public LegendEntry? Selected => _list.CurrentRow?.Tag as LegendEntry;
+
+    public MainEntryDialog(IReadOnlyList<LegendEntry> entries, bool excluding = false)
+    {
+        Text = excluding ? "Regel uitsluiten" : "Hoofdobject kiezen";
+        ClientSize = new Size(820, 420);
+        MinimumSize = new Size(520, 320);
+        StartPosition = FormStartPosition.CenterParent;
+        ShowInTaskbar = false;
+        var help = new Label { Text = excluding ? "Deze bron wordt op meerdere manieren weergegeven. Kies welke variant je wilt uitsluiten."
+            : "Het hoofdobject bepaalt de titel, kleur, lijn en het symbool. Hoeveelheden worden opgeteld.",
+            Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8), MaximumSize = new Size(760, 0) };
+        _list = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false, MultiSelect = false, RowHeadersVisible = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+        _list.Columns.Add("title", "Omschrijving");
+        _list.Columns.Add("source", "Bronlaag");
+        _list.Columns.Add("appearance", "Weergave");
+        foreach (var e in entries)
+            _list.Rows[_list.Rows.Add(e.DisplayDescription, string.Join(", ", e.SourceLayers.Select(l => l.SourceLayerName)),
+                e.AppearanceLabel)].Tag = e;
+        var buttons = new ButtonBar(false);
+        buttons.Ok.Text = excluding ? "Uitsluiten" : "Samenvoegen";
+        AcceptButton = buttons.Ok; CancelButton = buttons.Cancel;
+        SizeChanged += (_, _) => help.MaximumSize = new Size(Math.Max(100, ClientSize.Width - 20), 0);
+        Controls.Add(_list); Controls.Add(help); Controls.Add(buttons);
     }
 }

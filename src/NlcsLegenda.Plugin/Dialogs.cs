@@ -315,14 +315,25 @@ internal sealed class SettingsDialog : LegendDialog
             BoundCheck("Tijdelijk", () => _settings.ToonTijdelijk, v => _settings.ToonTijdelijk = v),
             BoundCheck("Revisie", () => _settings.ToonRevisie, v => _settings.ToonRevisie = v),
             BoundCheck("Gelijke statussen samenvoegen (alleen bij identieke weergave)", () => _settings.MergeIdenticalStatuses, v => _settings.MergeIdenticalStatuses = v)));
-        root.Controls.Add(Group("KLIC-groepering",
-            BoundCheck("Soort samenvoegen", () => _settings.SamenvoegenSoort, v => _settings.SamenvoegenSoort = v),
+        root.Controls.Add(Group("KLIC — aangevinkt kenmerk niet vergelijken",
+            BoundCheck("Soorten samenvoegen", () => _settings.SamenvoegenSoort, v => _settings.SamenvoegenSoort = v),
             BoundCheck("Spanning/druk samenvoegen", () => _settings.SamenvoegenSpecificatie, v => _settings.SamenvoegenSpecificatie = v),
             BoundCheck("Uitvoering samenvoegen", () => _settings.SamenvoegenUitvoering, v => _settings.SamenvoegenUitvoering = v),
-            BoundCheck("Netbeheerder samenvoegen", () => _settings.MergedDimensions.Contains(GroupDimension.Netbeheerder), v => { if (v) _settings.MergedDimensions.Add(GroupDimension.Netbeheerder); else _settings.MergedDimensions.Remove(GroupDimension.Netbeheerder); }),
+            BoundCheck("Netbeheerders samenvoegen", () => _settings.MergedDimensions.Contains(GroupDimension.Netbeheerder), v => { if (v) _settings.MergedDimensions.Add(GroupDimension.Netbeheerder); else _settings.MergedDimensions.Remove(GroupDimension.Netbeheerder); }),
             BoundCheck("Volgnummer samenvoegen", () => _settings.SamenvoegenNummer, v => _settings.SamenvoegenNummer = v),
             BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v), klic));
 
+
+        var otherMerge = new List<Control> {
+            new Label { Text = "Alleen bij gelijke weergave, binnen dezelfde discipline en hoofdgroep.", AutoSize = true } };
+        foreach (var (dimension, label) in new[] {
+            (GroupDimension.Soort, "Soorten samenvoegen"), (GroupDimension.Specificatie, "Specificaties samenvoegen"),
+            (GroupDimension.Uitvoering, "Uitvoeringen samenvoegen"), (GroupDimension.Nummer, "Volgnummers samenvoegen") })
+            otherMerge.Add(BoundCheck(label, () => _settings.NonKlicMergedDimensions.Contains(dimension), value => {
+                _settings.NonKlicMergedDimensions.Remove(dimension);
+                if (value) _settings.NonKlicMergedDimensions.Add(dimension);
+            }));
+        root.Controls.Add(Group("Overige lagen — aangevinkt kenmerk niet vergelijken", otherMerge.ToArray()));
 
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Padding = new Padding(3) };
         if (_composition is not null || _compositionSource is not null)
@@ -629,6 +640,8 @@ internal sealed class SettingsDialog : LegendDialog
                 continue;
             property.SetValue(target, property.GetValue(defaults));
         }
+        target.MergedDimensions = LegendSettings.DefaultKlicMergeDimensions();
+        target.NonKlicMergedDimensions.Clear();
     }
 }
 
@@ -906,12 +919,28 @@ internal sealed class RemarksEditDialog : LegendDialog
         var buttons = new ButtonBar(withApply: false);
         AcceptButton = buttons.Ok;
         CancelButton = buttons.Cancel;
-        buttons.AddExtra("Tekeningnotities").Click += (_, _) => _body.Text = StandardTexts.DrawingRemarks.Replace("\n", Environment.NewLine);
-        buttons.AddExtra("KLIC-waarschuwing").Click += (_, _) => _body.Text = StandardTexts.KlicDisclaimer;
+        var presets = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 4, 8, 4) };
+        var choice = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 250 };
+        choice.Items.AddRange(new object[] { "Tekeningnotities (TAUW)", "KLIC-waarschuwing (TAUW)", "Tekeningnotities + KLIC", "Eigen tekst" });
+        choice.SelectedIndex = 0;
+        var use = new Button { Text = "Tekst overnemen", AutoSize = true };
+        use.Click += (_, _) =>
+        {
+            _body.Text = (choice.SelectedIndex switch {
+                0 => StandardTexts.DrawingRemarks,
+                1 => StandardTexts.KlicDisclaimer,
+                2 => StandardTexts.DrawingRemarks + "\n\n" + StandardTexts.KlicDisclaimer,
+                _ => ""
+            }).Replace("\n", Environment.NewLine);
+            _body.Focus();
+        };
+        presets.Controls.Add(choice); presets.Controls.Add(use);
+        Controls.Add(presets);
         // enter voor een nieuwe regel, niet voor opslaan
         buttons.Ok.Click += (_, _) => DialogResult = DialogResult.OK;
 
         Controls.Add(layout);
+        Controls.SetChildIndex(layout, 0);
         Controls.Add(buttons);
     }
 

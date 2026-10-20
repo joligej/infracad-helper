@@ -62,6 +62,9 @@ public static class LegendBuilder
             {
                 string key = LegendOrder.Key(entry);
                 bool chosen = exampleChoices.TryGetValue(key, out var name);
+                if (!chosen && entry.ManualMergeId.Length > 0
+                    && s.ManualMergeGroups.FirstOrDefault(g => g.Id == entry.ManualMergeId) is { } merge)
+                    chosen = s.ExampleOverrides.TryGetValue(merge.MainKey, out name);
                 if (chosen && string.IsNullOrEmpty(name)) continue;
                 LegendExample? example = chosen && savedExamples.TryGetValue(name!, out var stored) && bt.Has(stored.BlockName) ? stored : null;
                 if (example is null && !string.IsNullOrWhiteSpace(s.ExampleLibraryPath))
@@ -73,6 +76,7 @@ public static class LegendBuilder
                 }
                 if (chosen && example is null) throw new InvalidOperationException($"Het gekozen voorbeeld voor '{entry.Description}' ontbreekt.");
                 if (example is null) continue;
+                if (!chosen && !ExampleColorsMatch(tr, bt[example.BlockName], entry, analysis)) continue;
                 using var reference = new BlockReference(Point3d.Origin, bt[example.BlockName])
                 { ScaleFactors = new Scale3d(s.Scale / example.Scale), Layer = "0" };
                 AppendEntity(btr, reference); tr.AddNewlyCreatedDBObject(reference, true);
@@ -301,6 +305,37 @@ public static class LegendBuilder
         return (barBottom, left + barWidth);
     }
 
+    private static bool ExampleColorsMatch(Transaction tr, ObjectId blockId, LegendEntry entry, AnalysisResult analysis)
+    {
+        var expected = entry.LayersByType.Values.Where(analysis.LayerStyles.ContainsKey)
+            .Select(k => DrawingAnalyzer.ColorSignature(analysis.LayerStyles[k].Color)).ToHashSet();
+        if (expected.Count == 0) return true;
+        var actual = new HashSet<string>();
+        var path = new HashSet<ObjectId>();
+        bool Read(ObjectId id, LayerDisplayStyle? parent, LayerDisplayStyle? parentLayer)
+        {
+            if (path.Count >= 16 || !path.Add(id)) return false;
+            try
+            {
+                foreach (ObjectId child in (BlockTableRecord)tr.GetObject(id, OpenMode.ForRead))
+                {
+                    if (tr.GetObject(child, OpenMode.ForRead) is not Entity entity || !entity.Visible || entity is DBText or MText or AttributeDefinition) continue;
+                    var layer = DrawingAnalyzer.EntityLayerStyle(entity, tr, parentLayer);
+                    var style = DrawingAnalyzer.EntityStyle(entity, tr, parent, layer);
+                    if (entity is BlockReference reference)
+                    {
+                        if (!Read(reference.BlockTableRecord, style, layer)) return false;
+                    }
+                    else actual.Add(DrawingAnalyzer.ColorSignature(style.Color));
+                }
+                return true;
+            }
+            finally { path.Remove(id); }
+        }
+        // bronkleuren boven een automatisch gekozen bibliotheekvoorbeeld
+        return Read(blockId, null, null) && actual.SetEquals(expected);
+    }
+
     private static double DrawRemarks(
         BlockTableRecord btr, Transaction tr, LegendSettings s, double left, double top,
         double textH, double widthModel, ObjectId styleId)
@@ -311,6 +346,7 @@ public static class LegendBuilder
             double titleH = s.ToModel(s.TitleTextHeightMm);
             y -= titleH;
             var heading = AddText(btr, tr, s.RemarksTitle, new Point3d(left, y, 0), titleH, s.HeaderTextLayer, styleId, underline: true);
+            heading.Color = Color.FromColorIndex(ColorMethod.ByAci, 7);
             y = Math.Min(y - (s.ToModel(s.HeaderSpacingMm) - textH),
                 heading.GeometricExtents.MinPoint.Y - textH * 0.3);
         }

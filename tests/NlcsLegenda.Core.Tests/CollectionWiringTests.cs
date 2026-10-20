@@ -14,6 +14,8 @@ public class CollectionWiringTests
         nameof(LegendSettings.MergedDimensions),
         nameof(LegendSettings.ExcludedEntries),
         nameof(LegendSettings.ManualEntries),
+        nameof(LegendSettings.ManualMergeGroups),
+        nameof(LegendSettings.NonKlicMergedDimensions),
         nameof(LegendSettings.ManualEntryOrder),
         nameof(LegendSettings.ExampleOverrides),
         nameof(LegendSettings.BlankEntries),
@@ -52,6 +54,7 @@ public class CollectionWiringTests
         s.IncludedStatuses.Add(NlcsStatus.Nieuw);
         s.IncludedDrawTypes.Clear();
         s.IncludedDrawTypes.Add(NlcsDrawType.Symbool);
+        s.MergedDimensions.Clear();
         s.MergedDimensions.Add(GroupDimension.Soort);
         s.ExcludedEntries.Add("N|WE|VH|X");
         s.ManualEntryOrder.Add("row-key");

@@ -66,6 +66,8 @@ public partial class Commands
         }
 
         FinalizePlacement(tr, db, br, def.Settings, def.GroupName);
+        if (!LegendViewport.Sync(db, tr, def))
+            note = AppendNote(note, "een gekoppeld legenda-venster is te klein; vergroot het kader of maak een automatisch venster");
         return UpdateResult.Updated;
     }
 

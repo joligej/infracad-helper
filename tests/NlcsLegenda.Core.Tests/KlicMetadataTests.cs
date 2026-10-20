@@ -61,7 +61,7 @@ public class KlicMetadataTests
     {
         var layers = new[] { Layer("Net A", "A"), Layer("Net B", "B") };
         var metrics = new Dictionary<string, LayerMetric> { ["A"] = new(1, 3, 0), ["B"] = new(2, 5, 0) };
-        var settings = new LegendSettings();
+        var settings = new LegendSettings { MergedDimensions = new() };
         var split = LegendGrouping.Build(layers, settings, metrics: metrics);
         Assert.Equal(2, split.Count);
         Assert.NotEqual(LegendSettings.EntryKey(split[0]), LegendSettings.EntryKey(split[1]));

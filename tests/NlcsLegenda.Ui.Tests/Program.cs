@@ -36,6 +36,7 @@ internal static class Program
             DiagnosticRun.Execute(CheckOverviewFatalError, Errors.Add);
             DiagnosticRun.Execute(CheckTreeImagesDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckOwnedFontsDisposed, Errors.Add);
+            DiagnosticRun.Execute(CheckManualMerging, Errors.Add);
             DiagnosticRun.Execute(() => CheckKlic(args.FirstOrDefault()), Errors.Add, "CheckKlic");
             DiagnosticRun.Execute(() => CheckNestedEditors(), Errors.Add, "CheckNestedEditors");
             DiagnosticRun.Execute(() => CheckCustomizationRoundtrip(), Errors.Add, "CheckCustomizationRoundtrip");
@@ -47,6 +48,7 @@ internal static class Program
                 () => new XrefInclusionDialog(new[] { "Een lange xrefnaam met veel informatie.dwg" }, new()),
                 () => new CustomStatusDialog(new[] { new CustomStatus { Name = "Eigen status" } }, new[] { ("key", "Voorbeeldregel") }),
                 () => new RemarksEditDialog("Notities", StandardTexts.DrawingRemarks),
+                () => new MainEntryDialog(new[] { Entry("Gasleiding"), Entry("Waterleiding") }),
                 () => new DescriptionsDialog(DescriptionCatalog.Default()),
                 () => new TextEditDialog("VH|ELEMENT", new DescriptionEntry { Specifiek = "Een langere omschrijving" }, new()),
                 () => new BlankEntryDialog(new[] { new BlankEntry() }),
@@ -397,6 +399,28 @@ internal static class Program
         custom.Close();
         using var remarks = new RemarksEditDialog("Kop", "\nRegel\n\n");
         Check(remarks.RemarksText == "\nRegel\n\n", "bewuste lege regels blijven behouden");
+    }
+
+    private static void CheckManualMerging()
+    {
+        var source = new[] { Entry("Eerste"), Entry("Tweede") };
+        var item = new OverviewLegend { Id = "merge", Name = "Samenvoegen", Settings = new(), Entries = source };
+        using var form = new OverviewDialog(new[] { item }, _ => null,
+            current => ManualMergeGroup.Apply(source.ToList(), current.Settings.ManualMergeGroups));
+        OpenOffscreen(form);
+        var grid = Descendants(form).OfType<DataGridView>().Single();
+        grid.ClearSelection(); grid.Rows[0].Selected = true; grid.Rows[1].Selected = true;
+        InModal("Hoofdobject kiezen", dialog =>
+        {
+            var choices = Descendants(dialog).OfType<DataGridView>().Single();
+            choices.CurrentCell = choices.Rows[1].Cells[0];
+            Descendants(dialog).OfType<Button>().Single(b => b.Text == "Samenvoegen").PerformClick();
+        }, () => Descendants(form).OfType<Button>().Single(b => b.Text == "Samenvoegen…").PerformClick());
+        Check(grid.Rows.Count == 1 && item.Entries.Single().Description == "Tweede", "hoofdobject bepaalt samengevoegde titel");
+        Check(item.Settings.ManualMergeGroups.Count == 1 && item.Changed, "handmatige samenvoeging opslaan");
+        Descendants(form).OfType<Button>().Single(b => b.Text == "Samenvoeging opheffen").PerformClick();
+        Check(grid.Rows.Count == 2 && item.Settings.ManualMergeGroups.Count == 0, "samenvoeging volledig omkeerbaar");
+        form.Close();
     }
 
     private static void InModal(string title, Action<Form> inspect, Action open)
