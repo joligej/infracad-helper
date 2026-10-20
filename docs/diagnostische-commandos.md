@@ -105,3 +105,9 @@ bewijst geen normale GUI-start, bediening, annulering van een venster of DPI-wee
 Isolatie- en exporttests die tijdelijk gebruikersinstellingen wijzigen, herstellen
 die in een `finally`-blok. Bewerk instellingen niet tegelijk met deze controles.
 Testuitvoer staat in `artifacts/` en kan na beoordeling worden verwijderd.
+
+### Bibliotheekvoorbeelden
+
+- `NLCSLEGENDAEXAMPLEAPPEARANCETEST`: behoud van bronvorm, maat en arceringsachtergrond; expliciete voorbeeldkeuze.
+- `NLCSLEGENDAEXAMPLEREVISIONTEST`: gewijzigde bibliotheek, gelijknamige hostblokken, behoud van andere legenda's en hergebruik zonder bron.
+- `NLCSLEGENDAEXAMPLEREVISIONVERIFY`: vervolg na opslaan en heropenen van de vorige proef.

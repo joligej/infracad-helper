@@ -42,7 +42,8 @@ public partial class Commands
                             .Cast<ObjectId>().Select(child => (Entity)tr.GetObject(child, OpenMode.ForRead)))
                         : new[] { entity };
                 }).ToArray();
-                var wrong = entities.Where(e => !e.Color.IsByLayer || e.LineWeight != LineWeight.ByLayer || !e.Transparency.IsByLayer
+                var wrong = entities.Where(e => !(e is MText { Text: "OPMERKINGEN" }
+                        ? e.Color.ColorIndex == 7 : e.Color.IsByLayer) || e.LineWeight != LineWeight.ByLayer || !e.Transparency.IsByLayer
                     || e.LinetypeId != db.ByLayerLinetype || Math.Abs(e.LinetypeScale - 1) > 1e-9).ToArray();
                 if (wrong.Length > 0) throw new InvalidOperationException(string.Join("; ", wrong.Select(e => $"{e.GetType().Name}: kleur={e.Color}, lijndikte={e.LineWeight}, transparantie={e.Transparency}, lijntypeschaal={e.LinetypeScale}")));
             }

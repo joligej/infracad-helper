@@ -45,9 +45,13 @@ public partial class Commands
         }
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            var entries = DrawingAnalyzer.Analyze(db, tr, new LegendSettings()).Entries;
+            var entries = DrawingAnalyzer.Analyze(db, tr, new LegendSettings { MergedDimensions = new() }).Entries;
             if (entries.Count != 3 || Math.Abs(entries.Sum(e => e.Metric.Length) - 10) > 1e-8)
                 throw new InvalidOperationException("Lokale KLIC-partities of hoeveelheden onjuist.");
+            var defaults = DrawingAnalyzer.Analyze(db, tr, new LegendSettings()).Entries;
+            if (defaults.Count != 1 || defaults[0].Netbeheerders.Count != 2
+                || Math.Abs(defaults[0].Metric.Length - 10) > 1e-8)
+                throw new InvalidOperationException("KLIC-standaard verliest bronnen of hoeveelheden.");
             tr.Commit();
         }
         db.SaveAs(path, DwgVersion.Current);
@@ -86,7 +90,7 @@ public partial class Commands
     private static void CheckKlicDrawing(Database db)
     {
         using var tr = db.TransactionManager.StartTransaction();
-        var settings = new LegendSettings { IncludeXrefLayers = true };
+        var settings = new LegendSettings { IncludeXrefLayers = true, MergedDimensions = new() };
         var entries = DrawingAnalyzer.Analyze(db, tr, settings).Entries;
         if (entries.Count != 5 || Math.Abs(entries.Sum(e => e.Metric.Length) - 30) > 1e-8)
             throw new InvalidOperationException($"KLIC-partities: {entries.Count}; lengte: {entries.Sum(e => e.Metric.Length)}.");

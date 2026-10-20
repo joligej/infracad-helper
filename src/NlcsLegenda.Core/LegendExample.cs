@@ -2,6 +2,9 @@ namespace NlcsLegenda.Core;
 
 public sealed record LegendExample(string BlockName, string Name, string Section, double Scale, string[] SourceKeys, double AnchorX = 0, double AnchorY = 0)
 {
+    public string ImportedBlockName { get; init; } = "";
+    public string Revision { get; init; } = "";
+
     public static string SourceKey(LegendEntry entry) => $"{entry.Status}|{entry.Discipline}|{entry.Hoofdgroep}|{entry.Element}".ToUpperInvariant();
 
     public static LegendExample? Match(IEnumerable<LegendExample> examples, LegendEntry entry, double scale)

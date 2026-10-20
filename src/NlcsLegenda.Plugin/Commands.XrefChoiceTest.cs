@@ -53,7 +53,7 @@ public partial class Commands
     private static void CheckXrefChoices(Database db)
     {
         using var tr = db.TransactionManager.StartTransaction();
-        var settings = new LegendSettings();
+        var settings = new LegendSettings { MergedDimensions = new() };
         void Check(string name, int rows, double length, int providers)
         {
             var saved = LegendSettings.FromJson(settings.ToJson());
@@ -76,6 +76,11 @@ public partial class Commands
         settings.XrefInclusion["OUTER"] = false;
         settings.XrefInclusion["OUTER|INNER"] = true;
         Check("uitgeschakelde bovenliggende bron", 3, 10, 2);
+        settings.SetAllXrefs(true);
+        settings.MergedDimensions = LegendSettings.DefaultKlicMergeDimensions();
+        Check("standaard samenvoeging", 1, 30, 4);
+        settings.XrefInclusion["OUTER"] = false;
+        Check("standaard met één bron uit", 1, 10, 2);
         tr.Abort();
     }
 }
