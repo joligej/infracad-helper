@@ -97,7 +97,7 @@ internal static class LegendManagement
         }
         if (keepGroup)
         {
-            // groep behouden tegen verweesde legenda-objecten bij bijwerken
+            // groep behouden tegen verweesde legendadelen
         }
         else
         {

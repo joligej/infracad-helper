@@ -555,7 +555,7 @@ public static class LegendBuilder
         mt.Contents = MTextFormat.Escape(text);
         if (mt.ActualWidth > width + 1e-8)
         {
-            // alleen woorden splitsen die zelfstandig buiten de tekstkolom vallen
+            // te lange woorden binnen de tekstkolom afbreken
             string wrapped = TextWrap.BreakLongWords(text, word =>
             {
                 mt.Contents = MTextFormat.Escape(word);
@@ -957,7 +957,7 @@ public static class LegendBuilder
             using var transient = new TransientObjects();
             var pieces = transient.Items;
             {
-                // gelijke xy-schaal behouden bij een vlak symbool met afwijkende z-schaal
+                // xy-maat behouden bij afwijkende z-schaal
                 var scale = reference.ScaleFactors;
                 var definition = (BlockTableRecord)tr.GetObject(reference.BlockTableRecord, OpenMode.ForRead);
                 bool flat = Math.Abs(Math.Abs(scale.X) - Math.Abs(scale.Y)) < 1e-9

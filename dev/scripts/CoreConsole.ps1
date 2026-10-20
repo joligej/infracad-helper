@@ -1,7 +1,7 @@
 #requires -Version 7.4
 
 function Get-NlcsProfileState {
-    # filedia opgeslagen als filedialog; sysvarmonitor bevat alleen de gewenste waarde
+    # filedia uit filedialog; sysvarmonitor alleen als voorkeur
     $root = 'HKCU:\Software\Autodesk\AutoCAD'
     if (!(Test-Path -LiteralPath $root)) { return }
     foreach ($series in Get-ChildItem -LiteralPath $root) {

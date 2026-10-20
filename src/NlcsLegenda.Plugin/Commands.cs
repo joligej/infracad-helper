@@ -51,7 +51,7 @@ public partial class Commands
         return "als globale standaard";
     }
 
-    // venstercode apart houden om vroegtijdig laden in de core console te voorkomen
+    // vensters pas laden buiten de core console
     private static bool RequireInteractive(Editor ed, string command)
     {
         if (!HostEnvironment.IsCoreConsole)
@@ -841,7 +841,7 @@ public partial class Commands
             var candidates = analysis.Entries.Where(e =>
                 analysis.EntryObjects.TryGetValue(LegendSettings.SelectionKey(e), out var sources) && sources.Any(ids.Contains)).ToList();
             if (candidates.Count == 0) { ed.WriteMessage("\nDit object hoort niet bij een opgenomen legendaregel."); continue; }
-            // dezelfde bron kan in meerdere blokinvoegingen anders worden weergegeven
+            // afzonderlijke weergave per broninvoeging
             if (candidates.Count > 1)
             {
                 using var choose = new MainEntryDialog(candidates, excluding: true);
