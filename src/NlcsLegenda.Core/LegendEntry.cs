@@ -28,7 +28,12 @@ public sealed class LegendEntry
     {
         get
         {
-            var text = Netbeheerders.Count == 0 ? Description : Description + " (" + string.Join(", ", Netbeheerders) + ")";
+            var description = Description;
+            if (DescriptionSource is DescriptionSource.Catalogus or DescriptionSource.Laagnaam
+                or DescriptionSource.Laagbeschrijving or DescriptionSource.Bloknaam)
+                foreach (var provider in Netbeheerders)
+                    description = ElementProperties.WithoutProviderSuffix(description, provider);
+            var text = Netbeheerders.Count == 0 ? description : description + " (" + string.Join(", ", Netbeheerders) + ")";
             var extra = KlicSummary.Description(KlicObjects, KlicDescriptionFields);
             return extra.Length == 0 ? text : text + " · " + extra;
         }

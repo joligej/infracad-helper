@@ -27,7 +27,9 @@ pwsh -File dev/scripts/Run-ReleaseAcceptance.ps1 -AcadVersion 2027
 ```
 
 De acceptatierunner vereist PowerShell 7.4+, een geïnstalleerde host en een nieuwe
-uitvoermap. Zonder `-Isolated` moeten andere CAD-processen gesloten zijn. Met
+uitvoermap. Met `-ReferenceTemplatePath <pad-naar-DWT>` bevat de volledige ronde
+ook scheidingsbanden, arceringen/afdekvlakken en de rechtstreeks gemeten templateopmaak.
+Bij een expliciete `-Cases`-selectie draait alleen die selectie. Zonder `-Isolated` moeten andere CAD-processen gesloten zijn. Met
 `-Isolated` krijgt iedere proef een eigen profiel. De resultaten bevatten DLL-hash,
 bronbehoud en opslaan/heropenen. Dit bewijst geen normale GUI-start of automatische
 bundellading. Gebruik voor installed acceptance `-PluginPath <geïnstalleerde DLL>`.

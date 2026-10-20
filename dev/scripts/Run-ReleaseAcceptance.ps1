@@ -9,7 +9,7 @@ param(
     [string]$TemplatePath,
     [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('examplerevision','exampleappearance','colorcomposition','resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -30,6 +30,9 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ examplerevision=@('NLCSLEGENDAEXAMPLEREVISIONTEST','EXAMPLEREVISION nieuwe bron toegepast, oude legenda gelijk en hergebruik zonder bron -> OK','NLCSLEGENDAEXAMPLEREVISIONVERIFY','EXAMPLEREVISION na heropenen: nieuwste voorbeeld en oude legenda behouden -> OK')
+ exampleappearance=@('NLCSLEGENDAEXAMPLEAPPEARANCETEST','EXAMPLEAPPEARANCE bronvorm, maat en achtergrondkleur behouden; expliciete keuze toegepast -> OK')
+ colorcomposition=@('NLCSLEGENDACOLORCOMPOSITIONTEST','COLORCOMPOSITION kleuren 1/3/5, kleurselectie, TAUW 24x5 mm, white en gekoppelde schaal -> OK')
  resources=@('NLCSLEGENDARESOURCETEST','RESOURCE losse objecten vrij, transactieobject behouden, dubbel opruimen veilig -> OK')
  presettarget=@("NLCSLEGENDAPRESETTARGETTEST`nStandaard`nLegenda`nStandaard",'PRESETTARGET globale en lokale profielen, zonder en met legenda, gescheiden -> OK')
  hatcharearegression=@('NLCSLEGENDAHATCHAREAREGRESSION','HATCHAREAREGRESSION eilanden en gaten, drie stijlen en bron behouden -> OK')
@@ -101,6 +104,9 @@ $specs=@{
  consumer=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDACONSUMERTEST",'CONSUMER: exploderen=')
  layout=@("NLCSLEGENDAAUDITFIXTURE`nNLCSLEGENDAOPMAAKMEETTEST`nNLCSLEGENDAVOLOPMAAKTEST",'VOLOPMAAK: totaal -> OK')
 }
+if($ReferenceTemplatePath -and !$PSBoundParameters.ContainsKey('Cases')){
+ $Cases+=@('band','appearance','templatefile')
+}
 # testcommando controleren vóór de eerste cad-start
 $sourceText=(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'src/NlcsLegenda.Plugin') -Filter 'Commands*.cs' | Get-Content -Raw) -join "`n"
 foreach($case in $Cases){
@@ -135,7 +141,7 @@ _Y
  $raw=Join-Path $dir "$Name.raw.log"
  $run=Invoke-NlcsCoreConsole -Executable $core -Drawing $Drawing -Script $script -Log $raw -Isolated:$Isolated -Environment @{NLCS_TEMPLATE_REFERENCE=$ReferenceTemplatePath}
  $exitCode=$run.ExitCode
- $log=(Get-Content -LiteralPath $raw -Raw) -replace "`0",''
+ $log=(Get-Content -LiteralPath $raw -Raw -Encoding Unicode)
  $log | Set-Content -LiteralPath (Join-Path $dir "$Name.log") -Encoding utf8
  $actual=($log -split "`r?`n" | Where-Object {$_ -notmatch '^Command:'}) -join "`n"
  $failures=[Collections.Generic.List[string]]::new()

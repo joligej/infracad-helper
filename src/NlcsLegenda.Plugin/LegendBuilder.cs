@@ -66,18 +66,28 @@ public static class LegendBuilder
                     && s.ManualMergeGroups.FirstOrDefault(g => g.Id == entry.ManualMergeId) is { } merge)
                     chosen = s.ExampleOverrides.TryGetValue(merge.MainKey, out name);
                 if (chosen && string.IsNullOrEmpty(name)) continue;
-                LegendExample? example = chosen && savedExamples.TryGetValue(name!, out var stored) && bt.Has(stored.BlockName) ? stored : null;
-                if (example is null && !string.IsNullOrWhiteSpace(s.ExampleLibraryPath))
+                if (!chosen && entry.SymbolLayer is { } symbolLayer && analysis.SymbolSamples.ContainsKey(symbolLayer))
+                    continue;
+                LegendExample? example = null;
+                ObjectId exampleId = ObjectId.Null;
+                bool hasSaved = chosen && savedExamples.TryGetValue(name!, out var stored)
+                    && bt.Has(ExampleLibrary.StoredBlockName(stored));
+                if (!string.IsNullOrWhiteSpace(s.ExampleLibraryPath) && (File.Exists(s.ExampleLibraryPath) || !hasSaved))
                 {
                     examples ??= exampleResources.Own(new ExampleLibrary(s.ExampleLibraryPath, db, tr));
                     example = chosen ? examples.Examples.FirstOrDefault(e => e.BlockName == name)
                         : LegendExample.Match(examples.Examples, entry, s.Scale);
-                    if (example is not null) examples.Import(db, tr, example);
+                    if (example is not null) exampleId = examples.Import(db, tr, example);
+                }
+                if (example is null && hasSaved)
+                {
+                    example = savedExamples[name!];
+                    exampleId = bt[ExampleLibrary.StoredBlockName(example)];
                 }
                 if (chosen && example is null) throw new InvalidOperationException($"Het gekozen voorbeeld voor '{entry.Description}' ontbreekt.");
                 if (example is null) continue;
-                if (!chosen && !ExampleColorsMatch(tr, bt[example.BlockName], entry, analysis)) continue;
-                using var reference = new BlockReference(Point3d.Origin, bt[example.BlockName])
+                if (!chosen && !ExampleColorsMatch(tr, exampleId, entry, analysis)) continue;
+                using var reference = new BlockReference(Point3d.Origin, exampleId)
                 { ScaleFactors = new Scale3d(s.Scale / example.Scale), Layer = "0" };
                 AppendEntity(btr, reference); tr.AddNewlyCreatedDBObject(reference, true);
                 double factor = s.Scale / example.Scale;
@@ -309,6 +319,14 @@ public static class LegendBuilder
     {
         var expected = entry.LayersByType.Values.Where(analysis.LayerStyles.ContainsKey)
             .Select(k => DrawingAnalyzer.ColorSignature(analysis.LayerStyles[k].Color)).ToHashSet();
+        void AddBackground(HashSet<string> colors, Color? color)
+        {
+            if (color is not null && (color.ColorMethod == ColorMethod.ByColor
+                || color.ColorMethod == ColorMethod.ByAci && color.ColorIndex is >= 1 and <= 255))
+                colors.Add(DrawingAnalyzer.ColorSignature(color));
+        }
+        foreach (var sample in entry.LayersByType.Values.Where(analysis.HatchSamples.ContainsKey).Select(k => analysis.HatchSamples[k]).Where(sample => !sample.IsSolid))
+            AddBackground(expected, sample.BackgroundColor);
         if (expected.Count == 0) return true;
         var actual = new HashSet<string>();
         var path = new HashSet<ObjectId>();
@@ -326,7 +344,12 @@ public static class LegendBuilder
                     {
                         if (!Read(reference.BlockTableRecord, style, layer)) return false;
                     }
-                    else actual.Add(DrawingAnalyzer.ColorSignature(style.Color));
+                    else
+                    {
+                        actual.Add(DrawingAnalyzer.ColorSignature(style.Color));
+                        if (entity is Hatch { IsSolidFill: false } hatch)
+                            AddBackground(actual, DrawingAnalyzer.ResolveColor(hatch.BackgroundColor, parent, layer));
+                    }
                 }
                 return true;
             }

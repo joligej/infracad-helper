@@ -10,7 +10,6 @@ public sealed class ExampleLibrary : IDisposable
     public const string CatalogKey = "NLCS_LEGENDA_VOORBEELDEN";
     private readonly Database? _source;
     private readonly string _path;
-    private bool _catalogSaved;
     public IReadOnlyList<LegendExample> Examples { get; }
 
     public ExampleLibrary(string path, Database? host = null, Transaction? transaction = null)
@@ -29,10 +28,12 @@ public sealed class ExampleLibrary : IDisposable
             _source.ReadDwgFile(path, FileOpenMode.OpenForReadAndAllShare, true, "");
             _source.CloseInput(true);
             using var tr = _source.TransactionManager.StartTransaction();
-            Examples = ReadCatalog(_source, tr);
+            using var stream = File.OpenRead(path);
+            string revision = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream));
+            Examples = ReadCatalog(_source, tr).Select(e => e with { Revision = revision, ImportedBlockName = "" }).ToArray();
             if (Examples.Count == 0) throw new InvalidDataException("Dit bestand bevat geen legendavoorbeelden.");
             var bt = (BlockTable)tr.GetObject(_source.BlockTableId, OpenMode.ForRead);
-            if (Examples.Any(e => !bt.Has(e.BlockName) || !double.IsFinite(e.Scale) || e.Scale <= 0))
+            if (Examples.Any(e => !bt.Has(e.BlockName)))
                 throw new InvalidDataException("De voorbeeldenbibliotheek bevat een ongeldig voorbeeld.");
         }
         catch { _source.Dispose(); throw; }
@@ -46,7 +47,7 @@ public sealed class ExampleLibrary : IDisposable
         string json = string.Concat(data.AsArray().Select(v => (string)v.Value));
         var examples = JsonSerializer.Deserialize<LegendExample[]>(json) ?? Array.Empty<LegendExample>();
         if (examples.Any(e => e is null || string.IsNullOrWhiteSpace(e.BlockName) || e.Name is null || e.Section is null || e.SourceKeys is null || e.SourceKeys.Any(k => k is null)
-            || !double.IsFinite(e.Scale) || e.Scale <= 0 || !double.IsFinite(e.AnchorX) || !double.IsFinite(e.AnchorY))
+            || e.ImportedBlockName is null || e.Revision is null || !double.IsFinite(e.Scale) || e.Scale <= 0 || !double.IsFinite(e.AnchorX) || !double.IsFinite(e.AnchorY))
             || examples.Select(e => e.BlockName).Distinct(StringComparer.Ordinal).Count() != examples.Length)
             throw new InvalidDataException("De voorbeeldenbibliotheek bevat ongeldige gegevens.");
         return examples;
@@ -69,14 +70,20 @@ public sealed class ExampleLibrary : IDisposable
     public ObjectId Import(Database db, Transaction tr, LegendExample example)
     {
         var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
-        if (!bt.Has(example.BlockName))
+        var cached = ReadCatalog(db, tr, CacheKey(_path)).ToDictionary(e => e.BlockName, StringComparer.Ordinal);
+        var imported = cached.GetValueOrDefault(example.BlockName);
+        if (imported is null || imported.Revision != example.Revision
+            || imported.Revision.Length > 0 && imported.ImportedBlockName.Length == 0
+            || !bt.Has(StoredBlockName(imported)))
         {
-            if (_source is null) throw new FileNotFoundException($"Het voorbeeld '{example.Name}' staat nog niet in deze tekening. Kies de voorbeeldenbibliotheek opnieuw in Overzicht.", _path);
+            if (_source is null)
+                throw new FileNotFoundException($"Het voorbeeld '{example.Name}' staat nog niet in deze tekening. Kies de voorbeeldenbibliotheek opnieuw in Overzicht.", _path);
             using var sourceTr = _source.TransactionManager.StartTransaction();
             var sourceBt = (BlockTable)sourceTr.GetObject(_source.BlockTableId, OpenMode.ForRead);
-            using var ids = new ObjectIdCollection { sourceBt[example.BlockName] };
+            ObjectId sourceId = sourceBt[example.BlockName];
+            using var ids = new ObjectIdCollection { sourceId };
             using var mapping = new IdMapping();
-            _source.WblockCloneObjects(ids, db.BlockTableId, mapping, DuplicateRecordCloning.Ignore, false);
+            _source.WblockCloneObjects(ids, db.BlockTableId, mapping, DuplicateRecordCloning.MangleName, false);
             var translated = mapping.Cast<IdPair>().Where(p => !p.Value.IsNull).ToDictionary(p => p.Key, p => p.Value);
             foreach (IdPair pair in mapping)
             {
@@ -88,17 +95,18 @@ public sealed class ExampleLibrary : IDisposable
                     if (translated.TryGetValue(id, out var target) && tr.GetObject(target, OpenMode.ForRead).OwnerId == to.ObjectId) ordered.Add(target);
                 if (ordered.Count > 0) ((DrawOrderTable)tr.GetObject(to.DrawOrderTableId, OpenMode.ForWrite)).SetRelativeDrawOrder(ordered);
             }
+            imported = example with { ImportedBlockName = ((BlockTableRecord)tr.GetObject(translated[sourceId], OpenMode.ForRead)).Name };
         }
-        if (!_catalogSaved)
-        {
-            WriteCatalog(db, tr, Examples, CacheKey(_path));
-            _catalogSaved = true;
-        }
+        cached[example.BlockName] = imported;
+        WriteCatalog(db, tr, Examples.Select(e => cached.TryGetValue(e.BlockName, out var saved) && saved.Revision == e.Revision ? saved : e), CacheKey(_path));
         var known = ReadCatalog(db, tr).ToDictionary(e => e.BlockName, StringComparer.Ordinal);
-        known[example.BlockName] = example;
+        known[example.BlockName] = imported;
         WriteCatalog(db, tr, known.Values);
-        return bt[example.BlockName];
+        return bt[StoredBlockName(imported)];
     }
+
+    internal static string StoredBlockName(LegendExample example) =>
+        string.IsNullOrEmpty(example.ImportedBlockName) ? example.BlockName : example.ImportedBlockName;
 
     private static string CacheKey(string path) => CatalogKey + "_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
         System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(path).ToUpperInvariant())))[..20];

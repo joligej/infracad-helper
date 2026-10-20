@@ -134,7 +134,8 @@ Tijdelijk uitgezette regels onthouden hun plaats. Nieuwe regels komen achteraan.
 Via **Overzicht → Voorbeeld…** kies je een voorbeeld voor de geselecteerde regel.
 Open eerst de bijbehorende voorbeeldenbibliotheek (DWG). De keuze geldt alleen voor
 deze legenda. **Uit tekening** gebruikt weer de brongeometrie; **Automatisch** kiest
-alleen een eenduidig passend voorbeeld. Bij meerdere varianten kies je zelf.
+alleen een eenduidig passend voorbeeld dat de bronkleuren behoudt. Bij bemonsterde
+symbolen blijft de werkelijke bronvorm leidend. Bij meerdere varianten kies je zelf.
 **Als nieuwe regel** voegt een handmatige regel toe, zonder bronhoeveelheid.
 
 Een voorbeeld bewaart de gezamenlijke lijnen, arceringen, symbolen en codes, met
@@ -142,6 +143,11 @@ hun onderlinge afstanden en schaal. Gebruikte voorbeelden worden in de tekening
 bewaard en blijven beschikbaar na heropenen, ook zonder de bibliotheek. Voor een
 nog niet gebruikt voorbeeld is het bibliotheekbestand wel nodig. Neem dat bestand
 daarom mee naar een andere computer en kies het daar opnieuw via **Bibliotheek…**.
+Is de bibliotheek gewijzigd, dan gebruikt **Toepassen** of **Bijwerken** de nieuwe
+versie van het gekozen voorbeeld. Andere geplaatste legenda's veranderen pas
+wanneer je die zelf bijwerkt. De blokken en stijlen van het voorbeeld blijven
+gescheiden van gelijknamige onderdelen in de tekening.
+
 Bedrijfseigen bibliotheken worden afzonderlijk geleverd en zitten niet in de
 openbare installer. Een gewone DWG zonder voorbeeldencatalogus is geen bibliotheek.
 
@@ -198,7 +204,10 @@ Dit staat standaard **uit**, zowel voor KLIC als voor overige lagen. Verschillen
 kleuren, lijnpatronen en symbolen blijven bij automatisch samenvoegen altijd apart.
 
 Voor nieuwe KLIC-legenda's staan **Spanning/druk**, **Uitvoering**, **Volgnummer**
-en **Netbeheerders samenvoegen** standaard aan. Een oud globaal profiel zonder
+en **Netbeheerders samenvoegen** standaard aan. Een beheerder achter in de laagnaam
+wordt herkend via de KLIC-gegevens, ook als punten of spaties anders zijn geschreven.
+Zonder die gegevens wordt geen beheerder uit een laagnaam geraden.
+Een oud globaal profiel zonder
 samenvoegkeuzes krijgt deze beginwaarden eenmaal mee; daarna worden ook bewust
 uitgeschakelde keuzes behouden. Bestaande legenda's houden hun lokale keuzes.
 **Overige lagen** heeft een eigen groep vinkjes, standaard allemaal uit. Binnen

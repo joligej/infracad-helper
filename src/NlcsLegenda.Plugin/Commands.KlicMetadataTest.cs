@@ -17,11 +17,12 @@ public partial class Commands
         using var db = new Database(true, true);
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            var layerId = ReviewLayer(db, tr, "B-WE-KL-DATA-G");
             var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
             var xml = new XElement("KLIC");
             foreach (var (length, provider, material, diameter) in new[] { (3d, first, "PE", "0.11"), (5d, second, "PVC", "0.16"), (2d, "", "", "0") })
             {
+                var suffix = provider.Length == 0 ? "" : "_" + provider.Replace(".", "").ToUpperInvariant();
+                var layerId = ReviewLayer(db, tr, "B-WE-KL-DATA" + suffix + "-G");
                 using var line = new Line(Point3d.Origin, new Point3d(length, 0, 0)) { LayerId = layerId };
                 model.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                 xml.Add(new XElement("KLIC_Administratief", new XElement("Handle", line.Handle.ToString()), new XElement("Netbeheerder", provider)));
@@ -45,9 +46,13 @@ public partial class Commands
         }
         using (var tr = db.TransactionManager.StartTransaction())
         {
-            var entries = DrawingAnalyzer.Analyze(db, tr, new LegendSettings()).Entries;
+            var entries = DrawingAnalyzer.Analyze(db, tr, new LegendSettings { MergedDimensions = new() }).Entries;
             if (entries.Count != 3 || Math.Abs(entries.Sum(e => e.Metric.Length) - 10) > 1e-8)
                 throw new InvalidOperationException("Lokale KLIC-partities of hoeveelheden onjuist.");
+            var defaults = DrawingAnalyzer.Analyze(db, tr, new LegendSettings()).Entries;
+            if (defaults.Count != 1 || defaults[0].Netbeheerders.Count != 2
+                || Math.Abs(defaults[0].Metric.Length - 10) > 1e-8)
+                throw new InvalidOperationException("KLIC-standaard verliest bronnen of hoeveelheden.");
             tr.Commit();
         }
         db.SaveAs(path, DwgVersion.Current);
@@ -86,7 +91,7 @@ public partial class Commands
     private static void CheckKlicDrawing(Database db)
     {
         using var tr = db.TransactionManager.StartTransaction();
-        var settings = new LegendSettings { IncludeXrefLayers = true };
+        var settings = new LegendSettings { IncludeXrefLayers = true, MergedDimensions = new() };
         var entries = DrawingAnalyzer.Analyze(db, tr, settings).Entries;
         if (entries.Count != 5 || Math.Abs(entries.Sum(e => e.Metric.Length) - 30) > 1e-8)
             throw new InvalidOperationException($"KLIC-partities: {entries.Count}; lengte: {entries.Sum(e => e.Metric.Length)}.");

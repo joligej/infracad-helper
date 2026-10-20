@@ -19,7 +19,7 @@ opnieuw gemeten in het lokale referentiemateriaal, bij de voorbeelden op 1:200,
 | Lettertype | NLCS-ISO.ttf, breedtefactor 1 |
 | Meerregelige omschrijvingen | MText-regelafstandfactor 0,624 (minimaal) |
 | Hulpkaders | Aparte niet-plotbare laag, ACI 40, lijndikte 0,18 mm |
-| Opmerkingenkop | 5 mm, onderstreept, dezelfde stijl als de titel |
+| Opmerkingenkop | 5 mm, onderstreept, dezelfde tekststijl als de titel, white (ACI 7) |
 | Opmerkingentekst | 2,5 mm, tekstbreedte 128,8894 mm |
 | Schaalbalk | 40 × 2 mm; vier segmenten, elk twee halve stroken |
 | Schaalbalklabels | 1,8 mm, boven de balk, laatste label met eenheid |
@@ -98,3 +98,22 @@ De native proef `NLCSLEGENDABANDTEST` vergelijkt de lijnmaten en stijlen
 rechtstreeks met de originele DWT op 1:200, 1:500 en 1:1000, lokaal, gecombineerd
 en uitsluitend via een xref. Met `-Cases band` voert het acceptatiescript ook
 heropenen en vijftig keer bijwerken uit. De referentie blijft buiten git.
+
+## Voorbeeldcontrole
+
+Op 20 oktober 2026 zijn alle 266 voorbeelden uit de lokale referentie naast hun
+geplotte uitvoer gezet. De lokale bibliotheek is gecorrigeerd voor ontbrekende
+annotaties, extra randen en de tekenvolgorde van afdekvlakken. Deze bedrijfseigen
+DWG blijft buiten de openbare repository en installer.
+
+Een samengesteld templatevoorbeeld is via **Overzicht → Voorbeeld** als één geheel
+te kiezen. Bij automatische bronanalyse blijven verschillende NLCS-elementen en
+weergavevarianten afzonderlijke regels. Losse maatvoering en annotaties worden
+niet vanzelf legenda-items; daarvoor is een gekozen voorbeeld of eigen regel nodig.
+Een expliciete schaalvariant in de bron wordt omgerekend, ook wanneer een
+templateblad zelf voorbeelden met verschillende schaalsuffixen bevat.
+
+De proeven `NLCSLEGENDAEXAMPLEAPPEARANCETEST` en
+`NLCSLEGENDAEXAMPLEREVISIONTEST` controleren bronvorm, achtergrondkleur,
+bibliotheekupdates, gelijknamige blokken en behoud van andere legenda's.
+De tweede proef heeft ook een controle na opslaan en heropenen.
