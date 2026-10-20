@@ -14,9 +14,13 @@ het bestand, dan volgt een melding; de plugin downloadt geen ontbrekende bijlage
 Voorzorgsmaatregelen, toelichtingen en contactverwijzingen staan bij de veldwaarden.
 
 Property Sets vereisen AEC-ondersteuning; Object Data vereist een beschikbare Map-API.
-Object Data wordt gelezen in de geopende bron-DWG. De Map-API levert geen eigen project
-voor een xref of losse achtergrond-database; daar blijven ingebedde gegevens en leesbare
-Property Sets beschikbaar. Open de bron-DWG in Civil 3D/Map om ook Object Data te vergelijken.
+Object Data wordt ook uit directe en geneste xrefs gelezen. De waarden komen van de
+geladen bronobjecten. Voor de veldnamen opent de plugin bij de eerste analyse een
+tijdelijke, alleen-lezen kopie van de bron-DWG. Deze wordt meteen gesloten en verwijderd;
+de veldindeling blijft beschikbaar zolang de geladen xref ongewijzigd is.
+De hoofdtekening blijft actief en de plugin herlaadt geen xrefs. Een gewijzigde bronversie
+wordt gemeld, zodat waarden niet aan een verkeerde veldindeling worden gekoppeld.
+De eerste analyse kan daardoor langer duren dan opnieuw bijwerken.
 In Core Console wordt Object Data niet gelezen. In gewone AutoCAD kunnen beide ontbreken.
 Overzicht vermeldt wanneer een aanwezige opslagvorm niet kon worden gecontroleerd.
 Die melding betekent niet dat de overige bronnen ook onleesbaar zijn.
@@ -84,8 +88,9 @@ leeg, dan kan de generieke tekst `TYPE \ LABEL \ OMSCHRIJVING` worden weggelaten
 
 ## Controle in Civil 3D/Map
 
-Open een kopie van een KLIC-brontekening met Object Data en voer
+Open een kopie van een KLIC-brontekening of een hoofdtekening met KLIC-xrefs en voer
 `NLCSLEGENDAMAPDATATEST` uit. De proef analyseert drie keer, waarvan eenmaal met
 materiaal en diameter als groepering. Object Data, hoeveelheden en de gedeelde
-Map-tabellen moeten daarna nog gelijk en leesbaar zijn. De proef wijzigt de bron
+Map-tabellen moeten daarna nog gelijk en leesbaar zijn. Ook de actieve tekening en het
+aantal geopende documenten worden gecontroleerd. De proef wijzigt de bron
 niet. Core Console kan deze controle niet uitvoeren.

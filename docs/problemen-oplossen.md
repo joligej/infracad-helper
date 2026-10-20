@@ -42,8 +42,9 @@ wordt ook als onbekend getoond, zodat een gedeeltelijk totaal niet volledig lijk
 ## KLIC-gegevens ontbreken
 
 Kijk bij **KLIC-details** welke gegevens daadwerkelijk aan het object zijn gekoppeld.
-Een laagnaam zoals DATA2 bevat geen netbeheerder. Object Data vereist dat de bron-DWG
-zelf in Civil 3D/Map geopend is; xrefs gebruiken de overige leesbare opslagvormen.
+Een laagnaam zoals DATA2 bevat geen netbeheerder. Object Data vereist Civil 3D/Map en
+werkt ook via xrefs. Controleer of de bron-DWG bereikbaar is. Bij een melding over een
+gewijzigde bronversie moet de xref eerst opnieuw geladen worden.
 Een aanwezige maar lege voorkeurswaarde wordt niet automatisch door een andere
 bron vervangen. Zie [KLIC-gegevens](klic-bronnen.md).
 

@@ -179,9 +179,10 @@ keuzemenu vóór het plaatsen. `NLCSLEGENDAINFO` meldt welke soorten uitstaan.
 
 Netbeheerders en andere KLIC-gegevens komen uit de bron-DWG, ook bij geneste xrefs.
 De plugin leest ingebedde InfraCAD Map-tabellen en, waar de AutoCAD-host dit ondersteunt,
-Property Sets en Object Data. Voor Object Data moet de bron-DWG zelf in Civil 3D/Map geopend
-zijn; bij xrefs worden de ingebedde gegevens en leesbare Property Sets gebruikt en wordt deze
-beperking gemeld. Netbeheerders worden niet afgeleid uit volgnummers zoals DATA2.
+Property Sets en Object Data. In Civil 3D/Map werkt Object Data ook met directe en
+geneste xrefs; de bron-DWG hoeft niet handmatig geopend te worden. De eerste analyse
+leest de veldindeling via een tijdelijke bronkopie. Netbeheerders worden niet afgeleid
+uit volgnummers zoals DATA2.
 
 Kies in **Overzicht → KLIC-instellingen** welke velden als kolommen en in de export verschijnen.
 Je kunt zoeken in de zichtbare velden of één gekozen eigenschap. Dit filter verandert alleen

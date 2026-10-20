@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.33.3 - 2026-10-20
+
+- KLIC Object Data wordt nu ook uit directe en geneste xrefs gelezen. Waarden blijven gekoppeld aan het oorspronkelijke bronobject; de hoofdtekening hoeft geen eigen Object Data-tabellen te bevatten.
+- De eerste analyse leest veldnamen via een tijdelijke, alleen-lezen bronkopie. Volgende analyses hergebruiken de veldindeling. Herladen en wijzigingen aan de tabeldefinities maken die cache ongeldig. Bronbestanden worden niet gewijzigd of automatisch herladen.
+- De Map-regressie controleert ook xrefs, behoud van de actieve tekening en het aantal geopende documenten. Ontbrekende of afwijkende KLIC-tabeldefinities geven een leesmelding.
+
 ## 1.33.2 - 2026-10-20
 
 - Object Data blijft beschikbaar na het maken of bijwerken van een legenda. De plug-in ruimde de gedeelde Map-tabellenverzameling op, waardoor een volgende analyse of Map-bewerking kon mislukken. Alleen de eigen tijdelijke Map-objecten worden nu vrijgegeven.

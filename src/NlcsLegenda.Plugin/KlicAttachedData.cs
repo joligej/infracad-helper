@@ -10,13 +10,18 @@ namespace NlcsLegenda.Plugin;
 internal sealed class KlicAttachedData : IDisposable
 {
     private readonly Database _database;
+    private readonly Database _mapDatabase;
     private readonly Dictionary<ObjectId, (string Name, (string Name, int Id)[] Fields)> _definitions = new();
-    private readonly List<(object Table, string Name, string[] Fields)> _tables = new();
+    private IReadOnlyDictionary<string, string[]> _tables = new Dictionary<string, string[]>();
     private object? _odTables;
     private bool _mapInitialized;
     private string? _mapIssue;
     private object? _readMode;
-    public KlicAttachedData(Database database) => _database = database;
+    public KlicAttachedData(Database database, Database mapDatabase)
+    {
+        _database = database;
+        _mapDatabase = mapDatabase;
+    }
 
     public void Read(Entity entity, Transaction tr, List<KlicRecord> records, List<string> issues)
     {
@@ -47,24 +52,25 @@ internal sealed class KlicAttachedData : IDisposable
             {
                 using var rowLifetime = row as IDisposable;
                 string name = (string)Get(row, "TableName")!;
-                var table = _tables.FirstOrDefault(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-                if (table.Table is null) continue;
-                context = table.Name;
-                if ((int)Get(row, "Count")! != table.Fields.Length) throw new InvalidDataException("Object Data-veldindeling wijkt af.");
+                if (!name.StartsWith("KLIC_", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!_tables.TryGetValue(name, out var fields))
+                    throw new InvalidDataException("De Object Data-tabel ontbreekt in de brontekening: " + name);
+                context = name;
+                if ((int)Get(row, "Count")! != fields.Length) throw new InvalidDataException("Object Data-veldindeling wijkt af.");
                 var values = new Dictionary<string, string>();
-                for (int i = 0; i < table.Fields.Length; i++)
+                for (int i = 0; i < fields.Length; i++)
                 {
-                    if (KlicFields.Find(table.Fields[i]) is null) continue;
-                    context = table.Name + "/" + table.Fields[i];
+                    if (KlicFields.Find(fields[i]) is null) continue;
+                    context = name + "/" + fields[i];
                     using var value = (IDisposable)Get(row, "Item", i)!;
                     string property = Get(value, "Type")!.ToString() switch
                     {
                         "Character" => "StrValue", "Integer" => "Int32Value", "Real" => "DoubleValue",
                         _ => throw new InvalidDataException("Onverwacht Object Data-veldtype.")
                     };
-                    values.Add(table.Fields[i], Convert.ToString(Get(value, property), CultureInfo.InvariantCulture) ?? "");
+                    values.Add(fields[i], Convert.ToString(Get(value, property), CultureInfo.InvariantCulture) ?? "");
                 }
-                if (values.Count > 0) records.Add(new KlicRecord(KlicSource.ObjectData, table.Name, values));
+                if (values.Count > 0) records.Add(new KlicRecord(KlicSource.ObjectData, name, values));
             }
         }
         catch (Exception ex) when (IsAdapterFailure(ex)) { issues.Add("Object Data niet volledig leesbaar (" + context + "): " + Message(ex)); }
@@ -119,38 +125,40 @@ internal sealed class KlicAttachedData : IDisposable
             var application = (assembly.GetType("Autodesk.Gis.Map.HostMapApplicationServices", true)!.GetProperty("Application")
                 ?? throw new MissingMemberException("Map.Application ontbreekt.")).GetValue(null)
                 ?? throw new InvalidOperationException("Map.Application is niet beschikbaar.");
-            // geen actief map-project gebruiken voor een andere brontekening
             if (!Autodesk.AutoCAD.ApplicationServices.Core.Application.DocumentManager.Cast<Autodesk.AutoCAD.ApplicationServices.Document>()
-                .Any(d => d.Database.UnmanagedObject == _database.UnmanagedObject))
-            {
-                _mapIssue = "Object Data in deze xref of achtergrondtekening is niet gecontroleerd. Open de bron-DWG in Civil 3D/Map voor deze controle; ingebedde gegevens en leesbare Property Sets blijven beschikbaar.";
-                return;
-            }
-            var project = Method(application, "GetProjectForDB", typeof(Database)).Invoke(application, new object[] { _database });
-            if (project is null) throw new InvalidOperationException("Deze bron-database is niet beschikbaar als Map-project.");
-            if (((Database)Get(project, "Database")!).UnmanagedObject != _database.UnmanagedObject) throw new InvalidOperationException("Map-project hoort bij een andere bron-database.");
+                .Any(d => d.Database.UnmanagedObject == _mapDatabase.UnmanagedObject))
+                throw new InvalidOperationException("Object Data vereist een geopende hoofdtekening in Civil 3D/Map.");
+            var project = Method(application, "GetProjectForDB", typeof(Database)).Invoke(application, new object[] { _mapDatabase });
+            if (project is null) throw new InvalidOperationException("Deze hoofdtekening is niet beschikbaar als Map-project.");
+            if (((Database)Get(project, "Database")!).UnmanagedObject != _mapDatabase.UnmanagedObject)
+                throw new InvalidOperationException("Map-project hoort bij een andere hoofdtekening.");
             _odTables = Get(project, "ODTables")!;
             _readMode = Enum.Parse(assembly.GetType("Autodesk.Gis.Map.Constants.OpenMode", true)!, "OpenForRead");
-            foreach (string name in (IEnumerable)Method(_odTables, "GetTableNames").Invoke(_odTables, null)!)
-            {
-                if (!name.StartsWith("KLIC_", StringComparison.OrdinalIgnoreCase)) continue;
-                var table = Get(_odTables, "Item", name)!;
-                try
-                {
-                    using var fields = (IDisposable)Get(table, "FieldDefinitions")!;
-                    var names = new List<string>();
-                    for (int i = 0; i < (int)Get(fields, "Count")!; i++)
-                    {
-                        using var field = (IDisposable)Get(fields, "Item", i)!;
-                        names.Add((string)Get(field, "Name")!);
-                    }
-                    _tables.Add((table, name, names.ToArray()));
-                }
-                catch { (table as IDisposable)?.Dispose(); throw; }
-            }
+            _tables = _database.UnmanagedObject == _mapDatabase.UnmanagedObject
+                ? ReadFields(_odTables)
+                : MapSourceSchema.Read(_database, application);
             if (_tables.Count == 0) _mapIssue = "Object Data aanwezig, maar geen leesbare KLIC-tabellen gevonden.";
         }
         catch (Exception ex) when (IsAdapterFailure(ex)) { _mapIssue = "Object Data niet gecontroleerd: " + Message(ex); }
+    }
+
+    internal static IReadOnlyDictionary<string, string[]> ReadFields(object tables)
+    {
+        var result = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (string name in (IEnumerable)Method(tables, "GetTableNames").Invoke(tables, null)!)
+        {
+            if (!name.StartsWith("KLIC_", StringComparison.OrdinalIgnoreCase)) continue;
+            using var table = (IDisposable)Get(tables, "Item", name)!;
+            using var definitions = (IDisposable)Get(table, "FieldDefinitions")!;
+            var fields = new string[(int)Get(definitions, "Count")!];
+            for (int i = 0; i < fields.Length; i++)
+            {
+                using var field = (IDisposable)Get(definitions, "Item", i)!;
+                fields[i] = (string)Get(field, "Name")!;
+            }
+            result.Add(name, fields);
+        }
+        return result;
     }
 
     private static bool IsAdapterFailure(Exception error) => !ExceptionSafety.IsFatal(error)
@@ -172,9 +180,6 @@ internal sealed class KlicAttachedData : IDisposable
     }
     public void Dispose()
     {
-        using var cleanup = new ResourceScope();
-        foreach (var table in _tables.Select(table => table.Table).OfType<IDisposable>()) cleanup.Own(table);
-        _tables.Clear();
         // tabellenverzameling eigendom van het map-project
         _odTables = null;
     }
