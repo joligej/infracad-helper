@@ -99,7 +99,7 @@ public class CompositionImprovementsTests
     [Fact]
     public void GlobalAllUncheckedSurvivesAnExplicitSave()
     {
-        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var directory = Path.Join(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         try
         {
             var s = new LegendSettings();
@@ -107,6 +107,10 @@ public class CompositionImprovementsTests
             GlobalLegendSettings.Save(directory, s);
             Assert.Empty(GlobalLegendSettings.Load(directory).MergedDimensions);
         }
-        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        finally
+        {
+            Assert.StartsWith(Path.GetFullPath(Path.GetTempPath()), Path.GetFullPath(directory));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
     }
 }

@@ -69,10 +69,9 @@ internal static class LegendViewport
             foreach (ObjectId entityId in (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForRead))
             {
                 if (tr.GetObject(entityId, OpenMode.ForRead) is not Viewport viewport) continue;
-                var link = Read(viewport, tr);
-                if (link?.Id != legend.Id) continue;
+                if (Read(viewport, tr) is not { } link || link.Id != legend.Id) continue;
                 viewport.UpgradeOpen();
-                Align(viewport, legend.Settings, bounds, link.Value.Automatic);
+                Align(viewport, legend.Settings, bounds, link.Automatic);
             }
         }
     }

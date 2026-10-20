@@ -25,7 +25,8 @@ public static class GlobalLegendSettings
     public static void UpgradeLegacyTemplate(LegendSettings s)
     {
         // uitsluitend de oude standaardmaten, geen eigen opmaak
-        if (s.SwatchWidthMm != 20 || s.SwatchHeightMm != 8 || s.RowPitchMm != 11 || s.ColumnWidthMm != 75) return;
+        if (!(Math.Abs(s.SwatchWidthMm - 20) <= 1e-9 && Math.Abs(s.SwatchHeightMm - 8) <= 1e-9
+            && Math.Abs(s.RowPitchMm - 11) <= 1e-9 && Math.Abs(s.ColumnWidthMm - 75) <= 1e-9)) return;
         var d = new LegendSettings();
         s.SwatchWidthMm = d.SwatchWidthMm;
         s.SwatchHeightMm = d.SwatchHeightMm;

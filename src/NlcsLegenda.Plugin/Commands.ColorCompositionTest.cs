@@ -27,17 +27,18 @@ public partial class Commands
                 for (int i = 0; i < 2; i++)
                 {
                     using var boundary = new Polyline();
-                    boundary.AddVertexAt(0, new Point2d(i * 20, 0), 0, 0, 0);
-                    boundary.AddVertexAt(1, new Point2d(i * 20 + 10, 0), 0, 0, 0);
-                    boundary.AddVertexAt(2, new Point2d(i * 20 + 10, 1), 0, 0, 0);
-                    boundary.AddVertexAt(3, new Point2d(i * 20, 1), 0, 0, 0);
+                    boundary.AddVertexAt(0, new Point2d(i * 20.0, 0), 0, 0, 0);
+                    boundary.AddVertexAt(1, new Point2d(i * 20.0 + 10, 0), 0, 0, 0);
+                    boundary.AddVertexAt(2, new Point2d(i * 20.0 + 10, 1), 0, 0, 0);
+                    boundary.AddVertexAt(3, new Point2d(i * 20.0, 1), 0, 0, 0);
                     boundary.Closed = true;
                     model.AppendEntity(boundary); tr.AddNewlyCreatedDBObject(boundary, true);
                     using var hatch = new Hatch { LayerId = layerId };
                     model.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
                     hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
                     hatch.Color = Color.FromColorIndex(ColorMethod.ByAci, (short)(i == 0 ? 1 : 256));
-                    hatch.AppendLoop(HatchLoopTypes.Outermost, new ObjectIdCollection(new[] { boundary.ObjectId }));
+                    using var loop = new ObjectIdCollection(new[] { boundary.ObjectId });
+                    hatch.AppendLoop(HatchLoopTypes.Outermost, loop);
                     hatch.EvaluateHatch(true);
                 }
                 tr.Commit();
@@ -105,7 +106,7 @@ public partial class Commands
                     throw new InvalidOperationException("Viewport niet op 1:500 vergrendeld.");
                 definition.Settings.Scale = 1000;
                 LegendViewport.Sync(doc.Database, tr, definition);
-                if (Math.Abs(viewport.CustomScale - 1) > 1e-8 || viewport.Width != 160)
+                if (Math.Abs(viewport.CustomScale - 1) > 1e-8 || Math.Abs(viewport.Width - 160) > 1e-8)
                     throw new InvalidOperationException("Viewport volgt schaalwijziging niet.");
                 s.ExcludedEntries.Add(LegendSettings.SelectionKey(entries[0]));
                 if (DrawingAnalyzer.Analyze(doc.Database, tr, s, excludedIds: new[] { br.ObjectId }).Entries.Count != 2)

@@ -316,7 +316,6 @@ internal sealed class SettingsDialog : LegendDialog
             BoundCheck("Revisie", () => _settings.ToonRevisie, v => _settings.ToonRevisie = v),
             BoundCheck("Gelijke statussen samenvoegen (alleen bij identieke weergave)", () => _settings.MergeIdenticalStatuses, v => _settings.MergeIdenticalStatuses = v)));
         root.Controls.Add(Group("KLIC — aangevinkt kenmerk niet vergelijken",
-            new Label { Text = "Alleen bij gelijke kleur, lijn en symbool, binnen dezelfde discipline en hoofdgroep.", AutoSize = true },
             BoundCheck("Soorten samenvoegen", () => _settings.SamenvoegenSoort, v => _settings.SamenvoegenSoort = v),
             BoundCheck("Spanning/druk samenvoegen", () => _settings.SamenvoegenSpecificatie, v => _settings.SamenvoegenSpecificatie = v),
             BoundCheck("Uitvoering samenvoegen", () => _settings.SamenvoegenUitvoering, v => _settings.SamenvoegenUitvoering = v),
@@ -420,17 +419,6 @@ internal sealed class SettingsDialog : LegendDialog
         root.Controls.Add(TextRow("Datum-formaat:", () => _settings.DateFormat, v => _settings.DateFormat = v, 160));
         root.Controls.Add(Group("Opmerkingen",
             BoundCheck("Opmerkingen tonen", () => _settings.IncludeRemarks, v => _settings.IncludeRemarks = v)));
-
-        var otherMerge = new List<Control> {
-            new Label { Text = "Alleen bij gelijke weergave, binnen dezelfde discipline en hoofdgroep.", AutoSize = true } };
-        foreach (var (dimension, label) in new[] {
-            (GroupDimension.Soort, "Soorten samenvoegen"), (GroupDimension.Specificatie, "Specificaties samenvoegen"),
-            (GroupDimension.Uitvoering, "Uitvoeringen samenvoegen"), (GroupDimension.Nummer, "Volgnummers samenvoegen") })
-            otherMerge.Add(BoundCheck(label, () => _settings.NonKlicMergedDimensions.Contains(dimension), value => {
-                _settings.NonKlicMergedDimensions.Remove(dimension);
-                if (value) _settings.NonKlicMergedDimensions.Add(dimension);
-            }));
-        root.Controls.Add(Group("Overige lagen — aangevinkt kenmerk niet vergelijken", otherMerge.ToArray()));
 
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Padding = new Padding(3) };
         var omschr = new Button { Text = "Omschrijvingen\u2026", AutoSize = true };
@@ -652,6 +640,8 @@ internal sealed class SettingsDialog : LegendDialog
                 continue;
             property.SetValue(target, property.GetValue(defaults));
         }
+        target.MergedDimensions = LegendSettings.DefaultKlicMergeDimensions();
+        target.NonKlicMergedDimensions.Clear();
     }
 }
 
