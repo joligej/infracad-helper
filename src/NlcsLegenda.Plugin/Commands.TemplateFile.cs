@@ -10,7 +10,7 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    // privétemplate buiten git; ontbrekende bron betekent een mislukte proef
+    // privétemplate verplicht voor deze proef
     [CommandMethod("NLCSLEGENDATEMPLATEFILETEST", CommandFlags.Modal)]
     public void NlcsLegendaTemplateFileTest()
     {

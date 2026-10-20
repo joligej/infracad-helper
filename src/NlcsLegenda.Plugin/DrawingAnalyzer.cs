@@ -205,7 +205,7 @@ public static class DrawingAnalyzer
         if (definition is not { IsFromExternalReference: true })
         {
             Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle, inheritedStyle);
-            // een herkenbaar symbool niet nogmaals als losse interne lijnen tellen
+            // symbolen zonder dubbeltelling van interne lijnen
             if (block is not null && NlcsLayerParser.TryParse(ent.Layer, out var blockLayer)
                 && blockLayer.DrawType is NlcsDrawType.Symbool or NlcsDrawType.Geometrie)
                 return;
@@ -526,7 +526,7 @@ public static class DrawingAnalyzer
 
     internal static double RecalculateHatchArea(Hatch hatch)
     {
-        // contouren opnieuw evalueren, zonder bronarcering of associaties te wijzigen
+        // contouren meten zonder bronarcering of associaties te wijzigen
         using var measure = new Hatch();
         measure.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
         measure.HatchStyle = hatch.NumberOfLoops == 1 ? HatchStyle.Normal : hatch.HatchStyle;
@@ -732,7 +732,7 @@ public static class DrawingAnalyzer
             }
             else
             {
-                // uitgelijnde tekst gebruikt het anker; position kan nog een oude tekstbreedte bevatten
+                // anker voor uitgelijnde tekst; position mogelijk verouderd
                 var anchor = copy.HorizontalMode == TextHorizontalMode.TextLeft && copy.VerticalMode == TextVerticalMode.TextBase
                     ? copy.Position : copy.AlignmentPoint;
                 string position = PointSignature(anchor);

@@ -37,7 +37,7 @@ internal sealed class KlicSourceMetadata : IDisposable
             }
             if (ownerTransaction is not null)
             {
-                // bestaande transactie gebruiken voor nog niet opgeslagen objectwijzigingen
+                // lopende transactie voor nog niet opgeslagen wijzigingen
                 ReadAttached(ownerTransaction);
             }
             else

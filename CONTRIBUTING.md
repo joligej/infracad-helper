@@ -50,7 +50,9 @@ Privé-DWG’s, bedrijfseigen voorbeelden en hun screenshots horen niet in git.
 Houd de bestaande stijl aan (zie `.editorconfig`): vier spaties, `var` waar het type
 duidelijk is. Gebruik weinig commentaar: korte Nederlandse fragmenten in kleine letters,
 alleen waar de reden voor de code anders onduidelijk blijft. Teksten in de UI en
-documentatie zijn Nederlands.
+documentatie zijn Nederlands. Kies namen die de taak of inhoud beschrijven. Sluit aan
+bij bestaande CAD-termen en vermijd onnodige afkortingen. Behoud namen die in
+opgeslagen instellingen of openbare commando's worden gebruikt.
 
 ## Pull requests
 
