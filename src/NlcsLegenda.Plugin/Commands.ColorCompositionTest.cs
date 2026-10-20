@@ -104,6 +104,11 @@ public partial class Commands
                 LegendViewport.Sync(doc.Database, tr, definition);
                 if (Math.Abs(viewport.CustomScale - 2) > 1e-8 || !viewport.Locked)
                     throw new InvalidOperationException("Viewport niet op 1:500 vergrendeld.");
+                viewport.Width = 150;
+                if (!LegendViewport.Align(viewport, s, new Extents3d(Point3d.Origin, new Point3d(73, 20, 0)), false)
+                    || Math.Abs(viewport.ViewCenter.X - 36.5) > 1e-8)
+                    throw new InvalidOperationException("Marge snijdt een passend voorbeeld af.");
+                viewport.Width = 160;
                 definition.Settings.Scale = 1000;
                 LegendViewport.Sync(doc.Database, tr, definition);
                 if (Math.Abs(viewport.CustomScale - 1) > 1e-8 || Math.Abs(viewport.Width - 160) > 1e-8)

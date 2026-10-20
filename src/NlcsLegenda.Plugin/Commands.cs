@@ -476,8 +476,9 @@ public partial class Commands
                     var viewport = (Viewport)existing.GetObject(result.ObjectId, OpenMode.ForWrite);
                     if (viewport.Number == 1) return;
                     LegendViewport.Link(viewport, existing, target.Id, automatic: false);
-                    LegendViewport.Align(viewport, settings, new Extents3d(min, max), automatic: false);
+                    bool fits = LegendViewport.Align(viewport, settings, new Extents3d(min, max), automatic: false);
                     existing.Commit();
+                    if (!fits) ed.WriteMessage("\nHet kader is te klein voor deze schaal; vergroot het kader of maak een automatisch venster.");
                     ed.WriteMessage($"\nLegenda-venster gekoppeld op 1:{settings.Scale:g}.");
                     return;
                 }

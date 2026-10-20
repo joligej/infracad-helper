@@ -35,7 +35,8 @@ tekening. `NLCSLEGENDAVIEWPORT` maakt in
 de paper space een viewport rond de gekozen legenda op de ingestelde schaal. Dit venster
 blijft gekoppeld: bij een schaalwijziging van de legenda volgt de viewport automatisch en
 blijft hij vergrendeld. Automatisch gemaakte kaders groeien mee; een handmatig getekend
-kader houdt zijn papierafmetingen. Kies **Bestaand** om een oud legenda-venster eenmalig te
+kader houdt zijn papierafmetingen. De marge wordt zo nodig verkleind; een te klein
+kader geeft een melding zonder de schaal te veranderen. Kies **Bestaand** om een oud legenda-venster eenmalig te
 koppelen. Andere viewports worden niet aangepast.
 
 ### Instellingen

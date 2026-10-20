@@ -36,7 +36,7 @@ internal static class LegendViewport
             ? (id, Convert.ToInt16(values[1].Value) == 1) : null;
     }
 
-    public static void Align(Viewport viewport, LegendSettings settings, Extents3d bounds, bool automatic)
+    public static bool Align(Viewport viewport, LegendSettings settings, Extents3d bounds, bool automatic)
     {
         viewport.Locked = false;
         double scale = 1000 / settings.Scale;
@@ -53,15 +53,21 @@ internal static class LegendViewport
         viewport.ViewDirection = Vector3d.ZAxis;
         viewport.ViewTarget = Point3d.Origin;
         viewport.TwistAngle = 0;
-        viewport.ViewCenter = new Point2d(bounds.MinPoint.X + (viewport.Width / 2 - margin) / scale,
-            bounds.MaxPoint.Y - (viewport.Height / 2 - margin) / scale);
+        double width = (bounds.MaxPoint.X - bounds.MinPoint.X) * scale;
+        double height = (bounds.MaxPoint.Y - bounds.MinPoint.Y) * scale;
+        double marginX = Math.Min(margin, Math.Max(0, (viewport.Width - width) / 2));
+        double marginY = Math.Min(margin, Math.Max(0, (viewport.Height - height) / 2));
+        viewport.ViewCenter = new Point2d(bounds.MinPoint.X + (viewport.Width / 2 - marginX) / scale,
+            bounds.MaxPoint.Y - (viewport.Height / 2 - marginY) / scale);
         viewport.CustomScale = scale;
         viewport.Locked = true;
+        return width <= viewport.Width + 1e-8 && height <= viewport.Height + 1e-8;
     }
 
-    public static void Sync(Database db, Transaction tr, LegendDefinition legend)
+    public static bool Sync(Database db, Transaction tr, LegendDefinition legend)
     {
-        if (!LegendManagement.TryGetGroupExtents(db, tr, legend.GroupName, out var bounds)) return;
+        if (!LegendManagement.TryGetGroupExtents(db, tr, legend.GroupName, out var bounds)) return true;
+        bool fits = true;
         foreach (DBDictionaryEntry item in (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead))
         {
             var layout = (Layout)tr.GetObject(item.Value, OpenMode.ForRead);
@@ -71,8 +77,9 @@ internal static class LegendViewport
                 if (tr.GetObject(entityId, OpenMode.ForRead) is not Viewport viewport) continue;
                 if (Read(viewport, tr) is not { } link || link.Id != legend.Id) continue;
                 viewport.UpgradeOpen();
-                Align(viewport, legend.Settings, bounds, link.Automatic);
+                fits &= Align(viewport, legend.Settings, bounds, link.Automatic);
             }
         }
+        return fits;
     }
 }
