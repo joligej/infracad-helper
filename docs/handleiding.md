@@ -204,8 +204,8 @@ Bij samenvoegen betekent een aangevinkt kenmerk: **niet vergelijken**.
 Dit staat standaard **uit**, zowel voor KLIC als voor overige lagen. Verschillende
 kleuren, lijnpatronen en symbolen blijven bij automatisch samenvoegen altijd apart.
 
-Voor nieuwe KLIC-legenda's staan **Spanning/druk**, **Uitvoering**, **Volgnummer**
-en **Netbeheerders samenvoegen** standaard aan. Een beheerder achter in de laagnaam
+Voor nieuwe KLIC-legenda's staan **Spanning/druk**, **Uitvoering**, **Volgnummer**,
+**Diameters** en **Netbeheerders samenvoegen** standaard aan. Een beheerder achter in de laagnaam
 wordt herkend via de KLIC-gegevens, ook als punten of spaties anders zijn geschreven.
 Zonder die gegevens wordt geen beheerder uit een laagnaam geraden.
 Een oud globaal profiel zonder
@@ -213,6 +213,19 @@ samenvoegkeuzes krijgt deze beginwaarden eenmaal mee; daarna worden ook bewust
 uitgeschakelde keuzes behouden. Bestaande legenda's houden hun lokale keuzes.
 **Overige lagen** heeft een eigen groep vinkjes, standaard allemaal uit. Binnen
 beide groepen blijven discipline en hoofdgroep aparte grenzen.
+
+![Samenvoegkeuzes voor KLIC en overige lagen](samenvoegen.png)
+
+**Diameters samenvoegen** negeert de diameter in de laagnaam, bijvoorbeeld bij
+`VRIJVERVAL_200` en `VRIJVERVAL_300`. Ook `DN200`, `DN_200`, `Ø200` en maten met
+mm, cm of m worden herkend. Een los getal geldt alleen bij bekende leidingsoorten
+als diameter; een volgnummer zoals `DATA2` blijft een aparte keuze. KLIC-rioollagen
+onder hoofdgroep RI gebruiken de KLIC-keuzes wanneer de objectgegevens aanwezig zijn.
+De samengevoegde regel behoudt alle bronobjecten en hoeveelheden; de automatische
+omschrijving noemt niet uitsluitend de eerste diameter. Bestaande legenda's krijgen
+de nieuwe keuze niet ongevraagd aangezet. Vink haar lokaal aan en kies **Toepassen**.
+Een bewust gekozen uitsplitsing onder **KLIC-instellingen → Afzonderlijke regels**
+blijft voorgaan; vink daar **Diameter** uit wanneer ook die objectwaarden samen mogen.
 
 Selecteer in **Overzicht** meerdere regels met Ctrl of Shift en kies **Samenvoegen…**
 om zelf een groep te maken. Kies vervolgens het **hoofdobject**: daarvan komen

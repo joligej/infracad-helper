@@ -350,6 +350,14 @@ internal static class Program
         Check(settings.SamenvoegenNummer, "KLIC-keuze wijzigt de instelling");
         number.Checked = false;
         Check(!settings.SamenvoegenNummer, "KLIC-keuze is omkeerbaar");
+        var diameters = Descendants(tabs.SelectedTab!).OfType<CheckBox>().Where(c => c.Text == "Diameters samenvoegen").ToArray();
+        Check(diameters.Length == 2, "Diameterkeuzes voor KLIC en overige lagen");
+        diameters[0].Checked = false;
+        diameters[1].Checked = true;
+        Check(!settings.MergedDimensions.Contains(GroupDimension.Diameter) && settings.NonKlicMergedDimensions.Contains(GroupDimension.Diameter), "Diameterkeuzes onafhankelijk");
+        diameters[0].Checked = true;
+        diameters[1].Checked = false;
+        Check(settings.MergedDimensions.Contains(GroupDimension.Diameter) && !settings.NonKlicMergedDimensions.Contains(GroupDimension.Diameter), "Diameterkeuzes omkeerbaar");
         form.Close();
     }
 

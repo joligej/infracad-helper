@@ -141,7 +141,7 @@ public sealed class LegendSettings
     public HashSet<GroupDimension> MergedDimensions { get; set; } = DefaultKlicMergeDimensions();
 
     public static HashSet<GroupDimension> DefaultKlicMergeDimensions() =>
-        new() { GroupDimension.Specificatie, GroupDimension.Uitvoering, GroupDimension.Nummer, GroupDimension.Netbeheerder };
+        new() { GroupDimension.Specificatie, GroupDimension.Uitvoering, GroupDimension.Nummer, GroupDimension.Netbeheerder, GroupDimension.Diameter };
 
     [Browsable(false)]
     public List<GroupDimension> NonKlicMergedDimensions { get; set; } = new();

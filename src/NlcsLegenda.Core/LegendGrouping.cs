@@ -86,6 +86,7 @@ public static class LegendGrouping
                     group, representative, settings, layerDescription, descriptions, descriptionSourceOf, blockName, out var descSource),
                 DescriptionSource = descSource,
                 LayersByType = byType,
+                SourceRenderLayers = group.Select(layer => layer.EffectiveRenderLayerName).Distinct().ToArray(),
                 Metric = metric,
                 SymbolBlockName = blockName,
                 SourceLayers = group.SelectMany(layer => layer.SourceLayers.Count > 0
@@ -116,7 +117,7 @@ public static class LegendGrouping
         }
 
         entries.RemoveAll(e => settings.IsEntryExcluded(LegendSettings.SelectionKey(e)));
-        return Sort(ManualMergeGroup.Apply(Merge(entries, settings), settings.ManualMergeGroups), settings);
+        return Sort(ManualMergeGroup.Apply(Merge(entries, settings, descriptions), settings.ManualMergeGroups), settings);
     }
 
     private static string RenderId(
@@ -142,7 +143,7 @@ public static class LegendGrouping
         return string.Join(";", parts);
     }
 
-    private static List<LegendEntry> Merge(List<LegendEntry> entries, LegendSettings settings)
+    private static List<LegendEntry> Merge(List<LegendEntry> entries, LegendSettings settings, DescriptionCatalog catalog)
     {
         bool mergeStatus = settings.MergeIdenticalStatuses;
         if (settings.MergedDimensions.Count == 0 && settings.NonKlicMergedDimensions.Count == 0 && !mergeStatus)
@@ -160,10 +161,10 @@ public static class LegendGrouping
                 ? "R:" + e.RenderIdentity
                 : e.StatusGroupId;
             var renderPart = e.RenderIdentity.Length > 0 ? e.RenderIdentity : string.Empty;
-            var dimensions = ElementProperties.IsKlic(e.Discipline, e.Hoofdgroep)
+            var dimensions = e.IsKlic
                 ? (IReadOnlyCollection<GroupDimension>)settings.MergedDimensions : settings.NonKlicMergedDimensions;
             var content = props.MergeKey(dimensions);
-            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{content}|{e.KlicGroupKey}|{renderPart}";
+            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{e.IsKlic}|{content}|{e.KlicGroupKey}|{renderPart}";
         }
 
         var merged = new List<LegendEntry>();
@@ -184,16 +185,31 @@ public static class LegendGrouping
         {
             var group = byKey[KeyOf(merged[i])];
             if (group.Count > 1)
-                merged[i] = Combine(group);
+            {
+                var rep = Representative(group);
+                string? description = null;
+                if (group.Select(e => ElementProperties.From(e.Element, e.Netbeheerders.FirstOrDefault() ?? "").Diameter).Distinct().Skip(1).Any()
+                    && rep.DescriptionSource is DescriptionSource.Catalogus or DescriptionSource.Laagnaam)
+                {
+                    var layer = new NlcsLayerName { Raw = rep.PrimaryLayer, LocalName = rep.PrimaryLayer,
+                        StatusCode = "", Discipline = rep.Discipline, Hoofdgroep = rep.Hoofdgroep,
+                        Element = ElementProperties.WithoutDiameter(rep.Element), TypeSuffix = "" };
+                    description = catalog.Describe(layer, settings.IncludeGeneralDescription, settings.GeneralSeparator);
+                }
+                merged[i] = Combine(group, description: description);
+            }
         }
         merged.AddRange(separate);
         return merged;
     }
 
-    internal static LegendEntry Combine(List<LegendEntry> group, LegendEntry? main = null, string manualId = "")
+    private static LegendEntry Representative(List<LegendEntry> group) =>
+        group.OrderBy(e => ElementProperties.From(e.Element, e.Netbeheerders.FirstOrDefault() ?? "").Nummer.Length == 0 ? 0 : 1)
+            .ThenBy(e => e.Element, StringComparer.OrdinalIgnoreCase).First();
+
+    internal static LegendEntry Combine(List<LegendEntry> group, LegendEntry? main = null, string manualId = "", string? description = null)
     {
-        var rep = main ?? group.OrderBy(e => ElementProperties.From(e.Element).Nummer.Length == 0 ? 0 : 1)
-                       .ThenBy(e => e.Element, StringComparer.OrdinalIgnoreCase).First();
+        var rep = main ?? Representative(group);
         var metric = LayerMetric.Empty;
         foreach (var e in group) metric += e.Metric;
         return new LegendEntry
@@ -206,9 +222,10 @@ public static class LegendGrouping
             KlicObjects = KlicSummary.Combine(group.SelectMany(e => e.KlicObjects)),
             KlicGroupKey = rep.KlicGroupKey,
             KlicDescriptionFields = rep.KlicDescriptionFields,
-            Description = rep.Description,
+            Description = description ?? rep.Description,
             DescriptionSource = rep.DescriptionSource,
             LayersByType = rep.LayersByType,
+            SourceRenderLayers = group.SelectMany(e => e.SourceRenderLayers.Count > 0 ? (IEnumerable<string>)e.SourceRenderLayers : e.LayersByType.Values).Distinct().ToArray(),
             SourceLayers = group.SelectMany(e => e.SourceLayers).Distinct().ToArray(),
             Netbeheerders = group.SelectMany(e => e.Netbeheerders).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p => p, StringComparer.CurrentCultureIgnoreCase).ToArray(),
             Metric = metric,

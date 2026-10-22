@@ -56,10 +56,13 @@ De plugin controleert daarmee niet de werkelijke ligging in het terrein.
 In **Instellingen → Inhoud** betekent een aangevinkt samenvoegkenmerk dat dit kenmerk niet
 wordt vergeleken. **Soorten samenvoegen** staat standaard uit: gas en water blijven
 verschillende soorten. Voor nieuwe KLIC-legenda's staan specificatie (spanning/druk),
-uitvoering, volgnummer en netbeheerder standaard aan. Overige lagen hebben aparte keuzes,
-standaard allemaal uit. Soort, specificatie, uitvoering en volgnummer komen
+uitvoering, volgnummer, diameter en netbeheerder standaard aan. Overige lagen hebben aparte keuzes,
+standaard allemaal uit. Soort, specificatie, uitvoering, diameter en volgnummer komen
 uit de NLCS-laagnaam; de netbeheerder komt uit de objectgegevens. DATA2 bewijst dus niet wie
-de netbeheerder is. Hoeveelheden worden opgeteld; zichtbaar verschillende symbolen of
+de netbeheerder is. Objectgegevens herkennen ook KLIC-riool onder hoofdgroep RI.
+Bij **Diameters samenvoegen** verliezen de samengevoegde regels geen bronobjecten;
+de afzonderlijke diameters blijven terug te vinden in KLIC-details en de bronlagen.
+Hoeveelheden worden opgeteld; zichtbaar verschillende symbolen of
 arceringen blijven gescheiden.
 
 Onder **KLIC-instellingen → Afzonderlijke regels** kun je bijvoorbeeld materiaal en diameter

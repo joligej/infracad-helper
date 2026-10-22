@@ -320,6 +320,7 @@ internal sealed class SettingsDialog : LegendDialog
             BoundCheck("Spanning/druk samenvoegen", () => _settings.SamenvoegenSpecificatie, v => _settings.SamenvoegenSpecificatie = v),
             BoundCheck("Uitvoering samenvoegen", () => _settings.SamenvoegenUitvoering, v => _settings.SamenvoegenUitvoering = v),
             BoundCheck("Netbeheerders samenvoegen", () => _settings.MergedDimensions.Contains(GroupDimension.Netbeheerder), v => { if (v) _settings.MergedDimensions.Add(GroupDimension.Netbeheerder); else _settings.MergedDimensions.Remove(GroupDimension.Netbeheerder); }),
+            BoundCheck("Diameters samenvoegen", () => _settings.MergedDimensions.Contains(GroupDimension.Diameter), v => { if (v) _settings.MergedDimensions.Add(GroupDimension.Diameter); else _settings.MergedDimensions.Remove(GroupDimension.Diameter); }),
             BoundCheck("Volgnummer samenvoegen", () => _settings.SamenvoegenNummer, v => _settings.SamenvoegenNummer = v),
             BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v), klic));
 
@@ -328,7 +329,8 @@ internal sealed class SettingsDialog : LegendDialog
             new Label { Text = "Alleen bij gelijke weergave, binnen dezelfde discipline en hoofdgroep.", AutoSize = true } };
         foreach (var (dimension, label) in new[] {
             (GroupDimension.Soort, "Soorten samenvoegen"), (GroupDimension.Specificatie, "Specificaties samenvoegen"),
-            (GroupDimension.Uitvoering, "Uitvoeringen samenvoegen"), (GroupDimension.Nummer, "Volgnummers samenvoegen") })
+            (GroupDimension.Uitvoering, "Uitvoeringen samenvoegen"), (GroupDimension.Nummer, "Volgnummers samenvoegen"),
+            (GroupDimension.Diameter, "Diameters samenvoegen") })
             otherMerge.Add(BoundCheck(label, () => _settings.NonKlicMergedDimensions.Contains(dimension), value => {
                 _settings.NonKlicMergedDimensions.Remove(dimension);
                 if (value) _settings.NonKlicMergedDimensions.Add(dimension);
