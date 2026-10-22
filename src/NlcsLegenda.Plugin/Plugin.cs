@@ -8,6 +8,8 @@ namespace NlcsLegenda.Plugin;
 
 public sealed class Plugin : IExtensionApplication
 {
+    private GdiErrorLog? _gdiLog;
+
     public void Initialize()
     {
         var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
@@ -15,6 +17,8 @@ public sealed class Plugin : IExtensionApplication
 
         if (HostEnvironment.IsCoreConsole)
             return;
+
+        _gdiLog = new GdiErrorLog(System.IO.Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NlcsLegenda", "gdi.log"));
 
         try
         {
@@ -29,6 +33,8 @@ public sealed class Plugin : IExtensionApplication
 
     public void Terminate()
     {
+        _gdiLog?.Dispose();
+        _gdiLog = null;
         RibbonBuilder.Shutdown();
     }
 }

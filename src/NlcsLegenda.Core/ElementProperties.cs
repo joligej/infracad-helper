@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
+
 namespace NlcsLegenda.Core;
 
 public enum GroupDimension
@@ -6,7 +9,8 @@ public enum GroupDimension
     Specificatie,
     Uitvoering,
     Nummer,
-    Netbeheerder
+    Netbeheerder,
+    Diameter
 }
 
 public sealed class ElementProperties
@@ -22,6 +26,7 @@ public sealed class ElementProperties
     public string Specificatie { get; private init; } = string.Empty;
     public string Uitvoering { get; private init; } = string.Empty;
     public string Nummer { get; private init; } = string.Empty;
+    public string Diameter { get; private init; } = string.Empty;
 
     public string Netbeheerder { get; private init; } = string.Empty;
 
@@ -41,7 +46,8 @@ public sealed class ElementProperties
 
         string specificatie = string.Empty;
         string nummer = string.Empty;
-        var tokens = e.Split('_', StringSplitOptions.RemoveEmptyEntries).ToList();
+        var (withoutDiameter, diameter) = SplitDiameter(e);
+        var tokens = withoutDiameter.Split('_', StringSplitOptions.RemoveEmptyEntries).ToList();
         if (tokens.Count >= 2)
         {
             var last = tokens[^1];
@@ -69,8 +75,36 @@ public sealed class ElementProperties
             Specificatie = specificatie,
             Uitvoering = uitvoering,
             Nummer = nummer,
+            Diameter = diameter,
             Netbeheerder = netbeheerder.Trim().ToUpperInvariant()
         };
+    }
+
+    private static readonly Regex DiameterToken = new(
+        @"^(?<prefix>DN|Ø|DIAM(?:ETER)?)?\s*(?<value>[0-9]+(?:[.,][0-9]+)?)\s*(?<unit>MM|CM|M)?$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+    private static readonly HashSet<string> PipeTypes = new(StringComparer.OrdinalIgnoreCase)
+        { "VRIJVERVAL", "DRUKRIOOL", "PERSLEIDING", "RIOOL", "RIOLERING", "HEMELWATER", "VUILWATER", "DRAINAGE", "DRAIN", "WATER", "GAS" };
+
+    internal static string WithoutDiameter(string element) => SplitDiameter(element).Element;
+
+    private static (string Element, string Diameter) SplitDiameter(string element)
+    {
+        var tokens = element.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 1; i < tokens.Length; i++)
+        {
+            var match = DiameterToken.Match(tokens[i]);
+            bool separatePrefix = i > 1 && tokens[i - 1].ToUpperInvariant() is "DN" or "Ø" or "DIAM" or "DIAMETER";
+            if (!match.Success || (match.Groups["prefix"].Length == 0 && !separatePrefix && !PipeTypes.Contains(tokens[0]))) continue;
+            if (!decimal.TryParse(match.Groups["value"].Value.Replace(',', '.'), NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out var value) || value <= 0) continue;
+            decimal factor = match.Groups["unit"].Value.ToUpperInvariant() switch { "M" => 1000, "CM" => 10, _ => 1 };
+            if (value > decimal.MaxValue / factor) continue;
+            // kale getallen alleen bij bekende leidingsoorten
+            return (string.Join('_', tokens.Where((_, index) => index != i && (!separatePrefix || index != i - 1))),
+                (value * factor).ToString("G29", CultureInfo.InvariantCulture));
+        }
+        return (element, string.Empty);
     }
 
     internal static string WithoutProviderSuffix(string? text, string? provider)
@@ -99,6 +133,7 @@ public sealed class ElementProperties
         GroupDimension.Uitvoering => Uitvoering,
         GroupDimension.Nummer => Nummer,
         GroupDimension.Netbeheerder => Netbeheerder,
+        GroupDimension.Diameter => Diameter,
         _ => string.Empty
     };
 

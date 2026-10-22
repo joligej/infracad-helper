@@ -67,6 +67,8 @@ public static class StandardTexts
         ["VH|KANTOPSLUITING_ELEMENT_INRITBAND"] = "Inritband",
         ["VH|KANTVERHARDING_STREKLAAG"] = "Streklaag",
         ["VH|DREMPEL_TALUD"] = "Verkeersdrempel",
+        ["RI|VRIJVERVAL"] = "Vrijvervalriool",
+        ["RI|DRUKRIOOL"] = "Drukriool",
         ["RI|HWA_RIOOLLEIDING"] = "Hemelwaterriool",
         ["RI|VWA_RIOOLLEIDING"] = "Vuilwaterriool",
         ["RI|GWA_RIOOLLEIDING"] = "Gemengd riool",

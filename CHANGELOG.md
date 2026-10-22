@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.34.0 - 2026-10-22
+
+- **Diameters samenvoegen** is apart instelbaar voor KLIC en overige lagen. De optie negeert de diameter in de laagnaam, met behoud van leidingsoort, kleur, lijnpatroon en de overige niet-samengevoegde kenmerken. Voor nieuwe KLIC-instellingen staat zij aan; bestaande keuzes blijven behouden.
+- KLIC-rioollagen onder hoofdgroep RI gebruiken hun objectgegevens voor de netbeheerder en de KLIC-samenvoegkeuzes. Vrijvervalriool krijgt een herkenbare naam; een samengevoegde automatische omschrijving noemt niet uitsluitend de eerste diameter.
+- Samengevoegde regels behouden alle bronobjecten voor selectie, ook bij een handmatige samenvoeging. Hoeveelheden en de afzonderlijke bronnen blijven beschikbaar.
+
+- Een terugkerende GDI+-fout krijgt een begrensd lokaal diagnoselog met de volledige lopende aanroepketen. De start- en lagenvensterproeven slagen met en zonder de plug-in; de oorzaak van de oudere hostmelding is nog niet definitief vastgesteld.
+
 ## 1.33.4 - 2026-10-20
 
 - Object Data uit een alleen-lezen xref blijft beschikbaar. Alleen de tijdelijke bronkopie krijgt een verwijderbaar bestandskenmerk; de originele xref blijft alleen-lezen en wordt niet gewijzigd. Zo mislukt de uitlezing niet meer bij het opruimen van de kopie.

@@ -21,6 +21,30 @@ De eerder waargenomen GDI+-melding ontstond in
 `Autodesk.AutoCAD.LayerManager.MultiTreeView.OnDrawNode`. Een verband met deze
 resourcelekken is niet aangetoond; deze release claimt geen reparatie van die hostmelding.
 
+## GDI+-onderzoek op 22 oktober 2026
+
+De oorspronkelijke melding betrof `Graphics.FillRectangle` vanuit
+`Autodesk.AutoCAD.LayerManager.MultiTreeView.OnDrawNode`. De nieuwe proeven
+registreren uitzonderingen vanaf de CAD-opstart, vóór de eerste idle-gebeurtenis.
+Starten, vijftien keer het lagenvenster openen/sluiten en gewoon QSAVE/QUIT slagen
+met en zonder de geïnstalleerde plug-in. Ook starten met een vooraf geopend
+lagenvenster slaagt in beide gevallen; er is geen oplopend GDI-resourcegebruik.
+
+In een eerdere proef zonder geladen NLCS-assemblies is één generieke GDI+-fout
+vastgelegd. Die eerste registratie bevatte alleen `Graphics.CheckErrorStatus`.
+Een andere opdracht nam daarna de testsessie over; die ronde is geen volledige
+acceptatieproef en bewijst niet dat dit precies dezelfde LayerManager-fout was.
+Een verbindingsprobleem in de testbesturing en een fout in de riooltest zijn
+afzonderlijk hersteld en opnieuw gecontroleerd; deze waren geen GDI+-fouten.
+
+De oorzaak van de oude melding is hiermee nog niet definitief vastgesteld.
+Vanaf 1.34.0 bewaart de plug-in een volgende GDI+-uitzondering met de lopende
+aanroepketen in `%LOCALAPPDATA%\NlcsLegenda\gdi.log`. Dat is lokale diagnose,
+zonder verzending, en geen reparatie of onderdrukking van de oorspronkelijke fout.
+Per CAD-sessie worden maximaal acht meldingen geschreven; het bestand blijft
+maximaal 256 KiB. Afsluiten koppelt de registratie los. Tests controleren ook
+een onschrijfbaar logbestand en dat de oorspronkelijke uitzondering doorgaat.
+
 ## Object Data uit xrefs in 1.33.3
 
 De Map-lezer van de hoofdtekening leest de oorspronkelijke objecten uit directe

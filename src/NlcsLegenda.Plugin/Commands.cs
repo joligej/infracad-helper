@@ -1065,9 +1065,9 @@ public partial class Commands
 
     private static string EntryGroupLabel(LegendEntry e)
     {
-        if (ElementProperties.IsKlic(e.Discipline, e.Hoofdgroep))
+        if (e.IsKlic)
         {
-            var soort = ElementProperties.From(e.Element).Soort;
+            var soort = ElementProperties.From(e.Element, e.Netbeheerders.FirstOrDefault() ?? "").Soort;
             if (!string.IsNullOrWhiteSpace(soort))
                 return soort;
         }

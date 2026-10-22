@@ -34,7 +34,7 @@ Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitle
 | Opmaak | Schaal, maten, kolommen, notities, hoeveelheden en schaalbalk |
 | Voorbeelden | Bronweergave of een volledig voorbeeld uit een DWG-bibliotheek |
 | Xrefs | Per koppeling kiezen of die meetelt, ook bij geneste bronnen |
-| KLIC | Netbeheerders en objectgegevens lezen; regels samenvoegen of uitsplitsen |
+| KLIC | Netbeheerders en objectgegevens lezen; onder meer diameters apart houden of samenvoegen |
 | Uitvoer | Een gekoppelde viewport die de legenda-schaal volgt, CSV/JSON of een uittrekstaat van een map |
 
 Elke legenda bewaart haar eigen bron en instellingen in de DWG. **Toepassen**
@@ -52,8 +52,8 @@ een opzet bewaren en delen.
   niet in de installer. Neem je eigen bibliotheek mee naar een andere computer.
 - **Hoeveelheden.** Een niet meetbaar bronoppervlak verschijnt als `? m²`, met een
   bronmelding. De plugin controleert geen werkelijke ligging van kabels en leidingen.
-- **KLIC-host.** Object Data wordt gelezen in de geopende bron-DWG in Civil 3D/Map.
-  Xrefs gebruiken ingebedde InfraCAD-gegevens en leesbare Property Sets.
+- **KLIC-host.** Civil 3D/Map leest Object Data uit de hoofdtekening en directe of
+  geneste xrefs. Ook ingebedde InfraCAD-gegevens en leesbare Property Sets tellen mee.
 
 De [handleiding](docs/handleiding.md) beschrijft keuzes en commando’s.
 [Maatvoering](docs/template-maatvoering.md) legt de opmaak vast;

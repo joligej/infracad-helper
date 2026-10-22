@@ -21,6 +21,7 @@ public sealed class LegendEntry
     public IReadOnlyList<string> Netbeheerders { get; init; } = Array.Empty<string>();
 
     public IReadOnlyList<KlicObjectData> KlicObjects { get; init; } = Array.Empty<KlicObjectData>();
+    public bool IsKlic => ElementProperties.IsKlic(Discipline, Hoofdgroep) || KlicObjects.Any(o => o.HasData);
     public string KlicGroupKey { get; init; } = string.Empty;
     public IReadOnlyList<string> KlicDescriptionFields { get; init; } = Array.Empty<string>();
 
@@ -48,6 +49,8 @@ public sealed class LegendEntry
     public string? ManualHatchPattern { get; init; }
 
     public Dictionary<NlcsDrawType, string> LayersByType { get; init; } = new();
+
+    public IReadOnlyList<string> SourceRenderLayers { get; init; } = Array.Empty<string>();
 
     public IReadOnlyList<NlcsLayerSource> SourceLayers { get; init; } = System.Array.Empty<NlcsLayerSource>();
 

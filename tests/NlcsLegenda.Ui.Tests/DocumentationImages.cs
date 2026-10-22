@@ -30,13 +30,21 @@ internal static class DocumentationImages
             Capture(form, directory, "overzicht.png", new Size(1180, 650));
         using (var form = new SettingsDialog(settings.Clone(), "Legenda: Inrichting – demonstratie", xrefNames: new[] { "KLIC", "ONDERGROND" }))
             Capture(form, directory, "instellingen.png", new Size(840, 650));
+        using (var form = new SettingsDialog(settings.Clone(), "Legenda: Inrichting – demonstratie", xrefNames: new[] { "KLIC", "ONDERGROND" }))
+            Capture(form, directory, "samenvoegen.png", new Size(840, 650), f => {
+                var tabs = Descendants(f).OfType<TabControl>().Single();
+                tabs.SelectedIndex = 1;
+                Application.DoEvents();
+                var group = Descendants(tabs.SelectedTab!).OfType<GroupBox>().Single(g => g.Text.StartsWith("KLIC —"));
+                tabs.SelectedTab!.AutoScrollPosition = new Point(0, group.Top);
+            });
         var checks = entries.Select(e => new EntryCheckItem(LegendSettings.EntryKey(e), e.Description,
             e.Status.DisplayName(), string.Join(" ", e.SourceLayers.Select(s => s.SourceLayerName)))).ToArray();
         using (var form = new LegendManageDialog(checks, new LegendSettings(), new[] {
             new ManualEntry { Layer = "PROJECT_GRENS", Description = "Werkgrens", Type = NlcsDrawType.Geometrie } }, allowPicking: true))
             Capture(form, directory, "samenstellen.png", new Size(840, 600), f =>
                 Descendants(f).OfType<TextBox>().Single().Text = "-kl-");
-        Console.WriteLine("Drie documentatiebeelden geschreven met synthetische gegevens.");
+        Console.WriteLine("Vier documentatiebeelden geschreven met synthetische gegevens.");
     }
 
     private static LegendEntry Entry(string layer, string text, NlcsDrawType type, double quantity, string xref = "")

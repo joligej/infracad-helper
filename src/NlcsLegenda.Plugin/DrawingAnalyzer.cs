@@ -154,7 +154,7 @@ public static class DrawingAnalyzer
         {
             Entries = entries,
             EntryObjects = !trackSources ? new Dictionary<string, IReadOnlySet<ObjectId>>() : entries.GroupBy(LegendSettings.SelectionKey).ToDictionary(g => g.Key,
-                g => (IReadOnlySet<ObjectId>)g.SelectMany(e => e.LayersByType.Values)
+                g => (IReadOnlySet<ObjectId>)g.SelectMany(e => e.SourceRenderLayers.Count > 0 ? (IEnumerable<string>)e.SourceRenderLayers : e.LayersByType.Values)
                     .SelectMany(k => c.Objects.GetValueOrDefault(k) ?? new()).ToHashSet()),
             HatchSamples = c.Hatches,
             SymbolSamples = c.SymbolSamples,
@@ -242,7 +242,7 @@ public static class DrawingAnalyzer
         if (TryMatchCustomRule(ent, tr, settings, layerName, sourceXref, out rule, out parsed))
         {
             metadata = c.Klic.Read(ent, sourceXref);
-            parsed = CopyLayer(parsed!, sourceXref, ElementProperties.IsKlic(parsed!.Discipline, parsed.Hoofdgroep) ? metadata.Provider : string.Empty,
+            parsed = CopyLayer(parsed!, sourceXref, metadata.Provider,
                 metadata.GroupKey(settings.Klic.GroupFields));
             if (!settings.IsIncluded(parsed)) return;
         }
@@ -250,7 +250,7 @@ public static class DrawingAnalyzer
         {
             if (!NlcsLayerParser.TryParse(layerName, out parsed)) return;
             metadata = c.Klic.Read(ent, sourceXref);
-            parsed = CopyLayer(parsed, sourceXref, ElementProperties.IsKlic(parsed.Discipline, parsed.Hoofdgroep) ? metadata.Provider : string.Empty,
+            parsed = CopyLayer(parsed, sourceXref, metadata.Provider,
                 metadata.GroupKey(settings.Klic.GroupFields));
             if (!settings.IsIncluded(parsed))
             {
