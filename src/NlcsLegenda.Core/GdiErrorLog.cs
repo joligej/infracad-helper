@@ -31,7 +31,7 @@ public sealed class GdiErrorLog : IDisposable
                 _reports++;
                 try
                 {
-                    // eerste-kans-stack is nog onvolledig; ook de lopende aanroep bewaren
+                    // volledige aanroep vóór het afwikkelen
                     var text = $"{DateTime.UtcNow:O} | NLCS {typeof(GdiErrorLog).Assembly.GetName().Version} | .NET {Environment.Version} | proces {Environment.ProcessId}\n"
                         + args.Exception + "\n" + Environment.StackTrace + "\n\n";
                     if (text.Length > MaxBytes / 4) text = text[..(MaxBytes / 4)];
@@ -43,7 +43,7 @@ public sealed class GdiErrorLog : IDisposable
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
                 {
-                    // diagnose mag de oorspronkelijke fout niet vervangen
+                    // diagnose zonder vervanging van de oorspronkelijke fout
                 }
             }
         });
