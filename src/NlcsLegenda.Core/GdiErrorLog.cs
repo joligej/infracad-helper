@@ -23,29 +23,37 @@ public sealed class GdiErrorLog : IDisposable
     {
         if (_writing || args.Exception is not ExternalException
             || !args.Exception.Message.Contains("GDI+", StringComparison.OrdinalIgnoreCase)) return;
-        lock (_gate)
+        WriteGuarded(() =>
         {
-            if (_disposed || _reports >= 8) return;
-            _reports++;
-            _writing = true;
-            try
+            lock (_gate)
             {
-                // eerste-kans-stack is nog onvolledig; ook de lopende aanroep bewaren
-                var text = $"{DateTime.UtcNow:O} | NLCS {typeof(GdiErrorLog).Assembly.GetName().Version} | .NET {Environment.Version} | proces {Environment.ProcessId}\n"
-                    + args.Exception + "\n" + Environment.StackTrace + "\n\n";
-                if (text.Length > MaxBytes / 4) text = text[..(MaxBytes / 4)];
-                Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-                if (File.Exists(_path) && new FileInfo(_path).Length + Encoding.UTF8.GetByteCount(text) > MaxBytes)
-                    File.WriteAllText(_path, text);
-                else
-                    File.AppendAllText(_path, text);
+                if (_disposed || _reports >= 8) return;
+                _reports++;
+                try
+                {
+                    // eerste-kans-stack is nog onvolledig; ook de lopende aanroep bewaren
+                    var text = $"{DateTime.UtcNow:O} | NLCS {typeof(GdiErrorLog).Assembly.GetName().Version} | .NET {Environment.Version} | proces {Environment.ProcessId}\n"
+                        + args.Exception + "\n" + Environment.StackTrace + "\n\n";
+                    if (text.Length > MaxBytes / 4) text = text[..(MaxBytes / 4)];
+                    Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+                    if (File.Exists(_path) && new FileInfo(_path).Length + Encoding.UTF8.GetByteCount(text) > MaxBytes)
+                        File.WriteAllText(_path, text);
+                    else
+                        File.AppendAllText(_path, text);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+                {
+                    // diagnose mag de oorspronkelijke fout niet vervangen
+                }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
-            {
-                // diagnose mag de oorspronkelijke fout niet vervangen
-            }
-            finally { _writing = false; }
-        }
+        });
+    }
+
+    private static void WriteGuarded(Action write)
+    {
+        _writing = true;
+        try { write(); }
+        finally { _writing = false; }
     }
 
     public void Dispose()

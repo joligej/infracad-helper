@@ -9,7 +9,7 @@ public class GdiErrorLogTests
     private static void ThrowGdiForLogTest()
     {
         try { throw new ExternalException("A generic error occurred in GDI+."); }
-        catch (ExternalException) { }
+        catch (ExternalException exception) { Assert.Equal("A generic error occurred in GDI+.", exception.Message); }
     }
 
     [Fact]
