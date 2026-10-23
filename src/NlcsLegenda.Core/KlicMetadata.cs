@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
 using System.Xml;
-using System.Xml.Linq;
+using System.Text;
 
 namespace NlcsLegenda.Core;
 
@@ -50,20 +50,47 @@ public static class KlicMetadata
                 {
                     if (xml.NodeType != XmlNodeType.Element || xml.Depth != 1) continue;
                     using var recordReader = xml.ReadSubtree();
-                    var record = XElement.Load(recordReader);
-                    string handle = record.Elements().FirstOrDefault(e => e.Name.LocalName == "Handle")?.Value.Trim() ?? "";
+                    recordReader.MoveToContent();
+                    string table = recordReader.LocalName;
+                    string? handle = null;
+                    Dictionary<string, string>? fields = null;
+                    bool duplicate = false;
+                    while (recordReader.Read())
+                    {
+                        if (recordReader.NodeType != XmlNodeType.Element || recordReader.Depth != 1) continue;
+                        string key = recordReader.LocalName;
+                        if (key == "Handle" && handle is null) handle = ReadValue(recordReader).Trim();
+                        else if (KlicFields.Find(key) is not null)
+                        {
+                            fields ??= new Dictionary<string, string>(StringComparer.Ordinal);
+                            if (!fields.TryAdd(key, ReadValue(recordReader).Trim())) duplicate = true;
+                        }
+                    }
                     if (!ulong.TryParse(handle, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var number)) continue;
+                    if (duplicate) throw new InvalidDataException("Dubbel veld in KLIC-brongegevens.");
+                    if (fields is null) continue;
                     handle = number.ToString("X", CultureInfo.InvariantCulture);
-                    var fields = new Dictionary<string, string>(StringComparer.Ordinal);
-                    foreach (var field in record.Elements().Where(e => KlicFields.Find(e.Name.LocalName) is not null))
-                        if (!fields.TryAdd(field.Name.LocalName, field.Value.Trim()))
-                            throw new InvalidDataException("Dubbel veld in KLIC-brongegevens.");
-                    if (fields.Count == 0) continue;
                     if (!result.TryGetValue(handle, out var records)) result.Add(handle, records = new());
-                    records.Add(new KlicRecord(KlicSource.InfraCAD, record.Name.LocalName, fields));
+                    records.Add(new KlicRecord(KlicSource.InfraCAD, table, fields));
                 }
             }
         }
         return result.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<KlicRecord>)kv.Value, StringComparer.OrdinalIgnoreCase);
     }
+
+    private static string ReadValue(XmlReader xml)
+    {
+        if (xml.IsEmptyElement) return "";
+        int depth = xml.Depth;
+        string value = "";
+        StringBuilder? parts = null;
+        while (xml.Read() && !(xml.NodeType == XmlNodeType.EndElement && xml.Depth == depth))
+        {
+            if (xml.NodeType is not (XmlNodeType.Text or XmlNodeType.CDATA or XmlNodeType.SignificantWhitespace)) continue;
+            if (value.Length == 0) value = xml.Value;
+            else (parts ??= new StringBuilder(value)).Append(xml.Value);
+        }
+        return parts?.ToString() ?? value;
+    }
+
 }

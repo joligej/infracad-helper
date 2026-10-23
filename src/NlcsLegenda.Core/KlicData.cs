@@ -71,19 +71,44 @@ public sealed record KlicObjectData(string Drawing, string Handle, string Xref,
 
     public IReadOnlyList<KlicRecord> Selected(string key)
     {
-        var available = Records.Where(r => r.Values.ContainsKey(key)).ToList();
-        if (available.Count == 0) return Array.Empty<KlicRecord>();
-        return available.GroupBy(r => r.Table, StringComparer.OrdinalIgnoreCase).SelectMany(table =>
+        if (!HasData) return Array.Empty<KlicRecord>();
+        var tables = new Dictionary<string, List<KlicRecord>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var record in Records)
         {
-            var source = table.Any(r => r.Source == PreferredSource) ? PreferredSource : table.Select(r => r.Source).Order().First();
-            return table.Where(r => r.Source == source);
-        }).ToArray();
+            if (!record.Values.ContainsKey(key)) continue;
+            if (!tables.TryGetValue(record.Table, out var group)) tables.Add(record.Table, group = new());
+            group.Add(record);
+        }
+        var result = new List<KlicRecord>();
+        foreach (var group in tables.Values)
+        {
+            var source = group[0].Source;
+            foreach (var record in group)
+            {
+                if (record.Source == PreferredSource) { source = PreferredSource; break; }
+                if (record.Source < source) source = record.Source;
+            }
+            foreach (var record in group)
+                if (record.Source == source) result.Add(record);
+        }
+        return result;
     }
 
-    public IReadOnlyList<string> Values(string key) => Selected(key).Select(r => r.Values[key].Trim())
-        .DistinctBy(v => KlicFields.Canonical(key, v)).OrderBy(v => v, StringComparer.OrdinalIgnoreCase).ToArray();
+    public IReadOnlyList<string> Values(string key)
+    {
+        var records = Selected(key);
+        if (records.Count == 0) return Array.Empty<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var values = new List<string>();
+        foreach (var record in records)
+        {
+            string value = record.Values[key].Trim();
+            if (seen.Add(KlicFields.Canonical(key, value))) values.Add(value);
+        }
+        return values.OrderBy(v => v, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
 
-    public string Provider => string.Join(" / ", Values("Netbeheerder").Where(v => v.Length > 0));
+    public string Provider => !HasData ? "" : string.Join(" / ", Values("Netbeheerder").Where(v => v.Length > 0));
 
     public IEnumerable<string> Conflicts => Records.SelectMany(r => r.Values.Keys).Distinct().Where(key =>
         Records.Where(r => r.Values.ContainsKey(key)).GroupBy(r => r.Table, StringComparer.OrdinalIgnoreCase)
@@ -91,6 +116,7 @@ public sealed record KlicObjectData(string Drawing, string Handle, string Xref,
 
     public string GroupKey(IEnumerable<string> fields)
     {
+        if (!HasData) return "";
         var keys = KlicFields.Valid(fields).Where(k => k != "DiameterM" || Values(k).Count > 0).OrderBy(k => k, StringComparer.Ordinal).ToArray();
         return keys.Length == 0 || !HasData ? "" : JsonSerializer.Serialize(keys.Select(k =>
             new { key = k, values = Values(k).Select(v => KlicFields.Canonical(k, v)).Order(StringComparer.Ordinal).ToArray() }));

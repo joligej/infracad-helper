@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
@@ -17,6 +19,11 @@ internal sealed class KlicAttachedData : IDisposable
     private bool _mapInitialized;
     private string? _mapIssue;
     private object? _readMode;
+    private MethodInfo? _getObjectRecords;
+    private readonly Dictionary<string, (string Name, int Index)[]> _knownFields = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<(Type, string), Func<object, object?>> Getters = new();
+    private static readonly ConcurrentDictionary<(Type, string), Func<object, object, object?>> Indexers = new();
+    private static readonly ConcurrentDictionary<Type, Func<object, int, object?>> PropertyValues = new();
     public KlicAttachedData(Database database, Database mapDatabase)
     {
         _database = database;
@@ -43,11 +50,11 @@ internal sealed class KlicAttachedData : IDisposable
         if (!hasObjectData) return;
         EnsureMap();
         if (_mapIssue is not null) { issues.Add(_mapIssue); return; }
-        string context = "objectrecords";
+        string context = "objectrecords", fieldContext = "";
         try
         {
-            var method = Method(_odTables!, "GetObjectRecords", typeof(uint), typeof(DBObject), _readMode!.GetType(), typeof(bool));
-            using var rows = (IDisposable)method.Invoke(_odTables, new[] { (object)0u, entity, _readMode, false })!;
+            _getObjectRecords ??= Method(_odTables!, "GetObjectRecords", typeof(uint), typeof(DBObject), _readMode!.GetType(), typeof(bool));
+            using var rows = (IDisposable)_getObjectRecords.Invoke(_odTables, new[] { (object)0u, entity, _readMode, false })!;
             foreach (var row in (IEnumerable)rows)
             {
                 using var rowLifetime = row as IDisposable;
@@ -57,23 +64,27 @@ internal sealed class KlicAttachedData : IDisposable
                     throw new InvalidDataException("De Object Data-tabel ontbreekt in de brontekening: " + name);
                 context = name;
                 if ((int)Get(row, "Count")! != fields.Length) throw new InvalidDataException("Object Data-veldindeling wijkt af.");
-                var values = new Dictionary<string, string>();
-                for (int i = 0; i < fields.Length; i++)
+                if (!_knownFields.TryGetValue(name, out var known))
+                    _knownFields.Add(name, known = fields.Select((key, index) => (Name: key, Index: index))
+                        .Where(f => KlicFields.Find(f.Name) is not null).ToArray());
+                var values = new Dictionary<string, string>(known.Length);
+                fieldContext = "";
+                foreach (var field in known)
                 {
-                    if (KlicFields.Find(fields[i]) is null) continue;
-                    context = name + "/" + fields[i];
-                    using var value = (IDisposable)Get(row, "Item", i)!;
+                    fieldContext = field.Name;
+                    using var value = (IDisposable)Get(row, "Item", field.Index)!;
                     string property = Get(value, "Type")!.ToString() switch
                     {
                         "Character" => "StrValue", "Integer" => "Int32Value", "Real" => "DoubleValue",
                         _ => throw new InvalidDataException("Onverwacht Object Data-veldtype.")
                     };
-                    values.Add(fields[i], Convert.ToString(Get(value, property), CultureInfo.InvariantCulture) ?? "");
+                    values.Add(field.Name, Convert.ToString(Get(value, property), CultureInfo.InvariantCulture) ?? "");
                 }
                 if (values.Count > 0) records.Add(new KlicRecord(KlicSource.ObjectData, name, values));
             }
         }
-        catch (Exception ex) when (IsAdapterFailure(ex)) { issues.Add("Object Data niet volledig leesbaar (" + context + "): " + Message(ex)); }
+        catch (Exception ex) when (IsAdapterFailure(ex)) { issues.Add("Object Data niet volledig leesbaar (" + context
+            + (fieldContext.Length == 0 ? "" : "/" + fieldContext) + "): " + Message(ex)); }
     }
 
     private void ReadPropertySets(ObjectId id, Transaction tr, List<KlicRecord> records)
@@ -97,9 +108,17 @@ internal sealed class KlicAttachedData : IDisposable
                 _definitions.Add(definitionId, definition = (name, fields.ToArray()));
             }
             if (definition.Fields.Length == 0) continue;
-            var getAt = Method(set, "GetAt", typeof(int));
-            var values = definition.Fields.ToDictionary(f => f.Name,
-                f => Convert.ToString(getAt.Invoke(set, new object[] { f.Id }), CultureInfo.InvariantCulture) ?? "");
+            var getAt = PropertyValues.GetOrAdd(set.GetType(), type =>
+            {
+                var target = Expression.Parameter(typeof(object));
+                var index = Expression.Parameter(typeof(int));
+                var method = type.GetMethod("GetAt", new[] { typeof(int) }) ?? throw new MissingMethodException(type.FullName, "GetAt");
+                return Expression.Lambda<Func<object, int, object?>>(Expression.Convert(
+                    Expression.Call(Expression.Convert(target, type), method, index), typeof(object)), target, index).Compile();
+            });
+            var values = new Dictionary<string, string>(definition.Fields.Length);
+            foreach (var field in definition.Fields)
+                values.Add(field.Name, Convert.ToString(getAt(set, field.Id), CultureInfo.InvariantCulture) ?? "");
             records.Add(new KlicRecord(KlicSource.PropertySets, definition.Name, values));
         }
     }
@@ -170,8 +189,24 @@ internal sealed class KlicAttachedData : IDisposable
     private static MethodInfo Method(object target, string name, params Type[] types) =>
         target.GetType().GetMethod(name, types) ?? throw new MissingMethodException(target.GetType().FullName, name);
 
-    private static object? Get(object obj, string name, params object[] index) =>
-        (obj.GetType().GetProperty(name) ?? throw new MissingMemberException(obj.GetType().Name, name)).GetValue(obj, index);
+    // alleen api-toegang bewaren; gegevens bij iedere analyse opnieuw lezen
+    private static object? Get(object obj, string name) => Getters.GetOrAdd((obj.GetType(), name), key =>
+    {
+        var property = key.Item1.GetProperty(key.Item2) ?? throw new MissingMemberException(key.Item1.Name, key.Item2);
+        var target = Expression.Parameter(typeof(object));
+        return Expression.Lambda<Func<object, object?>>(Expression.Convert(
+            Expression.Property(Expression.Convert(target, key.Item1), property), typeof(object)), target).Compile();
+    })(obj);
+
+    private static object? Get(object obj, string name, object index) => Indexers.GetOrAdd((obj.GetType(), name), key =>
+    {
+        var property = key.Item1.GetProperty(key.Item2) ?? throw new MissingMemberException(key.Item1.Name, key.Item2);
+        var target = Expression.Parameter(typeof(object));
+        var argument = Expression.Parameter(typeof(object));
+        return Expression.Lambda<Func<object, object, object?>>(Expression.Convert(Expression.MakeIndex(
+            Expression.Convert(target, key.Item1), property,
+            new[] { Expression.Convert(argument, property.GetIndexParameters()[0].ParameterType) }), typeof(object)), target, argument).Compile();
+    })(obj, index);
     private static string Message(Exception ex)
     {
         if (ex is TargetInvocationException { InnerException: { } inner }) ex = inner;
