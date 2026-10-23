@@ -659,7 +659,7 @@ internal static class Program
         var descriptionColumn = grid.Columns[1];
         descriptionColumn.FillWeight = 400;
         sort.SelectedItem = "Handmatig";
-        Check(ReferenceEquals(grid.Columns[1], descriptionColumn) && descriptionColumn.FillWeight == 400,
+        Check(ReferenceEquals(grid.Columns[1], descriptionColumn) && Math.Abs(descriptionColumn.FillWeight - 400) < 0.01f,
             "Volgorde wijzigen behoudt de ingestelde kolombreedte");
         grid.CurrentCell = grid.Rows[2].Cells[1];
         controls.OfType<Button>().Single(c => c.Text == "Naar begin").PerformClick();
