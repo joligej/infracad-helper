@@ -99,6 +99,7 @@ public partial class Commands
             if (Math.Abs(entries.Single(e => e.Netbeheerders.Contains(name)).Metric.Length - length) > 1e-8)
                 throw new InvalidOperationException("Netbeheerder aan verkeerde bron gekoppeld.");
         settings.MergedDimensions.Add(GroupDimension.Netbeheerder);
+        settings.MergedDimensions.Add(GroupDimension.Diameter);
         var merged = DrawingAnalyzer.Analyze(db, tr, settings);
         if (merged.Entries.Count != 1 || merged.Entries[0].Netbeheerders.Count != 4 || Math.Abs(merged.Entries[0].Metric.Length - 30) > 1e-8)
             throw new InvalidOperationException("Samenvoegen verliest bronnen of hoeveelheden.");

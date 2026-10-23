@@ -81,8 +81,9 @@ public partial class Commands
             if (State(aId) != savedA || State(bId) != bBefore || LoadGlobalDefaults().Scale != 1000)
                 throw new InvalidOperationException("Globaal en lokaal zijn niet gescheiden.");
             var empty = new LegendSettings { IncludeRemarks = false, IncludeScaleBar = false };
-            if (ApplySettingsAndRebuild(doc.Editor, db, aId, empty) is null || State(aId) != savedA)
-                throw new InvalidOperationException("Lege wijziging meldt geen fout of overschrijft vorige legenda.");
+            if (ApplySettingsAndRebuild(doc.Editor, db, aId, empty) is not null || State(aId) == savedA || State(bId) != bBefore)
+                throw new InvalidOperationException("Lege samenstelling niet opgeslagen of andere legenda gewijzigd.");
+            savedA = State(aId);
             var invalid = changed.Clone(); invalid.ManualEntries[0].Type = NlcsDrawType.Symbool; invalid.ManualEntries[0].SymbolBlock = "ONTBREEKT";
             if (ApplySettingsAndRebuild(doc.Editor, db, aId, invalid) is null || State(aId) != savedA || State(bId) != bBefore)
                 throw new InvalidOperationException("Mislukte opbouw liet gewijzigde instellingen of geometrie achter.");

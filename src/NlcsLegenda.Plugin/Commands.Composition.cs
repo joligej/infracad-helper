@@ -5,6 +5,34 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
+    internal static List<LegendEntry> ResolveExclusionPick(Database db, Transaction tr, string legendId,
+        AnalysisResult analysis, IReadOnlyList<ObjectId> picked, out bool legendRow)
+    {
+        var registry = LegendStore.Load(db, tr);
+        var local = picked.Where(id => !id.IsNull && id.IsValid && !id.IsErased && id.Database == db).ToArray();
+        var owner = local.Select(id => LegendManagement.FindLegendForEntity(db, tr, registry, id)).FirstOrDefault(d => d is not null);
+        legendRow = owner is not null;
+        if (owner is not null)
+        {
+            if (owner.Id != legendId) return new();
+            foreach (var entity in local.Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>())
+            {
+                var keys = LegendManagement.ReadRowKeys(entity, tr).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (keys.Count > 0) return analysis.Entries.Where(e => e.ExclusionKeys.Any(keys.Contains)).ToList();
+            }
+            // oude legenda's krijgen volledige regelsleutels bij het bijwerken
+            legendRow = false;
+            foreach (var entity in local.Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>())
+                if (LegendManagement.ReadRow(entity) is { } row)
+                    return analysis.Entries.Where(e => e.Hoofdgroep == row.Hoofdgroep && e.Element == row.Element).ToList();
+            return new();
+        }
+        var ids = picked.ToHashSet();
+        foreach (var entity in local.Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<AttributeReference>()) ids.Add(entity.OwnerId);
+        return analysis.Entries.Where(e => analysis.EntryObjects.TryGetValue(LegendSettings.SelectionKey(e), out var sources)
+            && sources.Any(ids.Contains)).ToList();
+    }
+
     private static List<EntryCheckItem> BuildCompositionItems(
         Database db, LegendSettings settings, string? legendId = null)
     {
@@ -32,6 +60,7 @@ public partial class Commands
         }
         var catalog = legendId is null ? LoadGlobalCatalog() : DescriptionCatalog.Default();
         var analysis = DrawingAnalyzer.Analyze(db, tr, probe, selection, catalog, excluded);
+        settings.RememberEntries(analysis.Entries);
         var items = analysis.Entries
             .Select(e => new EntryCheckItem(LegendSettings.SelectionKey(e),
                 $"[{e.Status.DisplayName()}] {e.DisplayDescription}" + AppearanceLabel(e, analysis), EntryGroupLabel(e),

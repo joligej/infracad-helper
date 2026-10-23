@@ -36,6 +36,8 @@ internal sealed class TriStateTree : TreeView
         }
     }
 
+    public event EventHandler? SelectionChanged;
+
     public void SetModel(CompositionTree model, string? filter = null)
     {
         _model = model;
@@ -51,6 +53,7 @@ internal sealed class TriStateTree : TreeView
         }
         RefreshStates();
         EndUpdate();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public CompositionTree Model => _model;
@@ -89,6 +92,7 @@ internal sealed class TriStateTree : TreeView
                 return;
         }
         RefreshStates();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void RefreshStates()

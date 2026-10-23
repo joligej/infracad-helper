@@ -14,6 +14,8 @@ public static class GlobalLegendSettings
             if (!json.RootElement.TryGetProperty("globalDefaultsVersion", out _)
                 && settings.MergedDimensions.Count == 0)
                 settings.MergedDimensions = LegendSettings.DefaultKlicMergeDimensions();
+            if (!json.RootElement.TryGetProperty("diameterMergeDefaultVersion", out _))
+                settings.MergedDimensions.Add(GroupDimension.Diameter);
         }
         var descriptions = DescriptionCatalog.Load(descriptionsPath);
         // voorrang van oude profielteksten behouden bij migratie
@@ -57,6 +59,7 @@ public static class GlobalLegendSettings
         Directory.CreateDirectory(directory);
         var profile = System.Text.Json.Nodes.JsonNode.Parse(stored.ToJson())!;
         profile["globalDefaultsVersion"] = 1;
+        profile["diameterMergeDefaultVersion"] = 1;
         var contents = new Dictionary<string, string>
         {
             [Path.Join(directory, "settings.json")] = profile.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }),

@@ -20,6 +20,7 @@ internal sealed class OverviewLegend
 internal sealed class OverviewDialog : LegendDialog
 {
     private readonly IReadOnlyList<OverviewLegend> _legends;
+    private readonly DialogSaveState? _saveState;
     private readonly Func<IReadOnlyList<OverviewLegend>, string?> _save;
     private readonly ComboBox _legend = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
     private readonly ComboBox _sort = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };
@@ -138,6 +139,8 @@ internal sealed class OverviewDialog : LegendDialog
         };
         foreach (var legend in legends) _legend.Items.Add(legend);
         _legend.SelectedIndex = 0;
+        _saveState = Own(new DialogSaveState(buttons, () => System.Text.Json.JsonSerializer.Serialize(
+            _legends.Select(l => new { l.Id, settings = l.Settings.ToJson() }))));
     }
 
     private void AddMoveEntry(string text, int offset)
@@ -205,6 +208,7 @@ internal sealed class OverviewDialog : LegendDialog
             ? $"{_entries.Count} regels in de tekening. Plaats eerst een legenda om de volgorde op te slaan."
             : $"{_entries.Count} regels · schaal 1:{Current.Settings.Scale:g} · wijzigingen gelden alleen voor deze legenda.";
         FillGrid(0);
+        _saveState?.Refresh();
     }
 
     private void FillGrid(int selected)
@@ -265,6 +269,7 @@ internal sealed class OverviewDialog : LegendDialog
         Current.Settings.ManualEntryOrder = LegendOrder.Remember(Current.Settings.ManualEntryOrder, _entries);
         Current.Changed = true;
         FillGrid(to);
+        _saveState?.Refresh();
     }
 
     private List<LegendEntry> SelectedEntries() => _grid.SelectedRows.Cast<DataGridViewRow>()
@@ -290,7 +295,7 @@ internal sealed class OverviewDialog : LegendDialog
         var ids = SelectedEntries().Select(e => e.ManualMergeId).Where(id => id.Length > 0).ToHashSet();
         if (ids.Count == 0)
         {
-            MessageBox.Show(this, "Selecteer een handmatig samengevoegde regel. Automatisch samenvoegen pas je aan in Instellingen > Inhoud.", "Samenvoeging opheffen");
+            MessageBox.Show(this, "Selecteer een handmatig samengevoegde regel. Automatisch samenvoegen pas je aan in Instellingen > Samenvoegen.", "Samenvoeging opheffen");
             return;
         }
         ChangeMerges(() => Current.Settings.ManualMergeGroups.RemoveAll(g => ids.Contains(g.Id)));
@@ -400,6 +405,7 @@ internal sealed class OverviewDialog : LegendDialog
             return false;
         }
         foreach (var legend in changed) legend.Changed = false;
+        _saveState?.Saved();
         return true;
     }
 }

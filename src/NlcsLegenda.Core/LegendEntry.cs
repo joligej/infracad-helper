@@ -21,7 +21,13 @@ public sealed class LegendEntry
     public IReadOnlyList<string> Netbeheerders { get; init; } = Array.Empty<string>();
 
     public IReadOnlyList<KlicObjectData> KlicObjects { get; init; } = Array.Empty<KlicObjectData>();
-    public bool IsKlic => ElementProperties.IsKlic(Discipline, Hoofdgroep) || KlicObjects.Any(o => o.HasData);
+    public bool IsKlic => ElementProperties.IsKlic(Discipline, Hoofdgroep)
+        || SourceLayers.Any(s => ElementProperties.IsKlicSource(s.SourceIdentity))
+        || KlicObjects.Any(o => o.HasData || ElementProperties.IsKlicSource(Path.GetFileNameWithoutExtension(o.Drawing)));
+    public IReadOnlyList<string> SourceEntryKeys { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> ExclusionKeys => SourceEntryKeys.Count > 0 ? SourceEntryKeys : new[] { LegendSettings.SelectionKey(this) };
+    public IReadOnlyList<string> MergedValues { get; init; } = Array.Empty<string>();
+    public bool ShowMergedValues { get; init; } = true;
     public string KlicGroupKey { get; init; } = string.Empty;
     public IReadOnlyList<string> KlicDescriptionFields { get; init; } = Array.Empty<string>();
 
@@ -34,7 +40,10 @@ public sealed class LegendEntry
                 or DescriptionSource.Laagbeschrijving or DescriptionSource.Bloknaam)
                 foreach (var provider in Netbeheerders)
                     description = ElementProperties.WithoutProviderSuffix(description, provider);
-            var text = Netbeheerders.Count == 0 ? description : description + " (" + string.Join(", ", Netbeheerders) + ")";
+            var values = (ShowMergedValues ? MergedValues : Array.Empty<string>())
+                .Concat(ShowMergedValues || Netbeheerders.Count <= 1 ? Netbeheerders : Array.Empty<string>())
+                .Distinct(StringComparer.CurrentCultureIgnoreCase).ToArray();
+            var text = values.Length == 0 ? description : description + " (" + string.Join(", ", values) + ")";
             var extra = KlicSummary.Description(KlicObjects, KlicDescriptionFields);
             return extra.Length == 0 ? text : text + " · " + extra;
         }
@@ -83,6 +92,7 @@ public sealed class LegendEntry
     public string RenderIdentity { get; init; } = string.Empty;
 
     public string SelectionIdentity { get; init; } = string.Empty;
+    public string LegacySelectionIdentity { get; init; } = string.Empty;
 
     public string AppearanceLabel { get; init; } = string.Empty;
 

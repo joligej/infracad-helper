@@ -85,6 +85,7 @@ internal static class LegendManagement
         var ids = group.GetAllEntityIds();
         double minX = double.MaxValue, maxY = double.MinValue;
         bool any = false;
+        Point3d? emptyPosition = null;
         foreach (var ent in Entities(ids, tr, OpenMode.ForWrite))
         {
             if (TryEntityExtents(tr, ent, Matrix3d.Identity, 0, out var ext))
@@ -93,6 +94,7 @@ internal static class LegendManagement
                 maxY = Math.Max(maxY, ext.MaxPoint.Y);
                 any = true;
             }
+            if (ent is BlockReference reference) emptyPosition ??= reference.Position;
             ent.Erase();
         }
         if (keepGroup)
@@ -103,9 +105,9 @@ internal static class LegendManagement
         {
             group.Erase();
         }
-        if (any)
-            topLeft = new Point3d(minX, maxY, 0);
-        return any;
+        if (any) topLeft = new Point3d(minX, maxY, 0);
+        else if (emptyPosition is { } point) topLeft = point;
+        return any || emptyPosition.HasValue;
     }
 
     public static bool TryGetGroupExtents(Database db, Transaction tr, string groupName, out Extents3d extents)
@@ -190,7 +192,6 @@ internal static class LegendManagement
 
     public static void TagRow(Database db, Transaction tr, IEnumerable<ObjectId> ids, NlcsLegenda.Core.LegendEntry entry)
     {
-        if (entry.IsBlank || entry.IsManual || entry.DescriptionSource == NlcsLegenda.Core.DescriptionSource.EigenKoppeling) return;
         var apps = (RegAppTable)tr.GetObject(db.RegAppTableId, OpenMode.ForRead);
         if (!apps.Has(RowApplication))
         {
@@ -199,16 +200,58 @@ internal static class LegendManagement
             apps.Add(app);
             tr.AddNewlyCreatedDBObject(app, true);
         }
+        bool editable = !entry.IsBlank && !entry.IsManual && entry.DescriptionSource != DescriptionSource.EigenKoppeling;
+        string token = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(entry.ExclusionKeys))));
         using var data = new ResultBuffer(new TypedValue(1001, RowApplication),
-            new TypedValue(1000, entry.Hoofdgroep), new TypedValue(1000, entry.Element));
-        foreach (var id in ids) ((Entity)tr.GetObject(id, OpenMode.ForWrite)).XData = data;
+            new TypedValue(1000, editable ? entry.Hoofdgroep : ""), new TypedValue(1000, editable ? entry.Element : ""),
+            new TypedValue(1000, token));
+        foreach (var id in ids)
+        {
+            var entity = (Entity)tr.GetObject(id, OpenMode.ForWrite);
+            entity.XData = data;
+            WriteRowKeys(entity, tr, entry.ExclusionKeys);
+        }
+    }
+
+    internal static string? RowToken(Entity entity)
+    {
+        using var data = entity.GetXDataForApplication(RowApplication);
+        var values = data?.AsArray();
+        return values is { Length: >= 4 } ? values[3].Value as string : null;
+    }
+
+    internal static void WriteRowKeys(Entity entity, Transaction tr, IReadOnlyList<string> keys)
+    {
+        string encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(keys)));
+        var chunks = encoded.Chunk(200).Select(c => new TypedValue((int)DxfCode.Text, new string(c))).ToArray();
+        if (entity.ExtensionDictionary.IsNull) entity.CreateExtensionDictionary();
+        var dictionary = (DBDictionary)tr.GetObject(entity.ExtensionDictionary, OpenMode.ForWrite);
+        using var record = new Xrecord();
+        using var values = new ResultBuffer(chunks);
+        record.Data = values;
+        dictionary.SetAt(RowApplication, record);
+        tr.AddNewlyCreatedDBObject(record, true);
+    }
+
+    internal static IReadOnlyList<string> ReadRowKeys(Entity entity, Transaction tr)
+    {
+        if (entity.ExtensionDictionary.IsNull) return Array.Empty<string>();
+        var dictionary = (DBDictionary)tr.GetObject(entity.ExtensionDictionary, OpenMode.ForRead);
+        if (!dictionary.Contains(RowApplication)) return Array.Empty<string>();
+        var record = (Xrecord)tr.GetObject(dictionary.GetAt(RowApplication), OpenMode.ForRead);
+        using var data = record.Data;
+        if (data is null) return Array.Empty<string>();
+        string encoded = string.Concat(data.AsArray().Select(v => v.Value as string));
+        try { return System.Text.Json.JsonSerializer.Deserialize<string[]>(Convert.FromBase64String(encoded)) ?? Array.Empty<string>(); }
+        catch (Exception ex) when (ex is FormatException or System.Text.Json.JsonException) { return Array.Empty<string>(); }
     }
 
     public static (string Hoofdgroep, string Element)? ReadRow(Entity entity)
     {
         using var data = entity.GetXDataForApplication(RowApplication);
         var values = data?.AsArray();
-        return values is { Length: 3 } && values[1].Value is string group && values[2].Value is string element
+        return values is { Length: >= 3 } && values[1].Value is string { Length: > 0 } group && values[2].Value is string { Length: > 0 } element
             ? (group, element) : null;
     }
 

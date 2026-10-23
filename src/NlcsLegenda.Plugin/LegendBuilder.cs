@@ -508,7 +508,7 @@ public static class LegendBuilder
             double frameWidth = Math.Max(swatchW, prepared?.Width ?? 0);
             var frame = MakeRectangle(btr.Database, x + (sampleColumnWidth - frameWidth) / 2,
                 midY - frameHeight / 2, frameWidth, frameHeight, s.SwatchFrameLayer);
-            AppendEntity(btr, frame);
+            rowEntities.Add(AppendEntity(btr, frame));
             tr.AddNewlyCreatedDBObject(frame, true);
         }
 

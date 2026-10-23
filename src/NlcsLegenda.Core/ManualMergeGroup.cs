@@ -20,7 +20,7 @@ public sealed class ManualMergeGroup
         return new() { MainKey = LegendOrder.Key(main), Members = members.Select(LegendOrder.Key).Distinct().ToList() };
     }
 
-    public static List<LegendEntry> Apply(List<LegendEntry> entries, IEnumerable<ManualMergeGroup> groups)
+    public static List<LegendEntry> Apply(List<LegendEntry> entries, IEnumerable<ManualMergeGroup> groups, bool showValues = true)
     {
         var result = new List<LegendEntry>(entries);
         foreach (var group in groups.Where(g => g.IsValid))
@@ -33,7 +33,8 @@ public sealed class ManualMergeGroup
             if (main is null || members.Count < 2 ||
                 members.Select(e => e.QuantityType).Where(k => k != QuantityKind.None).Distinct().Count() > 1) continue;
             int index = result.IndexOf(main);
-            result[index] = LegendGrouping.Combine(members, main, group.Id);
+            var label = MergedDescription.Create(members, main, Enum.GetValues<GroupDimension>());
+            result[index] = LegendGrouping.Combine(members, main, group.Id, label.Text, label.Values, showValues);
             result.RemoveAll(e => members.Contains(e));
         }
         return result;

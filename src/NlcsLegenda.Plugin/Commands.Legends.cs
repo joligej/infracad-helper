@@ -43,7 +43,7 @@ public partial class Commands
         // eigen tekstkopie gebruiken, niet de gewijzigde globale standaard
         var analysis = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, DescriptionCatalog.Default(), excluded);
         if (analysis.Entries.Count == 0)
-            return UpdateResult.NoEntries;
+            note = AppendNote(note, "geen regels opgenomen; samenstelling behouden");
         int unknownAreas = analysis.Entries.Count(e => e.Metric.HasUnknownArea);
         if (unknownAreas > 0) note = AppendNote(note, $"{unknownAreas} regel(s) met onbekend oppervlak (? m²); zie de bronmeldingen in Overzicht");
 
@@ -69,6 +69,33 @@ public partial class Commands
         if (!LegendViewport.Sync(db, tr, def))
             note = AppendNote(note, "een gekoppeld legenda-venster is te klein; vergroot het kader of maak een automatisch venster");
         return UpdateResult.Updated;
+    }
+
+    [CommandMethod("NLCSLEGENDARESET", CommandFlags.Modal)]
+    public void NlcsLegendaReset()
+    {
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        if (doc is null || !RequireInteractive(doc.Editor, "NLCSLEGENDARESET")) return;
+        try
+        {
+            if (!ResolveMutationTarget(doc.Editor, doc.Database, out var target, pickVerb: "resetten")) return;
+            var choice = new PromptKeywordOptions("\nEigen instellingen en samenstelling vervangen door de globale standaard? [Resetten/Annuleren]", "Resetten Annuleren") { AllowNone = true };
+            choice.Keywords.Default = "Annuleren";
+            var answer = doc.Editor.GetKeywords(choice);
+            if (answer.Status != PromptStatus.OK || answer.StringResult != "Resetten") return;
+            ResetLegend(doc.Editor, doc.Database, target);
+        }
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
+        {
+            doc.Editor.WriteMessage($"\nResetten mislukt: {ex.Message}");
+        }
+    }
+
+    private string? ResetLegend(Editor editor, Database database, MutationTarget target)
+    {
+        var settings = LoadGlobalDefaults();
+        settings.KnownEntryKeys.Clear();
+        return ApplyTargetSettings(editor, database, target, settings, "Resetten");
     }
 
     private static string AppendNote(string note, string extra) =>
@@ -117,6 +144,7 @@ public partial class Commands
                 var pko = new PromptKeywordOptions("\nActie");
                 pko.Keywords.Add("Bijwerken");
                 pko.Keywords.Add("Alles");
+                pko.Keywords.Add("Resetten");
                 pko.Keywords.Add("Instellingen");
                 pko.Keywords.Add("Overnemen");
                 pko.Keywords.Add("Standaardmaken");
@@ -136,6 +164,7 @@ public partial class Commands
                 {
                     case "Bijwerken": NlcsLegendaUpdate(); break;
                     case "Alles": UpdateAllLegends(ed, db); break;
+                    case "Resetten": NlcsLegendaReset(); break;
                     case "Instellingen": ManagerEditSettings(ed, db, registry); break;
                     case "Overnemen": ManagerCopySettings(ed, db, registry); break;
                     case "Standaardmaken": ManagerMakeGlobalDefault(ed, db, registry); break;

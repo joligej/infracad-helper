@@ -36,7 +36,7 @@ public partial class Commands
             {
                 var settings = new LegendSettings { IncludeInvisibleLayers = true, IncludeXrefLayers = true };
                 settings.Klic.PreferredSource = KlicSource.ObjectData;
-                if (pass == 1) settings.Klic.GroupFields = new() { "Materiaal", "DiameterM" };
+                if (pass == 1) { settings.Klic.GroupFields = new() { "Materiaal" }; settings.MergedDimensions.Remove(GroupDimension.Diameter); }
                 var result = DrawingAnalyzer.Analyze(doc.Database, tr, settings);
                 var data = result.Entries.SelectMany(e => e.KlicObjects).DistinctBy(o => o.Identity).ToArray();
                 var values = data.SelectMany(o => o.Records.Where(r => r.Source == KlicSource.ObjectData)

@@ -72,6 +72,13 @@ internal static class RibbonIcons
                 FillTriangle(g, fill, s, 22.5f, 7.5f, 25.5f, 12.5f, 19.5f, 12.5f);
                 break;
 
+            case "NLCSLEGENDARESET":
+                g.DrawArc(pen, 9 * s, 9 * s, 14 * s, 14 * s, 245, 280);
+                FillTriangle(g, fill, s, 7, 9, 13, 9, 10, 15);
+                g.DrawLine(pen, 14 * s, 13 * s, 19 * s, 18 * s);
+                g.DrawLine(pen, 19 * s, 13 * s, 14 * s, 18 * s);
+                break;
+
             case "NLCSLEGENDAINFO":
                 foreach (var y in new[] { 11f, 16f, 21f })
                 {

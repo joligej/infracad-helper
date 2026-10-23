@@ -26,7 +26,16 @@ legenda als globale standaard voor nieuwe legenda's.
 ### Bijwerken en viewport
 
 Is het ontwerp veranderd, dan tekent `NLCSLEGENDAUPDATE` de legenda opnieuw op precies
-dezelfde plek. Omdat een beheerde legenda bij bijwerken volledig opnieuw wordt opgebouwd,
+dezelfde plek. Instellingen, uitsluitingen en handmatige samenstellingen blijven bewaard
+voor bestaande regels, ook na een schaalwijziging of heropenen. Nieuwe bronregels worden
+volgens de opgeslagen filters toegevoegd. Ook een volledig uitgevinkte legenda blijft
+beschikbaar om later weer aan te vullen.
+
+**Resetten** (`NLCSLEGENDARESET`) vervangt na bevestiging de eigen instellingen en
+samenstelling door de huidige globale standaard. Naam, bronselectie en plaats blijven
+behouden; andere legenda's veranderen niet.
+
+Omdat een beheerde legenda bij bijwerken volledig opnieuw wordt opgebouwd,
 verdwijnen rechtstreekse wijzigingen die je met de hand in de legenda hebt gemaakt; pas de
 tekst daarom aan via de instellingen of `NLCSLEGENDATEKST`. Is er één legenda, dan gaat dat
 direct; bij meerdere klik je de gewenste legenda aan (of kies je uit een lijst). Een
@@ -47,7 +56,9 @@ instellingen waarmee hij is gemaakt. Bij één aanwezige legenda openen de inste
 klik je de gewenste legenda aan of kies je uit een lijst. Gewiste legenda's tellen niet
 mee; Undo maakt ze weer bereikbaar. **Lokale instellingen** (`NLCSLEGENDAOPTIES`) werkt
 uitsluitend op een bestaande legenda. **Toepassen** tekent die legenda meteen opnieuw;
-**Opslaan** doet hetzelfde en sluit het venster. Een fout houdt het venster open en
+**Opslaan** doet hetzelfde en sluit het venster. Na **Toepassen** zijn beide opslagknoppen
+uitgeschakeld totdat je iets wijzigt. **Annuleren** sluit het venster en laat reeds toegepaste
+wijzigingen staan. Een fout houdt het venster open en
 behoudt de vorige legenda en instellingen.
 **Globale standaard** (`NLCSLEGENDASTANDAARD`) opent afzonderlijk de instellingen voor
 nieuwe legenda's, ook wanneer er nog geen legenda in de tekening staat. De instellingen
@@ -190,7 +201,8 @@ de lijst en haar export. Dubbelklik op een regel of kies **KLIC-details** voor a
 waarden per bron en tabel, objecthandles, voorzorgsmaatregelen en bijlagen.
 
 Onder **Legenda-omschrijving** voeg je eigenschappen toe aan de tekst; onder **Afzonderlijke
-regels** kies je bijvoorbeeld materiaal en diameter om varianten apart weer te geven.
+regels** kies je bijvoorbeeld materiaal om varianten apart weer te geven.
+Diameters regel je op **Instellingen → Samenvoegen**, voor zowel laagnamen als objectgegevens.
 Zonder die keuzes blijft de bestaande legenda behouden. Opgeslagen keuzes gelden per legenda.
 Met **Volgorde → Handmatig** verplaats je regels; maak eerst het zoekfilter leeg.
 
@@ -199,7 +211,8 @@ voorrang krijgt. Ontbreekt een veld in die bron, dan wordt een andere beschikbar
 Een aanwezige lege waarde wordt niet stilzwijgend vervangen. Nulwaarden geven geen gemeten
 diepte aan; een standaarddiepte is apart benoemd. Zie [KLIC-gegevens](klic-bronnen.md).
 
-Bij samenvoegen betekent een aangevinkt kenmerk: **niet vergelijken**.
+Op **Instellingen → Samenvoegen** staan KLIC en overige lagen naast elkaar.
+Een aangevinkt kenmerk betekent: **niet vergelijken**.
 **Soorten samenvoegen** negeert bijvoorbeeld het verschil tussen gas en water.
 Dit staat standaard **uit**, zowel voor KLIC als voor overige lagen. Verschillende
 kleuren, lijnpatronen en symbolen blijven bij automatisch samenvoegen altijd apart.
@@ -220,16 +233,20 @@ beide groepen blijven discipline en hoofdgroep aparte grenzen.
 `VRIJVERVAL_200` en `VRIJVERVAL_300`. Ook `DN200`, `DN_200`, `Ø200` en maten met
 mm, cm of m worden herkend. Een los getal geldt alleen bij bekende leidingsoorten
 als diameter; een volgnummer zoals `DATA2` blijft een aparte keuze. KLIC-rioollagen
-onder hoofdgroep RI gebruiken de KLIC-keuzes wanneer de objectgegevens aanwezig zijn.
-De samengevoegde regel behoudt alle bronobjecten en hoeveelheden; de automatische
-omschrijving noemt niet uitsluitend de eerste diameter. Bestaande legenda's krijgen
-de nieuwe keuze niet ongevraagd aangezet. Vink haar lokaal aan en kies **Toepassen**.
-Een bewust gekozen uitsplitsing onder **KLIC-instellingen → Afzonderlijke regels**
-blijft voorgaan; vink daar **Diameter** uit wanneer ook die objectwaarden samen mogen.
+onder hoofdgroep RI gebruiken de KLIC-keuzes als zij KLIC-objectgegevens hebben of uit
+een bron met KLIC in de naam komen. De optie geldt ook voor diameters uit objectgegevens;
+daarvoor is geen tweede instelling nodig. Een bestaand globaal profiel krijgt de
+diameterstandaard eenmaal mee. Bestaande legenda's houden hun lokale keuze.
+
+**Samengevoegde waarden tonen** staat standaard aan. Zo wordt `Leiding 200` met
+`Leiding 300` één regel **Leiding (200, 300)**; `Leiding Dorp` en `Leiding Stad` worden
+**Leiding (Dorp, Stad)**. Uitgeschakeld blijft alleen **Leiding** staan. Bronobjecten,
+hoeveelheden en detailgegevens blijven in beide gevallen behouden.
 
 Selecteer in **Overzicht** meerdere regels met Ctrl of Shift en kies **Samenvoegen…**
 om zelf een groep te maken. Kies vervolgens het **hoofdobject**: daarvan komen
-de titel, kleur, lijn en het symbool. Deze handmatige keuze mag verschillende
+de kleur, lijn en het symbool. De titel gebruikt het gemeenschappelijke deel van de
+omschrijvingen; ontbreekt dat, dan blijft de titel van het hoofdobject staan. Deze handmatige keuze mag verschillende
 kleuren verbinden. Hoeveelheden met dezelfde eenheid worden opgeteld.
 **Samenvoeging opheffen** brengt de afzonderlijke regels terug. Een bestaande
 handmatige groep moet eerst worden opgeheven voordat je er een andere groep van maakt.

@@ -50,6 +50,7 @@ public class ConsumerAuditTests
         [nameof(LegendSettings.ExplodeOnPlace)] = "Plaatsing exploderen",
         [nameof(LegendSettings.IncludeInvisibleLayers)] = "DrawingAnalyzer bevroren/uit lagen",
         [nameof(LegendSettings.IncludeXrefLayers)] = "DrawingAnalyzer xref-default",
+        [nameof(LegendSettings.ShowMergedValues)] = "LegendGrouping en LegendEntry samengevoegde omschrijving",
         [nameof(LegendSettings.MergeIdenticalStatuses)] = "LegendGrouping statussamenvoeging",
         [nameof(LegendSettings.SuppressKlicPlaceholders)] = "PlaceholderText filter",
         [nameof(LegendSettings.IncludeScaleBar)] = "LegendBuilder schaalbalk",

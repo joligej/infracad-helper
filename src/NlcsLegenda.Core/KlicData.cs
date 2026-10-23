@@ -91,7 +91,7 @@ public sealed record KlicObjectData(string Drawing, string Handle, string Xref,
 
     public string GroupKey(IEnumerable<string> fields)
     {
-        var keys = KlicFields.Valid(fields).OrderBy(k => k, StringComparer.Ordinal).ToArray();
+        var keys = KlicFields.Valid(fields).Where(k => k != "DiameterM" || Values(k).Count > 0).OrderBy(k => k, StringComparer.Ordinal).ToArray();
         return keys.Length == 0 || !HasData ? "" : JsonSerializer.Serialize(keys.Select(k =>
             new { key = k, values = Values(k).Select(v => KlicFields.Canonical(k, v)).Order(StringComparer.Ordinal).ToArray() }));
     }
@@ -99,6 +99,20 @@ public sealed record KlicObjectData(string Drawing, string Handle, string Xref,
 
 public static class KlicSummary
 {
+    public static string WithoutDiameter(string group)
+    {
+        if (group.Length == 0) return group;
+        try
+        {
+            using var json = JsonDocument.Parse(group);
+            if (json.RootElement.ValueKind != JsonValueKind.Array) return group;
+            var fields = json.RootElement.EnumerateArray().Where(f => f.ValueKind != JsonValueKind.Object
+                || !f.TryGetProperty("key", out var key) || key.ValueKind != JsonValueKind.String || key.GetString() != "DiameterM").ToArray();
+            return fields.Length == 0 ? "" : JsonSerializer.Serialize(fields);
+        }
+        catch (JsonException) { return group; }
+    }
+
     public static IReadOnlyList<KlicObjectData> Combine(IEnumerable<KlicObjectData> objects) =>
         objects.DistinctBy(o => o.Identity).ToArray();
 

@@ -28,35 +28,36 @@ internal sealed class HelpDialog : LegendDialog
             "Open Lokale instellingen voor de gekozen legenda: schaal, inhoud, opmaak en teksten.\n\n" +
             "Bij één aanwezige legenda open je die direct. Bij meerdere kies je welke.\n" +
             "Globale standaard bewerkt alleen de instellingen voor nieuwe legenda's.\n\n" +
-            "Legenda → Templateopmaak herstellen zet de maten terug; eigen teksten blijven behouden.\n\nToepassen werkt de legenda direct bij. Opslaan doet dat ook en sluit het venster."),
+            "Legenda → Templateopmaak herstellen zet de maten terug; eigen teksten blijven behouden.\n\nToepassen werkt de legenda direct bij. Opslaan doet dat ook en sluit het venster. Na Toepassen zijn beide opslagknoppen uitgeschakeld totdat je iets wijzigt."),
         ("Overzicht en volgorde",
             "Overzicht leest alleen de gekozen legenda. Vernieuwen leest de bron opnieuw.\n\n" +
             "Kies Handmatig en verplaats regels met de knoppen of Alt+↑ / Alt+↓.\n" +
             "Toepassen werkt de legenda bij; Opslaan sluit het venster. Elke legenda\n" +
             "onthoudt haar eigen volgorde, ook na opnieuw openen.\n\n" +
             "Selecteer meerdere regels met Ctrl of Shift en kies Samenvoegen.\n" +
-            "Het hoofdobject bepaalt de titel en weergave. Samenvoeging opheffen draait dit terug."),
+            "Het hoofdobject bepaalt de weergave; gedeelde tekst wordt de titel. Samenvoeging opheffen draait dit terug."),
         ("KLIC-groepering",
             "Een aangevinkt kenmerk wordt niet vergeleken. Soorten samenvoegen staat uit.\n" +
-            "Spanning/druk, uitvoering, volgnummer en netbeheerder staan voor KLIC aan.\n" +
+            "Spanning/druk, uitvoering, volgnummer, diameter en netbeheerder staan voor KLIC aan.\n" +
             "Kleur, lijn en symbool moeten gelijk blijven. Overige lagen hebben eigen keuzes.\n\n" +
             "Netbeheerders worden uit de InfraCAD-metadata van de bron gelezen.\n" +
-            "Samenstellen toont de afzonderlijke bronregels om aan of uit te zetten."),
+            "Samenstellen toont de afzonderlijke bronregels om aan of uit te zetten.\n" +
+            "Samengevoegde waarden tonen: Leiding (200, 300); uit: Leiding."),
         ("KLIC-gegevens",
             "Kies in Overzicht → KLIC-instellingen welke gegevens je wilt tonen en exporteren.\n\n" +
             "Legenda-omschrijving voegt gekozen velden aan de tekst toe. Afzonderlijke regels\n" +
-            "splitst bijvoorbeeld verschillende materialen en diameters. De keuzes gelden\n" +
+            "splitst bijvoorbeeld materialen. Diameters regel je op Samenvoegen. De keuzes gelden\n" +
             "voor één legenda. Wis het zoekfilter voordat je regels handmatig verplaatst.\n\n" +
             "KLIC-details toont waarden per bron en tabel, bronverschillen en bijlagen.\n" +
             "Gegevensbron bepaalt welke opslagvorm voorrang krijgt. Object Data vereist\n" +
-            "een geopende bron-DWG in Civil 3D/Map; xrefs gebruiken de overige leesbare\n" +
-            "gegevens. Niet-leesbare bronnen worden gemeld.\n\n" +
+            "Civil 3D/Map en wordt ook uit directe en geneste xrefs gelezen.\n" +
+            "Niet-leesbare bronnen worden gemeld.\n\n" +
             "Een nulwaarde is geen gemeten diepte. Een standaarddiepte is apart benoemd."),
         ("Samenstellen en zoeken",
             "Samenstellen heeft aparte tabbladen voor bronregels en eigen regels. Zoek op woorden of een deel van de laagnaam\n" +
             "of omschrijving; * kan meerdere delen combineren. Een groepsvinkje verandert\n" +
             "tijdens zoeken alleen de zichtbare resultaten.\n\n" +
-            "In tekening uitsluiten: klik meerdere objecten, ook binnen xrefs.\n" +
+            "In tekening uitsluiten: klik bronobjecten of legendaregels, ook symbolen en xrefs.\n" +
             "Enter past toe; Escape annuleert de aanklikronde. De bronobjecten blijven staan.\n\n" +
             "Laag toevoegen opent een doorzoekbare lijst. Een eigen regel heeft geen gemeten\n" +
             "hoeveelheid. Koppel een Eigen laag als de brongeometrie wel moet meetellen."),
@@ -93,7 +94,8 @@ internal sealed class HelpDialog : LegendDialog
             "Batch doet dat voor alle tekeningen in een map tegelijk, in één uittrekstaat."),
         ("Commando's",
             "NLCSLEGENDA — legenda maken\n" +
-            "NLCSLEGENDAUPDATE — een legenda bijwerken\n" +
+            "NLCSLEGENDAUPDATE — bijwerken met behoud van eigen keuzes\n" +
+            "NLCSLEGENDARESET — eigen keuzes vervangen door de globale standaard\n" +
             "NLCSLEGENDABEHEER — legenda's beheren\n" +
             "NLCSLEGENDAINFO — overzicht zonder tekenen\n" +
             "NLCSLEGENDAEXPORT — wegschrijven als CSV en JSON"),

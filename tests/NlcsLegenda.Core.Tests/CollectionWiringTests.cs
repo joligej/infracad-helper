@@ -13,6 +13,7 @@ public class CollectionWiringTests
         nameof(LegendSettings.IncludedDrawTypes),
         nameof(LegendSettings.MergedDimensions),
         nameof(LegendSettings.ExcludedEntries),
+        nameof(LegendSettings.KnownEntryKeys),
         nameof(LegendSettings.ManualEntries),
         nameof(LegendSettings.ManualMergeGroups),
         nameof(LegendSettings.NonKlicMergedDimensions),

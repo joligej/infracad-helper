@@ -65,6 +65,7 @@ internal sealed class SettingsDialog : LegendDialog
     private readonly IReadOnlyList<string> _xrefNames;
     private readonly Func<LegendSettings, IReadOnlyList<EntryCheckItem>>? _compositionSource;
     private bool _syncing;
+    private readonly DialogSaveState? _saveState;
     private readonly IReadOnlyList<ManualEntry> _layerChoices;
 
     public event EventHandler? ApplyRequested;
@@ -106,6 +107,7 @@ internal sealed class SettingsDialog : LegendDialog
             SizeMode = TabSizeMode.Fixed, ItemSize = new Size(0, 1), TabStop = false };
         tabs.TabPages.Add(BuildAlgemeenTab());
         tabs.TabPages.Add(BuildInhoudTab());
+        tabs.TabPages.Add(BuildSamenvoegenTab());
         tabs.TabPages.Add(BuildOpmaakTab());
         tabs.TabPages.Add(BuildTekstenTab());
         tabs.TabPages.Add(BuildHoeveelhedenTab());
@@ -147,6 +149,7 @@ internal sealed class SettingsDialog : LegendDialog
         Controls.Add(content);
         Controls.Add(buttons);
         Controls.Add(header);
+        _saveState = Own(new DialogSaveState(buttons, () => _settings.ToJson()));
     }
 
     public LegendSettings Settings => _settings;
@@ -158,6 +161,7 @@ internal sealed class SettingsDialog : LegendDialog
         _syncing = true;
         try { foreach (var s in _resync) s(); }
         finally { _syncing = false; }
+        _saveState?.Refresh();
     }
 
     private Panel NumRow(string label, Func<double> get, Action<double> set,
@@ -206,7 +210,7 @@ internal sealed class SettingsDialog : LegendDialog
         combo.SelectedIndexChanged += (_, _) =>
         {
             if (!_syncing && combo.SelectedItem is string s && Enum.TryParse<TEnum>(s, out var v))
-                set(v);
+            { set(v); SyncAll(); }
         };
         _resync.Add(() => combo.SelectedItem = get().ToString());
         return LabeledRow(label, combo);
@@ -256,13 +260,13 @@ internal sealed class SettingsDialog : LegendDialog
         var root = new SettingsStack();
 
         var scale = new NumericUpDown { Minimum = 1, Maximum = 1_000_000, Value = (decimal)Math.Clamp(_settings.Scale, 1, 1_000_000), Width = 100 };
-        scale.ValueChanged += (_, _) => _settings.Scale = (double)scale.Value;
+        scale.ValueChanged += (_, _) => { _settings.Scale = (double)scale.Value; _saveState?.Refresh(); };
         _resync.Add(() => scale.Value = (decimal)Math.Clamp(_settings.Scale, 1, 1_000_000));
         var title = new TextBox { Text = _settings.Title, Width = 260 };
-        title.TextChanged += (_, _) => _settings.Title = title.Text;
+        title.TextChanged += (_, _) => { _settings.Title = title.Text; _saveState?.Refresh(); };
         _resync.Add(() => title.Text = _settings.Title);
         var margin = new NumericUpDown { Minimum = 0, Maximum = 100, DecimalPlaces = 1, Increment = 0.5M, Value = (decimal)Math.Clamp(_settings.ViewportMarginMm, 0, 100), Width = 80 };
-        margin.ValueChanged += (_, _) => _settings.ViewportMarginMm = (double)margin.Value;
+        margin.ValueChanged += (_, _) => { _settings.ViewportMarginMm = (double)margin.Value; _saveState?.Refresh(); };
         _resync.Add(() => margin.Value = (decimal)Math.Clamp(_settings.ViewportMarginMm, 0, 100));
 
         root.Controls.Add(LabeledRow("Schaal 1:", scale));
@@ -296,12 +300,6 @@ internal sealed class SettingsDialog : LegendDialog
         sources.Controls[0].Controls.Add(xrefs);
         root.Controls.Add(sources);
 
-        var klic = new Button { Text = "KLIC-velden en groepering…", AutoSize = true, Padding = new Padding(6, 3, 6, 3) };
-        klic.Click += (_, _) =>
-        {
-            using var dialog = new KlicOptionsDialog(_settings.Klic);
-            if (dialog.ShowDialog(this) == DialogResult.OK) _settings.Klic = dialog.Result;
-        };
         root.Controls.Add(Group("Elementsoorten",
             BoundCheck("Geometrie / lijnen", () => _settings.ToonGeometrie, v => _settings.ToonGeometrie = v),
             BoundCheck("Vlakken", () => _settings.ToonVlakken, v => _settings.ToonVlakken = v),
@@ -315,28 +313,6 @@ internal sealed class SettingsDialog : LegendDialog
             BoundCheck("Tijdelijk", () => _settings.ToonTijdelijk, v => _settings.ToonTijdelijk = v),
             BoundCheck("Revisie", () => _settings.ToonRevisie, v => _settings.ToonRevisie = v),
             BoundCheck("Gelijke statussen samenvoegen (alleen bij identieke weergave)", () => _settings.MergeIdenticalStatuses, v => _settings.MergeIdenticalStatuses = v)));
-        root.Controls.Add(Group("KLIC — aangevinkt kenmerk niet vergelijken",
-            BoundCheck("Soorten samenvoegen", () => _settings.SamenvoegenSoort, v => _settings.SamenvoegenSoort = v),
-            BoundCheck("Spanning/druk samenvoegen", () => _settings.SamenvoegenSpecificatie, v => _settings.SamenvoegenSpecificatie = v),
-            BoundCheck("Uitvoering samenvoegen", () => _settings.SamenvoegenUitvoering, v => _settings.SamenvoegenUitvoering = v),
-            BoundCheck("Netbeheerders samenvoegen", () => _settings.MergedDimensions.Contains(GroupDimension.Netbeheerder), v => { if (v) _settings.MergedDimensions.Add(GroupDimension.Netbeheerder); else _settings.MergedDimensions.Remove(GroupDimension.Netbeheerder); }),
-            BoundCheck("Diameters samenvoegen", () => _settings.MergedDimensions.Contains(GroupDimension.Diameter), v => { if (v) _settings.MergedDimensions.Add(GroupDimension.Diameter); else _settings.MergedDimensions.Remove(GroupDimension.Diameter); }),
-            BoundCheck("Volgnummer samenvoegen", () => _settings.SamenvoegenNummer, v => _settings.SamenvoegenNummer = v),
-            BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v), klic));
-
-
-        var otherMerge = new List<Control> {
-            new Label { Text = "Alleen bij gelijke weergave, binnen dezelfde discipline en hoofdgroep.", AutoSize = true } };
-        foreach (var (dimension, label) in new[] {
-            (GroupDimension.Soort, "Soorten samenvoegen"), (GroupDimension.Specificatie, "Specificaties samenvoegen"),
-            (GroupDimension.Uitvoering, "Uitvoeringen samenvoegen"), (GroupDimension.Nummer, "Volgnummers samenvoegen"),
-            (GroupDimension.Diameter, "Diameters samenvoegen") })
-            otherMerge.Add(BoundCheck(label, () => _settings.NonKlicMergedDimensions.Contains(dimension), value => {
-                _settings.NonKlicMergedDimensions.Remove(dimension);
-                if (value) _settings.NonKlicMergedDimensions.Add(dimension);
-            }));
-        root.Controls.Add(Group("Overige lagen — aangevinkt kenmerk niet vergelijken", otherMerge.ToArray()));
-
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Padding = new Padding(3) };
         if (_composition is not null || _compositionSource is not null)
         {
@@ -354,6 +330,61 @@ internal sealed class SettingsDialog : LegendDialog
         blanco.Click += (_, _) => EditBlankEntries();
         actions.Controls.Add(blanco);
         root.Controls.Add(actions);
+        page.Controls.Add(root);
+        return page;
+    }
+
+    private TabPage BuildSamenvoegenTab()
+    {
+        var page = new TabPage("Samenvoegen") { Padding = new Padding(10), AutoScroll = true };
+        var root = new SettingsStack();
+        root.Controls.Add(new Label { Text = "Vink aan welke verschillen je wilt negeren. Kleur, lijnpatroon en symbool blijven apart.", AutoSize = true });
+        var choices = new TableLayoutPanel { AutoSize = true, ColumnCount = 3, Dock = DockStyle.Top, Padding = new Padding(6) };
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18));
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 26));
+        choices.Controls.Add(new Label { Text = "Kenmerk", AutoSize = true }, 0, 0);
+        choices.Controls.Add(new Label { Text = "KLIC", AutoSize = true }, 1, 0);
+        choices.Controls.Add(new Label { Text = "Overige lagen", AutoSize = true }, 2, 0);
+        int row = 1;
+        foreach (var (dimension, label) in new[] {
+            (GroupDimension.Soort, "Soorten"), (GroupDimension.Specificatie, "Spanning/druk of specificatie"),
+            (GroupDimension.Uitvoering, "Uitvoeringen"), (GroupDimension.Nummer, "Volgnummers"),
+            (GroupDimension.Diameter, "Diameters"), (GroupDimension.Netbeheerder, "Netbeheerders") })
+        {
+            choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            choices.Controls.Add(new Label { Text = label, AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(0, 5, 0, 5) }, 0, row);
+            CheckBox Choice(Func<ICollection<GroupDimension>> dimensions, string category)
+            {
+                var check = BoundCheck("", () => dimensions().Contains(dimension), value => {
+                    if (value) dimensions().Add(dimension); else dimensions().Remove(dimension);
+                });
+                check.AccessibleName = category + ": " + label + " samenvoegen";
+                check.MinimumSize = new Size(32, 24);
+                check.Anchor = AnchorStyles.Left;
+                return check;
+            }
+            choices.Controls.Add(Choice(() => _settings.MergedDimensions, "KLIC"), 1, row);
+            if (dimension != GroupDimension.Netbeheerder) choices.Controls.Add(Choice(() => _settings.NonKlicMergedDimensions, "Overige lagen"), 2, row);
+            else choices.Controls.Add(new Label { Text = "—", AutoSize = true }, 2, row);
+            row++;
+        }
+        var comparisons = new GroupBox { Text = "Samenvoegen", AutoSize = true, Padding = new Padding(6) };
+        comparisons.Controls.Add(choices);
+        root.Controls.Add(comparisons);
+        root.Controls.Add(new Label { Text = "KLIC: kabel- en leidinglagen, objecten met KLIC-gegevens en bronnen met KLIC in de naam. Overige lagen: alle andere objecten.", AutoSize = true, Margin = new Padding(3, 6, 3, 6) });
+        var textOptions = Group("Tekst", BoundCheck("Samengevoegde waarden tonen", () => _settings.ShowMergedValues, v => _settings.ShowMergedValues = v));
+        textOptions.Controls[0].Controls.Add(new Label { Text = "Aan: Leiding (200, 300). Uit: Leiding.", AutoSize = true });
+        textOptions.Controls[0].Controls.Add(BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v));
+        root.Controls.Add(textOptions);
+
+        var data = new Button { Text = "Extra KLIC-velden…", AutoSize = true };
+        data.Click += (_, _) =>
+        {
+            using var dialog = new KlicOptionsDialog(_settings.Klic);
+            if (dialog.ShowDialog(this) == DialogResult.OK) { _settings.Klic = dialog.Result; SyncAll(); }
+        };
+        root.Controls.Add(data);
         page.Controls.Add(root);
         return page;
     }
@@ -540,8 +571,8 @@ internal sealed class SettingsDialog : LegendDialog
             _settings.DescriptionOverrides = dlg.ToCatalog().Diff(DescriptionCatalog.Default());
             SyncAll();
         }
-        dlg.ApplyRequested += (_, _) => Apply();
-        if (dlg.ShowDialog(this) == DialogResult.OK) Apply();
+        dlg.SaveChanges = () => { Apply(); return null; };
+        dlg.ShowDialog(this);
     }
 
     private void EditCustomLayers()
@@ -617,7 +648,8 @@ internal sealed class SettingsDialog : LegendDialog
     {
         try
         {
-            if (SaveChanges?.Invoke() is not { } error) return true;
+            if (_saveState?.HasChanges == false) return true;
+            if (SaveChanges?.Invoke() is not { } error) { _saveState?.Saved(); return true; }
             MessageBox.Show(this, error, "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
@@ -966,7 +998,8 @@ internal sealed class DescriptionsDialog : LegendDialog
     private readonly DataGridView _grid;
     private BindingList<DescriptionRow> _rows = new();
 
-    public event EventHandler? ApplyRequested;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Func<string?>? SaveChanges { get; set; }
 
     public DescriptionsDialog(DescriptionCatalog initial)
     {
@@ -1016,7 +1049,6 @@ internal sealed class DescriptionsDialog : LegendDialog
         _grid.EditingControlShowing += OnEditingControlShowing;
 
         var buttons = new ButtonBar(withApply: true);
-        buttons.Apply!.Click += (_, _) => ApplyRequested?.Invoke(this, EventArgs.Empty);
         var reset = buttons.AddExtra("Standaardwaarden");
         reset.Click += (_, _) =>
         {
@@ -1031,6 +1063,10 @@ internal sealed class DescriptionsDialog : LegendDialog
         Controls.Add(buttons);
 
         SetRows(initial);
+        var state = TrackSaving(buttons, () => System.Text.Json.JsonSerializer.Serialize(new {
+            rows = _rows.ToArray(), edit = DialogSaveState.GridEdit(_grid) }), () => { _grid.EndEdit(); return SaveChanges?.Invoke(); });
+        _grid.CellValueChanged += (_, _) => state.Refresh();
+        _grid.CurrentCellDirtyStateChanged += (_, _) => state.Refresh();
     }
 
     private void SetRows(DescriptionCatalog catalog)
@@ -1096,7 +1132,8 @@ internal sealed class TextEditDialog : LegendDialog
     private readonly TextBox _specifiek;
     private readonly DescriptionEntry _default;
 
-    public event EventHandler? ApplyRequested;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Func<string?>? SaveChanges { get; set; }
 
     public TextEditDialog(string elementKey, DescriptionEntry current, DescriptionEntry defaults)
     {
@@ -1140,7 +1177,6 @@ internal sealed class TextEditDialog : LegendDialog
         layout.Controls.Add(_specifiek, 0, 4);
 
         var buttons = new ButtonBar(withApply: true);
-        buttons.Apply!.Click += (_, _) => ApplyRequested?.Invoke(this, EventArgs.Empty);
         var reset = buttons.AddExtra("Standaard");
         reset.Click += (_, _) =>
         {
@@ -1155,6 +1191,9 @@ internal sealed class TextEditDialog : LegendDialog
 
         _algemeen.Text = current.Algemeen ?? string.Empty;
         _specifiek.Text = current.Specifiek;
+        var state = TrackSaving(buttons, () => System.Text.Json.JsonSerializer.Serialize(new { Algemeen, Specifiek }), () => SaveChanges?.Invoke());
+        _algemeen.TextChanged += (_, _) => state.Refresh();
+        _specifiek.TextChanged += (_, _) => state.Refresh();
     }
 
     public string Algemeen => _algemeen.Text.Trim();

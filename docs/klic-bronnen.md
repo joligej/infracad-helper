@@ -53,30 +53,35 @@ De plugin controleert daarmee niet de werkelijke ligging in het terrein.
 
 ## Regels samenvoegen of uitsplitsen
 
-In **Instellingen → Inhoud** betekent een aangevinkt samenvoegkenmerk dat dit kenmerk niet
+In **Instellingen → Samenvoegen** betekent een aangevinkt samenvoegkenmerk dat dit kenmerk niet
 wordt vergeleken. **Soorten samenvoegen** staat standaard uit: gas en water blijven
 verschillende soorten. Voor nieuwe KLIC-legenda's staan specificatie (spanning/druk),
 uitvoering, volgnummer, diameter en netbeheerder standaard aan. Overige lagen hebben aparte keuzes,
 standaard allemaal uit. Soort, specificatie, uitvoering, diameter en volgnummer komen
 uit de NLCS-laagnaam; de netbeheerder komt uit de objectgegevens. DATA2 bewijst dus niet wie
-de netbeheerder is. Objectgegevens herkennen ook KLIC-riool onder hoofdgroep RI.
+de netbeheerder is. Ook objectgegevens of een bronnaam met KLIC herkennen KLIC-riool onder hoofdgroep RI.
 Bij **Diameters samenvoegen** verliezen de samengevoegde regels geen bronobjecten;
 de afzonderlijke diameters blijven terug te vinden in KLIC-details en de bronlagen.
 Hoeveelheden worden opgeteld; zichtbaar verschillende symbolen of
 arceringen blijven gescheiden.
 
-Onder **KLIC-instellingen → Afzonderlijke regels** kun je bijvoorbeeld materiaal en diameter
+De diameterkeuze geldt voor zowel de laagnaam als objectgegevens. Onder
+**KLIC-instellingen → Afzonderlijke regels** kun je andere extra velden, zoals materiaal,
 aanvinken. Verschillende combinaties krijgen dan aparte legendaregels, ook als andere
 eigenschappen worden samengevoegd. **Legenda-omschrijving** bepaalt welke veldwaarden achter
 de bestaande omschrijving verschijnen. Standaard zijn beide keuzes leeg; zo blijven bestaande
 legenda's gelijk. De maatvoering en vormgeving volgen de bestaande legenda-instellingen.
+
+**Samengevoegde waarden tonen** voegt de verschillende waarden tussen haakjes toe,
+bijvoorbeeld **Vrijvervalriool (200, 300)**. Zet dit uit voor alleen **Vrijvervalriool**.
+De gegevens blijven dan beschikbaar in Overzicht en KLIC-details.
 
 Elke legenda bewaart haar eigen keuzes. In Overzicht kun je de volgorde op **Handmatig**
 zetten en regels verplaatsen. Bij een actief filter is verplaatsen uitgeschakeld. Bestaande
 regels behouden hun plaats bij bijwerken; nieuwe combinaties worden achteraan toegevoegd.
 Eigen regels met dezelfde omschrijving maar verschillende voorbeelden houden elk hun positie.
 Eigen en blanco regels vallen buiten automatisch samenvoegen. **Overzicht → Samenvoegen**
-kan zelf gekozen regels combineren met één hoofdobject voor titel en weergave; blanco
+kan zelf gekozen regels combineren met één hoofdobject voor de weergave en een gedeelde titel; blanco
 regels en verschillende eenheden worden geweigerd. **Samenvoeging opheffen** maakt
 de handmatige groep weer los. Eigen regels volgen het statusfilter;
 een toewijzing aan een eigen status heeft voorrang op dat filter.

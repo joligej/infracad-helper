@@ -760,7 +760,7 @@ public partial class Commands
             }
 
             using var dialog = new DescriptionsDialog(initial);
-            void Apply()
+            string? Apply()
             {
                 if (target.IsGlobal)
                 {
@@ -771,16 +771,16 @@ public partial class Commands
                 {
                     var s = GetTargetSettings(db, target);
                     s.DescriptionOverrides = dialog.ToCatalog().Diff(DescriptionCatalog.Default());
-                    ApplyTargetSettings(ed, db, target, s, "Omschrijvingen");
+                    return ApplyTargetSettings(ed, db, target, s, "Omschrijvingen");
                 }
+                return null;
             }
-            dialog.ApplyRequested += (_, _) => Apply();
+            dialog.SaveChanges = Apply;
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            Apply();
         }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
@@ -833,13 +833,21 @@ public partial class Commands
         var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         while (true)
         {
-            var choice = new PromptNestedEntityOptions("\nKlik een object om uit de legenda te sluiten; Enter = toepassen:") { AllowNone = true };
+            var choice = new PromptNestedEntityOptions("\nKlik een bronobject of legendaregel om uit te sluiten; Enter = toepassen:") { AllowNone = true };
             var pick = ed.GetNestedEntity(choice);
             if (pick.Status == PromptStatus.Cancel) { ed.WriteMessage("\nGeannuleerd; niets gewijzigd."); return; }
             if (pick.Status != PromptStatus.OK) break;
-            var ids = pick.GetContainers().Append(pick.ObjectId).ToHashSet();
-            var candidates = analysis.Entries.Where(e =>
-                analysis.EntryObjects.TryGetValue(LegendSettings.SelectionKey(e), out var sources) && sources.Any(ids.Contains)).ToList();
+            var ids = new[] { pick.ObjectId }.Concat(pick.GetContainers()).ToArray();
+            List<LegendEntry> candidates;
+            bool legendRow;
+            using (var tr = db.TransactionManager.StartTransaction())
+                candidates = ResolveExclusionPick(db, tr, target.LegendId, analysis, ids, out legendRow);
+            if (legendRow && candidates.Count > 0)
+            {
+                excluded.UnionWith(candidates.SelectMany(e => e.ExclusionKeys));
+                ed.WriteMessage($"\nLegendaregel uitgesloten ({candidates.Count} bronregel(s)).");
+                continue;
+            }
             if (candidates.Count == 0) { ed.WriteMessage("\nDit object hoort niet bij een opgenomen legendaregel."); continue; }
             // afzonderlijke weergave per broninvoeging
             if (candidates.Count > 1)
@@ -1700,7 +1708,7 @@ public partial class Commands
             var current = new DescriptionEntry { Algemeen = value.Algemeen, Specifiek = value.Specifiek };
 
             using var dialog = new TextEditDialog(key, current, fallback);
-            void Apply()
+            string? Apply()
             {
                 if (target.IsGlobal)
                 {
@@ -1723,16 +1731,16 @@ public partial class Commands
                             Algemeen = string.IsNullOrWhiteSpace(dialog.Algemeen) ? null : dialog.Algemeen,
                             Specifiek = dialog.Specifiek
                         };
-                    ApplyTargetSettings(ed, db, target, s, $"Tekst voor {key}");
+                    return ApplyTargetSettings(ed, db, target, s, $"Tekst voor {key}");
                 }
+                return null;
             }
-            dialog.ApplyRequested += (_, _) => Apply();
+            dialog.SaveChanges = Apply;
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)
             {
                 ed.WriteMessage("\nGesloten.");
                 return;
             }
-            Apply();
         }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
@@ -4343,8 +4351,8 @@ public partial class Commands
                 settings.DescriptionOverrides = dialog.ToCatalog().Diff(DescriptionCatalog.Default());
                 ed.WriteMessage("\nOmschrijvingen voor deze nieuwe legenda bijgewerkt.");
             }
-            dialog.ApplyRequested += (_, _) => Apply();
-            if (AcWindows.ShowModalDialog(dialog) == WinForms.DialogResult.OK) Apply();
+            dialog.SaveChanges = () => { Apply(); return null; };
+            AcWindows.ShowModalDialog(dialog);
         }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
