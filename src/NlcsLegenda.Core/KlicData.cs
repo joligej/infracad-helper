@@ -110,9 +110,28 @@ public sealed record KlicObjectData(string Drawing, string Handle, string Xref,
 
     public string Provider => !HasData ? "" : string.Join(" / ", Values("Netbeheerder").Where(v => v.Length > 0));
 
-    public IEnumerable<string> Conflicts => Records.SelectMany(r => r.Values.Keys).Distinct().Where(key =>
-        Records.Where(r => r.Values.ContainsKey(key)).GroupBy(r => r.Table, StringComparer.OrdinalIgnoreCase)
-            .Any(table => table.Select(r => KlicFields.Canonical(key, r.Values[key])).Distinct().Skip(1).Any()));
+    public IEnumerable<string> Conflicts
+    {
+        get
+        {
+            var tables = new Dictionary<string, (string Raw, string Canonical)>(StringComparer.OrdinalIgnoreCase);
+            foreach (string key in Records.SelectMany(r => r.Values.Keys).Distinct())
+            {
+                tables.Clear();
+                foreach (var record in Records)
+                {
+                    if (!record.Values.TryGetValue(key, out var value)) continue;
+                    if (tables.TryGetValue(record.Table, out var previous))
+                    {
+                        if (previous.Raw == value || previous.Canonical == KlicFields.Canonical(key, value)) continue;
+                        yield return key;
+                        break;
+                    }
+                    tables.Add(record.Table, (value, KlicFields.Canonical(key, value)));
+                }
+            }
+        }
+    }
 
     public string GroupKey(IEnumerable<string> fields)
     {

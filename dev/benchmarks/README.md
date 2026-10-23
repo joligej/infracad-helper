@@ -39,3 +39,20 @@ geen aparte vergelijking met de oorspronkelijke TAUW-template. Bronrecords en
 lokale paden in uitvoerbestanden kunnen vertrouwelijk zijn: publiceer alleen een
 samenvatting. Sluit iedere CAD-proef normaal af en controleer bronbehoud en
 profielherstel afzonderlijk.
+
+## Broncontrole en exports vergelijken
+
+`CoreChecks` gebruikt de `rows.json.gz` van een Civil 3D-meting. Het vergelijkt twee
+Core-DLL's afwisselend in één proces, met drie opwarmrondes en tien metingen per
+versie. Broncontrole, CSV en JSON moeten exact dezelfde uitvoer geven. Inlezen en
+het vergelijken van de uitvoer vallen buiten de gemeten tijd. CSV en JSON bevatten
+netbeheerder, diameter en materiaal. Kies een nieuwe uitvoernaam:
+
+```powershell
+dotnet run --project dev/benchmarks/CoreChecks -c Release -- oude-core.dll nieuwe-core.dll rows.json.gz meting.json
+```
+
+De Civil 3D-meettool registreert ook processortijd (`cpuMs`). Deze telt alle threads
+van het CAD-proces en kan daardoor groter zijn dan de verstreken tijd. Gebruik
+hem als extra aanwijzing; vergelijk ook de spreiding en laat meetprogramma's niet
+tegelijk draaien.
