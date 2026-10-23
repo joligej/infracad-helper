@@ -369,7 +369,6 @@ public static class LegendBuilder
             double titleH = s.ToModel(s.TitleTextHeightMm);
             y -= titleH;
             var heading = AddText(btr, tr, s.RemarksTitle, new Point3d(left, y, 0), titleH, s.HeaderTextLayer, styleId, underline: true);
-            heading.Color = Color.FromColorIndex(ColorMethod.ByAci, 7);
             y = Math.Min(y - (s.ToModel(s.HeaderSpacingMm) - textH),
                 heading.GeometricExtents.MinPoint.Y - textH * 0.3);
         }
