@@ -1,9 +1,15 @@
 # Changelog
 
+## 1.35.2 - 2026-10-23
+
+- KLIC-uitlezing maakt minder tijdelijke objecten aan. Ingebedde XML wordt rechtstreeks gelezen; toegang tot de Map-API en Property Sets wordt hergebruikt. Alle bronwaarden en bronverschillen blijven beschikbaar.
+- Laagstijlen en ontlede laagnamen worden binnen één analyse hergebruikt. Een volgende analyse leest wijzigingen opnieuw.
+- Verschillende lijnpatronen uit dezelfde xref delen tijdens het bouwen één bronkopie. Na de bouwactie wordt die kopie vrijgegeven.
+- Een losse Civil 3D-meettool vergelijkt opbouwen en bijwerken, met controles op inhoud, hoeveelheden en getekende uitvoer. Zie [metingen](docs/prestaties.md).
+
 ## 1.35.1 - 2026-10-23
 
 - Bijwerken laat ongewijzigde herkennings- en uitsluitingskeuzes ook in de opgeslagen instellingen gelijk.
-
 - **Opmerkingen** volgt weer de templatekleur van de koppenlaag (ACI 130, ByLayer). Een eigen laagkleur per tekening blijft behouden bij het maken en bijwerken van legenda's.
 
 ## 1.35.0 - 2026-10-23

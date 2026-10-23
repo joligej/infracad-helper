@@ -126,3 +126,14 @@ onverwachte testfouten, volledige foutmeldingen, dubbel opruimen en Unicode-teks
 De native CAD-proef controleert dat een los object wordt vrijgegeven en een
 geregistreerd object beschikbaar blijft voor de transactie. Zie
 [CONTRIBUTING](../CONTRIBUTING.md) voor de volledige regressie- en releasecontroles.
+
+## Prestatiecontrole 1.35.2
+
+De nieuwe meettool geeft ernstige geheugen- en procesfouten door. De overige
+fouten worden met volledige context als een mislukte proef vastgelegd. Een
+overbodige tekstconversie uit de nieuwe review is verwijderd.
+
+Drie LINQ-stijladviezen in KlicData blijven bewust onverwerkt: deze lussen
+vermijden tijdelijke selecties bij tienduizenden bronobjecten. Bronkeuze, lege
+waarden, tabelvolgorde en dubbele waarden worden afzonderlijk getest. Dit zijn
+stijladviezen, geen vastgestelde functionele of beveiligingsfouten.

@@ -49,6 +49,39 @@ public class KlicMetadataTests
         Assert.Throws<InvalidDataException>(() => KlicMetadata.ReadProviders(new[] { new byte[KlicMetadata.MaxCompressedBytes + 1] }));
     }
 
+    [Fact]
+    public void XmlFieldsPreserveNamespacesNestedTextEmptyValuesAndRecordOrder()
+    {
+        var xml = """
+            <KLIC xmlns:k="urn:klic">
+              <k:Row><k:Handle>00ab</k:Handle><Handle>AC</Handle>
+                <Omschrijving> voor <b>tussen</b><![CDATA[ & na ]]><!-- geen tekst --></Omschrijving>
+                <Onbekend><Materiaal>niet opnemen</Materiaal></Onbekend><Materiaal/>
+              </k:Row>
+              <Row/><Row><Handle>AB</Handle><DiameterM>0.3000</DiameterM></Row>
+            </KLIC>
+            """;
+        var result = KlicMetadata.ReadRecords(new[] { Zip(xml) });
+        var records = Assert.Single(result).Value;
+        Assert.Equal("AB", result.Keys.Single());
+        Assert.Equal(2, records.Count);
+        Assert.Equal("Row", records[0].Table);
+        Assert.Equal("voor tussen & na", records[0].Values["Omschrijving"]);
+        Assert.Equal("", records[0].Values["Materiaal"]);
+        Assert.Equal("0.3000", records[1].Values["DiameterM"]);
+    }
+
+    [Theory]
+    [InlineData("AB", true)]
+    [InlineData("ongeldig", false)]
+    [InlineData("", false)]
+    public void DuplicateFieldsAreRejectedOnlyForRecordsWithAValidHandle(string handle, bool reject)
+    {
+        var bytes = Zip($"<KLIC><Row><Materiaal>PE</Materiaal><Materiaal>PVC</Materiaal><Handle>{handle}</Handle></Row></KLIC>");
+        if (reject) Assert.Throws<InvalidDataException>(() => KlicMetadata.ReadRecords(new[] { bytes }));
+        else Assert.Empty(KlicMetadata.ReadRecords(new[] { bytes }));
+    }
+
     private static NlcsLayerName Layer(string provider, string renderLayer) => new()
     {
         Raw = "B-WE-KL-DATA-G", LocalName = "B-WE-KL-DATA-G", StatusCode = "B", Status = NlcsStatus.Bestaand,

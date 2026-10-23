@@ -54,6 +54,29 @@ public static class DrawingAnalyzer
     private sealed class Collector
     {
         public bool TrackSources;
+        public required string[] KlicGroupFields;
+        public readonly Dictionary<ObjectId, (bool Inherits, LayerDisplayStyle Style)> SourceStyles = new();
+        public readonly Dictionary<string, NlcsLayerName?> SourceLayers = new(StringComparer.Ordinal);
+
+        public NlcsLayerName? ParseLayer(string name)
+        {
+            if (!SourceLayers.TryGetValue(name, out var parsed))
+            {
+                NlcsLayerParser.TryParse(name, out parsed);
+                SourceLayers.Add(name, parsed);
+            }
+            return parsed;
+        }
+
+        public LayerDisplayStyle LayerStyle(Entity entity, Transaction tr, LayerDisplayStyle? parent)
+        {
+            if (!SourceStyles.TryGetValue(entity.LayerId, out var source))
+            {
+                source = (LayerNaming.LocalName(entity.Layer) == "0", EntityLayerStyle(entity, tr));
+                SourceStyles.Add(entity.LayerId, source);
+            }
+            return source.Inherits && parent is not null ? parent : source.Style;
+        }
         public readonly Dictionary<string, HashSet<ObjectId>> Objects = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, LayerDisplayStyle> Styles = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, NlcsLayerName> Parsed = new(StringComparer.OrdinalIgnoreCase);
@@ -87,7 +110,7 @@ public static class DrawingAnalyzer
     {
         var timer = reportTimings is null ? null : System.Diagnostics.Stopwatch.StartNew();
         using var klic = new KlicSourceMetadata(settings.Klic, db, tr);
-        var c = new Collector { Klic = klic, TrackSources = trackSources };
+        var c = new Collector { Klic = klic, TrackSources = trackSources, KlicGroupFields = settings.KlicGroupFields().ToArray() };
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (excludedIds is { Count: > 0 })
             c.Excluded = new HashSet<ObjectId>(excludedIds);
@@ -197,7 +220,7 @@ public static class DrawingAnalyzer
             bool inheritsVisibleLayer = inheritedLayerStyle is not null && LayerNaming.LocalName(ent.Layer) == "0";
             if (!inheritsVisibleLayer && !IsVisible(ent.Layer, tr, c)) return;
         }
-        var layerStyle = EntityLayerStyle(ent, tr, inheritedLayerStyle);
+        var layerStyle = c.LayerStyle(ent, tr, inheritedLayerStyle);
         var effectiveStyle = EntityStyle(ent, tr, inheritedStyle, layerStyle, transform);
         var block = ent as BlockReference;
         var definition = block is not null && !block.BlockTableRecord.IsNull
@@ -207,7 +230,7 @@ public static class DrawingAnalyzer
         {
             Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle, inheritedStyle);
             // symbolen zonder dubbeltelling van interne lijnen
-            if (block is not null && NlcsLayerParser.TryParse(ent.Layer, out var blockLayer)
+            if (block is not null && c.ParseLayer(ent.Layer) is { } blockLayer
                 && blockLayer.DrawType is NlcsDrawType.Symbool or NlcsDrawType.Geometrie)
                 return;
         }
@@ -244,15 +267,16 @@ public static class DrawingAnalyzer
         {
             metadata = c.Klic.Read(ent, sourceXref);
             parsed = CopyLayer(parsed!, sourceXref, metadata.Provider,
-                metadata.GroupKey(settings.KlicGroupFields()));
+                metadata.GroupKey(c.KlicGroupFields));
             if (!settings.IsIncluded(parsed)) return;
         }
         else
         {
-            if (!NlcsLayerParser.TryParse(layerName, out parsed)) return;
+            parsed = c.ParseLayer(layerName);
+            if (parsed is null) return;
             metadata = c.Klic.Read(ent, sourceXref);
             parsed = CopyLayer(parsed, sourceXref, metadata.Provider,
-                metadata.GroupKey(settings.KlicGroupFields()));
+                metadata.GroupKey(c.KlicGroupFields));
             if (!settings.IsIncluded(parsed))
             {
                 c.ExcludedNlcs.Add(parsed.LocalName);
@@ -419,15 +443,26 @@ public static class DrawingAnalyzer
 
     private static double ConstantWidth(Entity entity, Transaction tr)
     {
-        IEnumerable<double> widths = entity switch
+        double? width = null;
+        bool Matches(double start, double end)
         {
-            Polyline p => Enumerable.Range(0, p.NumberOfVertices).SelectMany(i => new[] { p.GetStartWidthAt(i), p.GetEndWidthAt(i) }),
-            Polyline2d p => p.Cast<object>().Select(i => i is Vertex2d vertex ? vertex : (Vertex2d)tr.GetObject((ObjectId)i, OpenMode.ForRead))
-                .SelectMany(v => new[] { v.StartWidth, v.EndWidth }),
-            _ => Array.Empty<double>()
-        };
-        var values = widths.ToArray();
-        return values.Length > 0 && values.All(w => Math.Abs(w - values[0]) < 1e-9) ? values[0] : 0;
+            width ??= start;
+            return Math.Abs(start - width.Value) < 1e-9 && Math.Abs(end - width.Value) < 1e-9;
+        }
+        if (entity is Polyline polyline)
+        {
+            for (int i = 0; i < polyline.NumberOfVertices; i++)
+                if (!Matches(polyline.GetStartWidthAt(i), polyline.GetEndWidthAt(i))) return 0;
+        }
+        else if (entity is Polyline2d oldPolyline)
+        {
+            foreach (var item in oldPolyline)
+            {
+                var vertex = item as Vertex2d ?? (Vertex2d)tr.GetObject((ObjectId)item, OpenMode.ForRead);
+                if (!Matches(vertex.StartWidth, vertex.EndWidth)) return 0;
+            }
+        }
+        return width ?? 0;
     }
 
     internal static string LinetypeSignature(ObjectId id, Transaction tr)

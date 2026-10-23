@@ -38,7 +38,8 @@ Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitle
 | Uitvoer | Een gekoppelde viewport die de legenda-schaal volgt, CSV/JSON of een uittrekstaat van een map |
 
 Elke legenda bewaart haar eigen bron en instellingen in de DWG. **Toepassen**
-werkt de gekozen legenda meteen bij; **Opslaan** sluit daarna het venster.
+werkt de gekozen legenda meteen bij; **Opslaan** past wijzigingen toe en sluit het
+venster. Na Toepassen blijven beide knoppen uitgeschakeld totdat er weer iets wijzigt.
 **Bijwerken** bewaart uitgevinkte regels en eigen instellingen; **Resetten** begint
 weer met de globale standaard. Samenvoegkeuzes voor KLIC en overige lagen staan
 naast elkaar, met optioneel de samengevoegde waarden in de omschrijving.
@@ -61,6 +62,7 @@ een opzet bewaren en delen.
 De [handleiding](docs/handleiding.md) beschrijft keuzes en commando’s.
 [Maatvoering](docs/template-maatvoering.md) legt de opmaak vast;
 [KLIC-gegevens](docs/klic-bronnen.md) licht bronkeuze en groepering toe.
+[Prestatiemetingen](docs/prestaties.md) toont de gemeten doorlooptijden en beperkingen.
 
 ## Compatibiliteit en onderhoud
 

@@ -107,7 +107,7 @@ public static class LegendBuilder
                 string name = entry.SymbolBlockName!;
                 string renderLayer;
                 if (!entry.IsManual && analysis.LayerStyles.TryGetValue(layer, out var display))
-                    renderLayer = EnsureStyledLayer(tr, db, layer, display);
+                    renderLayer = EnsureStyledLayer(tr, db, imports, layer, display);
                 else { EnsureLayer(tr, db, layer, 7); renderLayer = layer; }
                 var sample = entry.IsManual ? null : analysis.SymbolSamples.GetValueOrDefault(layer);
                 if (!TryInsertSymbol(btr, tr, db, imports, name, renderLayer, sample?.Transform ?? SymbolTransform.Identity,
@@ -408,7 +408,7 @@ public static class LegendBuilder
         foreach (var lyr in entry.LayersByType.Values.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!entry.IsManual && analysis.LayerStyles.TryGetValue(lyr, out var style))
-                renderLayers[lyr] = EnsureStyledLayer(tr, db, lyr, style);
+                renderLayers[lyr] = EnsureStyledLayer(tr, db, imports, lyr, style);
             else
             {
                 EnsureLayer(tr, db, lyr, 7);
@@ -467,10 +467,10 @@ public static class LegendBuilder
                         LineWeight = LineWeight.LineWeight035,
                         Linetype = "Continuous", LinetypeIdentity = "Continuous"
                     };
-                    line.Layer = EnsureStyledLayer(tr, db, "NLCS_LEGENDA_KANTVERHARDING", style);
+                    line.Layer = EnsureStyledLayer(tr, db, imports, "NLCS_LEGENDA_KANTVERHARDING", style);
                     line.Color = style.Color;
                     line.LineWeight = style.LineWeight;
-                    line.LinetypeId = ResolveStyleLinetype(tr, db, style);
+                    line.LinetypeId = imports.ResolveLinetype(style);
                 }
                 rowEntities.Add(AppendEntity(btr, line));
                 tr.AddNewlyCreatedDBObject(line, true);
@@ -499,7 +499,7 @@ public static class LegendBuilder
             foreach (var entity in rowEntities.Select(id => tr.GetObject(id, OpenMode.ForWrite)).OfType<Entity>())
                 foreach (var style in renderLayers.Where(layer => layer.Key != entry.SymbolLayer && entity.Layer == layer.Value)
                     .Select(layer => analysis.LayerStyles.GetValueOrDefault(layer.Key)).OfType<LayerDisplayStyle>())
-                    ApplyEntityStyle(entity, style, tr, db);
+                    ApplyEntityStyle(entity, style, imports);
 
         if (s.DrawSwatchFrame)
         {
@@ -588,7 +588,7 @@ public static class LegendBuilder
             {
                 var primitive = imports.ImportPrimitive(sample.ReferenceId, btr.ObjectId, sample.SourceXref);
                 primitive.XData = null;
-                if (sample.InsertionStyle is { } style) ApplyEntityStyle(primitive, style, tr, db);
+                if (sample.InsertionStyle is { } style) ApplyEntityStyle(primitive, style, imports);
                 primitives.Add(primitive.ObjectId); created.Add(primitive.ObjectId); probeOk = true;
             }
             else
@@ -738,6 +738,32 @@ public static class LegendBuilder
         private readonly Dictionary<(Database, string), SymbolSnapshot> _sources = new();
         private readonly Dictionary<(ObjectId, string), ObjectId> _definitions = new();
         private readonly List<ObjectId> _importedBlocks = new();
+        private readonly Dictionary<Database, Database> _linetypeSources = new();
+
+        public ObjectId ResolveLinetype(LayerDisplayStyle style)
+        {
+            var table = (LinetypeTable)tr.GetObject(host.LinetypeTableId, OpenMode.ForRead);
+            if (style.LinetypeIdentity == "Continuous" || style.Linetype.Equals("Continuous", StringComparison.OrdinalIgnoreCase)) return table["Continuous"];
+            if (!table.Has(style.Linetype))
+                throw new InvalidOperationException($"Linetype '{style.Linetype}' ontbreekt.");
+            var id = table[style.Linetype];
+            if (id.OriginalDatabase == host) return id;
+            string importedName = "NLCS_LT_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(style.LinetypeIdentity)))[..20];
+            if (table.Has(importedName)) return table[importedName];
+            if (!_linetypeSources.TryGetValue(id.OriginalDatabase, out var source))
+                _linetypeSources.Add(id.OriginalDatabase, source = _resources.Own(OpenXrefSnapshot(id.OriginalDatabase)));
+            using var sourceTr = source.TransactionManager.StartTransaction();
+            var sourceTable = (LinetypeTable)sourceTr.GetObject(source.LinetypeTableId, OpenMode.ForRead);
+            var sourceId = sourceTable[LayerNaming.LocalName(style.Linetype)];
+            using var ids = new ObjectIdCollection { sourceId };
+            using var mapping = new IdMapping();
+            source.WblockCloneObjects(ids, host.LinetypeTableId, mapping, DuplicateRecordCloning.MangleName, false);
+            var imported = mapping[sourceId].Value;
+            ((LinetypeTableRecord)tr.GetObject(imported, OpenMode.ForWrite)).Name = importedName;
+            sourceTr.Commit();
+            return imported;
+        }
 
         public Hatch CopyHatch(HatchSample sample, ObjectId owner)
         {
@@ -837,7 +863,7 @@ public static class LegendBuilder
                     to.Color = from.Color; to.LineWeight = from.LineWeight; to.Transparency = from.Transparency;
                     to.IsOff = from.IsOff; to.IsFrozen = from.IsFrozen; to.IsPlottable = from.IsPlottable;
                     var lt = (LinetypeTableRecord)tr.GetObject(from.LinetypeObjectId, OpenMode.ForRead);
-                    to.LinetypeObjectId = ResolveStyleLinetype(tr, host, new LayerDisplayStyle
+                    to.LinetypeObjectId = ResolveLinetype(new LayerDisplayStyle
                     {
                         Color = from.Color,
                         Linetype = lt.Name,
@@ -943,7 +969,7 @@ public static class LegendBuilder
         }
         created.Add(probe.ObjectId);
         var insertionLayer = sample?.InsertionLayerStyle ?? DrawingAnalyzer.EntityLayerStyle(probe, tr);
-        if (sample?.InsertionStyle is { } insertionStyle) ApplyEntityStyle(probe, insertionStyle, tr, db);
+        if (sample?.InsertionStyle is { } insertionStyle) ApplyEntityStyle(probe, insertionStyle, imports);
         var queue = new Stack<(ObjectId Id, LayerDisplayStyle Layer)>();
         queue.Push((probe.ObjectId, insertionLayer));
         int guard = 0;
@@ -980,7 +1006,7 @@ public static class LegendBuilder
                         AppendEntity(btr, text); tr.AddNewlyCreatedDBObject(text, true);
                         attribute.Erase();
                     }
-                    ApplyEntityStyle(text, attributeStyle, tr, db);
+                    ApplyEntityStyle(text, attributeStyle, imports);
                     created.Add(text.ObjectId);
                     result.Add(text.ObjectId);
                 }
@@ -1006,7 +1032,7 @@ public static class LegendBuilder
                     var pieceStyle = DrawingAnalyzer.EntityStyle(piece, tr, parentStyle, pieceLayerStyle);
                     if (piece is Hatch hatch) hatch.BackgroundColor = DrawingAnalyzer.ResolveColor(hatch.BackgroundColor, parentStyle, pieceLayerStyle);
                     if (piece.Layer == "0") piece.LayerId = reference.LayerId;
-                    ApplyEntityStyle(piece, pieceStyle, tr, db);
+                    ApplyEntityStyle(piece, pieceStyle, imports);
                     AppendEntity(btr, piece);
                     created.Add(piece.ObjectId);
                     tr.AddNewlyCreatedDBObject(piece, true);
@@ -1020,12 +1046,12 @@ public static class LegendBuilder
         return result;
     }
 
-    private static void ApplyEntityStyle(Entity entity, LayerDisplayStyle style, Transaction tr, Database db)
+    private static void ApplyEntityStyle(Entity entity, LayerDisplayStyle style, SymbolImportSession imports)
     {
         entity.Color = style.Color;
         entity.LineWeight = style.LineWeight;
         entity.Transparency = style.Transparency.ToAutoCadValue();
-        entity.LinetypeId = ResolveStyleLinetype(tr, db, style);
+        entity.LinetypeId = imports.ResolveLinetype(style);
         entity.LinetypeScale = style.LinetypeScale;
     }
 
@@ -1347,7 +1373,7 @@ public static class LegendBuilder
     }
 
     // eigen weergavelaag bij afwijkende stijl; bronlaag behouden
-    private static string EnsureStyledLayer(Transaction tr, Database db, string name, LayerDisplayStyle style)
+    private static string EnsureStyledLayer(Transaction tr, Database db, SymbolImportSession imports, string name, LayerDisplayStyle style)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         bool nameExists = lt.Has(name);
@@ -1374,35 +1400,11 @@ public static class LegendBuilder
             Color = style.Color,
             LineWeight = style.LineWeight
         };
-        ltr.LinetypeObjectId = ResolveStyleLinetype(tr, db, style);
+        ltr.LinetypeObjectId = imports.ResolveLinetype(style);
         lt.Add(ltr);
         tr.AddNewlyCreatedDBObject(ltr, true);
         ltr.Transparency = style.Transparency.ToAutoCadValue();
         return styledName;
-    }
-
-    private static ObjectId ResolveStyleLinetype(Transaction tr, Database db, LayerDisplayStyle style)
-    {
-        var table = (LinetypeTable)tr.GetObject(db.LinetypeTableId, OpenMode.ForRead);
-        if (style.LinetypeIdentity == "Continuous" || style.Linetype.Equals("Continuous", StringComparison.OrdinalIgnoreCase)) return table["Continuous"];
-        if (!table.Has(style.Linetype))
-            throw new InvalidOperationException($"Linetype '{style.Linetype}' ontbreekt.");
-        var id = table[style.Linetype];
-        if (id.OriginalDatabase == db) return id;
-        string importedName = "NLCS_LT_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(style.LinetypeIdentity)))[..20];
-        if (table.Has(importedName)) return table[importedName];
-        using var source = OpenXrefSnapshot(id.OriginalDatabase);
-        using var sourceTr = source.TransactionManager.StartTransaction();
-        var sourceTable = (LinetypeTable)sourceTr.GetObject(source.LinetypeTableId, OpenMode.ForRead);
-        var sourceId = sourceTable[LayerNaming.LocalName(style.Linetype)];
-        using var ids = new ObjectIdCollection { sourceId };
-        using var mapping = new IdMapping();
-        source.WblockCloneObjects(ids, db.LinetypeTableId, mapping, DuplicateRecordCloning.MangleName, false);
-        var imported = mapping[sourceId].Value;
-        ((LinetypeTableRecord)tr.GetObject(imported, OpenMode.ForWrite)).Name = importedName;
-        sourceTr.Commit();
-        return imported;
     }
 
     private static bool LayerMatchesStyle(Transaction tr, LayerTableRecord layer, LayerDisplayStyle style)

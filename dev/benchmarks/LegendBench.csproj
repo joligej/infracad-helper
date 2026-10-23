@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <PluginDirectory Condition="'$(PluginDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\src\NlcsLegenda.Plugin\bin\Release\net10.0-windows</PluginDirectory>
+    <AcadDirectory Condition="'$(AcadDirectory)' == ''">$(ProgramW6432)\Autodesk\AutoCAD 2027</AcadDirectory>
+    <AssemblyName>LegendBench</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="LegendBench.cs" />
+    <Reference Include="NlcsLegenda"><HintPath>$(PluginDirectory)\NlcsLegenda.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="NlcsLegenda.Core"><HintPath>$(PluginDirectory)\NlcsLegenda.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="acmgd"><HintPath>$(AcadDirectory)\acmgd.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="acdbmgd"><HintPath>$(AcadDirectory)\acdbmgd.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="accoremgd"><HintPath>$(AcadDirectory)\accoremgd.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

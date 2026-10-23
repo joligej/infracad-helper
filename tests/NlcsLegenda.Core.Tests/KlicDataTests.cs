@@ -18,6 +18,32 @@ public class KlicDataTests
         RenderLayerName = name, Netbeheerder = data.Provider, KlicGroupKey = data.GroupKey(settings.Klic.GroupFields)
     };
 
+    [Theory]
+    [InlineData(KlicSource.InfraCAD)]
+    [InlineData(KlicSource.PropertySets)]
+    [InlineData(KlicSource.ObjectData)]
+    public void SourceSelectionKeepsTableOrderFallbacksAndAllValues(KlicSource preferred)
+    {
+        var records = new[]
+        {
+            Record(KlicSource.ObjectData, ("Materiaal", " staal ")),
+            Record(KlicSource.PropertySets, ("Materiaal", "PE")) with { Table = "KLIC_Anders" },
+            Record(KlicSource.PropertySets, ("Materiaal", "PVC")),
+            Record(KlicSource.InfraCAD, ("Materiaal", "")) with { Table = "klic_leidinglijn" },
+            Record(KlicSource.ObjectData, ("Materiaal", "STAAL")),
+            Record(KlicSource.PropertySets, ("Thema", "Water"))
+        };
+        var data = Data("A", records) with { PreferredSource = preferred };
+        string expected = preferred == KlicSource.InfraCAD ? "" : preferred == KlicSource.PropertySets ? "PVC" : "staal";
+        Assert.Equal(new[] { expected, "PE" }.Order(StringComparer.OrdinalIgnoreCase), data.Values("Materiaal"));
+        Assert.Equal(preferred == KlicSource.ObjectData ? 3 : 2, data.Selected("Materiaal").Count);
+        Assert.Equal(preferred, data.Selected("Materiaal")[0].Source);
+        Assert.Equal("Water", Assert.Single(data.Values("Thema")));
+        Assert.Empty(data.Values("DiameterM"));
+        var changed = data with { Records = new[] { Record(KlicSource.ObjectData, ("Materiaal", "Beton")) } };
+        Assert.Equal("Beton", Assert.Single(changed.Values("Materiaal")));
+    }
+
     [Fact]
     public void PropertySetEditIsVisibleAndPreferenceCanUseItWithoutChangingTheSource()
     {
