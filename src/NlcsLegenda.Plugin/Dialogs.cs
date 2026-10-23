@@ -373,10 +373,10 @@ internal sealed class SettingsDialog : LegendDialog
         comparisons.Controls.Add(choices);
         root.Controls.Add(comparisons);
         root.Controls.Add(new Label { Text = "KLIC: kabel- en leidinglagen, objecten met KLIC-gegevens en bronnen met KLIC in de naam. Overige lagen: alle andere objecten.", AutoSize = true, Margin = new Padding(3, 6, 3, 6) });
-        root.Controls.Add(Group("Tekst",
-            BoundCheck("Samengevoegde waarden tonen", () => _settings.ShowMergedValues, v => _settings.ShowMergedValues = v),
-            Own(new Label { Text = "Aan: Leiding (200, 300). Uit: Leiding.", AutoSize = true }),
-            BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v)));
+        var textOptions = Group("Tekst", BoundCheck("Samengevoegde waarden tonen", () => _settings.ShowMergedValues, v => _settings.ShowMergedValues = v));
+        textOptions.Controls[0].Controls.Add(new Label { Text = "Aan: Leiding (200, 300). Uit: Leiding.", AutoSize = true });
+        textOptions.Controls[0].Controls.Add(BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v));
+        root.Controls.Add(textOptions);
 
         var data = new Button { Text = "Extra KLIC-velden…", AutoSize = true };
         data.Click += (_, _) =>
