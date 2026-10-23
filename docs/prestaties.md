@@ -40,6 +40,12 @@ bron mogen blijven beschrijven; gedeeltelijk lezen zonder bescherming kan
 inconsistente gegevens opleveren ([FileOpenMode](https://help.autodesk.com/cloudhelp/2019/ENU/OARX-ManagedRefGuide/files/OREFNET-Autodesk_AutoCAD_DatabaseServices_FileOpenMode.html)).
 Er is geen langdurige cache van CAD-objecten of brongegevens toegevoegd.
 
+De kandidaat is gecontroleerd met 662 kerntests en acht native CAD-runs, inclusief
+heropenen, KLIC, xref-keuzes en het templatecontract. De volledige Civil 3D-proef
+maakte en vernieuwde de echte KLIC-xref-legenda viermaal. Bronrecords en getekende
+uitvoer waren gelijk aan 1.35.2; de drie aanvullende Map-analyses slaagden. De
+sessie sloot normaal af, bronnen bleven gelijk en 35 profielwaarden zijn hersteld.
+
 ## Eerdere vergelijking 1.35.1–1.35.2
 
 Op 23 oktober 2026 zijn versie 1.35.1 en de kandidaat voor 1.35.2 vergeleken in

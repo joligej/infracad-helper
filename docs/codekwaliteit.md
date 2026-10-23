@@ -137,3 +137,12 @@ Drie LINQ-stijladviezen in KlicData blijven bewust onverwerkt: deze lussen
 vermijden tijdelijke selecties bij tienduizenden bronobjecten. Bronkeuze, lege
 waarden, tabelvolgorde en dubbele waarden worden afzonderlijk getest. Dit zijn
 stijladviezen, geen vastgestelde functionele of beveiligingsfouten.
+
+## Prestatiecontrole 1.35.3
+
+Het nieuwe `cs/linq/missed-where`-advies in de broncontrole is inhoudelijk bekeken.
+De lus gebruikt `TryGetValue` om een veld tegelijk te vinden en te lezen, en stopt
+bij het eerste verschil. Een afzonderlijk filter zou extra iteratie of opnieuw
+opzoeken introduceren. Daarom blijft deze meetbaar snellere lus staan. Tests dekken
+tabelnamen, veldvolgorde, lege en numerieke waarden, verschillende woordenboek-
+vergelijkingen en opnieuw gewijzigde records. Er wordt geen broncontrole overgeslagen.
