@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.35.0 - 2026-10-23
+
+- Bijwerken behoudt lokale keuzes, ook bij een andere legendaschaal. Symbolen krijgen een schaalvaste herkenning; een volledig uitgevinkte legenda blijft beheerd.
+- **Resetten** zet de gekozen legenda terug naar de globale standaard, met behoud van naam, bron en plaats.
+- Aanklikken om uit te sluiten werkt op bronobjecten, geneste symbolen en legendaregels, ook na exploderen en heropenen. Een samengevoegde regel schakelt alle bijbehorende bronregels uit.
+- **Samenvoegen** heeft een eigen instellingenpagina met KLIC en overige lagen naast elkaar. KLIC-bronnen worden ook aan hun bronnaam herkend. De diameterkeuze geldt voor laagnamen én objectgegevens; nieuwe KLIC-legenda's voegen diameters standaard samen.
+- Samengevoegde waarden verschijnen achter de gemeenschappelijke omschrijving, bijvoorbeeld **Leiding (200, 300)**. Dit kan worden uitgezet.
+- Na **Toepassen** zijn Opslaan en Toepassen uitgeschakeld totdat er weer iets wijzigt.
+
 ## 1.34.0 - 2026-10-22
 
 - **Diameters samenvoegen** is apart instelbaar voor KLIC en overige lagen. De optie negeert de diameter in de laagnaam, met behoud van leidingsoort, kleur, lijnpatroon en de overige niet-samengevoegde kenmerken. Voor nieuwe KLIC-instellingen staat zij aan; bestaande keuzes blijven behouden.

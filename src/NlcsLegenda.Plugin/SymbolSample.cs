@@ -24,6 +24,10 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
     public SymbolTransform RenderTransform => SourceScale is > 1
         ? Transform.Divide(SourceScale.Value / TargetScale) : Transform;
 
+    public string SelectionIdentity =>
+        $"S:{DefinitionIdentity}:{(SourceScale is > 1 ? Transform.Divide(SourceScale.Value / 1000.0) : Transform).Signature}"
+        + (AttributeIdentity.Length == 0 ? string.Empty : ":" + AttributeIdentity);
+
     public string RenderIdentity =>
         $"S:{DefinitionIdentity}:{RenderTransform.Signature}" + (AttributeIdentity.Length == 0 ? string.Empty : ":" + AttributeIdentity);
 }

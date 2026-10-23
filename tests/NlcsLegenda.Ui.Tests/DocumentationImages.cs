@@ -33,10 +33,8 @@ internal static class DocumentationImages
         using (var form = new SettingsDialog(settings.Clone(), "Legenda: Inrichting – demonstratie", xrefNames: new[] { "KLIC", "ONDERGROND" }))
             Capture(form, directory, "samenvoegen.png", new Size(840, 650), f => {
                 var tabs = Descendants(f).OfType<TabControl>().Single();
-                tabs.SelectedIndex = 1;
+                tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(p => p.Text == "Samenvoegen");
                 Application.DoEvents();
-                var group = Descendants(tabs.SelectedTab!).OfType<GroupBox>().Single(g => g.Text.StartsWith("KLIC —"));
-                tabs.SelectedTab!.AutoScrollPosition = new Point(0, group.Top);
             });
         var checks = entries.Select(e => new EntryCheckItem(LegendSettings.EntryKey(e), e.Description,
             e.Status.DisplayName(), string.Join(" ", e.SourceLayers.Select(s => s.SourceLayerName)))).ToArray();

@@ -121,7 +121,7 @@ internal static class Program
 
     private static void CheckRibbonIcons()
     {
-        string[] commands = { "NLCSLEGENDA", "NLCSLEGENDAUPDATE", "NLCSLEGENDAINFO",
+        string[] commands = { "NLCSLEGENDA", "NLCSLEGENDAUPDATE", "NLCSLEGENDARESET", "NLCSLEGENDAINFO",
             "NLCSLEGENDASAMENSTELLEN", "NLCSLEGENDAOMSCHRIJVINGEN", "NLCSLEGENDATEKST",
             "NLCSLEGENDASTATUS", "NLCSLEGENDAXREFS", "NLCSLEGENDALAAGNAAM",
             "NLCSLEGENDAVIEWPORT", "NLCSLEGENDAEXPORT", "NLCSLEGENDABATCH",
@@ -191,13 +191,41 @@ internal static class Program
     private static void CheckSettingsSave()
     {
         int saves = 0;
-        using var dialog = new SettingsDialog(new(), "Legenda: A") { SaveChanges = () => { saves++; return null; } };
+        var settings = new LegendSettings();
+        using var dialog = new SettingsDialog(settings, "Legenda: A") { SaveChanges = () => { saves++; return null; } };
         OpenOffscreen(dialog);
-        Descendants(dialog).OfType<Button>().Single(b => b.Text == "Toepassen").PerformClick();
-        Check(saves == 1 && dialog.Visible, "Toepassen slaat onmiddellijk op en houdt het venster open");
-        dialog.DialogResult = DialogResult.OK;
+        var apply = Descendants(dialog).OfType<Button>().Single(b => b.Text == "Toepassen");
+        var save = Descendants(dialog).OfType<Button>().Single(b => b.Text == "Opslaan");
+        var title = Descendants(dialog).OfType<TextBox>().Single(t => t.Text == settings.Title);
+        Check(!apply.Enabled && !save.Enabled, "Ongewijzigde instellingen hoeven niet opgeslagen");
+        title.Text = "Mijn legenda";
+        Check(apply.Enabled && save.Enabled, "Tekstwijziging activeert opslagknoppen direct");
+        apply.PerformClick();
+        Check(saves == 1 && dialog.Visible && !apply.Enabled && !save.Enabled, "Toepassen bewaart en schakelt beide opslagknoppen uit");
+        Check(Descendants(dialog).OfType<Button>().Single(b => b.Text == "Annuleren").Enabled, "Sluiten na Toepassen blijft mogelijk");
+        title.Text = "Andere titel";
+        Check(save.Enabled, "Nieuwe wijziging mag opgeslagen");
+        title.Text = "Mijn legenda";
+        Check(!save.Enabled, "Terug naar toegepaste waarde is niet gewijzigd");
+        title.Text = "Definitieve titel";
+        save.PerformClick();
         dialog.Close();
-        Check(saves == 2, "Opslaan gebruikt hetzelfde toepaspad");
+        Check(saves == 2 && !dialog.Visible, "Opslaan gebruikt hetzelfde toepaspad");
+
+        int compositions = 0;
+        using var manage = new LegendManageDialog(new[] { new EntryCheckItem("a", "Boom", "Groen") }, new())
+            { SaveChanges = () => { compositions++; return null; } };
+        OpenOffscreen(manage);
+        var tree = Descendants(manage).OfType<TriStateTree>().Single();
+        var applyComposition = Descendants(manage).OfType<Button>().Single(b => b.Text == "Toepassen");
+        tree.SelectedNode = tree.Nodes[0];
+        typeof(TriStateTree).GetMethod("OnKeyDown", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(tree, new object[] { new KeyEventArgs(Keys.Space) });
+        Check(applyComposition.Enabled, "Uitvinken activeert Toepassen direct");
+        applyComposition.PerformClick();
+        Check(compositions == 1 && !applyComposition.Enabled && manage.ExcludedKeys.Contains("a"), "Samenstelling toegepast en knoppen uitgeschakeld");
+        manage.DialogResult = DialogResult.Cancel; manage.Close();
+        Check(compositions == 1, "Annuleren na Toepassen slaat niet opnieuw op");
     }
 
     private static void CheckLayerSearch()
@@ -344,13 +372,13 @@ internal static class Program
                 bitmap.Save(Path.Join(output, $"settings-{tabs.SelectedIndex}-{scale:0.00}.png"));
             }
         }
-        tabs.SelectedIndex = 1;
-        var number = Descendants(tabs.SelectedTab!).OfType<CheckBox>().Single(c => c.Text == "Volgnummer samenvoegen");
+        tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(p => p.Text == "Samenvoegen");
+        var number = Descendants(tabs.SelectedTab!).OfType<CheckBox>().Single(c => c.AccessibleName == "KLIC: Volgnummers samenvoegen");
         number.Checked = true;
         Check(settings.SamenvoegenNummer, "KLIC-keuze wijzigt de instelling");
         number.Checked = false;
         Check(!settings.SamenvoegenNummer, "KLIC-keuze is omkeerbaar");
-        var diameters = Descendants(tabs.SelectedTab!).OfType<CheckBox>().Where(c => c.Text == "Diameters samenvoegen").ToArray();
+        var diameters = Descendants(tabs.SelectedTab!).OfType<CheckBox>().Where(c => c.AccessibleName?.EndsWith(": Diameters samenvoegen") == true).ToArray();
         Check(diameters.Length == 2, "Diameterkeuzes voor KLIC en overige lagen");
         diameters[0].Checked = false;
         diameters[1].Checked = true;
@@ -382,7 +410,7 @@ internal static class Program
         }, () => Descendants(parent).OfType<Button>().First(b => b.Visible && b.Text.StartsWith("Samenstellen")).PerformClick());
         Check(loads == 1 && settings.ManualEntries.Single().Description == "Nieuw", "onderliggende Samenstellen past werkkopie toe");
         var tabs = Descendants(parent).OfType<TabControl>().Single();
-        tabs.SelectedIndex = 3;
+        tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(p => p.Text == "Teksten");
         InModal("NLCS Legenda – omschrijvingen", dialog =>
         {
             var grid = Descendants(dialog).OfType<DataGridView>().Single();
@@ -502,8 +530,9 @@ internal static class Program
         }
         Descendants(edit).OfType<ComboBox>().Single().SelectedIndex = (int)KlicSource.PropertySets;
         edit.DialogResult = DialogResult.OK; edit.Close();
-        Check(edit.Result.GroupFields.SequenceEqual(new[] { "DiameterM" }) && edit.Result.PreferredSource == KlicSource.PropertySets,
-            "KLIC-keuzes bevestigd");
+        Check(edit.Result.GroupFields.Count == 0 && edit.Result.Columns.SequenceEqual(new[] { "DiameterM" })
+            && edit.Result.DescriptionFields.SequenceEqual(new[] { "DiameterM" }) && edit.Result.PreferredSource == KlicSource.PropertySets,
+            "Diameter alleen via Samenvoegen gegroepeerd; extra kolom en tekst blijven beschikbaar");
         var entry = new LegendEntry { Status = NlcsStatus.Bestaand, Discipline = "WE", Hoofdgroep = "KL", Element = "WATER", Description = "Water",
             KlicObjects = new[] { new KlicObjectData("bron.dwg", "AB", "XREF", new[] {
             new KlicRecord(KlicSource.InfraCAD, "KLIC_LeidingLijn", new Dictionary<string,string> { ["Materiaal"] = "PE" }),

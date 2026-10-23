@@ -143,7 +143,8 @@ public static class DrawingAnalyzer
             name => c.KlicObjects.TryGetValue(name, out var objects) ? objects : Array.Empty<KlicObjectData>(),
             name => c.Styles.TryGetValue(name, out var style) ? $"{style.Color} / {LayerNaming.LocalName(style.Linetype)}" : null,
             name => c.SymbolSamples.ContainsKey(name) ? "" : renderIds.GetValueOrDefault(name)
-                + "|" + HatchSignature(c.Hatches.GetValueOrDefault(name), sourceScale: true));
+                + "|" + HatchSignature(c.Hatches.GetValueOrDefault(name), sourceScale: true),
+            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.SelectionIdentity : null);
 
         if (timer is not null)
         {
@@ -243,7 +244,7 @@ public static class DrawingAnalyzer
         {
             metadata = c.Klic.Read(ent, sourceXref);
             parsed = CopyLayer(parsed!, sourceXref, metadata.Provider,
-                metadata.GroupKey(settings.Klic.GroupFields));
+                metadata.GroupKey(settings.KlicGroupFields()));
             if (!settings.IsIncluded(parsed)) return;
         }
         else
@@ -251,7 +252,7 @@ public static class DrawingAnalyzer
             if (!NlcsLayerParser.TryParse(layerName, out parsed)) return;
             metadata = c.Klic.Read(ent, sourceXref);
             parsed = CopyLayer(parsed, sourceXref, metadata.Provider,
-                metadata.GroupKey(settings.Klic.GroupFields));
+                metadata.GroupKey(settings.KlicGroupFields()));
             if (!settings.IsIncluded(parsed))
             {
                 c.ExcludedNlcs.Add(parsed.LocalName);
@@ -314,7 +315,8 @@ public static class DrawingAnalyzer
             if (!c.Objects.TryGetValue(key, out var sourceObjects)) c.Objects[key] = sourceObjects = new();
             sourceObjects.Add(ent.ObjectId);
         }
-        if (metadata.HasData || metadata.ReadIssues.Count > 0 || ElementProperties.IsKlic(parsed.Discipline, parsed.Hoofdgroep))
+        if (metadata.HasData || metadata.ReadIssues.Count > 0 || ElementProperties.IsKlic(parsed.Discipline, parsed.Hoofdgroep)
+            || ElementProperties.IsKlicSource(System.IO.Path.GetFileNameWithoutExtension(metadata.Drawing)))
         {
             if (!c.KlicObjects.TryGetValue(key, out var objects)) c.KlicObjects.Add(key, objects = new());
             objects.Add(metadata);

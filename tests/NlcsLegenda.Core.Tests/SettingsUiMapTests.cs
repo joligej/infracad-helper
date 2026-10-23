@@ -19,6 +19,8 @@ public class SettingsUiMapTests
     {
         [nameof(LegendSettings.ExampleLibraryPath)] = new("Overzicht > Voorbeeld > Bibliotheek", Binding.Subdialog),
         [nameof(LegendSettings.ExampleOverrides)] = new("Overzicht > Voorbeeld", Binding.Subdialog),
+        [nameof(LegendSettings.ShowMergedValues)] = new("Samenvoegen", Binding.CheckBox),
+        [nameof(LegendSettings.KnownEntryKeys)] = new("(intern: herkenning)", Binding.Intern),
         [nameof(LegendSettings.SchemaVersion)] = new("(intern: schema)", Binding.Intern),
         [nameof(LegendSettings.Scale)] = new("Algemeen", Binding.Numeric),
         [nameof(LegendSettings.Title)] = new("Algemeen", Binding.Text),

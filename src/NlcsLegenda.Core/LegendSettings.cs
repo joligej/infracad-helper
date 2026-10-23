@@ -140,6 +140,14 @@ public sealed class LegendSettings
     [Browsable(false)]
     public HashSet<GroupDimension> MergedDimensions { get; set; } = DefaultKlicMergeDimensions();
 
+    [Category("Groepering"), DisplayName("Samengevoegde waarden tonen")]
+    public bool ShowMergedValues { get; set; } = true;
+
+    [Browsable(false)]
+    public HashSet<string> KnownEntryKeys { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyList<string> KlicGroupFields() => Klic.GroupFields.Append("DiameterM").Distinct().ToArray();
+
     public static HashSet<GroupDimension> DefaultKlicMergeDimensions() =>
         new() { GroupDimension.Specificatie, GroupDimension.Uitvoering, GroupDimension.Nummer, GroupDimension.Netbeheerder, GroupDimension.Diameter };
 
@@ -438,20 +446,64 @@ public sealed class LegendSettings
         return names.Length == 0 ? basic : basic + "|" + System.Text.Json.JsonSerializer.Serialize(names);
     }
 
-    public static string SelectionKey(LegendEntry entry) => entry.RenderIdentity.Length == 0 ? EntryKey(entry)
+    public static string SelectionKey(LegendEntry entry) => SelectionKey(entry, null);
+
+    public static string SelectionKey(LegendEntry entry, string? identity) => entry.RenderIdentity.Length == 0 ? EntryKey(entry)
         : EntryKey(entry) + "|STYLE:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(entry.SelectionIdentity.Length > 0 ? entry.SelectionIdentity : entry.RenderIdentity)));
+            System.Text.Encoding.UTF8.GetBytes(identity ?? (entry.SelectionIdentity.Length > 0 ? entry.SelectionIdentity : entry.RenderIdentity))));
 
     internal static string WithoutStyle(string key) => key.Split("|STYLE:", 2, StringSplitOptions.None)[0];
 
     public static bool MatchesExclusion(string key, string excluded) =>
-        new[] { key, WithoutStyle(key), WithoutKlicGroup(WithoutStyle(key)), BaseEntryKey(key) }
+        new[] { key, WithoutStyle(key), WithoutKlicGroup(WithoutStyle(key)), BaseEntryKey(key), WithoutDiameterKey(key), WithoutStyle(WithoutDiameterKey(key)) }
             .Contains(excluded, StringComparer.OrdinalIgnoreCase);
 
-    public bool IsEntryExcluded(string key) => ExcludedEntries.Contains(key)
-        || ExcludedEntries.Contains(WithoutStyle(key))
-        || ExcludedEntries.Contains(WithoutKlicGroup(WithoutStyle(key)))
-        || ExcludedEntries.Contains(BaseEntryKey(key));
+    private static string WithoutDiameterKey(string key)
+    {
+        int start = key.IndexOf("|KLIC:", StringComparison.Ordinal);
+        if (start < 0) return key;
+        int style = key.LastIndexOf("|STYLE:", StringComparison.Ordinal);
+        if (style < start) style = key.Length;
+        var group = KlicSummary.WithoutDiameter(key[(start + 6)..style]);
+        return key[..start] + (group.Length == 0 ? "" : "|KLIC:" + group) + key[style..];
+    }
+
+    public bool IsEntryExcluded(string key)
+    {
+        if (ExcludedEntries.Count == 0) return false;
+        if (ExcludedEntries.Contains(key) || ExcludedEntries.Contains(WithoutStyle(key))
+            || ExcludedEntries.Contains(WithoutKlicGroup(WithoutStyle(key))) || ExcludedEntries.Contains(BaseEntryKey(key))) return true;
+        string previous = WithoutDiameterKey(key);
+        return ExcludedEntries.Contains(previous) || ExcludedEntries.Contains(WithoutStyle(previous));
+    }
+
+    public void RememberEntries(IEnumerable<LegendEntry> entries)
+    {
+        var list = entries.ToArray();
+        var current = list.Select(SelectionKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var migrated = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in list.Where(e => e.LegacySelectionIdentity.Length > 0))
+        {
+            var legacy = SelectionKey(entry, entry.LegacySelectionIdentity);
+            foreach (var old in new[] { legacy, WithoutDiameterKey(legacy) }.Where(ExcludedEntries.Contains))
+            {
+                ExcludedEntries.Add(SelectionKey(entry));
+                if (!current.Contains(old)) migrated.Add(old);
+            }
+        }
+        ExcludedEntries.ExceptWith(migrated);
+        KnownEntryKeys.ExceptWith(migrated);
+        var previous = KnownEntryKeys.Concat(ExcludedEntries).Distinct(StringComparer.OrdinalIgnoreCase)
+            .GroupBy(WithoutStyle, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.OrdinalIgnoreCase);
+        foreach (var group in current.GroupBy(WithoutStyle, StringComparer.OrdinalIgnoreCase))
+        {
+            // alleen een unieke regel volgen bij gewijzigde weergave
+            if (group.Count() != 1 || !previous.TryGetValue(group.Key, out var old) || old.Length != 1) continue;
+            if (ExcludedEntries.Remove(old[0])) ExcludedEntries.Add(group.Single());
+            KnownEntryKeys.Remove(old[0]);
+        }
+        KnownEntryKeys.UnionWith(current);
+    }
 
     internal static string BaseEntryKey(string key) => string.Join("|", key.Split('|').Take(4));
 
@@ -506,6 +558,7 @@ public sealed class LegendSettings
         ExcludedDisciplines = new HashSet<string>(other.ExcludedDisciplines, StringComparer.OrdinalIgnoreCase);
         ExcludedHoofdgroepen = new HashSet<string>(other.ExcludedHoofdgroepen, StringComparer.OrdinalIgnoreCase);
         ExcludedEntries = new HashSet<string>(other.ExcludedEntries, StringComparer.OrdinalIgnoreCase);
+        KnownEntryKeys = new(other.KnownEntryKeys, StringComparer.OrdinalIgnoreCase);
         DescriptionOverrides = other.DescriptionOverrides.Clone();
         XrefInclusion = new Dictionary<string, bool>(other.XrefInclusion, StringComparer.OrdinalIgnoreCase);
         ManualEntryOrder = new List<string>(other.ManualEntryOrder);
@@ -568,7 +621,7 @@ public sealed class LegendSettings
 
     private static bool IsCollectionProperty(System.Reflection.PropertyInfo p) =>
         p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
-            or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries)
+            or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries) or nameof(KnownEntryKeys)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
             or nameof(CustomLayerRules) or nameof(BlankEntries) or nameof(ManualMergeGroups) or nameof(NonKlicMergedDimensions)
             or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder) or nameof(Klic) or nameof(ExampleOverrides);
@@ -650,6 +703,7 @@ public sealed class LegendSettings
         ExcludedDisciplines = ToCi(ExcludedDisciplines);
         ExcludedHoofdgroepen = ToCi(ExcludedHoofdgroepen);
         ExcludedEntries = ToCi(ExcludedEntries);
+        KnownEntryKeys = ToCi(KnownEntryKeys);
         XrefInclusion = ToCi(XrefInclusion);
         DescriptionOverrides ??= new DescriptionCatalog();
         DescriptionOverrides.Normalize();

@@ -53,6 +53,7 @@ internal sealed class LegendManageDialog : LegendDialog
     private readonly DataGridView _grid;
     private BindingList<ManualRow> _rows = new();
     private readonly IReadOnlyList<EntryCheckItem> _allEntries;
+    private readonly DialogSaveState _saveState;
 
     public bool PickObjectsRequested { get; private set; }
 
@@ -159,13 +160,20 @@ internal sealed class LegendManageDialog : LegendDialog
         Controls.Add(buttons);
 
         LoadFrom(initial);
+        _saveState = Own(new DialogSaveState(buttons, () => System.Text.Json.JsonSerializer.Serialize(new {
+            excluded = ExcludedKeys.OrderBy(k => k, StringComparer.Ordinal).ToArray(), rows = _rows.ToArray(), edit = DialogSaveState.GridEdit(_grid) })));
+        _tree.SelectionChanged += (_, _) => _saveState.Refresh();
+        _rows.ListChanged += (_, _) => _saveState.Refresh();
+        _grid.CellValueChanged += (_, _) => _saveState.Refresh();
+        _grid.CurrentCellDirtyStateChanged += (_, _) => _saveState.Refresh();
     }
 
     private bool Save()
     {
         try
         {
-            if (SaveChanges?.Invoke() is not { } error) return true;
+            if (!_saveState.HasChanges) return true;
+            if (SaveChanges?.Invoke() is not { } error) { _saveState.Saved(); return true; }
             Warn(error);
         }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { Warn(ex.Message); }

@@ -29,10 +29,10 @@ public class DiameterGroupingTests
 
     private static NlcsLayerName Layer(string element, string provider = "", string appearance = "210:RI-OVERIG-SO", string metadataGroup = "") => new()
     {
-        Raw = "SIT-BS-KLIC|B-WE-RI-" + element + "-G", LocalName = "B-WE-RI-" + element + "-G",
+        Raw = "SIT-BS-RIOOL|B-WE-RI-" + element + "-G", LocalName = "B-WE-RI-" + element + "-G",
         StatusCode = "B", Status = NlcsStatus.Bestaand, Discipline = "WE", Hoofdgroep = "RI",
         Element = element, TypeSuffix = "G", DrawType = NlcsDrawType.Geometrie,
-        IsXref = true, XrefName = "SIT-BS-KLIC", Netbeheerder = provider,
+        IsXref = true, XrefName = "SIT-BS-RIOOL", Netbeheerder = provider,
         RenderIdentity = appearance, KlicGroupKey = metadataGroup
     };
     private static IReadOnlyList<KlicObjectData> Metadata(string layer) => new[] {
@@ -54,9 +54,11 @@ public class DiameterGroupingTests
         Assert.Equal(120, entry.Metric.Length);
         Assert.Equal(12, entry.SourceLayers.Count);
         Assert.Equal(12, entry.SourceRenderLayers.Count);
-        Assert.Equal("Vrijvervalriool (Gemeente Hilversum)", entry.DisplayDescription);
+        Assert.Equal("Vrijvervalriool (125, 160, 200, 250, 300, 315, 400, 500, 600, 800, 1000, 1250, Gemeente Hilversum)", entry.DisplayDescription);
         Assert.Equal(12, entry.KlicObjects.Count);
-        Assert.DoesNotContain("125", entry.DisplayDescription);
+        settings.ShowMergedValues = false;
+        Assert.Equal("Vrijvervalriool (Gemeente Hilversum)", Assert.Single(LegendGrouping.Build(layers, settings, klicObjects: Metadata)).DisplayDescription);
+        settings.ShowMergedValues = true;
         Assert.Contains("Gemeente Hilversum", entry.DisplayDescription);
         settings.MergedDimensions.Remove(GroupDimension.Diameter);
         Assert.Equal(12, LegendGrouping.Build(layers, settings, klicObjects: Metadata).Count);

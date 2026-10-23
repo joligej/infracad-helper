@@ -39,6 +39,9 @@ Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitle
 
 Elke legenda bewaart haar eigen bron en instellingen in de DWG. **Toepassen**
 werkt de gekozen legenda meteen bij; **Opslaan** sluit daarna het venster.
+**Bijwerken** bewaart uitgevinkte regels en eigen instellingen; **Resetten** begint
+weer met de globale standaard. Samenvoegkeuzes voor KLIC en overige lagen staan
+naast elkaar, met optioneel de samengevoegde waarden in de omschrijving.
 De **Globale standaard** geldt voor nieuwe legenda’s. Met **Profielen** kun je
 een opzet bewaren en delen.
 

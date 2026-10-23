@@ -110,7 +110,8 @@ internal static class RibbonBuilder
         var tab = new RibbonTab { Title = "NLCS Legenda", Id = TabId };
         AddPanel(tab, "Legenda",
             ("Genereren", "NLCSLEGENDA", "Maak een legenda van de tekening of selectie."),
-            ("Bijwerken", "NLCSLEGENDAUPDATE", "Teken een bestaande legenda opnieuw."),
+            ("Bijwerken", "NLCSLEGENDAUPDATE", "Werk de bronnen bij met behoud van je instellingen en samenstelling."),
+            ("Resetten", "NLCSLEGENDARESET", "Begin opnieuw met de globale standaard; bron, naam en positie blijven behouden."),
             ("Overzicht", "NLCSLEGENDAINFO", "Bekijk alle regels en pas de volgorde aan."));
         AddPanel(tab, "Inhoud",
             ("Samenstellen", "NLCSLEGENDASAMENSTELLEN", "Regels uitvinken en eigen regels toevoegen."),

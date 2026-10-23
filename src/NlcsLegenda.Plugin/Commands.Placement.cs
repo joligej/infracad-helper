@@ -10,6 +10,10 @@ public partial class Commands
     {
         var ms = (BlockTableRecord)tr.GetObject(
             SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+        var rows = ((BlockTableRecord)tr.GetObject(br.BlockTableRecord, OpenMode.ForRead)).Cast<ObjectId>()
+            .Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>()
+            .Where(e => LegendManagement.RowToken(e) is not null)
+            .GroupBy(e => LegendManagement.RowToken(e)!).ToDictionary(g => g.Key, g => LegendManagement.ReadRowKeys(g.First(), tr));
         using var transient = new TransientObjects();
         var pieces = transient.Items;
         var ids = new List<ObjectId>();
@@ -20,6 +24,9 @@ public partial class Commands
                 {
                     ids.Add(LegendBuilder.AppendEntity(ms, entity));
                     tr.AddNewlyCreatedDBObject(entity, true);
+                    // exploderen kopieert xdata, niet de volledige regeldictionary
+                    if (LegendManagement.RowToken(entity) is { } token && rows.TryGetValue(token, out var keys))
+                        LegendManagement.WriteRowKeys(entity, tr, keys);
                 }
         }
         return ids;
@@ -32,7 +39,8 @@ public partial class Commands
         if (s.ExplodeOnPlace)
         {
             ids = ExplodeToModelspace(tr, db, br);
-            br.Erase();
+            if (ids.Count > 0) br.Erase();
+            else ids.Add(br.ObjectId);
         }
         else
         {

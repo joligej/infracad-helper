@@ -19,6 +19,9 @@ public sealed class ElementProperties
         string.Equals(discipline, "KL", StringComparison.OrdinalIgnoreCase)
         || string.Equals(hoofdgroep, "KL", StringComparison.OrdinalIgnoreCase);
 
+    public static bool IsKlicSource(string source) => source.Split(new[] { '|', '-', '_', ' ', '.' }, StringSplitOptions.RemoveEmptyEntries)
+        .Any(part => part.Equals("KLIC", StringComparison.OrdinalIgnoreCase));
+
     private static readonly string[] Specificaties = { "LS", "MS", "HS", "HD", "LD" };
     private static readonly string[] Uitvoeringen = { "MANTELBUIS", "HULPSTUK" };
 
