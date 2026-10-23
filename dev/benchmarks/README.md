@@ -56,3 +56,21 @@ De Civil 3D-meettool registreert ook processortijd (`cpuMs`). Deze telt alle thr
 van het CAD-proces en kan daardoor groter zijn dan de verstreken tijd. Gebruik
 hem als extra aanwijzing; vergelijk ook de spreiding en laat meetprogramma's niet
 tegelijk draaien.
+
+## KLIC-vensters vergelijken
+
+Bewaar vóór de wijziging de uitvoermap van `tests/NlcsLegenda.Ui.Tests` na een
+Release-build. De nieuwe UI-testapp kan de oude DLL en de eigen vensters met
+dezelfde `rows.json.gz` vergelijken:
+
+```powershell
+dotnet run --project tests/NlcsLegenda.Ui.Tests -c Release -- --benchmark oude-ui/NlcsLegenda.Ui.Tests.dll rows.json.gz nieuwe-meting.json
+```
+
+Dit vereist Windows. De proef meet alleen het aanmaken en vullen van de vensters,
+zonder CAD-analyse of tekenen op het scherm. KLIC-details gebruikt de regel met
+de meeste bronobjecten; Overzicht gebruikt alle regels. Twee opwarmrondes en zeven
+afwisselende metingen per versie beperken opstart- en volgorde-effecten. Alle
+kolomkoppen, zichtbaarheid, celwaarden en samenvattingen moeten gelijk blijven.
+De uitvoer bevat DLL-hashes, tijden en tijdelijke .NET-toewijzingen. De opgeslagen
+brongegevens worden niet gewijzigd of in het meetresultaat overgenomen.
