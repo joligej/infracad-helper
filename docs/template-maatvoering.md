@@ -19,7 +19,7 @@ opnieuw gemeten in het lokale referentiemateriaal, bij de voorbeelden op 1:200,
 | Lettertype | NLCS-ISO.ttf, breedtefactor 1 |
 | Meerregelige omschrijvingen | MText-regelafstandfactor 0,624 (minimaal) |
 | Hulpkaders | Aparte niet-plotbare laag, ACI 40, lijndikte 0,18 mm |
-| Opmerkingenkop | 5 mm, onderstreept, dezelfde tekststijl als de titel, white (ACI 7) |
+| Opmerkingenkop | 5 mm, onderstreept, dezelfde tekststijl en laagkleur als de titel, ACI 130 (ByLayer) |
 | Opmerkingentekst | 2,5 mm, tekstbreedte 128,8894 mm |
 | Schaalbalk | 40 × 2 mm; vier segmenten, elk twee halve stroken |
 | Schaalbalklabels | 1,8 mm, boven de balk, laatste label met eenheid |

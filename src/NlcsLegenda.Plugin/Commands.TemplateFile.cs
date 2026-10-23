@@ -32,6 +32,15 @@ public partial class Commands
                 if (Math.Abs(actual - expected) > tolerance)
                     throw new InvalidOperationException($"{what}: {actual:R}; DWT: {expected:R}.");
             }
+            var notes = ((BlockTable)sourceTr.GetObject(source.BlockTableId, OpenMode.ForRead)).Cast<ObjectId>()
+                .SelectMany(id => ((BlockTableRecord)sourceTr.GetObject(id, OpenMode.ForRead)).Cast<ObjectId>())
+                .Select(id => sourceTr.GetObject(id, OpenMode.ForRead)).OfType<Entity>()
+                .Where(t => (t is DBText dbText ? dbText.TextString : t is MText mText ? mText.Text : string.Empty)
+                    .Contains("OPMERKINGEN", StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (notes.Length == 0) throw new InvalidOperationException("Geen opmerkingenkoppen in de DWT.");
+            var noteColors = notes.Select(t => t.Color.IsByLayer
+                ? ((LayerTableRecord)sourceTr.GetObject(t.LayerId, OpenMode.ForRead)).Color.ColorIndex : t.Color.ColorIndex).Distinct().ToArray();
+            if (noteColors.Length != 1) throw new InvalidOperationException("De DWT heeft verschillende kleuren voor opmerkingenkoppen.");
             foreach (double scale in new[] { 200d, 500d, 1000d })
             {
                 double unit = scale / 1000;
@@ -48,6 +57,10 @@ public partial class Commands
                 var actualTitle = drawn.OfType<MText>().Single(t => t.Text == "LEGENDA");
                 var actualHeader = drawn.OfType<MText>().Single(t => t.Text == "Bestaande situatie:");
                 var actualDescription = drawn.OfType<MText>().Single(t => t.Text == "Geometrie");
+                var actualNotes = drawn.OfType<MText>().Single(t => t.Text == "OPMERKINGEN");
+                var notesLayer = (LayerTableRecord)tr.GetObject(actualNotes.LayerId, OpenMode.ForRead);
+                if (!actualNotes.Color.IsByLayer || notesLayer.Color.ColorIndex != noteColors[0])
+                    throw new InvalidOperationException($"Opmerkingenkleur verschilt van de DWT: {noteColors[0]}.");
                 Near(actualTitle.TextHeight / unit, title.Height / unit, "Titelhoogte");
                 Near(actualHeader.TextHeight / unit, header.Height / unit, "Statushoogte");
                 Near(actualDescription.TextHeight / unit, description.Height / unit, "Omschrijvinghoogte");

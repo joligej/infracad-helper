@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.35.1 - 2026-10-23
+
+- Bijwerken laat ongewijzigde herkennings- en uitsluitingskeuzes ook in de opgeslagen instellingen gelijk.
+
+- **Opmerkingen** volgt weer de templatekleur van de koppenlaag (ACI 130, ByLayer). Een eigen laagkleur per tekening blijft behouden bij het maken en bijwerken van legenda's.
+
 ## 1.35.0 - 2026-10-23
 
 - Bijwerken behoudt lokale keuzes, ook bij een andere legendaschaal. Symbolen krijgen een schaalvaste herkenning; een volledig uitgevinkte legenda blijft beheerd.

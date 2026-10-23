@@ -8,6 +8,24 @@ public class PreservedChoicesTests
     private static LegendEntry Entry(string appearance) => new() { Status = NlcsStatus.Nieuw, Discipline = "WE", Hoofdgroep = "GR", Element = "BOOM", Description = "Boom", RenderIdentity = appearance };
 
     [Fact]
+    public void UnchangedEntriesDoNotRewriteSavedChoices()
+    {
+        var entries = Enumerable.Range(1, 5).Select(i => new LegendEntry {
+            Status = NlcsStatus.Nieuw, Discipline = "WE", Hoofdgroep = "VH", Element = "ELEMENT_" + i, Description = "Element " + i, RenderIdentity = "lijn"
+        }).ToArray();
+        var settings = new LegendSettings();
+        settings.RememberEntries(entries);
+        settings.ExcludedEntries.UnionWith(entries.Take(3).Select(LegendSettings.SelectionKey));
+        string before = settings.ToJson();
+        settings = LegendSettings.FromJson(before);
+        for (int i = 0; i < 5; i++)
+        {
+            settings.RememberEntries(i % 2 == 0 ? entries : entries.Reverse());
+            Assert.Equal(before, settings.ToJson());
+        }
+    }
+
+    [Fact]
     public void LegacySymbolChoicesRemainDistinctForSeveralAppearances()
     {
         var layers = new[] { "N-WE-GR-BOOM-S-200", "N-WE-GR-BOOM-S-500" }.Select((name, i) => {

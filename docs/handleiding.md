@@ -365,7 +365,7 @@ Een automatisch templatevoorbeeld wordt alleen gebruikt als zijn kleuren bij de
 bron passen. Anders blijft de bronweergave behouden. Een via **Overzicht → Voorbeeld**
 expliciet gekozen voorbeeld gebruikt wel zijn eigen weergave.
 
-De opmerkingenkop is **white (ACI 7)**. In **Opmerkingen** kies je tekeningnotities,
+De opmerkingenkop volgt de koppenlaag **X-XX-AL-LEGENDA-T50**, standaard ACI 130 zoals in de template. Een eigen kleur via de Layer Manager blijft bij bijwerken behouden. In **Opmerkingen** kies je tekeningnotities,
 de KLIC-waarschuwing, beide samen of eigen tekst. Klik **Tekst overnemen** en pas
 de tekst aan. De algemene teksten komen uit de TAUW-template; projectspecifieke
 beplantingslijsten worden niet als algemene standaard overgenomen.

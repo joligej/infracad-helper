@@ -500,6 +500,7 @@ public sealed class LegendSettings
             .Where(g => g.Count() == 1 && previous.TryGetValue(g.Key, out var old) && old.Length == 1))
         {
             var old = previous[group.Key][0];
+            if (StringComparer.OrdinalIgnoreCase.Equals(old, group.Single())) continue;
             if (ExcludedEntries.Remove(old)) ExcludedEntries.Add(group.Single());
             KnownEntryKeys.Remove(old);
         }

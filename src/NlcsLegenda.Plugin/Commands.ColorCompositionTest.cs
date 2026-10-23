@@ -90,7 +90,15 @@ public partial class Commands
                     || Math.Abs(h.GeometricExtents.MaxPoint.Y - h.GeometricExtents.MinPoint.Y - 2.5) > 0.001))
                     throw new InvalidOperationException("TAUW-maten op 1:500 wijken af.");
                 var heading = drawn.OfType<MText>().Single(t => t.Text == "OPMERKINGEN");
-                if (heading.Color.ColorIndex != 7) throw new InvalidOperationException("Opmerkingenkop niet white.");
+                if (!heading.Color.IsByLayer) throw new InvalidOperationException("Opmerkingenkop volgt de laagkleur niet.");
+                var headingLayer = (LayerTableRecord)tr.GetObject(heading.LayerId, OpenMode.ForWrite);
+                if (headingLayer.Color.ColorIndex != 130) throw new InvalidOperationException("Templatekleur van de opmerkingenkop wijkt af.");
+                headingLayer.Color = Color.FromColorIndex(ColorMethod.ByAci, 6);
+                var rebuilt = LegendBuilder.BuildBlock(doc.Database, tr, analysis, s, out _, out _);
+                var rebuiltHeading = ((BlockTableRecord)tr.GetObject(rebuilt, OpenMode.ForRead)).Cast<ObjectId>()
+                    .Select(e => tr.GetObject(e, OpenMode.ForRead)).OfType<MText>().Single(t => t.Text == "OPMERKINGEN");
+                if (!rebuiltHeading.Color.IsByLayer || rebuiltHeading.LayerId != heading.LayerId || headingLayer.Color.ColorIndex != 6)
+                    throw new InvalidOperationException("Eigen laagkleur verloren bij bijwerken.");
                 var group = "NLCS-Legenda-composition";
                 var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(doc.Database), OpenMode.ForWrite);
                 using var br = new BlockReference(Point3d.Origin, id);
@@ -118,7 +126,7 @@ public partial class Commands
                     throw new InvalidOperationException("Uitsluiten van één kleur raakt andere varianten.");
                 tr.Abort();
             }
-            doc.Editor.WriteMessage("\nCOLORCOMPOSITION kleuren 1/3/5, kleurselectie, TAUW 24x5 mm, white en gekoppelde schaal -> OK");
+            doc.Editor.WriteMessage("\nCOLORCOMPOSITION kleuren 1/3/5, kleurselectie, TAUW 24x5 mm, laagkleur en gekoppelde schaal -> OK");
         }, text => doc.Editor.WriteMessage(text), "CompositionRegression");
     }
 }

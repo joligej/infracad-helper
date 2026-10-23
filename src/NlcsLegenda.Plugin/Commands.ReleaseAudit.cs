@@ -269,7 +269,15 @@ public partial class Commands
                 if (resourceBaseline is not null && resourceBaseline != resources)
                     throw new InvalidOperationException($"Resourcegroei bij update {i}: {resourceBaseline} -> {resources}.");
                 resourceBaseline ??= resources;
-                if (Snapshot() != baseline) throw new InvalidOperationException($"Brongegevens gewijzigd bij update {i}.");
+                var current = Snapshot();
+                if (current != baseline)
+                {
+                    var before = baseline.Split('\n').Select(line => line.TrimEnd('\r')).ToArray();
+                    var after = current.Split('\n').Select(line => line.TrimEnd('\r')).ToArray();
+                    int changed = Enumerable.Range(0, Math.Max(before.Length, after.Length))
+                        .First(index => before.ElementAtOrDefault(index) != after.ElementAtOrDefault(index));
+                    throw new InvalidOperationException($"Brongegevens gewijzigd bij update {i}, regel {changed + 1}: {before.ElementAtOrDefault(changed)} -> {after.ElementAtOrDefault(changed)}.");
+                }
                 if (i == 10 || i == 50)
                 {
                     ed.Command("_.QSAVE");

@@ -121,6 +121,7 @@ public partial class Commands
             var registry = LegendStore.Load(db, tr);
             var analysis = DrawingAnalyzer.Analyze(db, tr, settings, catalog: LoadCatalog(db));
             entryCount = analysis.Entries.Count;
+            settings.RememberEntries(analysis.Entries);
             var btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _, out var issues);
             if (issues.Count > 0)
                 throw new InvalidOperationException("Tekenfouten in legenda: "
