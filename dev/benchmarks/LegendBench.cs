@@ -74,7 +74,7 @@ public sealed class LegendBench
             File.WriteAllText(Path.Join(root, "profile.json"), JsonSerializer.Serialize(new { entities = entities.Length, samples }, Json));
             doc.Editor.WriteMessage("\nNLCSBENCHPROFILE DONE");
         }
-        catch (System.Exception ex) { File.WriteAllText(Path.Join(root, "benchmark-error.txt"), ex.ToString()); doc.Editor.WriteMessage("\nNLCSBENCHPROFILE FAIL"); }
+        catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex)) { File.WriteAllText(Path.Join(root, "benchmark-error.txt"), ex.ToString()); doc.Editor.WriteMessage("\nNLCSBENCHPROFILE FAIL"); }
     }
 
     [CommandMethod("NLCSBENCH", CommandFlags.Modal)]
@@ -206,7 +206,7 @@ public sealed class LegendBench
             Progress("klaar");
             doc.Editor.WriteMessage("\nNLCSBENCH DONE");
         }
-        catch (System.Exception ex)
+        catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
             File.WriteAllText(Path.Join(root, "benchmark-error.txt"), ex.ToString());
             doc.Editor.WriteMessage("\nNLCSBENCH FAIL: " + ex.GetBaseException().Message);
@@ -233,7 +233,7 @@ public sealed class LegendBench
                 var entity = (Entity)tr.GetObject(objectId, OpenMode.ForRead);
                 if (entity is BlockReference reference) { Visit(reference.BlockTableRecord, transform * reference.BlockTransform, depth + 1); continue; }
                 var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                string color = entity.Color.ToString() + ":" + layer.Color;
+                string color = entity.Color + ":" + layer.Color;
                 string bounds = entity.Bounds is { } b ? Point(b.MinPoint.TransformBy(transform)) + ":" + Point(b.MaxPoint.TransformBy(transform)) : "";
                 string detail = entity switch {
                     MText text => string.Join("|", text.Contents, Number(text.TextHeight), Number(text.Width), Number(text.LineSpacingFactor),
