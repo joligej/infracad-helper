@@ -97,7 +97,12 @@ public sealed class LegendBench
             if (File.Exists(Path.Join(root, "benchmark.json"))) throw new InvalidOperationException("Deze uitvoermap bevat al een meting.");
             var db = doc.Database;
             string source = config.AttachSource.Length > 0 ? config.AttachSource : db.Filename;
-            string SourceHash() => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(source)));
+            string SourceHash()
+            {
+                using var file = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                return Convert.ToHexString(SHA256.HashData(file));
+            }
+            using var process = Process.GetCurrentProcess();
             string sourceHash = SourceHash();
             if (!sourceHash.Equals(config.SourceHash, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Bronbestand wijkt af van de verwachte checksum.");
@@ -123,6 +128,7 @@ public sealed class LegendBench
                 var local = settings.Clone();
                 double analyze = 0, group = 0;
                 long allocated = GC.GetTotalAllocatedBytes(false);
+                var cpu = process.TotalProcessorTime;
                 var clock = Stopwatch.StartNew();
                 var analysis = DrawingAnalyzer.Analyze(db, tr, local, catalog: DescriptionCatalog.Default(), excludedIds: excluded,
                     reportTimings: (a, g) => { analyze = a; group = g; });
@@ -131,6 +137,7 @@ public sealed class LegendBench
                 clock.Restart();
                 var block = LegendBuilder.BuildBlock(db, tr, analysis, local, out var count, out var issues);
                 double draw = clock.Elapsed.TotalMilliseconds;
+                double cpuMs = (process.TotalProcessorTime - cpu).TotalMilliseconds;
                 long bytes = GC.GetTotalAllocatedBytes(false) - allocated;
                 if (issues.Count > 0) throw new InvalidOperationException("Tekenfout: " + issues[0].Reason);
                 string Escape(string value) => JsonSerializer.Serialize(value)[1..^1];
@@ -152,7 +159,7 @@ public sealed class LegendBench
                 rowsHash = data; shapeHash = shapeDigest;
                 if (iteration == 0) File.WriteAllText(Path.Join(root, "legend-shape.txt"), shape);
                 samples.Add(new { kind = "build", iteration, analyzeMs = analyze, groupMs = group, analysisTotalMs = analyzed, drawMs = draw,
-                    totalMs = analyzed + draw, allocatedBytes = bytes, entries = count, rowsHash = data, shapeHash = shapeDigest,
+                    totalMs = analyzed + draw, cpuMs, allocatedBytes = bytes, entries = count, rowsHash = data, shapeHash = shapeDigest,
                     length = analysis.Entries.Sum(e => e.Metric.Length), area = analysis.Entries.Sum(e => e.Metric.Area),
                     objects = analysis.Entries.Sum(e => e.Metric.Count), klicRecords = analysis.Entries.Sum(e => e.KlicObjects.Sum(o => o.Records.Count)) });
                 tr.Abort();
@@ -170,6 +177,7 @@ public sealed class LegendBench
             {
                 Progress($"bijwerken {iteration + 1}/{config.Runs}");
                 long allocated = GC.GetTotalAllocatedBytes(false);
+                var cpu = process.TotalProcessorTime;
                 var clock = Stopwatch.StartNew();
                 int count;
                 using (var tr = db.TransactionManager.StartTransaction())
@@ -184,6 +192,7 @@ public sealed class LegendBench
                 clock.Restart();
                 doc.Editor.Regen();
                 double regen = clock.Elapsed.TotalMilliseconds;
+                double cpuMs = (process.TotalProcessorTime - cpu).TotalMilliseconds;
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
                     var groups = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
@@ -191,7 +200,7 @@ public sealed class LegendBench
                     var reference = legend.GetAllEntityIds().Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<BlockReference>().Single();
                     string digest = Hash(Shape(tr, reference.BlockTableRecord));
                     if (shapeHash != digest) throw new InvalidOperationException("Bijwerken verandert de legenda-uitvoer.");
-                    samples.Add(new { kind = "update", iteration, updateMs = update, regenMs = regen, totalMs = update + regen,
+                    samples.Add(new { kind = "update", iteration, updateMs = update, regenMs = regen, totalMs = update + regen, cpuMs,
                         allocatedBytes = bytes, entries = count, shapeHash = digest });
                     tr.Abort();
                 }

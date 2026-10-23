@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.35.3 - 2026-10-23
+
+- KLIC-broncontrole in Overzicht en exports groepeert dezelfde veldwaarden niet meer herhaaldelijk. Alle bronverschillen, vergelijkingsregels en verse wijzigingen blijven behouden. Zie [metingen](docs/prestaties.md) voor de afgebakende tijdwinst.
+- De losse meettool kan ook een lokaal geopende DWG controleren en registreert processortijd. Een aanvullende vergelijking meet broncontrole en exports met identieke uitvoer.
+
 ## 1.35.2 - 2026-10-23
 
 - KLIC-uitlezing maakt minder tijdelijke objecten aan. Ingebedde XML wordt rechtstreeks gelezen; toegang tot de Map-API en Property Sets wordt hergebruikt. Alle bronwaarden en bronverschillen blijven beschikbaar.
