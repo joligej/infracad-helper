@@ -495,12 +495,13 @@ public sealed class LegendSettings
         KnownEntryKeys.ExceptWith(migrated);
         var previous = KnownEntryKeys.Concat(ExcludedEntries).Distinct(StringComparer.OrdinalIgnoreCase)
             .GroupBy(WithoutStyle, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.OrdinalIgnoreCase);
-        foreach (var group in current.GroupBy(WithoutStyle, StringComparer.OrdinalIgnoreCase))
+        // alleen een unieke regel volgen bij gewijzigde weergave
+        foreach (var group in current.GroupBy(WithoutStyle, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() == 1 && previous.TryGetValue(g.Key, out var old) && old.Length == 1))
         {
-            // alleen een unieke regel volgen bij gewijzigde weergave
-            if (group.Count() != 1 || !previous.TryGetValue(group.Key, out var old) || old.Length != 1) continue;
-            if (ExcludedEntries.Remove(old[0])) ExcludedEntries.Add(group.Single());
-            KnownEntryKeys.Remove(old[0]);
+            var old = previous[group.Key][0];
+            if (ExcludedEntries.Remove(old)) ExcludedEntries.Add(group.Single());
+            KnownEntryKeys.Remove(old);
         }
         KnownEntryKeys.UnionWith(current);
     }

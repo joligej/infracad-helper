@@ -9,6 +9,7 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDAPRESETTARGETTEST` | Controleert profielkeuze voor globale standaard zonder/met legenda en lokaal laden, inclusief behoud van de andere instellingen. Scriptinvoer: Standaard, Legenda, Standaard. |
 | `NLCSLEGENDAHEIGHTLIMITTEST` | Meet de volledige legenda inclusief koppen, notities, schaalbalk en kader bij twee hoogtelimieten op drie schalen; wijst een onhaalbare hoogte af. |
 | `NLCSLEGENDADRAWINGDEFAULTSTEST` | Controleert kleur, lijndikte, transparantie en lijntypeschaal van complete legenda’s bij afwijkende tekeninstellingen, behouden en geëxplodeerd. |
+| `NLCSLEGENDACHOICESTEST` / `NLCSLEGENDACHOICESVERIFY` | Controleert bron- en rijselectie, symbolen, gegroepeerde en geëxplodeerde regels, uitsluiten bij schaalwijziging, lege samenstelling, resetten en heropenen. |
 | `NLCSLEGENDACUSTOMIZATIONTEST` / `NLCSLEGENDACUSTOMIZATIONVERIFY` | Controleert eigen arceringen en symbolen op gedeelde lagen, tekstkoppelingen, heropenen, bijwerken en exploderen. |
 | `NLCSLEGENDABATCHXREFTEST` | Controleert xref-hoeveelheden en uitsluiting bij batchexport, met ongewijzigde bronbestanden. |
 | `NLCSLEGENDAEXPORTISOLATIONTEST` | Exporteert een opgeslagen legenda bij onleesbare algemene instellingen en herstelt de oorspronkelijke gebruikersbestanden. |

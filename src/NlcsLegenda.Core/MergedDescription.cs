@@ -31,18 +31,13 @@ internal static class MergedDescription
             else values.AddRange(texts.Where(t => !t.Equals(title, StringComparison.CurrentCultureIgnoreCase)));
         }
         var properties = entries.Select(e => ElementProperties.From(e.Element, e.Netbeheerders.FirstOrDefault() ?? "")).ToArray();
-        foreach (var dimension in dimensions.Where(d => d != GroupDimension.Netbeheerder))
-        {
-            if (dimension == GroupDimension.Soort && texts.Length > 1 && values.Count > 0) continue;
-            var variants = properties.Select(p => p.Value(dimension)).Where(v => v.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            if (variants.Length < 2) continue;
-            foreach (var variant in variants)
-            {
-                string display = dimension is GroupDimension.Diameter or GroupDimension.Nummer or GroupDimension.Specificatie
-                    ? variant : StandardTexts.Humanize(variant);
-                if (!values.Any(v => v.Equals(display, StringComparison.OrdinalIgnoreCase))) values.Add(display);
-            }
-        }
+        bool describedTypes = texts.Length > 1 && values.Count > 0;
+        var variants = dimensions.Where(d => d != GroupDimension.Netbeheerder && !(d == GroupDimension.Soort && describedTypes))
+            .Select(d => (Dimension: d, Values: properties.Select(p => p.Value(d)).Where(v => v.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()))
+            .Where(v => v.Values.Length > 1)
+            .SelectMany(v => v.Values.Select(value => v.Dimension is GroupDimension.Diameter or GroupDimension.Nummer or GroupDimension.Specificatie
+                ? value : StandardTexts.Humanize(value)));
+        values.AddRange(variants);
         if (dimensions.Contains(GroupDimension.Diameter)) values.AddRange(Diameters(entries.SelectMany(e => e.KlicObjects)));
         return new(title, values.Distinct(StringComparer.CurrentCultureIgnoreCase)
             .OrderBy(v => decimal.TryParse(v, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) ? number : decimal.MaxValue)

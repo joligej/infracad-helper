@@ -20,7 +20,7 @@ internal sealed class OverviewLegend
 internal sealed class OverviewDialog : LegendDialog
 {
     private readonly IReadOnlyList<OverviewLegend> _legends;
-    private DialogSaveState? _saveState;
+    private readonly DialogSaveState? _saveState;
     private readonly Func<IReadOnlyList<OverviewLegend>, string?> _save;
     private readonly ComboBox _legend = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
     private readonly ComboBox _sort = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150 };

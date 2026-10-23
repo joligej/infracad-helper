@@ -28,19 +28,21 @@ public partial class Commands
         var analysis = ChoiceAnalysis(db, tr, registry, definition.Settings);
         int checkedRows = 0; bool merged = false, symbol = false, fill = false;
         foreach (var top in ChoiceMembers(db, tr, definition))
-        foreach (var entity in RegressionEntities(tr, top))
         {
-            var keys = LegendManagement.ReadRowKeys(entity, tr);
-            if (keys.Count == 0) continue;
-            var candidates = ResolveExclusionPick(db, tr, definition.Id, analysis, new[] { entity.ObjectId, top }, out bool row);
-            if (!row || !candidates.SelectMany(e => e.ExclusionKeys).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(keys))
-                throw new InvalidOperationException($"Legendaregel niet aanklikbaar: {entity.GetType().Name} / {keys.Count} sleutels.");
-            if (ResolveExclusionPick(db, tr, "andere legenda", analysis, new[] { entity.ObjectId, top }, out _).Count != 0)
-                throw new InvalidOperationException("Aanklikken raakt een andere legenda.");
-            merged |= keys.Count > 1;
-            symbol |= candidates.Any(e => e.SymbolLayer is not null);
-            fill |= entity is Hatch;
-            checkedRows++;
+            foreach (var entity in RegressionEntities(tr, top))
+            {
+                var keys = LegendManagement.ReadRowKeys(entity, tr);
+                if (keys.Count == 0) continue;
+                var candidates = ResolveExclusionPick(db, tr, definition.Id, analysis, new[] { entity.ObjectId, top }, out bool row);
+                if (!row || !candidates.SelectMany(e => e.ExclusionKeys).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(keys))
+                    throw new InvalidOperationException($"Legendaregel niet aanklikbaar: {entity.GetType().Name} / {keys.Count} sleutels.");
+                if (ResolveExclusionPick(db, tr, "andere legenda", analysis, new[] { entity.ObjectId, top }, out _).Count != 0)
+                    throw new InvalidOperationException("Aanklikken raakt een andere legenda.");
+                merged |= keys.Count > 1;
+                symbol |= candidates.Any(e => e.SymbolLayer is not null);
+                fill |= entity is Hatch;
+                checkedRows++;
+            }
         }
         if (checkedRows < 8 || !merged || !symbol || !fill)
             throw new InvalidOperationException($"Onvolledige klikproef {definition.Name}: {checkedRows}, samen={merged}, symbool={symbol}, vulling={fill}.");
@@ -118,7 +120,7 @@ public partial class Commands
             SaveGlobalDefaults(defaults);
             using (var tr = db.TransactionManager.StartTransaction())
             {
-                var registry = LegendStore.Load(db, tr); var a = registry.FindById(aId)!;
+                var registry = LegendStore.Load(db, tr);
                 if (LegendManagement.ActiveRegistry(db, tr, registry).FindById(aId) is null)
                     throw new InvalidOperationException("Lege legenda niet bereikbaar voor resetten.");
                 tr.Commit();
@@ -128,7 +130,7 @@ public partial class Commands
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var registry = LegendStore.Load(db, tr); var a = registry.FindById(aId)!;
-                if (a.Name != "Keuzes A" || a.Settings.ExcludedEntries.Count != 0 || a.Settings.Scale != defaults.Scale
+                if (a.Name != "Keuzes A" || a.Settings.ExcludedEntries.Count != 0 || Math.Abs(a.Settings.Scale - defaults.Scale) > 1e-9
                     || a.Settings.Title != defaults.Title || registry.FindById(bId)!.Settings.ToJson() != otherState)
                     throw new InvalidOperationException("Resetten behoudt oude keuzes of raakt andere legenda.");
                 CheckChoiceRows(db, tr, registry, a);
@@ -148,7 +150,7 @@ public partial class Commands
         {
             using var tr = db.TransactionManager.StartTransaction();
             var registry = LegendStore.Load(db, tr); var a = registry.Legends.Single(d => d.Name == "Keuzes A");
-            if (a.Settings.Scale != 500 || a.Settings.Title != "Mijn titel" || a.Settings.ExcludedEntries.Count != 1)
+            if (Math.Abs(a.Settings.Scale - 500) > 1e-9 || a.Settings.Title != "Mijn titel" || a.Settings.ExcludedEntries.Count != 1)
                 throw new InvalidOperationException("Lokale keuzes niet bewaard.");
             if (BuildManagedLegend(db, tr, registry, a, out _, out _) != UpdateResult.Updated) throw new InvalidOperationException("Bijwerken na heropenen mislukt.");
             if (DrawingAnalyzer.Analyze(db, tr, a.Settings, excludedIds: LegendManagement.CollectManagedIds(db, tr, registry)).Entries.Any(e => e.SymbolLayer is not null))

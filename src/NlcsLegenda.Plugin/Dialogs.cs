@@ -65,7 +65,7 @@ internal sealed class SettingsDialog : LegendDialog
     private readonly IReadOnlyList<string> _xrefNames;
     private readonly Func<LegendSettings, IReadOnlyList<EntryCheckItem>>? _compositionSource;
     private bool _syncing;
-    private DialogSaveState? _saveState;
+    private readonly DialogSaveState? _saveState;
     private readonly IReadOnlyList<ManualEntry> _layerChoices;
 
     public event EventHandler? ApplyRequested;
@@ -375,7 +375,7 @@ internal sealed class SettingsDialog : LegendDialog
         root.Controls.Add(new Label { Text = "KLIC: kabel- en leidinglagen, objecten met KLIC-gegevens en bronnen met KLIC in de naam. Overige lagen: alle andere objecten.", AutoSize = true, Margin = new Padding(3, 6, 3, 6) });
         root.Controls.Add(Group("Tekst",
             BoundCheck("Samengevoegde waarden tonen", () => _settings.ShowMergedValues, v => _settings.ShowMergedValues = v),
-            new Label { Text = "Aan: Leiding (200, 300). Uit: Leiding.", AutoSize = true },
+            Own(new Label { Text = "Aan: Leiding (200, 300). Uit: Leiding.", AutoSize = true }),
             BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v)));
 
         var data = new Button { Text = "Extra KLIC-velden…", AutoSize = true };
