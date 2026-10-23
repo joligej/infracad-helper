@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.35.4 - 2026-10-23
+
+- KLIC-details bepaalt de voorkeursbron eenmaal per veld en bronobject. Overzicht hergebruikt de berekende bronmeldingen bij het tonen van kolommen en regels. Dit versnelt het vullen van beide vensters; inhoud en broncontrole blijven gelijk.
+- Vernieuwen leest gewijzigde waarden opnieuw. De regressiecontrole dekt bronvoorkeur, terugval per tabel, dubbele records en het verschijnen en verdwijnen van bronmeldingen. Sorteren behoudt de gekozen kolombreedte.
+- Een herhaalbare venstermeting vergelijkt de volledige lijstinhoud met de vorige versie. Zie [metingen](docs/prestaties.md).
+
 ## 1.35.3 - 2026-10-23
 
 - KLIC-broncontrole in Overzicht en exports groepeert dezelfde veldwaarden niet meer herhaaldelijk. Alle bronverschillen, vergelijkingsregels en verse wijzigingen blijven behouden. Zie [metingen](docs/prestaties.md) voor de afgebakende tijdwinst.

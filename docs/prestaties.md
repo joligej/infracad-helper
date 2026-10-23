@@ -105,3 +105,32 @@ Twee vroege proefruns sloten niet tijdig af, waaronder één met ongewijzigd
 afgerond en CAD weer vrij is. De drie uiteindelijke kandidaatproeven sloten
 normaal af en herstelden alle 35 vastgelegde profielwaarden. Dit is geen bewijs
 dat de oudere GDI+-melding is opgelost; daarvoor is de oorzaak nog niet bewezen.
+
+## Vensters in 1.35.4
+
+Vergelijking met 1.35.3 op dezelfde uit Civil 3D uitgelezen gegevens: 181 regels
+in Overzicht en 5.164 bronobjecten bij de grootste regel in KLIC-details. Twee
+opwarmrondes, daarna zeven afwisselende metingen per versie in één Windows-proces.
+De proef meet het aanmaken en vullen van de echte forms, zonder nieuwe CAD-analyse
+of schermweergave. Alle kolomkoppen, zichtbaarheid, celwaarden en samenvattingen
+waren bij iedere vergelijking gelijk.
+
+| Venster | 1.35.3, mediaan | 1.35.4, mediaan | Verschil |
+| --- | ---: | ---: | ---: |
+| KLIC-details | 842 ms | 240 ms | 72% korter |
+| Overzicht | 657 ms | 440 ms | 33% korter |
+
+De spreiding was 794–1.061 versus 201–322 ms voor KLIC-details en 646–735
+versus 410–526 ms voor Overzicht. Cumulatieve tijdelijke toewijzingen daalden van
+469 naar 188 MiB en van 339 naar 223 MiB. Dit is geen piekgeheugenmeting.
+
+KLIC-details bepaalt de objectidentiteit eenmaal per bronobject en hergebruikt
+de voorkeursbron per veld tijdens het vullen. Overzicht gebruikt dezelfde
+bronmelding voor de kolomzichtbaarheid en de regel. Deze gegevens worden niet
+buiten het venster of over een nieuwe analyse heen bewaard. Vernieuwen en een
+andere bronvoorkeur blijven actuele waarden opleveren.
+
+De winst geldt voor het vullen van deze vensters, niet voor het maken of bijwerken
+van de getekende legenda. De tekenlogica, TAUW-opmaak, Map-uitlezing en
+xref-bestandstoegang zijn niet gewijzigd. De [meetprocedure](../dev/benchmarks/README.md#klic-vensters-vergelijken)
+is beschikbaar; de gebruikte brongegevens blijven lokaal.

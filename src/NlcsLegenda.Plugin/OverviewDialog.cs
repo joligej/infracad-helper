@@ -135,7 +135,7 @@ internal sealed class OverviewDialog : LegendDialog
             if (_loading || Current.Id.Length == 0) return;
             Current.Settings.SortMode = Enum.Parse<LegendSortMode>((string)_sort.SelectedItem!);
             Current.Changed = true;
-            LoadEntries();
+            LoadEntries(updateColumns: false);
         };
         foreach (var legend in legends) _legend.Items.Add(legend);
         _legend.SelectedIndex = 0;
@@ -170,7 +170,6 @@ internal sealed class OverviewDialog : LegendDialog
         _loading = false;
         foreach (var action in _actions) action.Enabled = _analysisError is null;
         _example.Enabled &= Current.Id.Length > 0;
-        ConfigureColumns();
         LoadEntries();
     }
 
@@ -186,10 +185,10 @@ internal sealed class OverviewDialog : LegendDialog
                 FillWeight = name is "Omschrijving" or "Bronlagen" ? 240 : 120,
                 Visible = name switch
                 {
-                    "Weergave" => Current.Entries.Any(e => e.AppearanceLabel.Length > 0),
-                    "Netbeheerder" => Current.Entries.Any(e => e.Netbeheerders.Count > 0),
-                    "Samengevoegd" => Current.Entries.Any(e => e.MergedMembers.Count > 0),
-                    "Broncontrole" => Current.Entries.Any(e => e.Metric.HasUnknownArea || KlicSummary.Issues(e.KlicObjects).Length > 0),
+                    "Weergave" => _entries.Any(e => e.AppearanceLabel.Length > 0),
+                    "Netbeheerder" => _entries.Any(e => e.Netbeheerders.Count > 0),
+                    "Samengevoegd" => _entries.Any(e => e.MergedMembers.Count > 0),
+                    "Broncontrole" => _entries.Any(e => RowValues(e)[^1].Length > 0),
                     _ => true
                 },
                 SortMode = DataGridViewColumnSortMode.NotSortable,
@@ -197,11 +196,12 @@ internal sealed class OverviewDialog : LegendDialog
             });
     }
 
-    private void LoadEntries()
+    private void LoadEntries(bool updateColumns = true)
     {
         _entries = _analysisError is null ? LegendGrouping.Sort(Current.Entries, Current.Settings) : new();
         _rowValues.Clear();
         _fieldValues.Clear();
+        if (updateColumns) ConfigureColumns();
         _moves.Visible = Current.Id.Length > 0 && Current.Settings.SortMode == LegendSortMode.Handmatig;
         _moves.Enabled = Current.Id.Length > 0 && Current.Settings.SortMode == LegendSortMode.Handmatig;
         _summary.Text = Current.Id.Length == 0
@@ -309,7 +309,7 @@ internal sealed class OverviewDialog : LegendDialog
             change();
             Current.Entries = _analyze!(Current);
             Current.Changed = true;
-            ConfigureColumns(); LoadEntries();
+            LoadEntries();
         }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {
@@ -362,7 +362,7 @@ internal sealed class OverviewDialog : LegendDialog
             Current.Settings.Klic = dialog.Result;
             if (_analyze is not null) Current.Entries = _analyze(Current);
             Current.Changed = Current.Id.Length > 0;
-            ConfigureColumns(); LoadEntries();
+            LoadEntries();
         }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
         {

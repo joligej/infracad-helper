@@ -18,6 +18,11 @@ internal static class Program
             return Errors.Count == 0 ? 0 : 1;
         }
         Application.EnableVisualStyles();
+        if (args is ["--benchmark", var baseline, var input, var output])
+        {
+            DialogBenchmark.Run(baseline, input, output);
+            return 0;
+        }
         if (args is ["--docs", var directory])
         {
             DocumentationImages.Write(directory);
@@ -37,6 +42,7 @@ internal static class Program
             DiagnosticRun.Execute(CheckTreeImagesDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckOwnedFontsDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckManualMerging, Errors.Add);
+            DiagnosticRun.Execute(CheckKlicRefresh, Errors.Add);
             DiagnosticRun.Execute(() => CheckKlic(args.FirstOrDefault()), Errors.Add, "CheckKlic");
             DiagnosticRun.Execute(() => CheckNestedEditors(), Errors.Add, "CheckNestedEditors");
             DiagnosticRun.Execute(() => CheckCustomizationRoundtrip(), Errors.Add, "CheckCustomizationRoundtrip");
@@ -437,6 +443,47 @@ internal static class Program
         Check(remarks.RemarksText == "\nRegel\n\n", "bewuste lege regels blijven behouden");
     }
 
+    private static void CheckKlicRefresh()
+    {
+        var infra = new Dictionary<string, string> { ["Materiaal"] = "PE", ["DiameterM"] = "0.11" };
+        var map = new Dictionary<string, string>(infra);
+        var obj = new KlicObjectData("bron.dwg", "AB", "KLIC", new[] {
+            new KlicRecord(KlicSource.InfraCAD, "Leiding", infra),
+            new KlicRecord(KlicSource.ObjectData, "leiding", map),
+            new KlicRecord(KlicSource.InfraCAD, "Leiding", infra),
+            new KlicRecord(KlicSource.InfraCAD, "Extra", new Dictionary<string, string> { ["Materiaal"] = "PVC" })
+        }, Array.Empty<string>(), KlicSource.ObjectData);
+        var entry = new LegendEntry { Status = NlcsStatus.Bestaand, Discipline = "WE", Hoofdgroep = "KL", Element = "WATER", Description = "Water", KlicObjects = new[] { obj, obj with { Handle = "AC" } } };
+        var legend = new OverviewLegend { Id = "refresh", Name = "Water", Settings = new(), Entries = new[] { entry } };
+        using var overview = new OverviewDialog(new[] { legend }, _ => null, _ => legend.Entries);
+        OpenOffscreen(overview);
+        var grid = Descendants(overview).OfType<DataGridView>().Single();
+        var refresh = Descendants(overview).OfType<Button>().Single(b => b.Text == "Vernieuwen");
+        Check(!grid.Columns[^1].Visible, "Overzicht verbergt broncontrole bij gelijke bronnen");
+        map["Materiaal"] = "Staal";
+        refresh.PerformClick();
+        Check(grid.Columns[^1].Visible && ((string)grid.Rows[0].Cells[^1].Value).Contains("Bronverschil: Materiaal"),
+            "Vernieuwen leest gewijzigde bronwaarden en toont de broncontrolekolom");
+
+        void Details(KlicSource source, string expected)
+        {
+            using var details = new KlicDetailsDialog(new LegendEntry { Status = NlcsStatus.Bestaand, Discipline = "WE", Hoofdgroep = "KL", Element = "WATER", Description = "Water", KlicObjects = entry.KlicObjects.Select(o => o with { PreferredSource = source }).ToArray() });
+            var data = Descendants(details).OfType<TabControl>().Single().TabPages[0].Controls.OfType<DataGridView>().Single();
+            var used = data.Rows.Cast<DataGridViewRow>().Where(row => (string)row.Cells[0].Value == "Materiaal" && (string)row.Cells[4].Value == "Ja").ToArray();
+            Check(used.Select(row => (string)row.Cells[1].Value).Order().SequenceEqual(new[] { expected, "PVC" }.Order()),
+                "Details kiest per tabel de actuele voorkeursbron met terugval");
+            Check(data.Rows.Cast<DataGridViewRow>().All(row => (int)row.Cells[5].Value == 2),
+                "Details telt unieke bronobjecten, ook bij dubbele records");
+        }
+        Details(KlicSource.ObjectData, "Staal");
+        Details(KlicSource.InfraCAD, "PE");
+        map["Materiaal"] = "PE";
+        refresh.PerformClick();
+        Check(!grid.Columns[^1].Visible && (string)grid.Rows[0].Cells[^1].Value == "",
+            "Opgeloste bronverschillen verdwijnen na Vernieuwen");
+        overview.Close();
+    }
+
     private static void CheckManualMerging()
     {
         var source = new[] { Entry("Eerste"), Entry("Tweede") };
@@ -608,8 +655,12 @@ internal static class Program
         OpenOffscreen(form);
         var controls = Descendants(form).ToList();
         var sort = controls.OfType<ComboBox>().Single(c => c.Items.Contains("Handmatig"));
-        sort.SelectedItem = "Handmatig";
         var grid = controls.OfType<DataGridView>().Single();
+        var descriptionColumn = grid.Columns[1];
+        descriptionColumn.FillWeight = 400;
+        sort.SelectedItem = "Handmatig";
+        Check(ReferenceEquals(grid.Columns[1], descriptionColumn) && descriptionColumn.FillWeight == 400,
+            "Volgorde wijzigen behoudt de ingestelde kolombreedte");
         grid.CurrentCell = grid.Rows[2].Cells[1];
         controls.OfType<Button>().Single(c => c.Text == "Naar begin").PerformClick();
         Check((string)grid.Rows[0].Cells[1].Value == "C", "regel naar begin verplaatsen");

@@ -22,6 +22,24 @@ internal sealed class KlicDetailsDialog : LegendDialog
         return path;
     }
 
+    private static IEnumerable<(string Object, KlicSource Source, string Table, string Key, string Value, bool Selected)>
+        ReadValues(IReadOnlyList<KlicObjectData> objects)
+    {
+        foreach (var obj in objects)
+        {
+            string identity = obj.Identity;
+            var selected = new Dictionary<string, IReadOnlyList<KlicRecord>>(StringComparer.Ordinal);
+            foreach (var record in obj.Records)
+            foreach (var value in record.Values)
+            {
+                if (!selected.TryGetValue(value.Key, out var records))
+                    selected.Add(value.Key, records = obj.Selected(value.Key));
+                bool used = records.Any(r => r.Source == record.Source && r.Table.Equals(record.Table, StringComparison.OrdinalIgnoreCase));
+                yield return (identity, record.Source, record.Table, value.Key, value.Value, used);
+            }
+        }
+    }
+
     public KlicDetailsDialog(LegendEntry entry)
     {
         Text = "KLIC-details – " + entry.Description; Font = SystemFonts.MessageBoxFont;
@@ -39,11 +57,7 @@ internal sealed class KlicDetailsDialog : LegendDialog
             page.Controls.Add(grid); tabs.TabPages.Add(page); return grid;
         }
         var data = Grid("Veldwaarden", "Eigenschap", "Waarde", "Bron", "Tabel", "Gebruikt", "Bronobjecten");
-        var values = entry.KlicObjects.SelectMany(o => o.Records.SelectMany(r => r.Values.Select(v => new
-        {
-            Object = o.Identity, r.Source, r.Table, Key = v.Key, Value = v.Value,
-            Selected = o.Selected(v.Key).Any(selected => selected.Source == r.Source && selected.Table.Equals(r.Table, StringComparison.OrdinalIgnoreCase))
-        })));
+        var values = ReadValues(entry.KlicObjects);
         foreach (var group in values.GroupBy(v => new { v.Source, v.Table, v.Key, v.Value, v.Selected }).OrderBy(g => g.Key.Key).ThenBy(g => g.Key.Source))
             data.Rows.Add(KlicFields.Find(group.Key.Key)?.Label ?? group.Key.Key, KlicFields.Format(group.Key.Key, group.Key.Value),
                 KlicFields.SourceLabel(group.Key.Source), group.Key.Table, group.Key.Selected ? "Ja" : "Nee", group.Select(v => v.Object).Distinct().Count());
