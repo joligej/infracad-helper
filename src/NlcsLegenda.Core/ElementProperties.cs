@@ -23,7 +23,7 @@ public sealed class ElementProperties
         .Any(part => part.Equals("KLIC", StringComparison.OrdinalIgnoreCase));
 
     private static readonly string[] Specificaties = { "LS", "MS", "HS", "HD", "LD" };
-    private static readonly string[] Uitvoeringen = { "MANTELBUIS", "HULPSTUK" };
+    private static readonly string[] Uitvoeringen = { "MANTELBUIS", "HULPSTUK", "KABELBED", "COAXKABEL", "GLASVEZEL" };
 
     public string Soort { get; private init; } = string.Empty;
     public string Specificatie { get; private init; } = string.Empty;
@@ -36,21 +36,17 @@ public sealed class ElementProperties
     public static ElementProperties From(string element, string netbeheerder = "")
     {
         var e = WithoutProviderSuffix(element, netbeheerder).ToUpperInvariant();
-        string uitvoering = string.Empty;
-        foreach (var u in Uitvoeringen)
-        {
-            if (e.EndsWith("_" + u, StringComparison.Ordinal))
-            {
-                uitvoering = u;
-                e = e[..^(u.Length + 1)];
-                break;
-            }
-        }
-
-        string specificatie = string.Empty;
-        string nummer = string.Empty;
         var (withoutDiameter, diameter) = SplitDiameter(e);
         var tokens = withoutDiameter.Split('_', StringSplitOptions.RemoveEmptyEntries).ToList();
+        string uitvoering = string.Empty;
+        int construction = tokens.Count > 1 ? tokens.FindIndex(1, token => Uitvoeringen.Contains(token)) : -1;
+        if (construction >= 0)
+        {
+            uitvoering = string.Join('_', tokens.Skip(construction));
+            tokens.RemoveRange(construction, tokens.Count - construction);
+        }
+        string specificatie = string.Empty;
+        string nummer = string.Empty;
         if (tokens.Count >= 2)
         {
             var last = tokens[^1];
@@ -87,7 +83,7 @@ public sealed class ElementProperties
         @"^(?<prefix>DN|Ø|DIAM(?:ETER)?)?\s*(?<value>[0-9]+(?:[.,][0-9]+)?)\s*(?<unit>MM|CM|M)?$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
     private static readonly HashSet<string> PipeTypes = new(StringComparer.OrdinalIgnoreCase)
-        { "VRIJVERVAL", "DRUKRIOOL", "PERSLEIDING", "RIOOL", "RIOLERING", "HEMELWATER", "VUILWATER", "DRAINAGE", "DRAIN", "WATER", "GAS" };
+        { "VRIJVERVAL", "DRUKRIOOL", "PERSLEIDING", "RIOOL", "RIOLERING", "HEMELWATER", "VUILWATER", "DRAINAGE", "DRAIN", "WATER", "GAS", "DATA", "ELEKTRA", "ELEKTRICITEIT", "WARMTE", "WARMTEKOUD", "OLIE" };
 
     internal static string WithoutDiameter(string element) => SplitDiameter(element).Element;
 

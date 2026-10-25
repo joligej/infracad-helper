@@ -17,17 +17,19 @@ public class LegendGroupingTests
     }
 
     [Fact]
-    public void LineAndHatchOfSameElement_CollapseToOneEntry()
+    public void LineAndHatchOfSameElement_StaySeparate()
     {
         var entries = Build(
             "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-G",
             "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A",
             "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A-200");
 
-        var entry = Assert.Single(entries);
-        Assert.True(entry.HasHatch);
-        Assert.NotNull(entry.GeometryLayer);
-        Assert.Equal("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-G", entry.GeometryLayer);
+        Assert.Equal(2, entries.Count);
+        var line = Assert.Single(entries, e => e.GeometryLayer is not null);
+        var hatch = Assert.Single(entries, e => e.HasHatch);
+        Assert.Null(line.HatchLayer);
+        Assert.Null(hatch.GeometryLayer);
+        Assert.Equal("N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-G", line.GeometryLayer);
     }
 
     [Fact]

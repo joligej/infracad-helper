@@ -8,6 +8,25 @@ internal static class LegendViewport
 {
     private const string Key = "NLCSLEGENDA_VIEWPORT";
 
+    public static void SetLayer(Viewport viewport, Database db, Transaction tr, LegendSettings settings)
+    {
+        string name = (settings.ViewportLayer ?? "").Trim();
+        if (!LayerNaming.IsValid(name)) throw new InvalidOperationException("Kies een geldige, lokale laag voor het viewportkader.");
+        var layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        LayerTableRecord layer;
+        if (layers.Has(name))
+            layer = (LayerTableRecord)tr.GetObject(layers[name], OpenMode.ForWrite);
+        else
+        {
+            layers.UpgradeOpen();
+            layer = new LayerTableRecord { Name = name };
+            layers.Add(layer);
+            tr.AddNewlyCreatedDBObject(layer, true);
+        }
+        layer.IsPlottable = settings.PlotViewportFrame;
+        viewport.LayerId = layer.ObjectId;
+    }
+
     public static void Link(Viewport viewport, Transaction tr, string legendId, bool automatic)
     {
         if (viewport.ExtensionDictionary.IsNull) viewport.CreateExtensionDictionary();
@@ -43,13 +62,16 @@ internal static class LegendViewport
         double margin = settings.ViewportMarginMm;
         if (automatic)
         {
-            var topLeft = viewport.CenterPoint + new Vector3d(-viewport.Width / 2, viewport.Height / 2, 0);
+            var previous = ViewportMath.CenterOffset(viewport.Width, viewport.Height, settings.ViewportAnchor);
+            var anchor = viewport.CenterPoint - new Vector3d(previous.X, previous.Y, 0);
             var plan = ViewportMath.Compute(bounds.MaxPoint.X - bounds.MinPoint.X,
                 bounds.MaxPoint.Y - bounds.MinPoint.Y, settings.Scale, margin);
             viewport.Width = plan.PaperWidthMm;
             viewport.Height = plan.PaperHeightMm;
-            viewport.CenterPoint = topLeft + new Vector3d(viewport.Width / 2, -viewport.Height / 2, 0);
+            var offset = ViewportMath.CenterOffset(viewport.Width, viewport.Height, settings.ViewportAnchor);
+            viewport.CenterPoint = anchor + new Vector3d(offset.X, offset.Y, 0);
         }
+        viewport.PerspectiveOn = false;
         viewport.ViewDirection = Vector3d.ZAxis;
         viewport.ViewTarget = Point3d.Origin;
         viewport.TwistAngle = 0;
@@ -59,6 +81,7 @@ internal static class LegendViewport
         double marginY = Math.Min(margin, Math.Max(0, (viewport.Height - height) / 2));
         viewport.ViewCenter = new Point2d(bounds.MinPoint.X + (viewport.Width / 2 - marginX) / scale,
             bounds.MaxPoint.Y - (viewport.Height / 2 - marginY) / scale);
+        viewport.ViewHeight = viewport.Height / scale;
         viewport.CustomScale = scale;
         viewport.Locked = true;
         return width <= viewport.Width + 1e-8 && height <= viewport.Height + 1e-8;
@@ -77,6 +100,7 @@ internal static class LegendViewport
                 if (tr.GetObject(entityId, OpenMode.ForRead) is not Viewport viewport) continue;
                 if (Read(viewport, tr) is not { } link || link.Id != legend.Id) continue;
                 viewport.UpgradeOpen();
+                SetLayer(viewport, db, tr, legend.Settings);
                 fits &= Align(viewport, legend.Settings, bounds, link.Automatic);
             }
         }

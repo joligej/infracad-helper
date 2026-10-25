@@ -196,7 +196,7 @@ internal sealed class LegendManageDialog : LegendDialog
                 return "Vul bij elke eigen regel zowel een laag als een omschrijving in.";
             if (row.Type == "Symbool" && string.IsNullOrWhiteSpace(row.Blok))
                 return "Vul bij elke eigen symboolregel een bloknaam in.";
-            if (!LayerNaming.IsValid(row.Laag))
+            if (!LayerNaming.IsValidReference(row.Laag))
                 return $"\"{row.Laag.Trim()}\" is geen geldige laagnaam.";
         }
         return null;
@@ -333,16 +333,19 @@ internal sealed class LayerChoiceDialog : LegendDialog
         StartPosition = FormStartPosition.CenterParent;
         ShowInTaskbar = false;
         MinimizeBox = false;
-        var search = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Zoek een deel van de laagnaam of omschrijving…", AccessibleName = "Laag zoeken" };
+        var search = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Zoek in bron, laag, omschrijving of voorbeeld…", AccessibleName = "Laag zoeken" };
         _list = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
             AllowUserToDeleteRows = false, RowHeadersVisible = false, MultiSelect = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
+        _list.Columns.Add("source", "Bron");
         _list.Columns.Add("layer", "Laag");
         _list.Columns.Add("description", "Omschrijving");
-        _list.Columns[0].FillWeight = 65;
-        _list.Columns[1].FillWeight = 35;
-        _list.Columns[0].MinimumWidth = 240;
-        _list.Columns[1].MinimumWidth = 160;
+        _list.Columns.Add("example", "Blok / patroon");
+        _list.Columns[0].FillWeight = 25;
+        _list.Columns[1].FillWeight = 30;
+        _list.Columns[2].FillWeight = 25;
+        _list.Columns[3].FillWeight = 20;
+        foreach (DataGridViewColumn column in _list.Columns) column.MinimumWidth = 100;
         var buttons = new ButtonBar(false);
         buttons.Ok.Text = "Toevoegen";
         AcceptButton = buttons.Ok;
@@ -350,8 +353,8 @@ internal sealed class LayerChoiceDialog : LegendDialog
         void Filter()
         {
             _list.Rows.Clear();
-            foreach (var choice in _choices.Where(c => LayerSearch.Matches(c.Layer + " " + c.Description, search.Text)))
-                _list.Rows[_list.Rows.Add(choice.Layer, choice.Description)].Tag = choice;
+            foreach (var choice in _choices.Where(c => LayerSearch.Matches(c.Layer + " " + c.Description + " " + c.SymbolBlock + " " + c.HatchPattern, search.Text)))
+                _list.Rows[_list.Rows.Add(choice.Layer.Contains('|') ? LayerNaming.SourceName(choice.Layer) : "Deze tekening", LayerNaming.LocalName(choice.Layer), choice.Description, LayerNaming.LocalName(choice.SymbolBlock ?? choice.HatchPattern))].Tag = choice;
             buttons.Ok.Enabled = _list.Rows.Count > 0;
         }
         search.TextChanged += (_, _) => Filter();

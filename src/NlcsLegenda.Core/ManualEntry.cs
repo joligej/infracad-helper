@@ -17,7 +17,7 @@ public sealed class ManualEntry
     public string? HatchPattern { get; set; }
 
     public bool IsValid =>
-        LayerNaming.IsValid(Layer) && !string.IsNullOrWhiteSpace(Description);
+        LayerNaming.IsValidReference(Layer) && !string.IsNullOrWhiteSpace(Description);
 
     public ManualEntry Clone() => new()
     {

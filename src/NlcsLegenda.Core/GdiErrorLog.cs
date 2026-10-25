@@ -21,8 +21,12 @@ public sealed class GdiErrorLog : IDisposable
 
     private void OnException(object? sender, FirstChanceExceptionEventArgs args)
     {
-        if (_writing || args.Exception is not ExternalException
-            || !args.Exception.Message.Contains("GDI+", StringComparison.OrdinalIgnoreCase)) return;
+        if (_writing || _disposed || Volatile.Read(ref _reports) >= 8) return;
+        bool gdi = args.Exception is ExternalException && args.Exception.Message.Contains("GDI+", StringComparison.OrdinalIgnoreCase);
+        if (!gdi && args.Exception is not NullReferenceException) return;
+        string stack = Environment.StackTrace;
+        if (!gdi && !stack.Contains("Autodesk.Aec.AecLayerManagerEx.", StringComparison.Ordinal)
+            && !stack.Contains("Autodesk.AutoCAD.LayerManager.", StringComparison.Ordinal)) return;
         WriteGuarded(() =>
         {
             lock (_gate)
@@ -33,7 +37,7 @@ public sealed class GdiErrorLog : IDisposable
                 {
                     // volledige aanroep vóór het afwikkelen
                     var text = $"{DateTime.UtcNow:O} | NLCS {typeof(GdiErrorLog).Assembly.GetName().Version} | .NET {Environment.Version} | proces {Environment.ProcessId}\n"
-                        + args.Exception + "\n" + Environment.StackTrace + "\n\n";
+                        + args.Exception + "\n" + stack + "\n\n";
                     if (text.Length > MaxBytes / 4) text = text[..(MaxBytes / 4)];
                     Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
                     if (File.Exists(_path) && new FileInfo(_path).Length + Encoding.UTF8.GetByteCount(text) > MaxBytes)

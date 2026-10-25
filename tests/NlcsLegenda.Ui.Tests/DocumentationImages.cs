@@ -58,7 +58,9 @@ internal static class DocumentationImages
     private static void Capture(Form form, string directory, string name, Size size, Action<Form>? configure = null)
     {
         form.StartPosition = FormStartPosition.Manual;
-        form.Location = new Point(-20000, -20000);
+        form.Location = Screen.PrimaryScreen!.WorkingArea.Location;
+        form.Opacity = 0;
+        form.ShowInTaskbar = false;
         form.ClientSize = size;
         form.Show();
         configure?.Invoke(form);

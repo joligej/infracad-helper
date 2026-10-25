@@ -138,7 +138,7 @@ internal sealed class SettingsDialog : LegendDialog
         var buttons = new ButtonBar(withApply: true);
         buttons.Apply!.Click += (_, _) =>
         {
-            if (ValidateScale() && Save())
+            if (ValidateSettings() && Save())
                 ApplyRequested?.Invoke(this, EventArgs.Empty);
         };
         AcceptButton = buttons.Ok;
@@ -274,6 +274,9 @@ internal sealed class SettingsDialog : LegendDialog
         root.Controls.Add(BoundCheck("Titel tonen", () => _settings.IncludeTitle, v => _settings.IncludeTitle = v));
         root.Controls.Add(Group("Viewport",
             BoundCheck("Viewport zelf tekenen", () => _settings.ViewportManual, v => _settings.ViewportManual = v),
+            ComboRow("Plaatsingspunt:", () => _settings.ViewportAnchor, v => _settings.ViewportAnchor = v),
+            TextRow("Viewportlaag:", () => _settings.ViewportLayer, v => _settings.ViewportLayer = v),
+            BoundCheck("Viewportkader plotten", () => _settings.PlotViewportFrame, v => _settings.PlotViewportFrame = v),
             LabeledRow("Marge (mm):", margin)));
         var resetFormat = new Button { Text = "Templateopmaak herstellen", AutoSize = true };
         resetFormat.Click += (_, _) => { _settings.ResetFormattingToTemplate(); RefreshGrids(); };
@@ -389,16 +392,7 @@ internal sealed class SettingsDialog : LegendDialog
         return page;
     }
 
-    internal static Panel LabeledRow(string label, Control control)
-    {
-        var panel = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = new Padding(3) };
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
-        panel.Controls.Add(new Label { Text = label, AutoSize = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(0, 4, 6, 4) }, 0, 0);
-        control.Anchor = control is TextBox or ComboBox ? AnchorStyles.Left | AnchorStyles.Right : AnchorStyles.Left;
-        panel.Controls.Add(control, 1, 0);
-        return panel;
-    }
+    internal static Panel LabeledRow(string label, Control control) => new SettingsRow(label, control);
 
     private TabPage BuildOpmaakTab()
     {
@@ -410,6 +404,12 @@ internal sealed class SettingsDialog : LegendDialog
             BoundCheck("Kader per voorbeeldvak", () => _settings.DrawSwatchFrame, v => _settings.DrawSwatchFrame = v),
             BoundCheck("Symboolblokken invoegen", () => _settings.InsertSymbolBlocks, v => _settings.InsertSymbolBlocks = v),
             BoundCheck("Exploderen bij plaatsen", () => _settings.ExplodeOnPlace, v => _settings.ExplodeOnPlace = v)));
+        root.Controls.Add(Group("Symbolen",
+            BoundCheck("Passend maken in het voorbeeldvak", () => _settings.NormalizeSymbols, v => _settings.NormalizeSymbols = v),
+            BoundCheck("Verschillende groottes samenvoegen", () => _settings.MergeSymbolSizes, v => _settings.MergeSymbolSizes = v),
+            BoundCheck("Verschillende draairichtingen samenvoegen", () => _settings.MergeSymbolRotations, v => _settings.MergeSymbolRotations = v),
+            BoundCheck("Verschillende attribuutteksten samenvoegen", () => _settings.MergeSymbolAttributes, v => _settings.MergeSymbolAttributes = v),
+            new Label { Text = "Bij samenvoegen wordt één van de symbolen als voorbeeld gebruikt. Kleur, vorm, spiegeling en vervorming blijven onderscheiden.", AutoSize = true }));
         root.Controls.Add(ComboRow("Sortering:", () => _settings.SortMode, v => _settings.SortMode = v));
         root.Controls.Add(NumRow("Arceerschaal-factor:", () => _settings.HatchScaleFactor, v => _settings.HatchScaleFactor = v, 0.01M, 100M, 2, 0.1M));
         root.Controls.Add(Group("Koppen",
@@ -577,7 +577,7 @@ internal sealed class SettingsDialog : LegendDialog
 
     private void EditCustomLayers()
     {
-        using var dlg = new CustomLayerDialog(_settings.CustomLayerRules);
+        using var dlg = new CustomLayerDialog(_settings.CustomLayerRules, _layerChoices);
         if (dlg.ShowDialog(this) == DialogResult.OK)
         {
             _settings.CustomLayerRules = dlg.Result;
@@ -635,12 +635,15 @@ internal sealed class SettingsDialog : LegendDialog
         if (dlg.ShowDialog(this) == DialogResult.OK) Apply();
     }
 
-    private bool ValidateScale()
+    private bool ValidateSettings()
     {
-        if (_settings.Scale > 0)
-            return true;
-        MessageBox.Show(this, "De schaal moet groter dan 0 zijn (bijvoorbeeld 200 voor 1:200).",
-            "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        string? error = !double.IsFinite(_settings.Scale) || _settings.Scale <= 0
+            ? "De schaal moet groter dan 0 zijn (bijvoorbeeld 200 voor 1:200)."
+            : !LayerNaming.IsValid(_settings.ViewportLayer) || _settings.ViewportLayer.Length > 255
+                ? "Kies een geldige lokale laag voor het viewportkader, zonder xref-naam."
+                : null;
+        if (error is null) return true;
+        MessageBox.Show(this, error, "NLCS Legenda", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         return false;
     }
 
@@ -661,7 +664,7 @@ internal sealed class SettingsDialog : LegendDialog
 
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
-        if (DialogResult == DialogResult.OK && (!ValidateScale() || !Save()))
+        if (DialogResult == DialogResult.OK && (!ValidateSettings() || !Save()))
             e.Cancel = true;
     }
 
@@ -757,7 +760,7 @@ internal sealed class CustomStatusDialog : LegendDialog
         ShowIcon = false;
         MinimizeBox = false;
 
-        var split = new SplitContainer { Dock = DockStyle.Fill };
+        var split = new SplitContainer { Dock = DockStyle.Fill, Size = ClientSize, SplitterDistance = 220 };
 
         var leftButtons = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.LeftToRight, AutoSize = true };
         var add = new Button { Text = "Nieuw", AutoSize = true };
@@ -805,12 +808,6 @@ internal sealed class CustomStatusDialog : LegendDialog
 
         Controls.Add(split);
         Controls.Add(buttons);
-
-        Load += (_, _) =>
-        {
-            try { split.SplitterDistance = 220; }
-            catch (ArgumentException) { /* standaardverdeling bij te weinig ruimte */ }
-        };
 
         ReloadStatuses(_statuses.Count > 0 ? 0 : -1);
     }
@@ -1320,8 +1317,11 @@ internal sealed class CustomLayerDialog : LegendDialog
     private readonly List<CustomLayerRule> _rules;
     private readonly ListBox _list = new() { Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true };
 
-    public CustomLayerDialog(IReadOnlyList<CustomLayerRule> initial)
+    private readonly IReadOnlyList<ManualEntry> _choices;
+
+    public CustomLayerDialog(IReadOnlyList<CustomLayerRule> initial, IReadOnlyList<ManualEntry>? choices = null)
     {
+        _choices = choices ?? Array.Empty<ManualEntry>();
         _rules = initial.Select(r => r.Clone()).ToList();
 
         Text = "NLCS Legenda \u2013 eigen lagen";
@@ -1412,6 +1412,21 @@ internal sealed class CustomLayerDialog : LegendDialog
         var flow = new SettingsStack { Padding = new Padding(8) };
         Panel Row(string label, Control c) => SettingsDialog.LabeledRow(label, c);
 
+        var choose = new Button { Text = "Laag kiezen…", AutoSize = true, Enabled = _choices.Count > 0 };
+        choose.Click += (_, _) =>
+        {
+            using var picker = new LayerChoiceDialog(_choices);
+            if (picker.ShowDialog(dlg) != DialogResult.OK || picker.Selected is not { } selected) return;
+            layer.Text = LayerNaming.LocalName(selected.Layer);
+            xref.Text = LayerNaming.SourceName(selected.Layer);
+            scope.SelectedIndex = xref.Text.Length > 0 ? 2 : 0;
+            element.Text = selected.Description;
+            desc.Text = selected.Description;
+            if (type.Items.Contains(selected.Type)) type.SelectedItem = selected.Type;
+            status.SelectedItem = selected.Status.ToString();
+            block.Text = LayerNaming.LocalName(selected.SymbolBlock);
+        };
+        flow.Controls.Add(choose);
         flow.Controls.Add(Row("Laagnaam:", layer));
         flow.Controls.Add(Row("Logisch element:", element));
         flow.Controls.Add(Row("Omschrijving:", desc));
@@ -1433,7 +1448,13 @@ internal sealed class CustomLayerDialog : LegendDialog
 
         ok.Click += (_, _) =>
         {
-            rule.Layer = layer.Text.Trim();
+            var reference = layer.Text.Trim();
+            rule.Layer = LayerNaming.LocalName(reference);
+            if (reference.Contains('|'))
+            {
+                xref.Text = LayerNaming.SourceName(reference);
+                scope.SelectedIndex = 2;
+            }
             rule.Element = element.Text.Trim();
             rule.Description = desc.Text.Trim();
             rule.Type = (NlcsDrawType)type.SelectedItem!;

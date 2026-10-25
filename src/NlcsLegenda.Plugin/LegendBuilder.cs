@@ -108,7 +108,7 @@ public static class LegendBuilder
                 string renderLayer;
                 if (!entry.IsManual && analysis.LayerStyles.TryGetValue(layer, out var display))
                     renderLayer = EnsureStyledLayer(tr, db, imports, layer, display);
-                else { EnsureLayer(tr, db, layer, 7); renderLayer = layer; }
+                else renderLayer = ResolveManualLayer(tr, db, imports, layer);
                 var sample = entry.IsManual ? null : analysis.SymbolSamples.GetValueOrDefault(layer);
                 if (!TryInsertSymbol(btr, tr, db, imports, name, renderLayer, sample?.Transform ?? SymbolTransform.Identity,
                     sample, 0, 0, s.ModelUnitsPerPaperMm, s.IncludeInvisibleLayers, out var ids, out var reason))
@@ -121,6 +121,15 @@ public static class LegendBuilder
                     bounds.AddExtents(new Extents3d(lo, hi));
                 }
                 symbols.Add(entry, new PreparedSymbol(ids, bounds.MaxPoint.X - bounds.MinPoint.X, bounds.MaxPoint.Y - bounds.MinPoint.Y));
+            }
+        if (s.NormalizeSymbols)
+            foreach (var pair in symbols.Where(p => !p.Value.IsExample).ToArray())
+            {
+                var symbol = pair.Value;
+                double factor = Math.Min(swatchW / Math.Max(symbol.Width, 1e-12), swatchH / Math.Max(symbol.Height, 1e-12));
+                foreach (var id in symbol.Entities)
+                    TransformPlanarSymbol((Entity)tr.GetObject(id, OpenMode.ForWrite), Matrix3d.Scaling(factor, Point3d.Origin));
+                symbols[pair.Key] = symbol with { Width = symbol.Width * factor, Height = symbol.Height * factor };
             }
         double sampleColumnWidth = Math.Max(swatchW, symbols.Values.Select(v => v.Width).DefaultIfEmpty(0).Max());
         colWidth += sampleColumnWidth - swatchW;
@@ -266,7 +275,8 @@ public static class LegendBuilder
         {
             double height = s.ToModel(1.8);
             y -= s.ToModel(0.5) + height;
-            AddText(btr, tr, line, new Point3d(left, y, 0), height, s.TextLayer, styleId);
+            var footer = AddText(btr, tr, line, new Point3d(left, y, 0), height, s.TextLayer, styleId);
+            y = Math.Min(y, footer.Location.Y - footer.ActualHeight);
         }
 
         return (y, rightX);
@@ -411,8 +421,7 @@ public static class LegendBuilder
                 renderLayers[lyr] = EnsureStyledLayer(tr, db, imports, lyr, style);
             else
             {
-                EnsureLayer(tr, db, lyr, 7);
-                renderLayers[lyr] = lyr;
+                renderLayers[lyr] = ResolveManualLayer(tr, db, imports, lyr);
             }
         }
 
@@ -922,8 +931,10 @@ public static class LegendBuilder
                     {
                         var record = (SymbolTableRecord)transaction.GetObject(id, OpenMode.ForRead);
                         if (record is BlockTableRecord { IsLayout: true }) continue;
-                        if (record is LayerTableRecord)
+                        if (record is LayerTableRecord layer)
                         {
+                            layer.UpgradeOpen();
+                            layer.IsLocked = false;
                             originalLayers[id] = record.Name;
                             if (record.Name == "0") continue;
                         }
@@ -1036,6 +1047,7 @@ public static class LegendBuilder
                     AppendEntity(btr, piece);
                     created.Add(piece.ObjectId);
                     tr.AddNewlyCreatedDBObject(piece, true);
+                    if (piece is Hatch placedHatch) placedHatch.EvaluateHatch(true);
                     children.Add((piece.ObjectId, pieceLayerStyle));
                 }
                 for (int i = children.Count - 1; i >= 0; i--) queue.Push(children[i]);
@@ -1090,7 +1102,9 @@ public static class LegendBuilder
         {
             var ge = ent.GeometricExtents;
             min = ge.MinPoint; max = ge.MaxPoint;
-            return true;
+            return double.IsFinite(min.X) && double.IsFinite(min.Y) && double.IsFinite(min.Z)
+                && double.IsFinite(max.X) && double.IsFinite(max.Y) && double.IsFinite(max.Z)
+                && min.X <= max.X && min.Y <= max.Y && min.Z <= max.Z;
         }
         catch (Autodesk.AutoCAD.Runtime.Exception)
         {
@@ -1373,6 +1387,21 @@ public static class LegendBuilder
     }
 
     // eigen weergavelaag bij afwijkende stijl; bronlaag behouden
+    private static string ResolveManualLayer(Transaction tr, Database db, SymbolImportSession imports, string name)
+    {
+        if (!name.Contains('|')) { EnsureLayer(tr, db, name, 7); return name; }
+        var layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        if (!layers.Has(name)) throw new InvalidOperationException($"De bronlaag '{name}' ontbreekt. Laad de xref of kies de laag opnieuw.");
+        var layer = (LayerTableRecord)tr.GetObject(layers[name], OpenMode.ForRead);
+        var linetype = (LinetypeTableRecord)tr.GetObject(layer.LinetypeObjectId, OpenMode.ForRead);
+        return EnsureStyledLayer(tr, db, imports, LayerNaming.LocalName(name), new LayerDisplayStyle
+        {
+            Color = layer.Color, LineWeight = layer.LineWeight,
+            Linetype = linetype.Name, LinetypeIdentity = DrawingAnalyzer.LinetypeSignature(layer.LinetypeObjectId, tr),
+            Transparency = TransparencyValue.From(layer.Transparency)
+        });
+    }
+
     private static string EnsureStyledLayer(Transaction tr, Database db, SymbolImportSession imports, string name, LayerDisplayStyle style)
     {
         var lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
@@ -1412,7 +1441,7 @@ public static class LegendBuilder
         string linetype = DrawingAnalyzer.LinetypeSignature(layer.LinetypeObjectId, tr);
         string expected = style.LinetypeIdentity.Length > 0 ? style.LinetypeIdentity
             : DrawingAnalyzer.LinetypeSignature(((LinetypeTable)tr.GetObject(layer.Database.LinetypeTableId, OpenMode.ForRead))[style.Linetype], tr);
-        return !layer.IsOff && !layer.IsFrozen && layer.Color.ColorMethod == style.Color.ColorMethod
+        return !layer.IsLocked && !layer.IsOff && !layer.IsFrozen && layer.Color.ColorMethod == style.Color.ColorMethod
             && layer.Color.ColorIndex == style.Color.ColorIndex
             && layer.Color.ColorValue.ToArgb() == style.Color.ColorValue.ToArgb()
             && StringComparer.Ordinal.Equals(linetype, expected)

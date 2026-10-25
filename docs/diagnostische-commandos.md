@@ -6,6 +6,8 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 
 | Commando | Doel |
 | --- | --- |
+| `NLCSLEGENDAVIEWPORTREGRESSION` | Controleert linksboven/middelpunt, viewportlaag en plotkeuze, handmatig kader en gekoppelde schaal op 1:200/500/1000. |
+| `NLCSLEGENDAXREFCHOICEREGRESSION` | Controleert een eigen symbool uit een alleen-lezen xref met vergrendelde bronlaag, uniforme grootte, rotatie, spiegeling, normalisatie en ongewijzigde bron. |
 | `NLCSLEGENDAPRESETTARGETTEST` | Controleert profielkeuze voor globale standaard zonder/met legenda en lokaal laden, inclusief behoud van de andere instellingen. Scriptinvoer: Standaard, Legenda, Standaard. |
 | `NLCSLEGENDAHEIGHTLIMITTEST` | Meet de volledige legenda inclusief koppen, notities, schaalbalk en kader bij twee hoogtelimieten op drie schalen; wijst een onhaalbare hoogte af. |
 | `NLCSLEGENDADRAWINGDEFAULTSTEST` | Controleert kleur, lijndikte, transparantie en lijntypeschaal van complete legenda’s bij afwijkende tekeninstellingen, behouden en geëxplodeerd. |

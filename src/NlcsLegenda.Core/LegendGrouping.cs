@@ -35,7 +35,7 @@ public static class LegendGrouping
             && SwatchTypes.Contains(layer.DrawType) && settings.IsDrawTypeIncluded(layer.DrawType)))
         {
 
-            var splitKey = layer.GroupKey + "\u0001" + layer.Netbeheerder.ToUpperInvariant() + "\u0001" + layer.KlicGroupKey + "\u0001" + layer.RenderIdentity;
+            var splitKey = layer.GroupKey + "\u0001" + layer.Netbeheerder.ToUpperInvariant() + "\u0001" + layer.KlicGroupKey + "\u0001" + layer.DrawType + "\u0001" + layer.RenderIdentity;
             if (!groups.TryGetValue(splitKey, out var list))
             {
                 list = new List<NlcsLayerName>();
@@ -153,7 +153,8 @@ public static class LegendGrouping
     private static List<LegendEntry> Merge(List<LegendEntry> entries, LegendSettings settings)
     {
         bool mergeStatus = settings.MergeIdenticalStatuses;
-        if (settings.MergedDimensions.Count == 0 && settings.NonKlicMergedDimensions.Count == 0 && !mergeStatus)
+        if (settings.MergedDimensions.Count == 0 && settings.NonKlicMergedDimensions.Count == 0 && !mergeStatus
+            && !settings.MergeSymbolSizes && !settings.MergeSymbolRotations && !settings.MergeSymbolAttributes)
             return entries;
 
         // blanco en handmatige regels buiten de samenvoeging
@@ -172,7 +173,8 @@ public static class LegendGrouping
                 ? (IReadOnlyCollection<GroupDimension>)settings.MergedDimensions : settings.NonKlicMergedDimensions;
             var content = props.MergeKey(dimensions);
             var metadata = dimensions.Contains(GroupDimension.Diameter) ? KlicSummary.WithoutDiameter(e.KlicGroupKey) : e.KlicGroupKey;
-            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{e.IsKlic}|{content}|{metadata}|{renderPart}";
+            var types = string.Join(",", e.LayersByType.Keys.OrderBy(t => t));
+            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{e.IsKlic}|{content}|{metadata}|{types}|{renderPart}";
         }
 
         var merged = new List<LegendEntry>();

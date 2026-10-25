@@ -162,7 +162,7 @@ public static class DrawingAnalyzer
             catalog,
             RenderId,
             name => c.CustomDesc.ContainsKey(name) ? DescriptionSource.EigenKoppeling : (DescriptionSource?)null,
-            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.RenderIdentity : null,
+            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.GroupIdentity(settings) : null,
             name => c.KlicObjects.TryGetValue(name, out var objects) ? objects : Array.Empty<KlicObjectData>(),
             name => c.Styles.TryGetValue(name, out var style) ? $"{style.Color} / {LayerNaming.LocalName(style.Linetype)}" : null,
             name => c.SymbolSamples.ContainsKey(name) ? "" : renderIds.GetValueOrDefault(name)
@@ -315,8 +315,18 @@ public static class DrawingAnalyzer
                 identity = SymbolDefinitionIdentity(id, ent.Database, tr, style, layerStyle, settings.IncludeInvisibleLayers);
                 c.SymbolDefinitionIdentities[cacheKey] = identity;
             }
+            string normalized = "";
+            if (settings.MergeSymbolSizes)
+            {
+                var normalizedKey = (id, cacheKey.Item2 + "|normalized");
+                if (!c.SymbolDefinitionIdentities.TryGetValue(normalizedKey, out normalized!))
+                {
+                    normalized = NormalizedBlockIdentity(id, ent.Database, tr, style, layerStyle, settings.IncludeInvisibleLayers);
+                    c.SymbolDefinitionIdentities[normalizedKey] = normalized;
+                }
+            }
             symbol = new SymbolSample(blockName, identity, SymbolTransform.From(transform * br.BlockTransform))
-            { ReferenceId = br.ObjectId, SourceXref = sourceXref, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers),
+            { ReferenceId = br.ObjectId, SourceXref = sourceXref, NormalizedDefinitionIdentity = normalized, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers),
                 InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceScale = parsed.Scale, TargetScale = settings.Scale };
         }
         if (ent is Curve curve && parsed.DrawType == NlcsDrawType.Symbool)
@@ -325,6 +335,7 @@ public static class DrawingAnalyzer
             symbol = new SymbolSample("@" + curve.GetType().Name, identity, SymbolTransform.From(transform))
             {
                 ReferenceId = curve.ObjectId, IsPrimitive = true, SourceXref = sourceXref,
+                NormalizedDefinitionIdentity = settings.MergeSymbolSizes ? NormalizedPrimitiveIdentity(curve, tr) + ":" + StyleSignature(style) : "",
                 InsertionStyle = style, InsertionLayerStyle = layerStyle,
                 SourceScale = parsed.Scale, TargetScale = settings.Scale
             };
@@ -643,19 +654,9 @@ public static class DrawingAnalyzer
         foreach (var logical in samples.GroupBy(x => x.Parsed.GroupKey + "\u0001" + x.Parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + x.Parsed.KlicGroupKey).OrderBy(x => x.Key, StringComparer.Ordinal))
         {
             var bundles = new List<(List<LayerSample> Layers, string Signature)>();
-            foreach (var layers in logical.GroupBy(x => x.Parsed.SourceIdentity, StringComparer.OrdinalIgnoreCase).Select(source => source.ToList()))
-            {
-                var byType = layers.GroupBy(x => x.Parsed.DrawType).ToList();
-                if (byType.Any(type => type.Select(x => x.Signature).Distinct(StringComparer.Ordinal).Count() > 1))
-                {
-                    foreach (var type in byType)
-                        foreach (var variant in type.GroupBy(x => x.Signature, StringComparer.Ordinal))
-                            bundles.Add((variant.ToList(), $"{(int)type.Key}:{variant.Key}"));
-                }
-                else
-                    bundles.Add((layers, string.Join(";", byType.OrderBy(x => x.Key)
-                        .Select(x => $"{(int)x.Key}:{x.First().Signature}"))));
-            }
+            foreach (var type in logical.GroupBy(x => x.Parsed.DrawType))
+                foreach (var variant in type.GroupBy(x => x.Signature, StringComparer.Ordinal))
+                    bundles.Add((variant.ToList(), $"{(int)type.Key}:{variant.Key}"));
             int partition = 0;
             foreach (var renderClass in bundles.GroupBy(x => x.Signature, StringComparer.Ordinal)
                 .OrderByDescending(g => g.Any(x => x.Layers.Any(l => !l.Parsed.IsXref)))
@@ -720,6 +721,17 @@ public static class DrawingAnalyzer
     private static string SampleSignature(LayerDisplayStyle style, HatchSample? hatch, SymbolSample? symbol) =>
         symbol is not null ? symbol.RenderIdentity : StyleSignature(style) + "|" + HatchSignature(hatch);
 
+    private static string NormalizedPrimitiveIdentity(Curve curve, Transaction tr)
+    {
+        if (curve is not (Line or Circle or Arc or Polyline or Ellipse or Spline)) return PrimitiveSymbolIdentity(curve, tr);
+        var bounds = curve.GeometricExtents;
+        double size = Math.Max(bounds.MaxPoint.X - bounds.MinPoint.X, bounds.MaxPoint.Y - bounds.MinPoint.Y);
+        if (size < 1e-12) return PrimitiveSymbolIdentity(curve, tr);
+        using var copy = (Curve)curve.Clone();
+        copy.TransformBy(Matrix3d.Scaling(1 / size, bounds.MinPoint));
+        return PrimitiveSymbolIdentity(copy, tr);
+    }
+
     private static string PrimitiveSymbolIdentity(Curve curve, Transaction tr)
     {
         var origin = curve.GeometricExtents.MinPoint;
@@ -737,6 +749,45 @@ public static class DrawingAnalyzer
                 .Select(v => NumberSignature(v.StartWidth) + ":" + NumberSignature(v.EndWidth)));
         string shape = curve.GetType().Name + "|" + curve.Closed + "|" + widths + "|" + string.Join(";", points);
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(shape)));
+    }
+
+    private static string NormalizedBlockIdentity(ObjectId id, Database db, Transaction tr,
+        LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible)
+    {
+        var entities = ((BlockTableRecord)tr.GetObject(id, OpenMode.ForRead)).Cast<ObjectId>()
+            .Select(item => tr.GetObject(item, OpenMode.ForRead)).OfType<Entity>().Where(entity =>
+            {
+                var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
+                return layer.IsPlottable && (includeInvisible || IsBlockPartVisible(entity, layer));
+            }).ToArray();
+        // alleen volledig vergelijkbare geometrie; anders de oorspronkelijke identiteit
+        if (entities.Length == 0 || entities.Any(e => e is not (Line or Circle or Arc or Polyline or Ellipse or Spline or DBText or MText or Hatch { IsSolidFill: true })))
+            return "";
+        var bounds = new Extents3d();
+        foreach (var entity in entities)
+        {
+            if (!TryGetExtents(entity, out var min, out var max)) return "";
+            bounds.AddExtents(new Extents3d(min, max));
+        }
+        double size = Math.Max(bounds.MaxPoint.X - bounds.MinPoint.X, bounds.MaxPoint.Y - bounds.MinPoint.Y);
+        if (size < 1e-12) return "";
+        var transform = Matrix3d.Scaling(1 / size, Point3d.Origin) * Matrix3d.Displacement(Point3d.Origin - bounds.MinPoint);
+        var parts = new List<string>();
+        foreach (var entity in entities)
+        {
+            using var copy = (Entity)entity.Clone();
+            LegendBuilder.TransformPlanarSymbol(copy, transform);
+            if (copy is Hatch { IsSolidFill: true } solid)
+            {
+                solid.PatternScale = 1;
+                solid.PatternAngle = 0;
+                solid.PatternSpace = 1;
+                solid.PatternDouble = false;
+            }
+            parts.Add(SymbolEntitySignature(copy, db, tr, new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible));
+        }
+        parts.Sort(StringComparer.Ordinal);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join("\n", parts))));
     }
 
     private static string SymbolDefinitionIdentity(ObjectId definitionId, Database host, Transaction tr, LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible)

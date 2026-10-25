@@ -54,7 +54,7 @@ public sealed class CustomLayerRule
 
     public bool MatchtBlok(string? entityBlockName) =>
         string.IsNullOrEmpty(BlockName)
-        || string.Equals(entityBlockName, BlockName, StringComparison.OrdinalIgnoreCase);
+        || string.Equals(LayerNaming.LocalName(entityBlockName), LayerNaming.LocalName(BlockName), StringComparison.OrdinalIgnoreCase);
 
     public bool ScopeMatches(string sourceXref) => Scope switch
     {

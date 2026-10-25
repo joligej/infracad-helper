@@ -18,7 +18,7 @@ public class QuantityAndExportTests
     }
 
     [Fact]
-    public void Metrics_AreAggregatedAcrossLayersOfGroup()
+    public void Metrics_StayWithTheirDrawingType()
     {
         var metrics = new Dictionary<string, LayerMetric>(StringComparer.OrdinalIgnoreCase)
         {
@@ -31,10 +31,11 @@ public class QuantityAndExportTests
                   "N-WE-VH-OPENVERHARDING_BETONSTRAATSTEEN-A"),
             new LegendSettings(), null, metrics);
 
-        var entry = Assert.Single(entries);
-        Assert.Equal(3, entry.Metric.Count);
-        Assert.Equal(10, entry.Metric.Length);
-        Assert.Equal(50, entry.Metric.Area);
+        Assert.Equal(2, entries.Count);
+        var line = Assert.Single(entries, e => e.GeometryLayer is not null);
+        var hatch = Assert.Single(entries, e => e.HatchLayer is not null);
+        Assert.Equal(new LayerMetric(2, 10, 0), line.Metric);
+        Assert.Equal(new LayerMetric(1, 0, 50), hatch.Metric);
     }
 
     [Fact]

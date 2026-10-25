@@ -46,7 +46,7 @@ public class CustomLayerRuleTests
     }
 
     [Fact]
-    public void MultipleRules_SameElement_CombineIntoOneEntry()
+    public void MultipleRules_SameElement_KeepDrawingTypesSeparate()
     {
         var settings = new LegendSettings();
         var line = new CustomLayerRule { Layer = "Eigen asfalt lijn", Element = "Eigen asfalt", Type = NlcsDrawType.Geometrie, Description = "Eigen asfalt" };
@@ -59,9 +59,10 @@ public class CustomLayerRuleTests
         var entries = LegendGrouping.Build(new[] { cl, ch }, settings,
             layerDescription: _ => "Eigen asfalt");
 
-        var entry = Assert.Single(entries);
-        Assert.NotNull(entry.GeometryLayer);
-        Assert.NotNull(entry.HatchLayer);
+        Assert.Equal(2, entries.Count);
+        Assert.All(entries, entry => Assert.Single(entry.LayersByType));
+        Assert.Contains(entries, entry => entry.GeometryLayer is not null);
+        Assert.Contains(entries, entry => entry.HatchLayer is not null);
     }
 
     [Fact]
