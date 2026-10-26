@@ -73,6 +73,22 @@ public class LegendOrderTests
     }
 
     [Fact]
+    public void SplitDrawingTypesKeepTheirPreviousPositionWithoutCopyingAnExample()
+    {
+        var other = Entry("B");
+        var combined = Entry("A", "Geometrie=line;Arcering=hatch");
+        var line = Entry("A", "Geometrie=line");
+        var hatch = Entry("A", "Arcering=hatch");
+        var saved = new[] { LegendOrder.Key(combined), LegendOrder.Key(other) };
+        Assert.Equal(new[] { line, hatch, other }, LegendOrder.Apply(new[] { other, line, hatch }, saved));
+        var remembered = LegendOrder.Remember(saved, new[] { line, hatch, other });
+        Assert.Equal(new[] { LegendOrder.Key(line), LegendOrder.Key(hatch), LegendOrder.Key(other) }, remembered);
+        var choices = LegendOrder.AlignChoices(new Dictionary<string, string> { [saved[0]] = "combined example" }, new[] { line, hatch });
+        Assert.False(choices.ContainsKey(LegendOrder.Key(line)));
+        Assert.False(choices.ContainsKey(LegendOrder.Key(hatch)));
+    }
+
+    [Fact]
     public void BlankRowsWithSameTextHaveIndependentKeys()
     {
         var a = new BlankEntry(); var b = a.CloneWithNewId();

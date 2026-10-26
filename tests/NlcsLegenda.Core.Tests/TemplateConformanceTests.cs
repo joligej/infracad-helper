@@ -21,11 +21,12 @@ public class TemplateConformanceTests
     [Fact]
     public void GeometryLayer_DoesNotFallBackToVlak()
     {
-        var entry = Assert.Single(LegendGrouping.Build(Parse($"{Base}-G", $"{Base}-A"), new LegendSettings()));
-        Assert.Equal($"{Base}-G", entry.GeometryLayer);
-        Assert.Equal($"{Base}-A", entry.HatchLayer);
-        Assert.Null(entry.VlakLayer);
-        Assert.True(entry.HasHatch);
+        var entries = LegendGrouping.Build(Parse($"{Base}-G", $"{Base}-A"), new LegendSettings());
+        var line = Assert.Single(entries, e => e.GeometryLayer is not null);
+        Assert.Equal($"{Base}-G", line.GeometryLayer);
+        Assert.Null(line.HatchLayer);
+        Assert.Null(line.VlakLayer);
+        Assert.Equal($"{Base}-A", Assert.Single(entries, e => e.HasHatch).HatchLayer);
     }
 
     [Fact]
@@ -40,9 +41,10 @@ public class TemplateConformanceTests
     [Fact]
     public void GeometryAndVlak_KeepBothLayersSeparate()
     {
-        var entry = Assert.Single(LegendGrouping.Build(Parse($"{Base}-G", $"{Base}-GV"), new LegendSettings()));
-        Assert.Equal($"{Base}-G", entry.GeometryLayer);
-        Assert.Equal($"{Base}-GV", entry.VlakLayer);
+        var entries = LegendGrouping.Build(Parse($"{Base}-G", $"{Base}-GV"), new LegendSettings());
+        Assert.Equal(2, entries.Count);
+        Assert.Equal($"{Base}-G", Assert.Single(entries, e => e.GeometryLayer is not null).GeometryLayer);
+        Assert.Equal($"{Base}-GV", Assert.Single(entries, e => e.VlakLayer is not null).VlakLayer);
     }
 
     [Fact]

@@ -48,6 +48,12 @@ kader houdt zijn papierafmetingen. De marge wordt zo nodig verkleind; een te kle
 kader geeft een melding zonder de schaal te veranderen. Kies **Bestaand** om een oud legenda-venster eenmalig te
 koppelen. Andere viewports worden niet aangepast.
 
+Bij plaatsen wijs je standaard de **linkerbovenhoek** aan. Onder **Legenda → Viewport**
+kun je kiezen voor het **middelpunt**. Bij automatisch vergroten blijft dat punt op zijn
+plaats. Zowel getekende als automatisch geplaatste kaders komen standaard op
+**VIEWPORT-NOPLOT**, met plotten uit. De laagnaam en plotinstelling zijn aanpasbaar;
+de plotinstelling geldt voor alle objecten op die laag.
+
 ### Instellingen
 
 De globale instellingen zijn het startpunt voor een **nieuwe** legenda. Wijzig je later de
@@ -83,12 +89,27 @@ De standaard statuskoppen zijn "Nieuwe situatie:", "Bestaande situatie:", "Verva
 
 Onder de legenda staan standaard de tekeningnotities, een schaalbalk en de schaaltekst.
 De schaalbalk heeft vier segmenten van elk 10 mm op papier, met afwisselende halve
-vullingen. De maximale hoogte onder Kolommen geldt voor de hele legenda, inclusief deze onderdelen en een eventueel kader. Past één regel niet, vergroot dan de hoogte of zet deze op 0. Teksten en onderdelen kun je aanpassen of uitzetten. In het opmerkingenvenster
+vullingen. De maximale hoogte onder Kolommen geldt voor de hele legenda, inclusief meerregelige omschrijvingen, deze onderdelen en een eventueel kader. Ook het maximumaantal regels per kolom blijft gelden. Past één regel niet, vergroot dan de hoogte of zet deze op 0. Teksten en onderdelen kun je aanpassen of uitzetten. In het opmerkingenvenster
 kies je tussen tekeningnotities en de KLIC-waarschuwing.
+
+Bij de standaardregelafstand krijgen lange omschrijvingen extra leesruimte. De compacte
+afstand uit de template blijft voor korte labels gelden. De berekening van de
+kolomhoogte gebruikt de werkelijk getekende teksthoogte.
 
 De legenda is bedoeld voor modelruimte in meters. Papiermaten worden eenmaal met de
 gekozen schaal omgerekend. Symbolen behouden hun modelmaat; een expliciete NLCS-schaalvariant
 wordt naar de gekozen schaal omgerekend. Grote symbolen krijgen meer rij- en kolomruimte.
+Met **Opmaak → Symbolen → Passend maken in het voorbeeldvak** worden ze evenredig
+verkleind of vergroot tot het ingestelde vak. Gekozen templatevoorbeelden houden hun
+eigen opmaak. **Verschillende groottes samenvoegen** maakt van gelijke symbolen met
+verschillende uniforme schaal één regel, ook bij afzonderlijke blokdefinities met
+dezelfde vorm. **Verschillende draairichtingen samenvoegen** negeert daarnaast de
+rotatie in het tekeningvlak. Spiegeling, vervorming en kleur blijven onderscheiden.
+Varianten waarbij bijvoorbeeld alleen de buitencontour groter is maar het middenpunt
+niet meeschaalt, zijn geen gelijke vormen. Voeg die via **Overzicht → Samenvoegen**
+met een gekozen hoofdvoorbeeld samen. **Verschillende attribuutteksten samenvoegen** helpt bijvoorbeeld bij
+kadastrale symbolen met wisselende nummers. Eén bronsymbool wordt het voorbeeld;
+alle bronobjecten en aantallen blijven bij de samengevoegde regel horen.
 De hulpkaders zijn in modelruimte zichtbaar en worden niet geplot; een buitenkader staat
 standaard uit. Een lege tekststijl kiest `NLCS-ISO` met lettertype `NLCS-ISO.ttf`. Ontbreekt dat lettertype, installeer
 het of kies in Instellingen een bestaande tekststijl.
@@ -116,8 +137,20 @@ regel kun je via Samenstellen weer opnemen.
 
 **Samenstellen** heeft twee tabbladen: **Tekening** voor gevonden bronregels en
 **Eigen regels** voor zelf toegevoegde regels. De wijzigingen horen bij de gekozen
-legenda. **Laag toevoegen** biedt lokale lagen met een voorgestelde omschrijving,
+legenda. **Laag toevoegen** biedt lokale en xref-lagen met een voorgestelde omschrijving,
 type en waar mogelijk blok of patroon; deze gegevens zijn vrij aanpasbaar.
+De keuzelijst toont bron, laagnaam en blok of patroon apart. Je kunt op alle kolommen
+zoeken, ook binnen de volledige xref-naam. Meerdere voorbeelden op één laag zijn
+afzonderlijk te kiezen.
+Bij **Eigen lagen → Laag kiezen** worden de bron, het type en het blok overgenomen.
+Je kunt ook een volledige naam als `ONDERGROND|laag` plakken; de bronkoppeling wordt
+dan automatisch ingevuld. Een voorbeeld uit een vergrendelde of alleen-lezen bron
+wordt op een lokale legendalaag getekend; de bron wordt niet aangepast.
+
+Lijngeometrie, arceringen, vlakvullingen en symbolen krijgen ieder een eigen regel.
+Daardoor kan een arcering uit de ene bron niet het samenvoegen van gelijke lijnen
+uit een andere bron verhinderen. Bestaande gecombineerde uitsluitingen en de
+handmatige volgorde worden waar de oorspronkelijke inhoud gelijk is overgenomen.
 
 Zoeken werkt op elk deel van omschrijving of laagnaam, inclusief xref-namen.
 `fiets asfalt` zoekt beide woorden, ongeacht de volgorde. `*asfalt*fiets*` zoekt

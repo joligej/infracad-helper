@@ -28,14 +28,9 @@ public class ElementTypeFilterTests
     public void AllTypesOn_ByDefault_KeepsEntry()
     {
         var s = new LegendSettings();
-        Assert.True(s.ToonGeometrie && s.ToonVlakken && s.ToonArceringen && s.ToonVlakvullingen && s.ToonSymbolen);
-
         var entries = LegendGrouping.Build(Parse(AllTypeLayers()), s);
-        var e = Assert.Single(entries);
-        Assert.True(e.LayersByType.ContainsKey(NlcsDrawType.Geometrie));
-        Assert.True(e.LayersByType.ContainsKey(NlcsDrawType.Arcering));
-        Assert.True(e.LayersByType.ContainsKey(NlcsDrawType.Vlakvulling));
-        Assert.True(e.LayersByType.ContainsKey(NlcsDrawType.Symbool));
+        Assert.Equal(4, entries.Count);
+        Assert.All(entries, entry => Assert.Single(entry.LayersByType));
     }
 
     [Theory]
@@ -47,12 +42,11 @@ public class ElementTypeFilterTests
     {
         var s = new LegendSettings();
         s.IncludedDrawTypes.Remove(off);
-
         var entries = LegendGrouping.Build(Parse(AllTypeLayers()), s);
-        var e = Assert.Single(entries);
-        Assert.False(e.LayersByType.ContainsKey(off));
+        Assert.Equal(3, entries.Count);
+        Assert.DoesNotContain(entries, e => e.LayersByType.ContainsKey(off));
         foreach (var t in new[] { NlcsDrawType.Geometrie, NlcsDrawType.Arcering, NlcsDrawType.Vlakvulling, NlcsDrawType.Symbool }.Where(t => t != off))
-            Assert.True(e.LayersByType.ContainsKey(t));
+            Assert.Single(entries, e => e.LayersByType.ContainsKey(t));
     }
 
     [Fact]
@@ -239,12 +233,8 @@ public class ElementTypeFilterTests
     public void Filtering_IsDeterministic()
     {
         var s = new LegendSettings { ToonGeometrie = false };
-        var layers = AllTypeLayers();
-
-        var first = LegendGrouping.Build(Parse(layers), s).Single();
-        var second = LegendGrouping.Build(Parse(layers), s).Single();
-        Assert.Equal(
-            string.Join(",", first.LayersByType.Keys.OrderBy(k => k)),
-            string.Join(",", second.LayersByType.Keys.OrderBy(k => k)));
+        var first = LegendGrouping.Build(Parse(AllTypeLayers()), s);
+        var second = LegendGrouping.Build(Parse(AllTypeLayers()), s);
+        Assert.Equal(first.SelectMany(e => e.LayersByType.Keys), second.SelectMany(e => e.LayersByType.Keys));
     }
 }

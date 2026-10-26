@@ -414,6 +414,8 @@ public partial class Commands
                 return;
             }
 
+            if (Convert.ToInt32(AcApp.GetSystemVariable("CVPORT")) != 1) ed.SwitchToPaperSpace();
+
             // doelkeuze vóór de transactie
             LegendRegistry registry;
             using (var trReg = db.TransactionManager.StartTransaction())
@@ -475,6 +477,7 @@ public partial class Commands
                     using var existing = db.TransactionManager.StartTransaction();
                     var viewport = (Viewport)existing.GetObject(result.ObjectId, OpenMode.ForWrite);
                     if (viewport.Number == 1) return;
+                    LegendViewport.SetLayer(viewport, db, existing, settings);
                     LegendViewport.Link(viewport, existing, target.Id, automatic: false);
                     bool fits = LegendViewport.Align(viewport, settings, new Extents3d(min, max), automatic: false);
                     existing.Commit();
@@ -509,10 +512,12 @@ public partial class Commands
                     return;
                 }
 
-                double left = Math.Min(p1.Value.X, p2.Value.X);
-                double right = Math.Max(p1.Value.X, p2.Value.X);
-                double bottom = Math.Min(p1.Value.Y, p2.Value.Y);
-                double topY = Math.Max(p1.Value.Y, p2.Value.Y);
+                var first = p1.Value.TransformBy(ed.CurrentUserCoordinateSystem);
+                var second = p2.Value.TransformBy(ed.CurrentUserCoordinateSystem);
+                double left = Math.Min(first.X, second.X);
+                double right = Math.Max(first.X, second.X);
+                double bottom = Math.Min(first.Y, second.Y);
+                double topY = Math.Max(first.Y, second.Y);
                 vpW = right - left;
                 vpH = topY - bottom;
                 if (vpW < 1e-6 || vpH < 1e-6)
@@ -539,13 +544,16 @@ public partial class Commands
                 vpH = plan.PaperHeightMm;
                 viewCenter = new Point2d((min.X + max.X) / 2.0, (min.Y + max.Y) / 2.0);
 
-                var pp = ed.GetPoint("\nMiddelpunt van de viewport op de sheet:");
+                var pp = ed.GetPoint(settings.ViewportAnchor == ViewportAnchor.Middelpunt
+                    ? "\nMiddelpunt van de viewport op het tekenblad:" : "\nLinksbovenpunt van de viewport op het tekenblad:");
                 if (pp.Status != PromptStatus.OK)
                 {
                     ed.WriteMessage("\nGeannuleerd.");
                     return;
                 }
-                vpCenter = pp.Value;
+                var point = pp.Value.TransformBy(ed.CurrentUserCoordinateSystem);
+                var offset = ViewportMath.CenterOffset(vpW, vpH, settings.ViewportAnchor);
+                vpCenter = new Point3d(point.X + offset.X, point.Y + offset.Y, 0);
             }
 
             using (var tr = db.TransactionManager.StartTransaction())
@@ -557,6 +565,7 @@ public partial class Commands
                 ps.AppendEntity(vp);
                 tr.AddNewlyCreatedDBObject(vp, true);
 
+                LegendViewport.SetLayer(vp, db, tr, settings);
                 vp.CenterPoint = vpCenter;
                 vp.Width = vpW;
                 vp.Height = vpH;

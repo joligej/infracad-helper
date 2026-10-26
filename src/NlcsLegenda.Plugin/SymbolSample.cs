@@ -8,6 +8,18 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
 
     public bool IsPrimitive { get; init; }
 
+    public string NormalizedDefinitionIdentity { get; init; } = string.Empty;
+
+    public string GroupIdentity(NlcsLegenda.Core.LegendSettings settings)
+    {
+        var transform = settings.MergeSymbolSizes ? RenderTransform.WithoutSize() : RenderTransform;
+        if (settings.MergeSymbolRotations) transform = transform.WithoutRotation();
+        string definition = settings.MergeSymbolSizes && NormalizedDefinitionIdentity.Length > 0
+            ? NormalizedDefinitionIdentity : DefinitionIdentity;
+        return $"S:{definition}:{transform.Signature}"
+            + (settings.MergeSymbolAttributes || AttributeIdentity.Length == 0 ? "" : ":" + AttributeIdentity);
+    }
+
     public string SourceXref { get; init; } = string.Empty;
 
     public string AttributeIdentity { get; init; } = string.Empty;
@@ -48,13 +60,29 @@ public readonly record struct SymbolTransform(Vector3d XAxis, Vector3d YAxis, Ve
         Component(YAxis.X), Component(YAxis.Y), Component(YAxis.Z),
         Component(ZAxis.X), Component(ZAxis.Y), Component(ZAxis.Z));
 
+    public SymbolTransform WithoutSize()
+    {
+        double size = Math.Max(XAxis.Length, YAxis.Length);
+        return size > 1e-12 ? new(XAxis / size, YAxis / size, ZAxis.GetNormal()) : this;
+    }
+
+    public SymbolTransform WithoutRotation()
+    {
+        // alleen rotatie in het tekeningvlak; spiegeling en vervorming behouden
+        if (Math.Abs(XAxis.Z) > 1e-9 || Math.Abs(YAxis.Z) > 1e-9 || XAxis.Length < 1e-12) return this;
+        var rotation = Matrix3d.Rotation(-Math.Atan2(XAxis.Y, XAxis.X), Vector3d.ZAxis, Point3d.Origin);
+        return new(XAxis.TransformBy(rotation), YAxis.TransformBy(rotation), ZAxis.TransformBy(rotation));
+    }
+
     public SymbolTransform Divide(double factor) => new(XAxis / factor, YAxis / factor, ZAxis / factor);
 
     public Matrix3d ToMatrix() => Matrix3d.AlignCoordinateSystem(
         Point3d.Origin, Vector3d.XAxis, Vector3d.YAxis, Vector3d.ZAxis,
         Point3d.Origin, XAxis, YAxis, ZAxis);
 
-    private static string Component(double value) =>
-        Math.Round(value, 9, MidpointRounding.AwayFromZero)
-            .ToString("0.#########", System.Globalization.CultureInfo.InvariantCulture);
+    private static string Component(double value)
+    {
+        double rounded = Math.Round(value, 9, MidpointRounding.AwayFromZero);
+        return rounded == 0 ? "0" : rounded.ToString("0.#########", System.Globalization.CultureInfo.InvariantCulture);
+    }
 }

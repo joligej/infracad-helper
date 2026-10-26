@@ -55,4 +55,16 @@ public class MergedValuesTests
         settings.ShowMergedValues = false;
         Assert.Equal("Waterleiding", Assert.Single(LegendGrouping.Build(new[] { layer }, settings, _ => "Waterleiding", klicObjects: _ => data)).DisplayDescription);
     }
+    [Fact]
+    public void DiameterDisplayRemovesFloatingPointNoiseWithoutChangingTheSource()
+    {
+        var raw = new[] { "0.118", "0.11800000000000001", "0.222" };
+        var data = raw.Select((diameter, index) => new KlicObjectData("klic.dwg", index.ToString(), "", new[] {
+            new KlicRecord(KlicSource.InfraCAD, "Leiding", new Dictionary<string,string> { ["DiameterM"] = diameter }) },
+            Array.Empty<string>(), KlicSource.InfraCAD)).ToArray();
+        var entry = Assert.Single(LegendGrouping.Build(new[] { Layer("B-WE-KL-WATER-G") }, new(),
+            _ => "Waterleiding", klicObjects: _ => data));
+        Assert.Equal("Waterleiding (118, 222)", entry.DisplayDescription);
+        Assert.Equal(raw, data.SelectMany(o => o.Values("DiameterM")));
+    }
 }

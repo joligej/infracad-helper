@@ -39,24 +39,22 @@ public class DrawtypeMatrixTests
     [InlineData("G", "V")]
     [InlineData("G", "GV")]
     [InlineData("G", "S")]
-    public void Combinatie_BevatBeideSoorten_EnGeometrieBlijftLijn(string a, string b)
+    public void Combinatie_HoudtSoortenEnGeometrieGescheiden(string a, string b)
     {
-        var entry = Single(a, b);
-        Assert.Equal(NlcsDrawType.Geometrie, NlcsDrawTypeExtensions.FromSuffix(a));
-        Assert.True(entry.LayersByType.ContainsKey(NlcsDrawType.Geometrie),
-            "G moet als lijn aanwezig blijven naast de andere soort");
-        Assert.True(entry.LayersByType.ContainsKey(NlcsDrawTypeExtensions.FromSuffix(b)),
-            $"tweede soort ({b}) ontbreekt in LayersByType");
-        Assert.Equal(2, entry.LayersByType.Count);
+        var parsed = new[] { a, b }.Select(suffix => { Assert.True(NlcsLayerParser.TryParse($"{Base}-{suffix}", out var layer)); return layer!; });
+        var entries = LegendGrouping.Build(parsed, new LegendSettings());
+        Assert.Equal(2, entries.Count);
+        Assert.All(entries, entry => Assert.Single(entry.LayersByType));
+        Assert.Contains(entries, e => e.GeometryLayer == $"{Base}-G");
+        Assert.Contains(entries, e => e.LayersByType.ContainsKey(NlcsDrawTypeExtensions.FromSuffix(b)));
     }
 
     [Fact]
-    public void DrieSoorten_GAS_VallenSamenInEenRegel()
+    public void DrieSoorten_GAS_KrijgenAfzonderlijkeRegels()
     {
-        var entry = Single("G", "A", "S");
-        Assert.True(entry.LayersByType.ContainsKey(NlcsDrawType.Geometrie));
-        Assert.True(entry.LayersByType.ContainsKey(NlcsDrawType.Arcering));
-        Assert.True(entry.LayersByType.ContainsKey(NlcsDrawType.Symbool));
-        Assert.Equal(3, entry.LayersByType.Count);
+        var parsed = new[] { "G", "A", "S" }.Select(suffix => { Assert.True(NlcsLayerParser.TryParse($"{Base}-{suffix}", out var layer)); return layer!; });
+        var entries = LegendGrouping.Build(parsed, new LegendSettings());
+        Assert.Equal(3, entries.Count);
+        Assert.All(entries, entry => Assert.Single(entry.LayersByType));
     }
 }

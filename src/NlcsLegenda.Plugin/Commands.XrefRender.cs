@@ -1088,11 +1088,11 @@ public partial class Commands
                         .Distinct(System.StringComparer.OrdinalIgnoreCase).OrderBy(source => source, System.StringComparer.Ordinal));
                     ed.WriteMessage($"\nSYMBOL row: length={row.Metric.Length:0.###} sources={sources}");
                 }
-                var shared = rows.SingleOrDefault(entry => System.Math.Abs(entry.Metric.Length - 12.0) < 0.01);
-                var different = rows.SingleOrDefault(entry => System.Math.Abs(entry.Metric.Length - 3.0) < 0.01);
-                var rotated = rows.SingleOrDefault(entry => System.Math.Abs(entry.Metric.Length - 2.0) < 0.01);
-                var scaled = rows.SingleOrDefault(entry => System.Math.Abs(entry.Metric.Length - 4.0) < 0.01);
-                var mirrored = rows.SingleOrDefault(entry => System.Math.Abs(entry.Metric.Length - 1.0) < 0.01);
+                var shared = rows.SingleOrDefault(entry => entry.SourceLayers.Any(source => source.SourceIdentity == "SYMBOLA"));
+                var different = rows.SingleOrDefault(entry => entry.SourceLayers.Any(source => source.SourceIdentity == "SYMBOLC"));
+                var rotated = rows.SingleOrDefault(entry => entry.SourceLayers.Any(source => source.SourceIdentity == "SYMBOLD"));
+                var scaled = rows.SingleOrDefault(entry => entry.SourceLayers.Any(source => source.SourceIdentity == "SYMBOLE"));
+                var mirrored = rows.SingleOrDefault(entry => entry.SourceLayers.Any(source => source.SourceIdentity == "SYMBOLF"));
                 var distinctIdentities = rows.Select(entry => entry.RenderIdentity)
                     .Distinct(StringComparer.Ordinal).Count();
                 symbolGroupingOk = rows.Count == 5
@@ -1114,7 +1114,9 @@ public partial class Commands
                         .Distinct(System.StringComparer.OrdinalIgnoreCase).SequenceEqual(new[] { "SYMBOLE" })
                     && mirrored.SourceLayers.Select(source => source.SourceIdentity)
                         .Distinct(System.StringComparer.OrdinalIgnoreCase).SequenceEqual(new[] { "SYMBOLF" });
-                exportOk = ExportedLengths(rows).SequenceEqual(new[] { 1.0, 2.0, 3.0, 4.0, 12.0 });
+                exportOk = ExportedCounts(rows).SequenceEqual(new[] { 1, 1, 1, 1, 2 })
+                    && ExportedLengths(analysis.Entries).SequenceEqual(new[] { 0.0, 0.0, 0.0, 0.0, 0.0, 22.0 })
+                    && rows.All(entry => entry.GeometryLayer is null);
                 infoOk = InfoRowCountMatches(analysis, settings);
                 tr.Commit();
             }
@@ -1166,10 +1168,10 @@ public partial class Commands
                 tr.Commit();
             }
 
-            bool totalOk = symbolGroupingOk && exportOk && infoOk && built == 5
+            bool totalOk = symbolGroupingOk && exportOk && infoOk && built == 6
                 && error == "geen" && ownershipOk && primitivesOk && textOk && transformsOk;
-            ed.WriteMessage($"\nSYMBOL: gelijke geometrie over blocknamen 5+7=12 m; andere inhoud/rotatie/schaal/mirror splitst={symbolGroupingOk}");
-            ed.WriteMessage($"\nSYMBOL: export/info behouden vijf correcte rijen={exportOk}/{infoOk}");
+            ed.WriteMessage($"\nSYMBOL: gelijke symbolen over blocknamen 1+1=2 st; andere inhoud/rotatie/schaal/mirror splitst={symbolGroupingOk}");
+            ed.WriteMessage($"\nSYMBOL: export/info behouden vijf symboolregels en een losse lijnregel={exportOk}/{infoOk}");
             ed.WriteMessage($"\nSYMBOL: legenda gebouwd={built} geometrie={primitivesOk} bronlabels={textOk} rotatie/schaal/mirror={transformsOk} host-owned/MText-only={ownershipOk}; fout={error}");
             ed.WriteMessage($"\nSYMBOL totaal: {(totalOk ? "OK" : "FAIL")}");
         }, message => ed.WriteMessage(message), "NlcsLegendaXrefSymbolTest");

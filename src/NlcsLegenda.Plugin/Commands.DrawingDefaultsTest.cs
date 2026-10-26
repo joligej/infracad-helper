@@ -42,8 +42,7 @@ public partial class Commands
                             .Cast<ObjectId>().Select(child => (Entity)tr.GetObject(child, OpenMode.ForRead)))
                         : new[] { entity };
                 }).ToArray();
-                var wrong = entities.Where(e => !(e is MText { Text: "OPMERKINGEN" }
-                        ? e.Color.ColorIndex == 7 : e.Color.IsByLayer) || e.LineWeight != LineWeight.ByLayer || !e.Transparency.IsByLayer
+                var wrong = entities.Where(e => !e.Color.IsByLayer || e.LineWeight != LineWeight.ByLayer || !e.Transparency.IsByLayer
                     || e.LinetypeId != db.ByLayerLinetype || Math.Abs(e.LinetypeScale - 1) > 1e-9).ToArray();
                 if (wrong.Length > 0) throw new InvalidOperationException(string.Join("; ", wrong.Select(e => $"{e.GetType().Name}: kleur={e.Color}, lijndikte={e.LineWeight}, transparantie={e.Transparency}, lijntypeschaal={e.LinetypeScale}")));
             }
@@ -72,12 +71,17 @@ public partial class Commands
                 foreach (double height in new[] { 100.0, 120.0 })
                 {
                     var settings = new LegendSettings { Scale = scale, MaxLegendHeightMm = height, DrawBorder = true,
-                        ManualEntries = Enumerable.Range(0, 18).Select(i => new ManualEntry { Layer = "EIGEN", Description = $"Eigen regel {i}" }).ToList() };
+                        ManualEntries = Enumerable.Range(0, 18).Select(i => new ManualEntry { Layer = "EIGEN", Description = i % 4 == 0 ? string.Join(" ", Enumerable.Repeat("Waterleiding met materiaal en diameter", 9)) : $"Eigen regel {i}" }).ToList() };
                     var analysis = DrawingAnalyzer.Analyze(doc.Database, tr, settings);
                     var block = LegendBuilder.BuildBlock(doc.Database, tr, analysis, settings, out var rows, out _);
                     var extents = new Extents3d();
                     foreach (ObjectId id in (BlockTableRecord)tr.GetObject(block, OpenMode.ForRead))
                         extents.AddExtents(((Entity)tr.GetObject(id, OpenMode.ForRead)).GeometricExtents);
+                    var descriptions = ((BlockTableRecord)tr.GetObject(block, OpenMode.ForRead)).Cast<ObjectId>()
+                        .Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<MText>()
+                        .Where(text => text.Contents.StartsWith("Waterleiding", StringComparison.Ordinal)).ToArray();
+                    if (descriptions.Length != 5 || descriptions.Any(text => text.LineSpacingFactor != 1))
+                        throw new InvalidOperationException("Lange omschrijvingen missen leesruimte.");
                     double measured = (extents.MaxPoint.Y - extents.MinPoint.Y) / settings.ModelUnitsPerPaperMm;
                     if (rows != 18 || measured > height + 0.01)
                         throw new InvalidOperationException($"Hoogte {measured} mm, toegestaan {height} mm; {rows} regels.");

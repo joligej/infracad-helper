@@ -88,10 +88,21 @@ public partial class Commands
         var blocks = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         var patterns = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
-        foreach (ObjectId id in model)
+        var visited = new HashSet<ObjectId>();
+        IEnumerable<Entity> Sources(BlockTableRecord definition)
         {
-            if (excluded.Contains(id)) continue;
-            if (tr.GetObject(id, OpenMode.ForRead) is not Entity entity) continue;
+            if (!visited.Add(definition.ObjectId)) yield break;
+            foreach (ObjectId id in definition)
+            {
+                if (excluded.Contains(id) || tr.GetObject(id, OpenMode.ForRead) is not Entity entity) continue;
+                yield return entity;
+                if (entity is BlockReference reference)
+                    foreach (var child in Sources((BlockTableRecord)tr.GetObject(reference.BlockTableRecord, OpenMode.ForRead)))
+                        yield return child;
+            }
+        }
+        foreach (var entity in Sources(model))
+        {
             var names = entity is BlockReference ? blocks : patterns;
             string? name = entity switch
             {
@@ -109,21 +120,25 @@ public partial class Commands
         foreach (ObjectId id in (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead))
         {
             var layer = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
-            if (layer.IsDependent || layer.Name.StartsWith("NLCS_LEGENDA", StringComparison.OrdinalIgnoreCase)) continue;
+            if (LayerNaming.LocalName(layer.Name).StartsWith("NLCS_LEGENDA", StringComparison.OrdinalIgnoreCase)) continue;
             bool parsed = NlcsLayerParser.TryParse(layer.Name, out var nlcs);
             string description = parsed ? LayerDescription.Clean(layer.Description, nlcs!)
-                ?? catalog.Describe(nlcs!, false, out _) : string.IsNullOrWhiteSpace(layer.Description) ? StandardTexts.Humanize(layer.Name) : layer.Description;
+                ?? catalog.Describe(nlcs!, false, out _) : string.IsNullOrWhiteSpace(layer.Description) ? StandardTexts.Humanize(LayerNaming.LocalName(layer.Name)) : layer.Description;
             if (parsed)
             {
                 string own = settings.DescriptionOverrides.Describe(nlcs!, false, out bool matched);
                 if (matched) description = own;
             }
-            string? block = blocks.TryGetValue(layer.Name, out var bs) && bs.Count == 1 ? bs.Single() : null;
-            string? pattern = patterns.TryGetValue(layer.Name, out var ps) && ps.Count == 1 ? ps.Single() : null;
-            choices.Add(new ManualEntry { Layer = layer.Name, Description = description,
-                Type = parsed ? nlcs!.DrawType : block is not null ? NlcsDrawType.Symbool : pattern is not null ? NlcsDrawType.Arcering : NlcsDrawType.Geometrie,
-                Status = parsed ? nlcs!.Status : NlcsStatus.Nieuw, Hoofdgroep = parsed ? nlcs!.Hoofdgroep : "HM",
-                SymbolBlock = block, HatchPattern = pattern });
+            blocks.TryGetValue(layer.Name, out var bs);
+            patterns.TryGetValue(layer.Name, out var ps);
+            var type = parsed ? nlcs!.DrawType : bs is { Count: > 0 } ? NlcsDrawType.Symbool
+                : ps is { Count: > 0 } ? NlcsDrawType.Arcering : NlcsDrawType.Geometrie;
+            var examples = type == NlcsDrawType.Symbool ? bs : type is NlcsDrawType.Arcering or NlcsDrawType.Vlakvulling ? ps : null;
+            foreach (var example in examples?.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Cast<string?>() ?? new string?[] { null })
+                choices.Add(new ManualEntry { Layer = layer.Name, Description = description, Type = type,
+                    Status = parsed ? nlcs!.Status : NlcsStatus.Nieuw, Hoofdgroep = parsed ? nlcs!.Hoofdgroep : "HM",
+                    SymbolBlock = type == NlcsDrawType.Symbool ? example : null,
+                    HatchPattern = type is NlcsDrawType.Arcering or NlcsDrawType.Vlakvulling ? example : null });
         }
         tr.Commit();
         return choices.OrderBy(c => c.Layer, StringComparer.OrdinalIgnoreCase).ToArray();

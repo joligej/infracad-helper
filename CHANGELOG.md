@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.36.0 - 2026-10-26
+
+- Eigen regels en herkenningsregels kunnen xref-lagen rechtstreeks uit een doorzoekbare lijst kiezen. Bron, laag en blok of patroon staan apart; voorbeelden uit vergrendelde bronlagen worden op lokale legendalagen getekend.
+- Lijngeometrie, arceringen, vlakvullingen en symbolen krijgen afzonderlijke regels. Eerdere uitsluitingen en handmatige volgorde worden bij een eenduidige splitsing overgenomen.
+- Lange samengestelde omschrijvingen krijgen bij de standaardopmaak meer regelafstand. Diameterlijsten tonen geen dubbele waarden door numerieke afrondingsruis; brongegevens blijven gelijk.
+- KLIC-herkenning onderscheidt leidingsoort, diameter en uitvoering beter, waaronder mantelbuizen en hulpstukken. Samenvoegen behoudt verschillen in weergave.
+- Symbolen kunnen passend worden gemaakt in het voorbeeldvak. Grootte, draairichting en attribuutteksten kunnen ieder afzonderlijk worden genegeerd bij het samenvoegen. Spiegeling, vervorming en kleur blijven behouden.
+- Viewports vragen standaard het linksbovenpunt; het middelpunt is apart instelbaar. Getekende en automatisch geplaatste viewports gebruiken standaard de niet-plottende laag `VIEWPORT-NOPLOT`. Laag en plotinstelling zijn aanpasbaar. Bijwerken herstelt de gekoppelde schaal zonder andere viewports te wijzigen.
+- Instellingen passen labels en invoervelden aan de beschikbare breedte aan. Lange teksten lopen door en alle onderdelen blijven bereikbaar via de schuifbalk. Kolomhoogte houdt rekening met meerregelige omschrijvingen en notities; een ingesteld maximaal aantal regels blijft ook gelden.
+- De gerichte foutregistratie neemt ook null-reference-meldingen van Autodesk's lagenvenster mee. De afzonderlijke GDI+-melding is ook zonder geladen plugin gereproduceerd; de AEC-null-reference is nog niet gereproduceerd en wordt niet als opgelost aangemerkt.
+
 ## 1.35.4 - 2026-10-23
 
 - KLIC-details bepaalt de voorkeursbron eenmaal per veld en bronobject. Overzicht hergebruikt de berekende bronmeldingen bij het tonen van kolommen en regels. Dit versnelt het vullen van beide vensters; inhoud en broncontrole blijven gelijk.

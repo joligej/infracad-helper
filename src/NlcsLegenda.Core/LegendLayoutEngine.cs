@@ -110,7 +110,7 @@ public static class LegendLayoutEngine
         {
             columnsNeeded = int.MaxValue;
             columnBudget = double.MaxValue;
-            maxRowsCap = int.MaxValue;
+            maxRowsCap = maxRows;
         }
         else if (s.Columns > 0)
         {

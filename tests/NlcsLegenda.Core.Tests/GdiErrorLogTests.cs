@@ -52,6 +52,22 @@ public class GdiErrorLogTests
     }
 
     [Fact]
+    public void CapturesAutodeskLayerManagerNullReferenceWithoutCatchingIt()
+    {
+        string folder = Path.Join(Path.GetTempPath(), "nlcs-host-" + Guid.NewGuid().ToString("N"));
+        string path = Path.Join(folder, "gdi.log");
+        try
+        {
+            using var log = new GdiErrorLog(path);
+            Assert.Throws<NullReferenceException>((Action)(() => throw new NullReferenceException("andere fout")));
+            Assert.False(File.Exists(path));
+            Assert.Throws<NullReferenceException>(Autodesk.AutoCAD.LayerManager.LogFixture.Fail);
+            Assert.Contains("Autodesk.AutoCAD.LayerManager.LogFixture.Fail", File.ReadAllText(path));
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
+    [Fact]
     public void BoundsRepeatedReportsAndFileSize()
     {
         string folder = Path.Join(Path.GetTempPath(), "nlcs-gdi-" + Guid.NewGuid().ToString("N"));

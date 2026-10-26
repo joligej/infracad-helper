@@ -13,6 +13,15 @@ public static class LayerNaming
         return bar < 0 ? databaseLayerName : databaseLayerName[(bar + 1)..];
     }
 
+    public static bool IsValidReference(string? name) =>
+        !string.IsNullOrWhiteSpace(name) && name.Split('|').All(IsValid);
+
+    public static string SourceName(string? name)
+    {
+        int separator = name?.LastIndexOf('|') ?? -1;
+        return separator < 0 ? string.Empty : name![..separator];
+    }
+
     public static bool IsValid(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))

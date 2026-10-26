@@ -3,8 +3,13 @@ namespace NlcsLegenda.Core;
 public readonly record struct ViewportPlan(
     double PaperWidthMm, double PaperHeightMm, double ViewHeightModel, double ViewWidthModel);
 
+public enum ViewportAnchor { Linksboven, Middelpunt }
+
 public static class ViewportMath
 {
+    public static (double X, double Y) CenterOffset(double width, double height, ViewportAnchor anchor) =>
+        anchor == ViewportAnchor.Middelpunt ? (0, 0) : (width / 2, -height / 2);
+
     public static double PaperMmPerModel(double scale)
     {
         if (!double.IsFinite(scale) || scale <= 0)

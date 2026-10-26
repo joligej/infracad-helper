@@ -17,6 +17,7 @@ internal static class Program
             Console.WriteLine($"Pictogrammen: {_checks} controles; {Errors.Count} fouten");
             return Errors.Count == 0 ? 0 : 1;
         }
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         Application.EnableVisualStyles();
         if (args is ["--benchmark", var baseline, var input, var output])
         {
@@ -368,7 +369,19 @@ internal static class Program
                 Application.DoEvents();
                 Check(control.Width >= 30 && control.Height >= control.Font.Height, $"{scale} / {page.Text} / {control.Text}: bedienbare afmetingen");
             }
+            Descendants(form).OfType<ListBox>().First().Focus();
             page.AutoScrollPosition = Point.Empty;
+            Application.DoEvents();
+            foreach (var row in Descendants(page).OfType<SettingsRow>())
+            {
+                foreach (Control input in row.Controls)
+                {
+                    Check(input.Right <= row.ClientSize.Width + 1, $"{scale} / {page.Text} / {input.Text}: past binnen de invoerrij");
+                    if (input is Label)
+                        Check(input.Height >= input.GetPreferredSize(new Size(input.Width, 0)).Height,
+                            $"{scale} / {page.Text} / {input.Text}: volledig leesbaar label");
+                }
+            }
             CheckButtons(form);
             if (output is not null)
             {
@@ -462,24 +475,24 @@ internal static class Program
         Check(!grid.Columns[^1].Visible, "Overzicht verbergt broncontrole bij gelijke bronnen");
         map["Materiaal"] = "Staal";
         refresh.PerformClick();
-        Check(grid.Columns[^1].Visible && ((string)grid.Rows[0].Cells[^1].Value).Contains("Bronverschil: Materiaal"),
+        Check(grid.Columns[^1].Visible && ((string?)grid.Rows[0].Cells[^1].Value)?.Contains("Bronverschil: Materiaal") == true,
             "Vernieuwen leest gewijzigde bronwaarden en toont de broncontrolekolom");
 
         void Details(KlicSource source, string expected)
         {
             using var details = new KlicDetailsDialog(new LegendEntry { Status = NlcsStatus.Bestaand, Discipline = "WE", Hoofdgroep = "KL", Element = "WATER", Description = "Water", KlicObjects = entry.KlicObjects.Select(o => o with { PreferredSource = source }).ToArray() });
             var data = Descendants(details).OfType<TabControl>().Single().TabPages[0].Controls.OfType<DataGridView>().Single();
-            var used = data.Rows.Cast<DataGridViewRow>().Where(row => (string)row.Cells[0].Value == "Materiaal" && (string)row.Cells[4].Value == "Ja").ToArray();
-            Check(used.Select(row => (string)row.Cells[1].Value).Order().SequenceEqual(new[] { expected, "PVC" }.Order()),
+            var used = data.Rows.Cast<DataGridViewRow>().Where(row => (string?)row.Cells[0].Value == "Materiaal" && (string?)row.Cells[4].Value == "Ja").ToArray();
+            Check(used.Select(row => (string?)row.Cells[1].Value).Order().SequenceEqual(new[] { expected, "PVC" }.Order()),
                 "Details kiest per tabel de actuele voorkeursbron met terugval");
-            Check(data.Rows.Cast<DataGridViewRow>().All(row => (int)row.Cells[5].Value == 2),
+            Check(data.Rows.Cast<DataGridViewRow>().All(row => row.Cells[5].Value is 2),
                 "Details telt unieke bronobjecten, ook bij dubbele records");
         }
         Details(KlicSource.ObjectData, "Staal");
         Details(KlicSource.InfraCAD, "PE");
         map["Materiaal"] = "PE";
         refresh.PerformClick();
-        Check(!grid.Columns[^1].Visible && (string)grid.Rows[0].Cells[^1].Value == "",
+        Check(!grid.Columns[^1].Visible && (string?)grid.Rows[0].Cells[^1].Value == "",
             "Opgeloste bronverschillen verdwijnen na Vernieuwen");
         overview.Close();
     }
@@ -600,7 +613,7 @@ internal static class Program
         OpenOffscreen(details);
         var detailTabs = Descendants(details).OfType<TabControl>().Single();
         var values = detailTabs.TabPages[0].Controls.OfType<DataGridView>().Single();
-        Check(values.Rows.Count == 2 && values.Rows.Cast<DataGridViewRow>().Count(r => (string)r.Cells[4].Value == "Ja") == 1,
+        Check(values.Rows.Count == 2 && values.Rows.Cast<DataGridViewRow>().Count(r => (string?)r.Cells[4].Value == "Ja") == 1,
             "beide bronwaarden en gekozen bron zichtbaar");
         details.Close(); overview.Close();
     }
@@ -663,12 +676,12 @@ internal static class Program
             "Volgorde wijzigen behoudt de ingestelde kolombreedte");
         grid.CurrentCell = grid.Rows[2].Cells[1];
         controls.OfType<Button>().Single(c => c.Text == "Naar begin").PerformClick();
-        Check((string)grid.Rows[0].Cells[1].Value == "C", "regel naar begin verplaatsen");
+        Check((string?)grid.Rows[0].Cells[1].Value == "C", "regel naar begin verplaatsen");
         var legends = controls.OfType<ComboBox>().Single(c => c.Items.OfType<OverviewLegend>().Any());
         legends.SelectedIndex = 1;
-        Check((string)grid.Rows[0].Cells[1].Value == "A" && !b.Changed, "andere legenda blijft gelijk");
+        Check((string?)grid.Rows[0].Cells[1].Value == "A" && !b.Changed, "andere legenda blijft gelijk");
         legends.SelectedIndex = 0;
-        Check((string)grid.Rows[0].Cells[1].Value == "C", "volgorde blijft bij wisselen");
+        Check((string?)grid.Rows[0].Cells[1].Value == "C", "volgorde blijft bij wisselen");
         controls.OfType<Button>().Single(c => c.Text == "Toepassen").PerformClick();
         Check(saves == 1 && !a.Changed, "Toepassen slaat eenmaal op");
         CheckButtons(form);
@@ -697,7 +710,9 @@ internal static class Program
     private static void OpenOffscreen(Form form)
     {
         form.StartPosition = FormStartPosition.Manual;
-        form.Location = new Point(-20000, -20000);
+        form.Location = Screen.PrimaryScreen!.WorkingArea.Location;
+        form.Opacity = 0;
+        form.ShowInTaskbar = false;
         form.Show();
         Application.DoEvents();
     }

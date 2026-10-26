@@ -42,7 +42,7 @@ public partial class Commands
                 var values = data.SelectMany(o => o.Records.Where(r => r.Source == KlicSource.ObjectData)
                     .Select(r => JsonSerializer.Serialize(new { o.Identity, r.Table, Values = r.Values.OrderBy(v => v.Key) }))).Order().ToArray();
                 if (values.Length == 0 || data.Any(o => o.ReadIssues.Count > 0))
-                    throw new InvalidOperationException("Geen foutloos leesbare Object Data gevonden.");
+                    throw new InvalidOperationException($"Object Data: {values.Length} records; " + string.Join("; ", data.SelectMany(o => o.ReadIssues).Distinct()));
                 if (AcApp.DocumentManager.Count != documents || AcApp.DocumentManager.MdiActiveDocument != doc)
                     throw new InvalidOperationException("Documentcontext na de analyse niet behouden.");
                 if (!names.SequenceEqual(Names()))

@@ -111,6 +111,18 @@ public sealed class LegendSettings
     [Category("Weergave"), DisplayName("Symboolblokken invoegen")]
     public bool InsertSymbolBlocks { get; set; } = true;
 
+    [Category("Weergave"), DisplayName("Symbolen passend maken")]
+    public bool NormalizeSymbols { get; set; }
+
+    [Category("Groepering"), DisplayName("Symboolgroottes samenvoegen")]
+    public bool MergeSymbolSizes { get; set; }
+
+    [Category("Groepering"), DisplayName("Symboolrotaties samenvoegen")]
+    public bool MergeSymbolRotations { get; set; }
+
+    [Category("Groepering"), DisplayName("Attribuutteksten samenvoegen")]
+    public bool MergeSymbolAttributes { get; set; }
+
     [Category("Weergave"), DisplayName("Arceerschaal-factor")]
     public double HatchScaleFactor { get; set; } = 1.0;
 
@@ -219,6 +231,15 @@ public sealed class LegendSettings
 
     [Category("Viewport"), DisplayName("Viewport zelf tekenen")]
     public bool ViewportManual { get; set; } = false;
+
+    [Category("Viewport"), DisplayName("Plaatsingspunt")]
+    public ViewportAnchor ViewportAnchor { get; set; } = ViewportAnchor.Linksboven;
+
+    [Category("Viewport"), DisplayName("Viewportlaag")]
+    public string ViewportLayer { get; set; } = "VIEWPORT-NOPLOT";
+
+    [Category("Viewport"), DisplayName("Viewportkader plotten")]
+    public bool PlotViewportFrame { get; set; } = false;
 
     [Category("Viewport"), DisplayName("Marge (mm)")]
     public double ViewportMarginMm { get; set; } = 5.0;
@@ -490,6 +511,16 @@ public sealed class LegendSettings
                 ExcludedEntries.Add(SelectionKey(entry));
                 if (!current.Contains(old)) migrated.Add(old);
             }
+        }
+        foreach (var siblings in list.Where(e => !e.IsManual && e.SelectionIdentity.Length > 0).GroupBy(EntryKey))
+        {
+            var ordered = siblings.OrderBy(e => e.LayersByType.Keys.Min()).ToArray();
+            if (ordered.Length < 2 || ordered.Any(e => e.LayersByType.Count != 1)
+                || ordered.Select(e => e.LayersByType.Keys.Single()).Distinct().Count() != ordered.Length) continue;
+            string identity = string.Join(";", ordered.Select(e => e.SelectionIdentity));
+            string combined = SelectionKey(ordered[0], identity);
+            if (ExcludedEntries.Contains(combined))
+                foreach (var entry in ordered) ExcludedEntries.Add(SelectionKey(entry));
         }
         ExcludedEntries.ExceptWith(migrated);
         KnownEntryKeys.ExceptWith(migrated);

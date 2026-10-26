@@ -20,7 +20,8 @@ venster bepaalt alleen de lijst en de lijstexport; het verandert de legenda niet
 ## De opmaak lijkt anders dan de voorbeelden
 
 Controleer de eenheid (meters), legendaschaal en eventuele schaalvariant van het
-bronsymbool. Een groot bronsymbool wordt niet automatisch verkleind tot het vakje.
+bronsymbool. Een groot bronsymbool wordt niet automatisch verkleind tot het vakje. Schakel daarvoor
+**Opmaak → Symbolen → Passend maken in het voorbeeldvak** in.
 **Lokale instellingen → Legenda → Templateopmaak herstellen** herstelt de vaste
 maatvoering; eigen teksten, bronkeuzes en schaal blijven bewaard.
 
@@ -68,6 +69,20 @@ Een `cer.log` met alleen informatieregels over de start van Autodesk CER bevat
 geen crashoorzaak. Bewaar bij een herhaling het tijdstip, de volledige melding en
 het bijbehorende rapport. Meld ook of er een foutvenster was of alleen een map
 werd aangemaakt. De eerdere afsluitmelding is niet reproduceerbaar vastgesteld.
+
+## Fout in het lagenvenster
+
+Een GDI+-melding in `LayerManager.MultiTreeView.OnDrawNode` is in Civil 3D 2027
+ook gereproduceerd zonder dat NLCS Legenda was geladen. Deze melding kan dus
+onafhankelijk van de plugin ontstaan. Dat bewijst niet de oorzaak van iedere
+GDI+-melding of afsluitfout.
+
+De melding `NullReferenceException` in `AecLayerManagerEx.standardFilter_Update`
+is nog niet gereproduceerd. De plugin registreert deze specifieke hostmelding en
+GDI+-meldingen in `%LOCALAPPDATA%\NlcsLegenda\gdi.log`, met een begrensde
+bestandsgrootte en maximaal acht meldingen per sessie. De oorspronkelijke fout
+wordt niet onderdrukt. Vermeld bij een herhaling het tijdstip en welke handeling
+in het lagenvenster eraan voorafging.
 
 ## Een probleem melden
 

@@ -31,9 +31,9 @@ Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitle
 | --- | --- |
 | Inhoud | Regels en kleurvarianten kiezen, door lagen zoeken, objecten aanklikken om uit te sluiten |
 | Volgorde en teksten | Handmatig ordenen, samenvoegen met een hoofdobject, eigen omschrijvingen en statussen |
-| Opmaak | Schaal, maten, kolommen, notities, hoeveelheden en schaalbalk |
+| Opmaak | Schaal, maten, kolommen, notities, hoeveelheden, schaalbalk en passende symbolen |
 | Voorbeelden | Bronweergave of een volledig voorbeeld uit een DWG-bibliotheek |
-| Xrefs | Per koppeling kiezen of die meetelt, ook bij geneste bronnen |
+| Xrefs | Bronnen en lagen doorzoeken en kiezen, ook bij geneste of alleen-lezen bronnen |
 | KLIC | Netbeheerders en objectgegevens lezen; onder meer diameters apart houden of samenvoegen |
 | Uitvoer | Een gekoppelde viewport die de legenda-schaal volgt, CSV/JSON of een uittrekstaat van een map |
 
@@ -51,7 +51,8 @@ een opzet bewaren en delen.
 ## Voor gebruik in een project
 
 - **Modelruimte in meters.** Papiermaten worden omgerekend met de gekozen schaal.
-  Symbolen behouden hun modelmaat; expliciete schaalvarianten worden omgerekend.
+  Symbolen behouden standaard hun modelmaat; passend maken en het samenvoegen van
+  grootte-, rotatie- en attribuutvarianten zijn apart instelbaar.
 - **Bibliotheek en lettertype.** Bedrijfseigen voorbeelden en `NLCS-ISO.ttf` zitten
   niet in de installer. Neem je eigen bibliotheek mee naar een andere computer.
 - **Hoeveelheden.** Een niet meetbaar bronoppervlak verschijnt als `? m²`, met een
