@@ -6,6 +6,7 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 
 | Commando | Doel |
 | --- | --- |
+| `NLCSLEGENDAMERGEREGRESSION` / `NLCSLEGENDAMERGEVERIFY` | Controleert lijnschalen, arceerschalen/-hoeken en gebruikersarceringen; behoud van kleur, patroon, lijndikte, hoeveelheden en uitsluitingen; waardeteksten en instellingen na heropenen. |
 | `NLCSLEGENDAVIEWPORTREGRESSION` | Controleert linksboven/middelpunt, viewportlaag en plotkeuze, handmatig kader en gekoppelde schaal op 1:200/500/1000. |
 | `NLCSLEGENDAXREFCHOICEREGRESSION` | Controleert een eigen symbool uit een alleen-lezen xref met vergrendelde bronlaag, uniforme grootte, rotatie, spiegeling, normalisatie en ongewijzigde bron. |
 | `NLCSLEGENDAPRESETTARGETTEST` | Controleert profielkeuze voor globale standaard zonder/met legenda en lokaal laden, inclusief behoud van de andere instellingen. Scriptinvoer: Standaard, Legenda, Standaard. |

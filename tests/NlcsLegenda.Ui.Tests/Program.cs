@@ -405,6 +405,29 @@ internal static class Program
         diameters[0].Checked = true;
         diameters[1].Checked = false;
         Check(settings.MergedDimensions.Contains(GroupDimension.Diameter) && !settings.NonKlicMergedDimensions.Contains(GroupDimension.Diameter), "Diameterkeuzes omkeerbaar");
+        var typeChoice = Descendants(tabs.SelectedTab!).OfType<ComboBox>().Single(c => c.AccessibleName == "Samenvoegen: voorbeeldtype");
+        string initial = settings.ToJson();
+        typeChoice.SelectedIndex = 1;
+        Check(settings.ToJson() == initial, "Een voorbeeldtype bekijken wijzigt niets");
+        diameters[0].Checked = false;
+        Check(!settings.MergeDimensionsFor(true, NlcsDrawType.Geometrie).Contains(GroupDimension.Diameter)
+            && settings.MergeDimensionsFor(true, NlcsDrawType.Symbool).Contains(GroupDimension.Diameter), "Lijnkeuze laat symbolen gelijk");
+        typeChoice.SelectedIndex = 5;
+        Check(diameters[0].Checked, "Symboolkeuze toont de eigen standaard");
+        diameters[1].Checked = true;
+        Check(settings.MergeDimensionsFor(false, NlcsDrawType.Symbool).Contains(GroupDimension.Diameter)
+            && !settings.MergeDimensionsFor(false, NlcsDrawType.Geometrie).Contains(GroupDimension.Diameter), "Overige symbolen wijzigen geen lijnen");
+        typeChoice.SelectedIndex = 1;
+        Check(!diameters[0].Checked && !diameters[1].Checked, "Terugschakelen bewaart beide lijnkeuzes");
+        Descendants(tabs.SelectedTab!).OfType<Button>().Single(b => b.Text == "KLIC: standaardkeuzes").PerformClick();
+        Check(diameters[0].Checked, "Standaard herstelt alleen gekozen categorie en type");
+        typeChoice.SelectedIndex = 5;
+        Check(diameters[1].Checked, "Herstellen KLIC-lijnen laat overige symbolen gelijk");
+        typeChoice.SelectedIndex = 0;
+        Check(!Descendants(tabs.SelectedTab!).OfType<Button>().Single(b => b.Text == "KLIC: standaardkeuzes").Enabled, "Geen herstelknop zonder afwijkend type");
+        foreach(var text in new[] { "Verschillende lijnschalen samenvoegen", "Verschillende arceerschalen samenvoegen", "Verschillende arceerhoeken samenvoegen" })
+            Descendants(tabs.SelectedTab!).OfType<CheckBox>().Single(c => c.Text == text).Checked = true;
+        Check(settings.MergeLineScales && settings.MergeHatchScales && settings.MergeHatchAngles, "Weergavekeuzes hebben eigen instellingen");
         form.Close();
     }
 

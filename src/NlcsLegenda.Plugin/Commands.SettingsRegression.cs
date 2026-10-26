@@ -60,7 +60,10 @@ public partial class Commands
             string globalBefore = File.ReadAllText(ConfigPath) + File.ReadAllText(DescriptionsPath);
             string aBefore = State(aId), bBefore = State(bId);
             var changed = initial.Clone(); changed.Scale = 500; changed.ManualEntries[0].Description = "Direct bijgewerkt";
+            changed.SetMergeDimension(false, NlcsDrawType.Arcering, GroupDimension.Materiaal, true);
+            changed.MergeHatchAngles = true;
             changed.Klic.GroupFields = new() { "Materiaal", "DiameterM" };
+            var expected = changed.Clone(); expected.Normalize();
             if (ApplySettingsAndRebuild(doc.Editor, db, aId, changed) is { } error) throw new InvalidOperationException(error);
             if (State(aId) == aBefore || State(bId) != bBefore)
                 throw new InvalidOperationException("Lokale wijziging ontbreekt of beïnvloedt B.");
@@ -73,7 +76,10 @@ public partial class Commands
                 var entities = ((Group)tr.GetObject(groups.GetAt(def.GroupName), OpenMode.ForRead)).GetAllEntityIds()
                     .SelectMany(i => RegressionEntities(tr, i)).ToArray();
                 if (!entities.OfType<MText>().Any(t => t.Text.Contains("Direct bijgewerkt") && Math.Abs(t.TextHeight - 1.25) < 1e-7)
-                    || !def.Settings.Klic.GroupFields.SequenceEqual(changed.Klic.GroupFields))
+                    || !def.Settings.Klic.GroupFields.SequenceEqual(expected.Klic.GroupFields)
+                    || !def.Settings.MergedDimensions.SetEquals(expected.MergedDimensions)
+                    || !def.Settings.MergeHatchAngles
+                    || !def.Settings.MergeDimensionsFor(false, NlcsDrawType.Arcering).Contains(GroupDimension.Materiaal))
                     throw new InvalidOperationException("Nieuwe tekst, schaal of KLIC-keuze niet direct toegepast.");
             }
             string savedA = State(aId);

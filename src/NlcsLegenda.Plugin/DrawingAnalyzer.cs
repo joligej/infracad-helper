@@ -142,12 +142,33 @@ public static class DrawingAnalyzer
 
         var renderIds = c.Styles.ToDictionary(kv => kv.Key, kv => StyleSignature(kv.Value), StringComparer.OrdinalIgnoreCase);
 
-        string RenderId(string name)
+        string RenderId(string name, bool grouping = true)
         {
             if (c.SymbolSamples.ContainsKey(name)) return string.Empty;
             renderIds.TryGetValue(name, out var baseId);
-            var hatch = c.Hatches.TryGetValue(name, out var h) ? HatchSignature(h) : string.Empty;
+            if (grouping && settings.MergeLineScales && c.Parsed[name].DrawType is NlcsDrawType.Geometrie or NlcsDrawType.Vlak)
+                baseId = StyleSignature(c.Styles[name], ignoreScale: true);
+            var hatch = c.Hatches.TryGetValue(name, out var h) ? HatchSignature(h, grouping: grouping ? settings : null) : string.Empty;
             return (baseId ?? string.Empty) + "|" + hatch;
+        }
+
+        IReadOnlyList<AppearanceValue> AppearanceValues(string name)
+        {
+            var values = new List<AppearanceValue>();
+            if (settings.MergeLineScales && c.Parsed[name].DrawType is NlcsDrawType.Geometrie or NlcsDrawType.Vlak
+                && c.Styles.TryGetValue(name, out var style) && style.LinetypeIdentity != "Continuous")
+                values.Add(new("lijnschaal", style.LinetypeScale));
+            if (c.Hatches.TryGetValue(name, out var hatch) && !hatch.IsSolid)
+            {
+                if (settings.MergeHatchScales)
+                {
+                    bool user = hatch.PatternType == HatchPatternType.UserDefined;
+                    values.Add(new(user ? "lijnafstand" : "arceerschaal",
+                        (user ? hatch.PatternSpace : hatch.PatternScale) * hatch.ScaleForLegend(hatch.TargetScale)));
+                }
+                if (settings.MergeHatchAngles) values.Add(new("hoek", hatch.PatternAngle * 180 / Math.PI, "°"));
+            }
+            return values;
         }
 
         double analysisMilliseconds = timer?.Elapsed.TotalMilliseconds ?? 0;
@@ -160,14 +181,17 @@ public static class DrawingAnalyzer
             c.Metrics,
             name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.BlockName : null,
             catalog,
-            RenderId,
+            name => RenderId(name),
             name => c.CustomDesc.ContainsKey(name) ? DescriptionSource.EigenKoppeling : (DescriptionSource?)null,
             name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.GroupIdentity(settings) : null,
             name => c.KlicObjects.TryGetValue(name, out var objects) ? objects : Array.Empty<KlicObjectData>(),
             name => c.Styles.TryGetValue(name, out var style) ? $"{style.Color} / {LayerNaming.LocalName(style.Linetype)}" : null,
             name => c.SymbolSamples.ContainsKey(name) ? "" : renderIds.GetValueOrDefault(name)
                 + "|" + HatchSignature(c.Hatches.GetValueOrDefault(name), sourceScale: true),
-            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.SelectionIdentity : null);
+            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.SelectionIdentity : null,
+            settings.MergeIdenticalStatuses
+                ? name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.RenderIdentity : RenderId(name, grouping: false) : null,
+            settings.MergeLineScales || settings.MergeHatchScales || settings.MergeHatchAngles ? AppearanceValues : null);
 
         if (timer is not null)
         {
@@ -504,8 +528,8 @@ public static class DrawingAnalyzer
             ? "foreground" : color.ColorMethod == Autodesk.AutoCAD.Colors.ColorMethod.None
                 ? "none" : color.ColorValue.ToArgb().ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-    private static string StyleSignature(LayerDisplayStyle style) => string.Join("|",
-        ColorSignature(style.Color), style.LinetypeIdentity, NumberSignature(style.LinetypeIdentity == "Continuous" ? 1 : style.LinetypeScale),
+    private static string StyleSignature(LayerDisplayStyle style, bool ignoreScale = false) => string.Join("|",
+        ColorSignature(style.Color), style.LinetypeIdentity, NumberSignature(ignoreScale || style.LinetypeIdentity == "Continuous" ? 1 : style.LinetypeScale),
         style.LineWeight, style.Transparency.Signature, NumberSignature(style.PolylineWidth));
 
     private static string ReadAttribute(BlockReference br, Transaction tr, string tag)
@@ -701,18 +725,21 @@ public static class DrawingAnalyzer
         }
     }
 
-    private static string HatchSignature(HatchSample? hatch, bool sourceScale = false)
+    private static string HatchSignature(HatchSample? hatch, bool sourceScale = false, LegendSettings? grouping = null)
     {
         if (hatch is null)
             return string.Empty;
+        bool scale = grouping?.MergeHatchScales == true && !hatch.IsSolid;
+        bool angle = grouping?.MergeHatchAngles == true && !hatch.IsSolid;
         double factor = sourceScale ? 1 : hatch.ScaleForLegend(hatch.TargetScale);
+        if (scale) factor = 1 / (hatch.PatternType == HatchPatternType.UserDefined ? hatch.PatternSpace : hatch.PatternScale);
         return string.Join(":", "H",
             hatch.PatternType,
             hatch.PatternName.Trim().ToUpperInvariant(),
-            NumberSignature(hatch.PatternScale * factor),
-            NumberSignature(hatch.PatternAngle),
-            NumberSignature(hatch.PatternSpace * factor), hatch.PatternDouble,
-            hatch.IsSolid, hatch.DefinitionSignature(factor),
+            NumberSignature(scale ? 1 : hatch.PatternScale * factor),
+            NumberSignature(angle ? 0 : hatch.PatternAngle),
+            NumberSignature(scale ? 1 : hatch.PatternSpace * factor), hatch.PatternDouble,
+            hatch.IsSolid, hatch.DefinitionSignature(factor, angle ? -hatch.PatternAngle : 0),
             hatch.Color is null ? string.Empty : ColorSignature(hatch.Color),
             hatch.BackgroundColor is null ? string.Empty : ColorSignature(hatch.BackgroundColor),
             hatch.Transparency.Signature);

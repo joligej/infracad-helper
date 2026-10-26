@@ -27,6 +27,7 @@ public sealed class LegendEntry
     public IReadOnlyList<string> SourceEntryKeys { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> ExclusionKeys => SourceEntryKeys.Count > 0 ? SourceEntryKeys : new[] { LegendSettings.SelectionKey(this) };
     public IReadOnlyList<string> MergedValues { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<AppearanceValue> AppearanceValues { get; init; } = Array.Empty<AppearanceValue>();
     public bool ShowMergedValues { get; init; } = true;
     public string KlicGroupKey { get; init; } = string.Empty;
     public IReadOnlyList<string> KlicDescriptionFields { get; init; } = Array.Empty<string>();
@@ -90,6 +91,7 @@ public sealed class LegendEntry
     public string? SymbolBlockName { get; init; }
 
     public string RenderIdentity { get; init; } = string.Empty;
+    public string FullRenderIdentity { get; init; } = string.Empty;
 
     public string SelectionIdentity { get; init; } = string.Empty;
     public string LegacySelectionIdentity { get; init; } = string.Empty;

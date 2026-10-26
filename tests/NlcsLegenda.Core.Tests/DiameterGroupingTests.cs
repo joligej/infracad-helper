@@ -15,7 +15,7 @@ public class DiameterGroupingTests
     [InlineData("VRIJVERVAL_0.2M", "", "VRIJVERVAL", "200", "")]
     [InlineData("VRIJVERVAL_20CM", "", "VRIJVERVAL", "200", "")]
     [InlineData("VRIJVERVAL_200_HULPSTUK", "", "VRIJVERVAL", "200", "")]
-    [InlineData("VRIJVERVAL_200_BETON", "", "VRIJVERVAL_BETON", "200", "")]
+    [InlineData("VRIJVERVAL_200_BETON", "", "VRIJVERVAL", "200", "")]
     [InlineData("DATA2", "", "DATA", "", "2")]
     [InlineData("WEG_200", "", "WEG_200", "", "")]
     [InlineData("VRIJVERVAL_0", "", "VRIJVERVAL_0", "", "")]
@@ -89,7 +89,9 @@ public class DiameterGroupingTests
             Layer("VRIJVERVAL_400", appearance: "rood:continuous"), Layer("DRUKRIOOL_200"),
             Layer("VRIJVERVAL_200_BETON"), Layer("VRIJVERVAL_200_PVC"),
             Layer("VRIJVERVAL_200", metadataGroup: "diameter=200"), Layer("VRIJVERVAL_300", metadataGroup: "diameter=300") };
-        Assert.Equal(7, LegendGrouping.Build(layers, new LegendSettings { IncludeXrefLayers = true }, klicObjects: Metadata).Count);
+        var settings = new LegendSettings { IncludeXrefLayers = true };
+        settings.MergedDimensions.Remove(GroupDimension.Materiaal);
+        Assert.Equal(7, LegendGrouping.Build(layers, settings, klicObjects: Metadata).Count);
     }
 
     [Fact]

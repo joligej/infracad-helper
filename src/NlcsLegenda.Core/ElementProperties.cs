@@ -10,7 +10,8 @@ public enum GroupDimension
     Uitvoering,
     Nummer,
     Netbeheerder,
-    Diameter
+    Diameter,
+    Materiaal
 }
 
 public sealed class ElementProperties
@@ -30,6 +31,7 @@ public sealed class ElementProperties
     public string Uitvoering { get; private init; } = string.Empty;
     public string Nummer { get; private init; } = string.Empty;
     public string Diameter { get; private init; } = string.Empty;
+    public string Materiaal { get; private init; } = string.Empty;
 
     public string Netbeheerder { get; private init; } = string.Empty;
 
@@ -38,6 +40,8 @@ public sealed class ElementProperties
         var e = WithoutProviderSuffix(element, netbeheerder).ToUpperInvariant();
         var (withoutDiameter, diameter) = SplitDiameter(e);
         var tokens = withoutDiameter.Split('_', StringSplitOptions.RemoveEmptyEntries).ToList();
+        var materials = tokens.Where(token => Materials.Contains(token)).ToArray();
+        tokens.RemoveAll(token => Materials.Contains(token));
         string uitvoering = string.Empty;
         int construction = tokens.Count > 1 ? tokens.FindIndex(1, token => Uitvoeringen.Contains(token)) : -1;
         if (construction >= 0)
@@ -75,6 +79,7 @@ public sealed class ElementProperties
             Uitvoering = uitvoering,
             Nummer = nummer,
             Diameter = diameter,
+            Materiaal = string.Join("_", materials),
             Netbeheerder = netbeheerder.Trim().ToUpperInvariant()
         };
     }
@@ -85,16 +90,20 @@ public sealed class ElementProperties
     private static readonly HashSet<string> PipeTypes = new(StringComparer.OrdinalIgnoreCase)
         { "VRIJVERVAL", "DRUKRIOOL", "PERSLEIDING", "RIOOL", "RIOLERING", "HEMELWATER", "VUILWATER", "DRAINAGE", "DRAIN", "WATER", "GAS", "DATA", "ELEKTRA", "ELEKTRICITEIT", "WARMTE", "WARMTEKOUD", "OLIE" };
 
+    private static readonly HashSet<string> Materials = new(StringComparer.OrdinalIgnoreCase)
+        { "PVC", "PE", "HDPE", "PEHD", "POLYETHYLEEN PE", "POLYETHYLEEN", "PP", "BETON", "STAAL", "GIETIJZER", "ASBESTCEMENT", "GRES", "KOPER", "RVS" };
+
     internal static string WithoutDiameter(string element) => SplitDiameter(element).Element;
 
     private static (string Element, string Diameter) SplitDiameter(string element)
     {
         var tokens = element.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        bool pipe = tokens.Any(token => PipeTypes.Contains(token) || token is "RIOOLLEIDING" or "LEIDING" or "BUIS");
         for (int i = 1; i < tokens.Length; i++)
         {
             var match = DiameterToken.Match(tokens[i]);
             bool separatePrefix = i > 1 && tokens[i - 1].ToUpperInvariant() is "DN" or "Ø" or "DIAM" or "DIAMETER";
-            if (!match.Success || (match.Groups["prefix"].Length == 0 && !separatePrefix && !PipeTypes.Contains(tokens[0]))) continue;
+            if (!match.Success || (match.Groups["prefix"].Length == 0 && !separatePrefix && !pipe)) continue;
             if (!decimal.TryParse(match.Groups["value"].Value.Replace(',', '.'), NumberStyles.AllowDecimalPoint,
                 CultureInfo.InvariantCulture, out var value) || value <= 0) continue;
             decimal factor = match.Groups["unit"].Value.ToUpperInvariant() switch { "M" => 1000, "CM" => 10, _ => 1 };
@@ -133,6 +142,7 @@ public sealed class ElementProperties
         GroupDimension.Nummer => Nummer,
         GroupDimension.Netbeheerder => Netbeheerder,
         GroupDimension.Diameter => Diameter,
+        GroupDimension.Materiaal => Materiaal,
         _ => string.Empty
     };
 

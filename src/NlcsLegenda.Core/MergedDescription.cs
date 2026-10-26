@@ -39,6 +39,19 @@ internal static class MergedDescription
                 ? value : StandardTexts.Humanize(value)));
         values.AddRange(variants);
         if (dimensions.Contains(GroupDimension.Diameter)) values.AddRange(Diameters(entries.SelectMany(e => e.KlicObjects)));
+        if (dimensions.Contains(GroupDimension.Materiaal))
+        {
+            var materials = entries.SelectMany(e => e.KlicObjects).SelectMany(o => o.Values("Materiaal"))
+                .Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (materials.Length > 1) values.AddRange(materials);
+        }
+        foreach (var variant in entries.SelectMany(e => e.AppearanceValues).GroupBy(v => (v.Name, v.Unit)))
+        {
+            var numbers = variant.Select(v => Math.Round(v.Value, 9)).Distinct().OrderBy(v => v).ToArray();
+            if (numbers.Length > 1)
+                values.Add(variant.Key.Name + " " + string.Join(" / ", numbers.Select(v =>
+                    v.ToString("0.#########", CultureInfo.GetCultureInfo("nl-NL")) + variant.Key.Unit)));
+        }
         return new(title, values.Distinct(StringComparer.CurrentCultureIgnoreCase)
             .OrderBy(v => decimal.TryParse(v, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) ? number : decimal.MaxValue)
             .ThenBy(v => v, StringComparer.CurrentCultureIgnoreCase).ToArray());

@@ -24,17 +24,19 @@ public static class LegendOrder
     // oude positie bij dezelfde inhoud of gesplitste tekentypen
     private static List<string> Align(IReadOnlyList<string> saved, IReadOnlyList<string> current, bool expandSplit = false)
     {
-        string Logical(string key)
+        string Logical(string key, bool previousFields = false)
         {
             try
             {
                 var parts = JsonSerializer.Deserialize<string[]>(key);
-                return parts is { Length: 4 } ? JsonSerializer.Serialize(new[] { parts[0], parts[2], parts[3] }) : key;
+                return parts is { Length: 4 } ? JsonSerializer.Serialize(new[] {
+                    previousFields ? LegendSettings.WithoutMaterialKey(parts[0]) : parts[0], parts[2], parts[3] }) : key;
             }
             catch (JsonException) { return key; }
         }
-        var oldGroups = saved.Distinct().GroupBy(Logical).ToDictionary(g => g.Key, g => g.ToArray());
-        var newGroups = current.Distinct().GroupBy(Logical).ToDictionary(g => g.Key, g => g.ToArray());
+        var oldGroups = saved.Distinct().GroupBy(k => Logical(k)).ToDictionary(g => g.Key, g => g.ToArray());
+        var newGroups = current.Distinct().GroupBy(k => Logical(k)).ToDictionary(g => g.Key, g => g.ToArray());
+        Dictionary<string, string[]>? oldFields = null, newFields = null;
         return saved.SelectMany(key =>
         {
             var logical = Logical(key);
@@ -42,6 +44,15 @@ public static class LegendOrder
             {
                 if (matches.Length == 1) return matches;
                 if (expandSplit && IsTypeSplit(key, matches)) return matches;
+            }
+            // nieuwe materiaalmetadata alleen bij een eenduidige opvolger
+            var previous = Logical(key, true);
+            if (previous == logical)
+            {
+                oldFields ??= saved.Distinct().GroupBy(k => Logical(k, true)).ToDictionary(g => g.Key, g => g.ToArray());
+                newFields ??= current.Distinct().GroupBy(k => Logical(k, true)).ToDictionary(g => g.Key, g => g.ToArray());
+                if (oldFields[previous].Length == 1 && newFields.TryGetValue(previous, out var successors) && successors.Length == 1)
+                    return successors;
             }
             return new[] { key };
         }).ToList();

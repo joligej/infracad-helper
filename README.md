@@ -34,7 +34,8 @@ Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitle
 | Opmaak | Schaal, maten, kolommen, notities, hoeveelheden, schaalbalk en passende symbolen |
 | Voorbeelden | Bronweergave of een volledig voorbeeld uit een DWG-bibliotheek |
 | Xrefs | Bronnen en lagen doorzoeken en kiezen, ook bij geneste of alleen-lezen bronnen |
-| KLIC | Netbeheerders en objectgegevens lezen; onder meer diameters apart houden of samenvoegen |
+| Samenvoegen | Eigen keuzes per voorbeeldtype; diameters, materialen en andere eigenschappen; optioneel lijnschalen en arceerschalen/-hoeken |
+| KLIC | Netbeheerders en objectgegevens lezen, afzonderlijke samenvoegkeuzes en alle bronwaarden bekijken |
 | Uitvoer | Een gekoppelde viewport die de legenda-schaal volgt, CSV/JSON of een uittrekstaat van een map |
 
 Elke legenda bewaart haar eigen bron en instellingen in de DWG. **Toepassen**
@@ -42,7 +43,8 @@ werkt de gekozen legenda meteen bij; **Opslaan** past wijzigingen toe en sluit h
 venster. Na Toepassen blijven beide knoppen uitgeschakeld totdat er weer iets wijzigt.
 **Bijwerken** bewaart uitgevinkte regels en eigen instellingen; **Resetten** begint
 weer met de globale standaard. Samenvoegkeuzes voor KLIC en overige lagen staan
-naast elkaar, met optioneel de samengevoegde waarden in de omschrijving.
+naast elkaar, met afwijkende keuzes per voorbeeldtype en optioneel de samengevoegde
+waarden in de omschrijving.
 De **Globale standaard** geldt voor nieuwe legenda’s. Met **Profielen** kun je
 een opzet bewaren en delen.
 

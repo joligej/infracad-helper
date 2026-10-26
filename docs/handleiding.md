@@ -234,8 +234,8 @@ de lijst en haar export. Dubbelklik op een regel of kies **KLIC-details** voor a
 waarden per bron en tabel, objecthandles, voorzorgsmaatregelen en bijlagen.
 
 Onder **Legenda-omschrijving** voeg je eigenschappen toe aan de tekst; onder **Afzonderlijke
-regels** kies je bijvoorbeeld materiaal om varianten apart weer te geven.
-Diameters regel je op **Instellingen → Samenvoegen**, voor zowel laagnamen als objectgegevens.
+regels** kies je aanvullende eigenschappen om varianten apart weer te geven.
+Diameters en materialen regel je op **Instellingen → Samenvoegen**, voor zowel laagnamen als objectgegevens.
 Zonder die keuzes blijft de bestaande legenda behouden. Opgeslagen keuzes gelden per legenda.
 Met **Volgorde → Handmatig** verplaats je regels; maak eerst het zoekfilter leeg.
 
@@ -248,10 +248,17 @@ Op **Instellingen → Samenvoegen** staan KLIC en overige lagen naast elkaar.
 Een aangevinkt kenmerk betekent: **niet vergelijken**.
 **Soorten samenvoegen** negeert bijvoorbeeld het verschil tussen gas en water.
 Dit staat standaard **uit**, zowel voor KLIC als voor overige lagen. Verschillende
-kleuren, lijnpatronen en symbolen blijven bij automatisch samenvoegen altijd apart.
+kleuren en lijnpatronen blijven bij automatisch samenvoegen apart. Lijnen, vlakcontouren,
+arceringen, vlakvullingen en symbolen behouden ieder hun eigen regel.
+
+Met **Voorbeeldtype** kies je eerst **Alle typen (standaard)** of een afzonderlijk type.
+Een wijziging bij bijvoorbeeld **Lijnen** maakt eigen keuzes voor dat type; symbolen
+en arceringen volgen hun eigen keuzes of de standaard. De knoppen **KLIC: standaardkeuzes**
+en **Overige lagen: standaardkeuzes** heffen alleen de afwijking voor het gekozen type op.
+De KLIC-keuzes en die voor overige lagen blijven onafhankelijk.
 
 Voor nieuwe KLIC-legenda's staan **Spanning/druk**, **Uitvoering**, **Volgnummer**,
-**Diameters** en **Netbeheerders samenvoegen** standaard aan. Een beheerder achter in de laagnaam
+**Diameters**, **Materialen** en **Netbeheerders samenvoegen** standaard aan. Een beheerder achter in de laagnaam
 wordt herkend via de KLIC-gegevens, ook als punten of spaties anders zijn geschreven.
 Zonder die gegevens wordt geen beheerder uit een laagnaam geraden.
 Een oud globaal profiel zonder
@@ -271,10 +278,28 @@ een bron met KLIC in de naam komen. De optie geldt ook voor diameters uit object
 daarvoor is geen tweede instelling nodig. Een bestaand globaal profiel krijgt de
 diameterstandaard eenmaal mee. Bestaande legenda's houden hun lokale keuze.
 
+**Materialen samenvoegen** negeert herkenbare materiaalnamen zoals PVC, PE, beton en
+staal in de laagnaam, plus het materiaal uit KLIC-objectgegevens. Soorten blijven
+onderscheiden: een waterleiding wordt daardoor geen gasleiding. Eerdere keuzes voor
+afzonderlijke materiaalregels uit het KLIC-venster worden overgenomen in dit centrale
+vinkje. Onbekende materiaalnamen worden niet geraden.
+
+Onder de eigenschappen staan de uiterlijkkeuzes voor het gekozen voorbeeldtype:
+
+- **Lijnschalen**: dezelfde lijn met een andere herhalingsafstand. Kleur, lijndikte en lijnbreedte blijven apart.
+- **Arceerschalen en arceerhoeken**: hetzelfde patroon met een andere schaal of hoek. Bij een gebruikersarcering gaat de schaalkeuze over de lijnafstand. Patroon, kleur, achtergrondkleur en transparantie blijven apart.
+- **Symbolen**: grootte, draairichting en attribuutteksten zijn afzonderlijk te negeren. Vorm, spiegeling en vervorming blijven apart. Passend maken in het vak stel je onder **Opmaak** in.
+
+Deze uiterlijkkeuzes gelden voor KLIC én overige lagen en staan standaard uit.
+Bij samenvoegen wordt één oorspronkelijk voorbeeld getekend. Wil je zelf bepalen
+welk voorbeeld dat is, gebruik dan de handmatige samenvoeging in Overzicht.
+
 **Samengevoegde waarden tonen** staat standaard aan. Zo wordt `Leiding 200` met
 `Leiding 300` één regel **Leiding (200, 300)**; `Leiding Dorp` en `Leiding Stad` worden
 **Leiding (Dorp, Stad)**. Uitgeschakeld blijft alleen **Leiding** staan. Bronobjecten,
-hoeveelheden en detailgegevens blijven in beide gevallen behouden.
+hoeveelheden en detailgegevens blijven in beide gevallen behouden. Ook materiaalvarianten
+en genegeerde schaal- of hoekverschillen kunnen zo zichtbaar worden, bijvoorbeeld
+**Leiding (lijnschaal 1 / 2)**.
 
 Selecteer in **Overzicht** meerdere regels met Ctrl of Shift en kies **Samenvoegen…**
 om zelf een groep te maken. Kies vervolgens het **hoofdobject**: daarvan komen
@@ -288,8 +313,9 @@ weergegeven. Generieke KLIC-placeholdertekst wordt standaard weggelaten.
 
 Bij de statussen staat ook *Gelijke statussen samenvoegen*. Die voegt dezelfde regel uit
 verschillende statussen samen, maar alleen als lijn, vlak, arcering en symbool er precies
-hetzelfde uitzien. Standaard staat dit uit, omdat de status in NLCS meestal juist de kleur
-bepaalt.
+hetzelfde uitzien. Bij eerder samengevoegde regels moet de volledige verzameling
+oorspronkelijke weergaven overeenkomen. Dit verandert de samenvoegkeuzes binnen een
+status niet. Standaard staat dit uit, omdat de status in NLCS meestal juist de kleur bepaalt.
 
 De keuzelijst bij Samenstellen volgt de bron van de gekozen legenda. Uitgevinkte
 regels blijven uitgevinkt als hun bron tijdelijk ontbreekt. Instellingen en

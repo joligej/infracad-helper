@@ -7,8 +7,8 @@ public class RequestedBehaviorTests
 {
     [Theory]
     [InlineData("DATA_COAXKABEL_17_ZIGGO BV", "Ziggo B.V.", "DATA", "COAXKABEL", "17")]
-    [InlineData("DATA_MANTELBUIS_POLYETHYLEEN PE_110_KPN BV", "KPN B.V.", "DATA", "MANTELBUIS_POLYETHYLEEN PE", "110")]
-    [InlineData("GAS_LD_MANTELBUIS_STAAL_200_LIANDER NV", "Liander N.V.", "GAS", "MANTELBUIS_STAAL", "200")]
+    [InlineData("DATA_MANTELBUIS_POLYETHYLEEN PE_110_KPN BV", "KPN B.V.", "DATA", "MANTELBUIS", "110")]
+    [InlineData("GAS_LD_MANTELBUIS_STAAL_200_LIANDER NV", "Liander N.V.", "GAS", "MANTELBUIS", "200")]
     public void PipeConstructionAndDiameterAreIndependent(string text, string provider, string kind, string construction, string diameter)
     {
         var properties = ElementProperties.From(text, provider);
