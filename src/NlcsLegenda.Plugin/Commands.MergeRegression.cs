@@ -21,7 +21,7 @@ public partial class Commands
             {
                 var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
                 var lines = (LinetypeTable)tr.GetObject(db.LinetypeTableId, OpenMode.ForWrite);
-                var lineType = new LinetypeTableRecord { Name = "MERGE_TEST", PatternLength = 1, NumDashes = 2 };
+                using var lineType = new LinetypeTableRecord { Name = "MERGE_TEST", PatternLength = 1, NumDashes = 2 };
                 lineType.SetDashLengthAt(0, 0.5); lineType.SetDashLengthAt(1, -0.5);
                 lines.Add(lineType); tr.AddNewlyCreatedDBObject(lineType, true);
                 var lineLayer = ReviewLayer(db, tr, "N-WE-VH-MERGELINE-G", 7);
@@ -29,7 +29,7 @@ public partial class Commands
                     (2.0, (short)7, LineWeight.LineWeight025), (1.0, (short)1, LineWeight.LineWeight025),
                     (1.0, (short)7, LineWeight.LineWeight050) })
                 {
-                    var line = new Line(Point3d.Origin, new Point3d(10, 0, 0)) { LayerId = lineLayer,
+                    using var line = new Line(Point3d.Origin, new Point3d(10, 0, 0)) { LayerId = lineLayer,
                         LinetypeId = lineType.ObjectId, LinetypeScale = scale, ColorIndex = color, LineWeight = weight };
                     model.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
                 }
@@ -42,7 +42,7 @@ public partial class Commands
                         (1.0, 0.0, (short)7, "ANSI32") })
                     {
                         if (user && pattern == "ANSI32") continue;
-                        var hatch = new Hatch { LayerId = layer, ColorIndex = color };
+                        using var hatch = new Hatch { LayerId = layer, ColorIndex = color };
                         model.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
                         hatch.SetHatchPattern(user ? HatchPatternType.UserDefined : HatchPatternType.PreDefined, user ? "_USER" : pattern);
                         hatch.PatternScale = user ? 1 : scale;
@@ -100,7 +100,7 @@ public partial class Commands
             changed.MergeIdenticalStatuses = true;
             Counts(changed, 3, 3, 2);
             changed.MergeIdenticalStatuses = false;
-            var lineToHide = original.Entries.First(e => e.Element == "MERGELINE" && original.LayerStyles[e.PrimaryLayer].Color.ColorIndex == 7 && original.LayerStyles[e.PrimaryLayer].LinetypeScale == 2);
+            var lineToHide = original.Entries.First(e => e.Element == "MERGELINE" && original.LayerStyles[e.PrimaryLayer].Color.ColorIndex == 7 && Math.Abs(original.LayerStyles[e.PrimaryLayer].LinetypeScale - 2) < 1e-9);
             changed.ExcludedEntries.Add(LegendSettings.SelectionKey(lineToHide));
             if (Read(changed).Entries.Sum(e => e.Metric.Count) != original.Entries.Sum(e => e.Metric.Count) - lineToHide.Metric.Count)
                 throw new InvalidOperationException("Samenvoegen verliest een eerdere uitsluiting.");

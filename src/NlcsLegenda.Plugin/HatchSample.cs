@@ -30,12 +30,13 @@ public sealed class HatchSample
 
     private PatternLine[] _definition = Array.Empty<PatternLine>();
 
-    internal string DefinitionSignature(double factor, double rotation = 0)
+    internal string DefinitionSignature(double factor, double? rotation = null)
     {
-        double cos = Math.Cos(rotation), sin = Math.Sin(rotation);
+        double angle = rotation.GetValueOrDefault();
+        double cos = Math.Cos(angle), sin = Math.Sin(angle);
         string Number(double value) => Math.Round(value, 9).ToString("R", System.Globalization.CultureInfo.InvariantCulture);
         return string.Join(";", _definition.Select(line => string.Join(",", new[] {
-            rotation == 0 ? line.Angle : (line.Angle + rotation + 2 * Math.PI) % (2 * Math.PI),
+            rotation.HasValue ? (line.Angle + angle + 2 * Math.PI) % (2 * Math.PI) : line.Angle,
             (line.X * cos - line.Y * sin) * factor, (line.X * sin + line.Y * cos) * factor,
             (line.OffsetX * cos - line.OffsetY * sin) * factor, (line.OffsetX * sin + line.OffsetY * cos) * factor
         }.Concat(line.Dashes.Select(d => d * factor)).Select(Number))));

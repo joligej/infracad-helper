@@ -739,7 +739,7 @@ public static class DrawingAnalyzer
             NumberSignature(scale ? 1 : hatch.PatternScale * factor),
             NumberSignature(angle ? 0 : hatch.PatternAngle),
             NumberSignature(scale ? 1 : hatch.PatternSpace * factor), hatch.PatternDouble,
-            hatch.IsSolid, hatch.DefinitionSignature(factor, angle ? -hatch.PatternAngle : 0),
+            hatch.IsSolid, hatch.DefinitionSignature(factor, angle ? -hatch.PatternAngle : null),
             hatch.Color is null ? string.Empty : ColorSignature(hatch.Color),
             hatch.BackgroundColor is null ? string.Empty : ColorSignature(hatch.BackgroundColor),
             hatch.Transparency.Signature);

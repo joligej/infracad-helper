@@ -404,26 +404,27 @@ internal sealed class SettingsDialog : LegendDialog
         root.Controls.Add(defaults);
         root.Controls.Add(new Label { Text = "KLIC: kabel- en leidinglagen, objecten met KLIC-gegevens en bronnen met KLIC in de naam. Overige lagen: alle andere objecten. De uiterlijkkeuzes hieronder gelden voor beide.", AutoSize = true, Margin = new Padding(3, 6, 3, 6) });
         var lines = Group("Lijnen en vlakcontouren",
-            BoundCheck("Verschillende lijnschalen samenvoegen", () => _settings.MergeLineScales, v => _settings.MergeLineScales = v),
-            new Label { Text = "De herhalingsafstand van hetzelfde lijnpatroon mag verschillen. Kleur, lijndikte en lijnbreedte blijven onderscheiden.", AutoSize = true });
+            BoundCheck("Verschillende lijnschalen samenvoegen", () => _settings.MergeLineScales, v => _settings.MergeLineScales = v));
+        lines.Controls[0].Controls.Add(new Label { Text = "De herhalingsafstand van hetzelfde lijnpatroon mag verschillen. Kleur, lijndikte en lijnbreedte blijven onderscheiden.", AutoSize = true });
         var hatches = Group("Arceringen",
             BoundCheck("Verschillende arceerschalen samenvoegen", () => _settings.MergeHatchScales, v => _settings.MergeHatchScales = v),
-            BoundCheck("Verschillende arceerhoeken samenvoegen", () => _settings.MergeHatchAngles, v => _settings.MergeHatchAngles = v),
-            new Label { Text = "Alleen hetzelfde patroon met dezelfde kleuren. Eén bronvoorbeeld bepaalt de getekende schaal en hoek.", AutoSize = true });
+            BoundCheck("Verschillende arceerhoeken samenvoegen", () => _settings.MergeHatchAngles, v => _settings.MergeHatchAngles = v));
+        hatches.Controls[0].Controls.Add(new Label { Text = "Alleen hetzelfde patroon met dezelfde kleuren. Eén bronvoorbeeld bepaalt de getekende schaal en hoek.", AutoSize = true });
         var symbols = Group("Symbolen",
             BoundCheck("Verschillende groottes samenvoegen", () => _settings.MergeSymbolSizes, v => _settings.MergeSymbolSizes = v),
             BoundCheck("Verschillende draairichtingen samenvoegen", () => _settings.MergeSymbolRotations, v => _settings.MergeSymbolRotations = v),
-            BoundCheck("Verschillende attribuutteksten samenvoegen", () => _settings.MergeSymbolAttributes, v => _settings.MergeSymbolAttributes = v),
-            new Label { Text = "Eén bronvoorbeeld wordt getekend. Vorm, kleur, spiegeling en vervorming blijven onderscheiden. Passend maken in het vak staat bij Opmaak.", AutoSize = true });
+            BoundCheck("Verschillende attribuutteksten samenvoegen", () => _settings.MergeSymbolAttributes, v => _settings.MergeSymbolAttributes = v));
+        symbols.Controls[0].Controls.Add(new Label { Text = "Eén bronvoorbeeld wordt getekend. Vorm, kleur, spiegeling en vervorming blijven onderscheiden. Passend maken in het vak staat bij Opmaak.", AutoSize = true });
         root.Controls.AddRange(new Control[] { lines, hatches, symbols });
         _resync.Add(() => {
             lines.Visible = selectedType is null or NlcsDrawType.Geometrie or NlcsDrawType.Vlak;
             hatches.Visible = selectedType is null or NlcsDrawType.Arcering;
             symbols.Visible = selectedType is null or NlcsDrawType.Symbool;
         });
-        root.Controls.Add(Group("Statussen (alle typen)",
-            BoundCheck("Gelijke statussen samenvoegen", () => _settings.MergeIdenticalStatuses, v => _settings.MergeIdenticalStatuses = v),
-            new Label { Text = "Alleen als alle oorspronkelijke voorbeelden hetzelfde uiterlijk hebben.", AutoSize = true }));
+        var statuses = Group("Statussen (alle typen)",
+            BoundCheck("Gelijke statussen samenvoegen", () => _settings.MergeIdenticalStatuses, v => _settings.MergeIdenticalStatuses = v));
+        statuses.Controls[0].Controls.Add(new Label { Text = "Alleen als alle oorspronkelijke voorbeelden hetzelfde uiterlijk hebben.", AutoSize = true });
+        root.Controls.Add(statuses);
         var textOptions = Group("Tekst (alle typen)", BoundCheck("Samengevoegde waarden tonen", () => _settings.ShowMergedValues, v => _settings.ShowMergedValues = v));
         textOptions.Controls[0].Controls.Add(new Label { Text = "Aan: Leiding (200, 300). Uit: Leiding.", AutoSize = true });
         textOptions.Controls[0].Controls.Add(BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v));

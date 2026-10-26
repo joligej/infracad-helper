@@ -185,9 +185,8 @@ public static class LegendGrouping
         List<LegendEntry> MergeGroups(IEnumerable<LegendEntry> source, bool acrossStatuses)
         {
             var result = new List<LegendEntry>();
-            foreach (var group in source.GroupBy(e => KeyOf(e, acrossStatuses)))
+            foreach (var members in source.GroupBy(e => KeyOf(e, acrossStatuses)).Select(g => g.ToList()))
             {
-                var members = group.ToList();
                 var rep = Representative(members);
                 if (members.Count == 1 && rep.KlicObjects.Count == 0) { result.Add(rep); continue; }
                 var label = MergedDescription.Create(members, rep, settings.MergeDimensionsFor(rep));
