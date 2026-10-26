@@ -36,27 +36,27 @@ public partial class Commands
                 var blocks = (BlockTable)tr.GetObject(source.BlockTableId, OpenMode.ForWrite);
                 var symbol = new BlockTableRecord { Name = "BOOM" };
                 blocks.Add(symbol); tr.AddNewlyCreatedDBObject(symbol, true);
-                var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 8) { LayerId = layer.ObjectId };
+                using var circle = new Circle(Point3d.Origin, Vector3d.ZAxis, 8) { LayerId = layer.ObjectId };
                 symbol.AppendEntity(circle); tr.AddNewlyCreatedDBObject(circle, true);
                 var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(source), OpenMode.ForWrite);
                 foreach (var scale in new[] { new Scale3d(1), new Scale3d(2), new Scale3d(2, 1, 1) })
                 {
-                    var reference = new BlockReference(new Point3d(scale.X * 50, scale.Y * 50, 0), symbol.ObjectId)
+                    using var reference = new BlockReference(new Point3d(scale.X * 50, scale.Y * 50, 0), symbol.ObjectId)
                     { LayerId = layer.ObjectId, ScaleFactors = scale };
                     model.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true);
                 }
                 var smaller = new BlockTableRecord { Name = "KLEINERE_BOOM" };
                 blocks.Add(smaller); tr.AddNewlyCreatedDBObject(smaller, true);
-                var smallCircle = new Circle(Point3d.Origin, Vector3d.ZAxis, 4) { LayerId = layer.ObjectId };
+                using var smallCircle = new Circle(Point3d.Origin, Vector3d.ZAxis, 4) { LayerId = layer.ObjectId };
                 smaller.AppendEntity(smallCircle); tr.AddNewlyCreatedDBObject(smallCircle, true);
-                var smallReference = new BlockReference(new Point3d(250, 250, 0), smaller.ObjectId) { LayerId = layer.ObjectId };
+                using var smallReference = new BlockReference(new Point3d(250, 250, 0), smaller.ObjectId) { LayerId = layer.ObjectId };
                 model.AppendEntity(smallReference); tr.AddNewlyCreatedDBObject(smallReference, true);
-                var rotated = new BlockReference(new Point3d(300, 300, 0), symbol.ObjectId)
+                using var rotated = new BlockReference(new Point3d(300, 300, 0), symbol.ObjectId)
                     { LayerId = layer.ObjectId, Rotation = 0.37 };
                 model.AppendEntity(rotated); tr.AddNewlyCreatedDBObject(rotated, true);
                 foreach (var (definition, radius) in new[] { (symbol, 0.8), (smaller, 0.4) })
                 {
-                    var hatch = new Hatch { LayerId = layer.ObjectId };
+                    using var hatch = new Hatch { LayerId = layer.ObjectId };
                     definition.AppendEntity(hatch); tr.AddNewlyCreatedDBObject(hatch, true);
                     hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
                     var points = new Point2dCollection { new(-radius, 0), new(radius, 0) };

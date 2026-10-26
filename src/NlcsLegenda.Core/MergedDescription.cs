@@ -44,11 +44,18 @@ internal static class MergedDescription
             .ThenBy(v => v, StringComparer.CurrentCultureIgnoreCase).ToArray());
     }
 
+    private static string FormatDiameter(decimal value)
+    {
+        // rekenruis uit de weergave; bronwaarden ongewijzigd
+        decimal rounded = decimal.Round(value, 9, MidpointRounding.AwayFromZero);
+        return (rounded == 0 ? value : rounded).ToString("G29", CultureInfo.InvariantCulture);
+    }
+
     internal static IReadOnlyList<string> Diameters(IEnumerable<KlicObjectData> objects)
     {
         var values = objects.SelectMany(o => o.Values("DiameterM"))
             .Select(v => decimal.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var d) && d > 0 && d <= decimal.MaxValue / 1000
-                ? (d * 1000).ToString("G29", CultureInfo.InvariantCulture) : "")
+                ? FormatDiameter(d * 1000) : "")
             .Where(v => v.Length > 0).Distinct().OrderBy(v => decimal.Parse(v, CultureInfo.InvariantCulture)).ToArray();
         return values.Length > 1 ? values : Array.Empty<string>();
     }

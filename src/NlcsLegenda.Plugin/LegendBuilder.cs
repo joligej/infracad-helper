@@ -571,6 +571,10 @@ public static class LegendBuilder
             });
             mt.Contents = MTextFormat.Escape(wrapped);
         }
+        // templateafstand voor korte labels; leesruimte voor lange alinea's
+        if (Math.Abs(s.LineSpacingFactor - TemplateDefaults.LineSpacingFactor) < 1e-9
+            && mt.ActualHeight > mt.TextHeight * 3)
+            mt.LineSpacingFactor = 1;
         return mt;
     }
 

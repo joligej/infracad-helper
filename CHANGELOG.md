@@ -4,6 +4,7 @@
 
 - Eigen regels en herkenningsregels kunnen xref-lagen rechtstreeks uit een doorzoekbare lijst kiezen. Bron, laag en blok of patroon staan apart; voorbeelden uit vergrendelde bronlagen worden op lokale legendalagen getekend.
 - Lijngeometrie, arceringen, vlakvullingen en symbolen krijgen afzonderlijke regels. Eerdere uitsluitingen en handmatige volgorde worden bij een eenduidige splitsing overgenomen.
+- Lange samengestelde omschrijvingen krijgen bij de standaardopmaak meer regelafstand. Diameterlijsten tonen geen dubbele waarden door numerieke afrondingsruis; brongegevens blijven gelijk.
 - KLIC-herkenning onderscheidt leidingsoort, diameter en uitvoering beter, waaronder mantelbuizen en hulpstukken. Samenvoegen behoudt verschillen in weergave.
 - Symbolen kunnen passend worden gemaakt in het voorbeeldvak. Grootte, draairichting en attribuutteksten kunnen ieder afzonderlijk worden genegeerd bij het samenvoegen. Spiegeling, vervorming en kleur blijven behouden.
 - Viewports vragen standaard het linksbovenpunt; het middelpunt is apart instelbaar. Getekende en automatisch geplaatste viewports gebruiken standaard de niet-plottende laag `VIEWPORT-NOPLOT`. Laag en plotinstelling zijn aanpasbaar. Bijwerken herstelt de gekoppelde schaal zonder andere viewports te wijzigen.

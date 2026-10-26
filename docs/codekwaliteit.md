@@ -21,6 +21,27 @@ De eerder waargenomen GDI+-melding ontstond in
 `Autodesk.AutoCAD.LayerManager.MultiTreeView.OnDrawNode`. Een verband met deze
 resourcelekken is niet aangetoond; deze release claimt geen reparatie van die hostmelding.
 
+## Controle voor 1.36.0
+
+In Civil 3D 2027 is de volledige GDI+-aanroepketen opnieuw vastgelegd bij het
+openen van het lagenvenster, zowel met als zonder geladen NLCS-assemblies:
+`Graphics.FillRectangle → LayerManager.MultiTreeView.OnDrawNode → SyncTheme`.
+Deze hostfout kan dus onafhankelijk van de plugin optreden. De afzonderlijke
+null-reference in `AecLayerManagerEx.standardFilter_Update` is niet gereproduceerd;
+1.36.0 registreert die gericht naast de GDI+-meldingen.
+
+De Map-proef met een alleen-lezen xref slaagt in drie opeenvolgende analyses:
+38.593 objecten en 76.704 records, met behoud van bronbestand en documentcontext.
+De eigen Civil 3D-testsessie sluit daarbij normaal af. Dit is geen bewijs dat
+iedere eerdere afsluitmelding dezelfde oorzaak had.
+
+De nieuwe reviewmeldingen over testobjecten en ingesprongen lussen zijn nagelopen.
+Nieuwe CAD-wrappers hebben een expliciete levensduur; geneste lussen hebben accolades.
+Exacte vergelijkingen in de viewportproef controleren behoud van opgeslagen waarden.
+De nulvergelijking na het afronden van symboolcoördinaten voorkomt verschillende
+sleutels voor `0` en `-0`. Labels in de instellingen worden met hun bovenliggende
+venster vrijgegeven; de vensterproeven controleren dat behoud van resources.
+
 ## GDI+-onderzoek op 22 oktober 2026
 
 De oorspronkelijke melding betrof `Graphics.FillRectangle` vanuit

@@ -92,6 +92,10 @@ De schaalbalk heeft vier segmenten van elk 10 mm op papier, met afwisselende hal
 vullingen. De maximale hoogte onder Kolommen geldt voor de hele legenda, inclusief meerregelige omschrijvingen, deze onderdelen en een eventueel kader. Ook het maximumaantal regels per kolom blijft gelden. Past één regel niet, vergroot dan de hoogte of zet deze op 0. Teksten en onderdelen kun je aanpassen of uitzetten. In het opmerkingenvenster
 kies je tussen tekeningnotities en de KLIC-waarschuwing.
 
+Bij de standaardregelafstand krijgen lange omschrijvingen extra leesruimte. De compacte
+afstand uit de template blijft voor korte labels gelden. De berekening van de
+kolomhoogte gebruikt de werkelijk getekende teksthoogte.
+
 De legenda is bedoeld voor modelruimte in meters. Papiermaten worden eenmaal met de
 gekozen schaal omgerekend. Symbolen behouden hun modelmaat; een expliciete NLCS-schaalvariant
 wordt naar de gekozen schaal omgerekend. Grote symbolen krijgen meer rij- en kolomruimte.

@@ -373,12 +373,14 @@ internal static class Program
             page.AutoScrollPosition = Point.Empty;
             Application.DoEvents();
             foreach (var row in Descendants(page).OfType<SettingsRow>())
-            foreach (Control input in row.Controls)
             {
-                Check(input.Right <= row.ClientSize.Width + 1, $"{scale} / {page.Text} / {input.Text}: past binnen de invoerrij");
-                if (input is Label)
-                    Check(input.Height >= input.GetPreferredSize(new Size(input.Width, 0)).Height,
-                        $"{scale} / {page.Text} / {input.Text}: volledig leesbaar label");
+                foreach (Control input in row.Controls)
+                {
+                    Check(input.Right <= row.ClientSize.Width + 1, $"{scale} / {page.Text} / {input.Text}: past binnen de invoerrij");
+                    if (input is Label)
+                        Check(input.Height >= input.GetPreferredSize(new Size(input.Width, 0)).Height,
+                            $"{scale} / {page.Text} / {input.Text}: volledig leesbaar label");
+                }
             }
             CheckButtons(form);
             if (output is not null)
