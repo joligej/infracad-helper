@@ -314,8 +314,7 @@ internal sealed class SettingsDialog : LegendDialog
             BoundCheck("Bestaand", () => _settings.ToonBestaand, v => _settings.ToonBestaand = v),
             BoundCheck("Vervallen", () => _settings.ToonVervallen, v => _settings.ToonVervallen = v),
             BoundCheck("Tijdelijk", () => _settings.ToonTijdelijk, v => _settings.ToonTijdelijk = v),
-            BoundCheck("Revisie", () => _settings.ToonRevisie, v => _settings.ToonRevisie = v),
-            BoundCheck("Gelijke statussen samenvoegen (alleen bij identieke weergave)", () => _settings.MergeIdenticalStatuses, v => _settings.MergeIdenticalStatuses = v)));
+            BoundCheck("Revisie", () => _settings.ToonRevisie, v => _settings.ToonRevisie = v)));
         var actions = new FlowLayoutPanel { Dock = DockStyle.Top, FlowDirection = FlowDirection.LeftToRight, AutoSize = true, Padding = new Padding(3) };
         if (_composition is not null || _compositionSource is not null)
         {
@@ -341,7 +340,24 @@ internal sealed class SettingsDialog : LegendDialog
     {
         var page = new TabPage("Samenvoegen") { Padding = new Padding(10), AutoScroll = true };
         var root = new SettingsStack();
-        root.Controls.Add(new Label { Text = "Vink aan welke verschillen je wilt negeren. Kleur, lijnpatroon en symbool blijven apart.", AutoSize = true });
+        root.Controls.Add(new Label { Text = "Vink aan welke verschillen je wilt negeren. Kleur en patroon blijven onderscheiden; lijnen, vlakken, arceringen en symbolen blijven aparte regels.", AutoSize = true });
+        NlcsDrawType? selectedType = null;
+        var types = new NlcsDrawType?[] { null, NlcsDrawType.Geometrie, NlcsDrawType.Vlak, NlcsDrawType.Arcering, NlcsDrawType.Vlakvulling, NlcsDrawType.Symbool };
+        var typeChoice = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 210, AccessibleName = "Samenvoegen: voorbeeldtype" };
+        typeChoice.Items.AddRange(new object[] { "Alle typen (standaard)", "Lijnen", "Vlakken", "Arceringen", "Vlakvullingen", "Symbolen" });
+        typeChoice.SelectedIndex = 0;
+        typeChoice.SelectedIndexChanged += (_, _) => { selectedType = types[typeChoice.SelectedIndex]; SyncAll(); };
+        root.Controls.Add(LabeledRow("Voorbeeldtype:", typeChoice));
+        var scope = new Label { AutoSize = true, Margin = new Padding(3, 6, 3, 6) };
+        void RefreshScope()
+        {
+            bool Own(bool klic) => selectedType is not null && _settings.MergeRules.Any(r => r.Klic == klic && r.Type == selectedType);
+            scope.Text = selectedType is null ? "Standaard voor alle typen zonder eigen keuzes."
+                : $"KLIC: {(Own(true) ? "eigen keuzes" : "standaardkeuzes")} · Overige lagen: {(Own(false) ? "eigen keuzes" : "standaardkeuzes")}. Een wijziging geldt alleen voor dit type.";
+        }
+        _resync.Add(RefreshScope);
+        RefreshScope();
+        root.Controls.Add(scope);
         var choices = new TableLayoutPanel { AutoSize = true, ColumnCount = 3, Dock = DockStyle.Top, Padding = new Padding(6) };
         choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
         choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18));
@@ -353,30 +369,63 @@ internal sealed class SettingsDialog : LegendDialog
         foreach (var (dimension, label) in new[] {
             (GroupDimension.Soort, "Soorten"), (GroupDimension.Specificatie, "Spanning/druk of specificatie"),
             (GroupDimension.Uitvoering, "Uitvoeringen"), (GroupDimension.Nummer, "Volgnummers"),
-            (GroupDimension.Diameter, "Diameters"), (GroupDimension.Netbeheerder, "Netbeheerders") })
+            (GroupDimension.Diameter, "Diameters"), (GroupDimension.Materiaal, "Materialen"), (GroupDimension.Netbeheerder, "Netbeheerders") })
         {
             choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             choices.Controls.Add(new Label { Text = label, AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(0, 5, 0, 5) }, 0, row);
-            CheckBox Choice(Func<ICollection<GroupDimension>> dimensions, string category)
+            CheckBox Choice(bool klic, string category)
             {
-                var check = BoundCheck("", () => dimensions().Contains(dimension), value => {
-                    if (value) dimensions().Add(dimension); else dimensions().Remove(dimension);
-                });
+                var check = BoundCheck("", () => _settings.MergeDimensionsFor(klic, selectedType).Contains(dimension),
+                    value => _settings.SetMergeDimension(klic, selectedType, dimension, value));
                 check.AccessibleName = category + ": " + label + " samenvoegen";
                 check.MinimumSize = new Size(32, 24);
                 check.Anchor = AnchorStyles.Left;
                 return check;
             }
-            choices.Controls.Add(Choice(() => _settings.MergedDimensions, "KLIC"), 1, row);
-            if (dimension != GroupDimension.Netbeheerder) choices.Controls.Add(Choice(() => _settings.NonKlicMergedDimensions, "Overige lagen"), 2, row);
+            choices.Controls.Add(Choice(true, "KLIC"), 1, row);
+            if (dimension != GroupDimension.Netbeheerder) choices.Controls.Add(Choice(false, "Overige lagen"), 2, row);
             else choices.Controls.Add(new Label { Text = "—", AutoSize = true }, 2, row);
             row++;
         }
-        var comparisons = new GroupBox { Text = "Samenvoegen", AutoSize = true, Padding = new Padding(6) };
+        var comparisons = new GroupBox { Text = "Verschillen in eigenschappen", AutoSize = true, Padding = new Padding(6) };
         comparisons.Controls.Add(choices);
         root.Controls.Add(comparisons);
-        root.Controls.Add(new Label { Text = "KLIC: kabel- en leidinglagen, objecten met KLIC-gegevens en bronnen met KLIC in de naam. Overige lagen: alle andere objecten.", AutoSize = true, Margin = new Padding(3, 6, 3, 6) });
-        var textOptions = Group("Tekst", BoundCheck("Samengevoegde waarden tonen", () => _settings.ShowMergedValues, v => _settings.ShowMergedValues = v));
+        var defaults = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top };
+        foreach (bool klic in new[] { true, false })
+        {
+            var reset = new Button { Text = (klic ? "KLIC" : "Overige lagen") + ": standaardkeuzes", AutoSize = true, Enabled = false };
+            reset.Click += (_, _) => {
+                if (selectedType is { } type) _settings.ResetMergeDimensions(klic, type);
+                SyncAll();
+            };
+            _resync.Add(() => reset.Enabled = selectedType is not null && _settings.MergeRules.Any(r => r.Klic == klic && r.Type == selectedType));
+            defaults.Controls.Add(reset);
+        }
+        root.Controls.Add(defaults);
+        root.Controls.Add(new Label { Text = "KLIC: kabel- en leidinglagen, objecten met KLIC-gegevens en bronnen met KLIC in de naam. Overige lagen: alle andere objecten. De uiterlijkkeuzes hieronder gelden voor beide.", AutoSize = true, Margin = new Padding(3, 6, 3, 6) });
+        var lines = Group("Lijnen en vlakcontouren",
+            BoundCheck("Verschillende lijnschalen samenvoegen", () => _settings.MergeLineScales, v => _settings.MergeLineScales = v));
+        lines.Controls[0].Controls.Add(new Label { Text = "De herhalingsafstand van hetzelfde lijnpatroon mag verschillen. Kleur, lijndikte en lijnbreedte blijven onderscheiden.", AutoSize = true });
+        var hatches = Group("Arceringen",
+            BoundCheck("Verschillende arceerschalen samenvoegen", () => _settings.MergeHatchScales, v => _settings.MergeHatchScales = v),
+            BoundCheck("Verschillende arceerhoeken samenvoegen", () => _settings.MergeHatchAngles, v => _settings.MergeHatchAngles = v));
+        hatches.Controls[0].Controls.Add(new Label { Text = "Alleen hetzelfde patroon met dezelfde kleuren. Eén bronvoorbeeld bepaalt de getekende schaal en hoek.", AutoSize = true });
+        var symbols = Group("Symbolen",
+            BoundCheck("Verschillende groottes samenvoegen", () => _settings.MergeSymbolSizes, v => _settings.MergeSymbolSizes = v),
+            BoundCheck("Verschillende draairichtingen samenvoegen", () => _settings.MergeSymbolRotations, v => _settings.MergeSymbolRotations = v),
+            BoundCheck("Verschillende attribuutteksten samenvoegen", () => _settings.MergeSymbolAttributes, v => _settings.MergeSymbolAttributes = v));
+        symbols.Controls[0].Controls.Add(new Label { Text = "Eén bronvoorbeeld wordt getekend. Vorm, kleur, spiegeling en vervorming blijven onderscheiden. Passend maken in het vak staat bij Opmaak.", AutoSize = true });
+        root.Controls.AddRange(new Control[] { lines, hatches, symbols });
+        _resync.Add(() => {
+            lines.Visible = selectedType is null or NlcsDrawType.Geometrie or NlcsDrawType.Vlak;
+            hatches.Visible = selectedType is null or NlcsDrawType.Arcering;
+            symbols.Visible = selectedType is null or NlcsDrawType.Symbool;
+        });
+        var statuses = Group("Statussen (alle typen)",
+            BoundCheck("Gelijke statussen samenvoegen", () => _settings.MergeIdenticalStatuses, v => _settings.MergeIdenticalStatuses = v));
+        statuses.Controls[0].Controls.Add(new Label { Text = "Alleen als alle oorspronkelijke voorbeelden hetzelfde uiterlijk hebben.", AutoSize = true });
+        root.Controls.Add(statuses);
+        var textOptions = Group("Tekst (alle typen)", BoundCheck("Samengevoegde waarden tonen", () => _settings.ShowMergedValues, v => _settings.ShowMergedValues = v));
         textOptions.Controls[0].Controls.Add(new Label { Text = "Aan: Leiding (200, 300). Uit: Leiding.", AutoSize = true });
         textOptions.Controls[0].Controls.Add(BoundCheck("Lege KLIC-teksten weglaten", () => _settings.SuppressKlicPlaceholders, v => _settings.SuppressKlicPlaceholders = v));
         root.Controls.Add(textOptions);
@@ -405,11 +454,7 @@ internal sealed class SettingsDialog : LegendDialog
             BoundCheck("Symboolblokken invoegen", () => _settings.InsertSymbolBlocks, v => _settings.InsertSymbolBlocks = v),
             BoundCheck("Exploderen bij plaatsen", () => _settings.ExplodeOnPlace, v => _settings.ExplodeOnPlace = v)));
         root.Controls.Add(Group("Symbolen",
-            BoundCheck("Passend maken in het voorbeeldvak", () => _settings.NormalizeSymbols, v => _settings.NormalizeSymbols = v),
-            BoundCheck("Verschillende groottes samenvoegen", () => _settings.MergeSymbolSizes, v => _settings.MergeSymbolSizes = v),
-            BoundCheck("Verschillende draairichtingen samenvoegen", () => _settings.MergeSymbolRotations, v => _settings.MergeSymbolRotations = v),
-            BoundCheck("Verschillende attribuutteksten samenvoegen", () => _settings.MergeSymbolAttributes, v => _settings.MergeSymbolAttributes = v),
-            new Label { Text = "Bij samenvoegen wordt één van de symbolen als voorbeeld gebruikt. Kleur, vorm, spiegeling en vervorming blijven onderscheiden.", AutoSize = true }));
+            BoundCheck("Passend maken in het voorbeeldvak", () => _settings.NormalizeSymbols, v => _settings.NormalizeSymbols = v)));
         root.Controls.Add(ComboRow("Sortering:", () => _settings.SortMode, v => _settings.SortMode = v));
         root.Controls.Add(NumRow("Arceerschaal-factor:", () => _settings.HatchScaleFactor, v => _settings.HatchScaleFactor = v, 0.01M, 100M, 2, 0.1M));
         root.Controls.Add(Group("Koppen",
@@ -679,6 +724,7 @@ internal sealed class SettingsDialog : LegendDialog
         }
         target.MergedDimensions = LegendSettings.DefaultKlicMergeDimensions();
         target.NonKlicMergedDimensions.Clear();
+        target.MergeRules.Clear();
     }
 }
 

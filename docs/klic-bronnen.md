@@ -56,18 +56,21 @@ De plugin controleert daarmee niet de werkelijke ligging in het terrein.
 In **Instellingen → Samenvoegen** betekent een aangevinkt samenvoegkenmerk dat dit kenmerk niet
 wordt vergeleken. **Soorten samenvoegen** staat standaard uit: gas en water blijven
 verschillende soorten. Voor nieuwe KLIC-legenda's staan specificatie (spanning/druk),
-uitvoering, volgnummer, diameter en netbeheerder standaard aan. Overige lagen hebben aparte keuzes,
-standaard allemaal uit. Soort, specificatie, uitvoering, diameter en volgnummer komen
-uit de NLCS-laagnaam; de netbeheerder komt uit de objectgegevens. DATA2 bewijst dus niet wie
+uitvoering, volgnummer, diameter, materiaal en netbeheerder standaard aan. Overige lagen hebben aparte keuzes,
+standaard allemaal uit. Soort, specificatie, uitvoering en volgnummer komen
+uit de NLCS-laagnaam; diameter en materiaal uit de laagnaam of objectgegevens.
+De netbeheerder komt uit de objectgegevens. Per voorbeeldtype zijn afwijkende
+keuzes mogelijk: bijvoorbeeld diameters bij lijnen samenvoegen en bij symbolen apart houden. DATA2 bewijst dus niet wie
 de netbeheerder is. Ook objectgegevens of een bronnaam met KLIC herkennen KLIC-riool onder hoofdgroep RI.
 Bij **Diameters samenvoegen** verliezen de samengevoegde regels geen bronobjecten;
 de afzonderlijke diameters blijven terug te vinden in KLIC-details en de bronlagen.
 Hoeveelheden worden opgeteld; zichtbaar verschillende symbolen of
 arceringen blijven gescheiden.
 
-De diameterkeuze geldt voor zowel de laagnaam als objectgegevens. Onder
-**KLIC-instellingen → Afzonderlijke regels** kun je andere extra velden, zoals materiaal,
-aanvinken. Verschillende combinaties krijgen dan aparte legendaregels, ook als andere
+De diameter- en materiaalkeuzes gelden voor zowel de laagnaam als objectgegevens.
+Een bestaande keuze voor afzonderlijke materialen uit het KLIC-venster wordt
+overgenomen bij **Samenvoegen**. Onder **KLIC-instellingen → Afzonderlijke regels**
+kun je andere extra velden, zoals het thema of de druk, aanvinken. Verschillende combinaties krijgen dan aparte legendaregels, ook als andere
 eigenschappen worden samengevoegd. **Legenda-omschrijving** bepaalt welke veldwaarden achter
 de bestaande omschrijving verschijnen. Standaard zijn beide keuzes leeg; zo blijven bestaande
 legenda's gelijk. De maatvoering en vormgeving volgen de bestaande legenda-instellingen.

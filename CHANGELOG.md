@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.37.0 - 2026-10-26
+
+- Samenvoegkeuzes staan bij elkaar. Lijnen, vlakken, arceringen, vlakvullingen en symbolen kunnen eigen keuzes krijgen, afzonderlijk voor KLIC en overige lagen. Per type kun je terug naar de standaardkeuzes.
+- Materialen zijn apart samen te voegen. Dezelfde keuze geldt voor herkenbare materialen in laagnamen en KLIC-objectgegevens; bestaande expliciete materiaalgroepen blijven behouden. Diameters worden ook herkend in namen als HWA_RIOOLLEIDING_PVC_160.
+- Verschillende lijnschalen, arceerschalen en arceerhoeken zijn afzonderlijk samen te voegen. Deze opties staan standaard uit. Kleur, patroon, lijndikte, transparantie en de afzonderlijke voorbeeldtypen blijven onderscheiden.
+- Samengevoegde materiaal-, schaal- en hoekwaarden zijn optioneel zichtbaar bij de omschrijving. Bronobjecten, hoeveelheden en uitsluitingen blijven behouden; de keuzes worden opgeslagen in de DWG.
+- Statussen worden pas na de andere samenvoegkeuzes vergeleken. Alleen dezelfde verzameling oorspronkelijke weergaven kan over statussen heen worden samengevoegd.
+
 ## 1.36.0 - 2026-10-26
 
 - Eigen regels en herkenningsregels kunnen xref-lagen rechtstreeks uit een doorzoekbare lijst kiezen. Bron, laag en blok of patroon staan apart; voorbeelden uit vergrendelde bronlagen worden op lokale legendalagen getekend.

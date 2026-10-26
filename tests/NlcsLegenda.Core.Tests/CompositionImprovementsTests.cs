@@ -25,7 +25,8 @@ public class CompositionImprovementsTests
     {
         var s = new LegendSettings();
         Assert.DoesNotContain(GroupDimension.Soort, s.MergedDimensions);
-        Assert.Equal(5, s.MergedDimensions.Count);
+        Assert.Equal(6, s.MergedDimensions.Count);
+        Assert.Contains(GroupDimension.Materiaal, s.MergedDimensions);
         Assert.Contains(GroupDimension.Diameter, s.MergedDimensions);
         Assert.Empty(s.NonKlicMergedDimensions);
         Assert.NotEqual(ElementProperties.From("GAS").MergeKey(s.MergedDimensions),

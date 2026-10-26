@@ -136,7 +136,7 @@ public sealed record KlicObjectData(string Drawing, string Handle, string Xref,
     public string GroupKey(IEnumerable<string> fields)
     {
         if (!HasData) return "";
-        var keys = KlicFields.Valid(fields).Where(k => k != "DiameterM" || Values(k).Count > 0).OrderBy(k => k, StringComparer.Ordinal).ToArray();
+        var keys = KlicFields.Valid(fields).Where(k => k is not ("DiameterM" or "Materiaal") || Values(k).Count > 0).OrderBy(k => k, StringComparer.Ordinal).ToArray();
         return keys.Length == 0 || !HasData ? "" : JsonSerializer.Serialize(keys.Select(k =>
             new { key = k, values = Values(k).Select(v => KlicFields.Canonical(k, v)).Order(StringComparer.Ordinal).ToArray() }));
     }
@@ -144,15 +144,24 @@ public sealed record KlicObjectData(string Drawing, string Handle, string Xref,
 
 public static class KlicSummary
 {
-    public static string WithoutDiameter(string group)
+    public static string WithoutDiameter(string group) => WithoutFields(group, new[] { "DiameterM" });
+
+    public static string WithoutMergedFields(string group, IReadOnlyCollection<GroupDimension> dimensions) =>
+        WithoutFields(group, dimensions.SelectMany(d => d switch {
+            GroupDimension.Diameter => new[] { "DiameterM" }, GroupDimension.Materiaal => new[] { "Materiaal" },
+            _ => Array.Empty<string>()
+        }).ToArray());
+
+    private static string WithoutFields(string group, IReadOnlyCollection<string> ignored)
     {
-        if (group.Length == 0) return group;
+        if (group.Length == 0 || ignored.Count == 0) return group;
         try
         {
             using var json = JsonDocument.Parse(group);
             if (json.RootElement.ValueKind != JsonValueKind.Array) return group;
             var fields = json.RootElement.EnumerateArray().Where(f => f.ValueKind != JsonValueKind.Object
-                || !f.TryGetProperty("key", out var key) || key.ValueKind != JsonValueKind.String || key.GetString() != "DiameterM").ToArray();
+                || !f.EnumerateObject().Any(p => p.Name.Equals("key", StringComparison.OrdinalIgnoreCase)
+                    && p.Value.ValueKind == JsonValueKind.String && ignored.Contains(p.Value.GetString(), StringComparer.OrdinalIgnoreCase))).ToArray();
             return fields.Length == 0 ? "" : JsonSerializer.Serialize(fields);
         }
         catch (JsonException) { return group; }

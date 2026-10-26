@@ -19,14 +19,14 @@ internal sealed class KlicOptionsDialog : LegendDialog
         {
             var page = new TabPage(title) { Padding = new Padding(10) };
             var list = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false, HorizontalScrollbar = true };
-            foreach (var field in KlicFields.All.Where(f => !grouping || f.Key != "DiameterM")) list.Items.Add(field, selected.Contains(field.Key));
+            foreach (var field in KlicFields.All.Where(f => !grouping || f.Key is not ("DiameterM" or "Materiaal"))) list.Items.Add(field, selected.Contains(field.Key));
             var hint = new Label { Text = explanation, Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(0, 0, 0, 10) };
             page.SizeChanged += (_, _) => hint.MaximumSize = new Size(Math.Max(100, page.ClientSize.Width - 20), 0);
             page.Controls.Add(list); page.Controls.Add(hint); tabs.TabPages.Add(page); return list;
         }
         var columns = AddFields("Overzicht en export", "Deze velden verschijnen als kolommen in Overzicht en in CSV/JSON-export.", Result.Columns);
         var description = AddFields("Legenda-omschrijving", "Voeg gekozen eigenschappen toe achter de omschrijving. Bij meerdere waarden blijven alle varianten zichtbaar. Zonder selectie blijft de bestaande tekst behouden.", Result.DescriptionFields);
-        var groups = AddFields("Afzonderlijke regels", "Objecten met verschillende waarden voor de aangevinkte eigenschappen krijgen afzonderlijke legendaregels. Diameter staat bij Instellingen → Samenvoegen en geldt voor zowel laagnamen als objectgegevens.", Result.GroupFields, grouping: true);
+        var groups = AddFields("Afzonderlijke regels", "Objecten met verschillende waarden voor de aangevinkte eigenschappen krijgen afzonderlijke legendaregels. Diameter en materiaal staan bij Instellingen → Samenvoegen en gelden voor zowel laagnamen als objectgegevens.", Result.GroupFields, grouping: true);
         var sourcePage = new TabPage("Gegevensbron") { Padding = new Padding(10), AutoScroll = true };
         var source = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
         foreach (var value in Enum.GetValues<KlicSource>()) source.Items.Add(KlicFields.SourceLabel(value));

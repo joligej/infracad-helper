@@ -123,6 +123,15 @@ public sealed class LegendSettings
     [Category("Groepering"), DisplayName("Attribuutteksten samenvoegen")]
     public bool MergeSymbolAttributes { get; set; }
 
+    [Category("Groepering"), DisplayName("Lijnschalen samenvoegen")]
+    public bool MergeLineScales { get; set; }
+
+    [Category("Groepering"), DisplayName("Arceerschalen samenvoegen")]
+    public bool MergeHatchScales { get; set; }
+
+    [Category("Groepering"), DisplayName("Arceerhoeken samenvoegen")]
+    public bool MergeHatchAngles { get; set; }
+
     [Category("Weergave"), DisplayName("Arceerschaal-factor")]
     public double HatchScaleFactor { get; set; } = 1.0;
 
@@ -158,16 +167,56 @@ public sealed class LegendSettings
     [Browsable(false)]
     public HashSet<string> KnownEntryKeys { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyList<string> KlicGroupFields() => Klic.GroupFields.Append("DiameterM").Distinct().ToArray();
+    public IReadOnlyList<string> KlicGroupFields() => Klic.GroupFields.Concat(new[] { "DiameterM", "Materiaal" }).Distinct().ToArray();
 
     public static HashSet<GroupDimension> DefaultKlicMergeDimensions() =>
-        new() { GroupDimension.Specificatie, GroupDimension.Uitvoering, GroupDimension.Nummer, GroupDimension.Netbeheerder, GroupDimension.Diameter };
+        new() { GroupDimension.Specificatie, GroupDimension.Uitvoering, GroupDimension.Nummer, GroupDimension.Netbeheerder, GroupDimension.Diameter, GroupDimension.Materiaal };
 
     [Browsable(false)]
     public List<GroupDimension> NonKlicMergedDimensions { get; set; } = new();
 
     [Browsable(false)]
     public List<ManualMergeGroup> ManualMergeGroups { get; set; } = new();
+
+    [Browsable(false)]
+    public List<MergeRule> MergeRules { get; set; } = new();
+
+    public IReadOnlyCollection<GroupDimension> MergeDimensionsFor(bool klic, NlcsDrawType? type = null) =>
+        type is not null && MergeRules.LastOrDefault(r => r.Klic == klic && r.Type == type) is { } rule
+            ? rule.Dimensions : klic ? MergedDimensions : NonKlicMergedDimensions;
+
+    public IReadOnlyCollection<GroupDimension> MergeDimensionsFor(LegendEntry entry) =>
+        MergeDimensionsFor(entry.IsKlic, entry.LayersByType.Count == 1 ? entry.LayersByType.Keys.First() : null);
+
+    public void SetMergeDimension(bool klic, NlcsDrawType? type, GroupDimension dimension, bool merge)
+    {
+        MigrateMaterialGrouping();
+        ICollection<GroupDimension> values;
+        if (type is null) values = klic ? MergedDimensions : NonKlicMergedDimensions;
+        else
+        {
+            if (!MergeRule.Supports(type.Value)) throw new ArgumentOutOfRangeException(nameof(type));
+            var rule = MergeRules.LastOrDefault(r => r.Klic == klic && r.Type == type);
+            if (rule is null)
+            {
+                rule = new() { Klic = klic, Type = type.Value, Dimensions = MergeDimensionsFor(klic).ToList() };
+                MergeRules.Add(rule);
+            }
+            values = rule.Dimensions;
+        }
+        if (merge && !values.Contains(dimension)) values.Add(dimension);
+        if (!merge) values.Remove(dimension);
+    }
+
+    private void MigrateMaterialGrouping()
+    {
+        if (Klic.GroupFields.RemoveAll(f => f == "Materiaal") == 0) return;
+        MergedDimensions.Remove(GroupDimension.Materiaal);
+        foreach (var rule in MergeRules.Where(r => r.Klic)) rule.Dimensions.Remove(GroupDimension.Materiaal);
+    }
+
+    public void ResetMergeDimensions(bool klic, NlcsDrawType type) =>
+        MergeRules.RemoveAll(r => r.Klic == klic && r.Type == type);
 
     [Category("Groepering"), DisplayName("Soort samenvoegen"), JsonIgnore,
      Description("Voegt kabels/leidingen samen ongeacht de soort (bijv. alle KL in één regel).")]
@@ -476,26 +525,42 @@ public sealed class LegendSettings
     internal static string WithoutStyle(string key) => key.Split("|STYLE:", 2, StringSplitOptions.None)[0];
 
     public static bool MatchesExclusion(string key, string excluded) =>
-        new[] { key, WithoutStyle(key), WithoutKlicGroup(WithoutStyle(key)), BaseEntryKey(key), WithoutDiameterKey(key), WithoutStyle(WithoutDiameterKey(key)) }
-            .Contains(excluded, StringComparer.OrdinalIgnoreCase);
+        ChoiceAliases(key).Contains(excluded, StringComparer.OrdinalIgnoreCase);
 
-    private static string WithoutDiameterKey(string key)
+    private static IEnumerable<string> ChoiceAliases(string key)
+    {
+        yield return key;
+        var plain = WithoutStyle(key);
+        yield return plain;
+        yield return WithoutKlicGroup(plain);
+        yield return BaseEntryKey(key);
+        var diameter = WithoutDiameterKey(key);
+        yield return diameter;
+        yield return WithoutStyle(diameter);
+        var material = WithoutMaterialKey(key);
+        yield return material;
+        yield return WithoutStyle(material);
+        var both = WithoutDiameterKey(material);
+        yield return both;
+        yield return WithoutStyle(both);
+    }
+
+    private static string WithoutDiameterKey(string key) => WithoutFieldsKey(key, GroupDimension.Diameter);
+    internal static string WithoutMaterialKey(string key) => WithoutFieldsKey(key, GroupDimension.Materiaal);
+
+    private static string WithoutFieldsKey(string key, GroupDimension dimension)
     {
         int start = key.IndexOf("|KLIC:", StringComparison.Ordinal);
         if (start < 0) return key;
         int style = key.LastIndexOf("|STYLE:", StringComparison.Ordinal);
         if (style < start) style = key.Length;
-        var group = KlicSummary.WithoutDiameter(key[(start + 6)..style]);
+        var group = KlicSummary.WithoutMergedFields(key[(start + 6)..style], new[] { dimension });
         return key[..start] + (group.Length == 0 ? "" : "|KLIC:" + group) + key[style..];
     }
 
     public bool IsEntryExcluded(string key)
     {
-        if (ExcludedEntries.Count == 0) return false;
-        if (ExcludedEntries.Contains(key) || ExcludedEntries.Contains(WithoutStyle(key))
-            || ExcludedEntries.Contains(WithoutKlicGroup(WithoutStyle(key))) || ExcludedEntries.Contains(BaseEntryKey(key))) return true;
-        string previous = WithoutDiameterKey(key);
-        return ExcludedEntries.Contains(previous) || ExcludedEntries.Contains(WithoutStyle(previous));
+        return ExcludedEntries.Count > 0 && ChoiceAliases(key).Any(ExcludedEntries.Contains);
     }
 
     public void RememberEntries(IEnumerable<LegendEntry> entries)
@@ -598,6 +663,7 @@ public sealed class LegendSettings
         ManualEntries = other.ManualEntries.Select(m => m.Clone()).ToList();
         ManualMergeGroups = other.ManualMergeGroups.Select(m => m.Clone()).ToList();
         NonKlicMergedDimensions = new(other.NonKlicMergedDimensions);
+        MergeRules = other.MergeRules.Select(r => r.Clone()).ToList();
         BlankEntries = other.BlankEntries.Select(b => b.Clone()).ToList();
         CustomStatuses = other.CustomStatuses.Select(cs => cs.Clone()).ToList();
         CustomLayerRules = other.CustomLayerRules.Select(r => r.Clone()).ToList();
@@ -657,7 +723,7 @@ public sealed class LegendSettings
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries) or nameof(KnownEntryKeys)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
             or nameof(CustomLayerRules) or nameof(BlankEntries) or nameof(ManualMergeGroups) or nameof(NonKlicMergedDimensions)
-            or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder) or nameof(Klic) or nameof(ExampleOverrides);
+            or nameof(MergeRules) or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder) or nameof(Klic) or nameof(ExampleOverrides);
 
     [JsonIgnore, Browsable(false)]
     public double ModelUnitsPerPaperMm => Scale / 1000.0;
@@ -729,8 +795,14 @@ public sealed class LegendSettings
         BlankEntries ??= new List<BlankEntry>();
         CustomStatuses ??= new List<CustomStatus>();
         CustomLayerRules ??= new List<CustomLayerRule>();
-        MergedDimensions ??= DefaultKlicMergeDimensions();
+        MergedDimensions = (MergedDimensions ?? DefaultKlicMergeDimensions()).Where(d => Enum.IsDefined(d)).ToHashSet();
+        MergeRules = (MergeRules ?? new()).Where(r => r is not null && MergeRule.Supports(r.Type))
+            .GroupBy(r => (r.Klic, r.Type)).Select(g => g.Last()).Select(r => new MergeRule {
+                Klic = r.Klic, Type = r.Type,
+                Dimensions = (r.Dimensions ?? new()).Where(d => Enum.IsDefined(d)).Distinct().ToList()
+            }).ToList();
         NonKlicMergedDimensions = (NonKlicMergedDimensions ?? new()).Where(d => Enum.IsDefined(d)).Distinct().ToList();
+        MigrateMaterialGrouping();
         ManualMergeGroups = (ManualMergeGroups ?? new()).Where(m => m is not null && m.IsValid)
             .Select(m => m.Clone()).ToList();
         ExcludedDisciplines = ToCi(ExcludedDisciplines);
