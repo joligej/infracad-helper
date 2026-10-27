@@ -59,6 +59,12 @@ public sealed class LegendRegistry
             l.Name ??= string.Empty;
             if (l.GroupName is null || l.SourceHandles is null || l.Settings is null || !Enum.IsDefined(l.Scope))
                 throw new JsonException("De opgeslagen bronselectie, groep of instellingen zijn ongeldig.");
+            l.Rows ??= new();
+            if (l.Rows.Any(r => r is null || r.Sources is null || r.Sources.Any(s => s is null || !s.IsValid) || r.ExclusionKeys is null
+                || string.IsNullOrWhiteSpace(r.Id) || r.OrderKey is null || r.Appearance is null || !Enum.IsDefined(r.Status)
+                || r.Description is null || r.SampleBlock is null || r.ExclusionKeys.Any(k => k is null)
+                || !double.IsFinite(r.Scale) || r.Scale <= 0))
+                throw new JsonException("De bewaarde legendaregels zijn ongeldig.");
             l.Settings.Normalize();
         }
     }

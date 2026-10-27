@@ -54,6 +54,8 @@ public static class GlobalLegendSettings
     public static void Save(string directory, LegendSettings settings)
     {
         var stored = settings.Clone();
+        stored.SourceRows.Clear(); stored.FinalSourceRows.Clear();
+        stored.RowChoices.RemoveAll(c => c.Scope == ChoiceScope.Variant);
         var descriptions = stored.DescriptionOverrides;
         stored.DescriptionOverrides = new DescriptionCatalog();
         Directory.CreateDirectory(directory);

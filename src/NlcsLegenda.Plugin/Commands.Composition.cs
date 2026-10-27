@@ -38,6 +38,7 @@ public partial class Commands
     {
         var probe = settings.Clone();
         probe.ExcludedEntries.Clear();
+        foreach (var choice in probe.RowChoices) choice.Excluded = false;
         probe.MergedDimensions.Clear();
         probe.NonKlicMergedDimensions.Clear();
         probe.ManualMergeGroups.Clear();
@@ -60,7 +61,12 @@ public partial class Commands
         }
         var catalog = legendId is null ? LoadGlobalCatalog() : DescriptionCatalog.Default();
         var analysis = DrawingAnalyzer.Analyze(db, tr, probe, selection, catalog, excluded);
+        LegendContinuity.Reconcile(settings, analysis.Entries, final: false);
         settings.RememberEntries(analysis.Entries);
+        foreach (var entry in analysis.Entries)
+            if (settings.RowChoices.Where(c => c.Matches(entry) && c.Excluded.HasValue)
+                .OrderBy(c => c.Scope == ChoiceScope.Layer ? 0 : c.Scope == ChoiceScope.ObjectKind ? 1 : 2).LastOrDefault()?.Excluded == true)
+                settings.ExcludedEntries.Add(LegendSettings.SelectionKey(entry));
         var items = analysis.Entries
             .Select(e => new EntryCheckItem(LegendSettings.SelectionKey(e),
                 $"[{e.Status.DisplayName()}] {e.DisplayDescription}" + AppearanceLabel(e, analysis), EntryGroupLabel(e),

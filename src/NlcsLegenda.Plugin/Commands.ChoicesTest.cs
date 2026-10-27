@@ -150,8 +150,11 @@ public partial class Commands
         {
             using var tr = db.TransactionManager.StartTransaction();
             var registry = LegendStore.Load(db, tr); var a = registry.Legends.Single(d => d.Name == "Keuzes A");
-            if (Math.Abs(a.Settings.Scale - 500) > 1e-9 || a.Settings.Title != "Mijn titel" || a.Settings.ExcludedEntries.Count != 1)
+            if (Math.Abs(a.Settings.Scale - 500) > 1e-9 || a.Settings.Title != "Mijn titel" || a.Settings.ExcludedEntries.Count == 0)
                 throw new InvalidOperationException("Lokale keuzes niet bewaard.");
+            var before = ChoiceAnalysis(db, tr, registry, a.Settings);
+            if (before.Entries.Any(e => e.SymbolLayer is null && a.Settings.IsEntryExcluded(LegendSettings.SelectionKey(e))))
+                throw new InvalidOperationException("Een andere objectsoort is onbedoeld uitgesloten.");
             if (BuildManagedLegend(db, tr, registry, a, out _, out _) != UpdateResult.Updated) throw new InvalidOperationException("Bijwerken na heropenen mislukt.");
             if (DrawingAnalyzer.Analyze(db, tr, a.Settings, excludedIds: LegendManagement.CollectManagedIds(db, tr, registry)).Entries.Any(e => e.SymbolLayer is not null))
                 throw new InvalidOperationException("Uitgevinkt symbool terug na heropenen.");

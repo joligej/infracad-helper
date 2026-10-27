@@ -15,6 +15,9 @@ public class CollectionWiringTests
         nameof(LegendSettings.MergeRules),
         nameof(LegendSettings.ExcludedEntries),
         nameof(LegendSettings.KnownEntryKeys),
+        nameof(LegendSettings.RowChoices),
+        nameof(LegendSettings.SourceRows),
+        nameof(LegendSettings.FinalSourceRows),
         nameof(LegendSettings.ManualEntries),
         nameof(LegendSettings.ManualMergeGroups),
         nameof(LegendSettings.NonKlicMergedDimensions),
@@ -52,6 +55,9 @@ public class CollectionWiringTests
     private static LegendSettings Populated()
     {
         var s = new LegendSettings();
+        s.RowChoices.Add(new RowChoice { Description = "Eigen boom", Sources = { new(":A1", "BOOM", NlcsDrawType.Symbool, "Boom", NlcsStatus.Nieuw) } });
+        s.SourceRows.Add(new SourceRow { SelectionKey = "a", Sources = new(s.RowChoices[0].Sources) });
+        s.FinalSourceRows.Add(s.SourceRows[0].Clone());
         s.IncludedStatuses.Clear();
         s.IncludedStatuses.Add(NlcsStatus.Nieuw);
         s.IncludedDrawTypes.Clear();

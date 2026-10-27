@@ -2,6 +2,11 @@ namespace NlcsLegenda.Core;
 
 public sealed class ManualEntry
 {
+    public string SampleBlock { get; set; } = "";
+    public double SampleScale { get; set; } = 1000;
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? Id { get; set; }
+
     public string Layer { get; set; } = string.Empty;
 
     public NlcsDrawType Type { get; set; } = NlcsDrawType.Geometrie;
@@ -21,6 +26,7 @@ public sealed class ManualEntry
 
     public ManualEntry Clone() => new()
     {
+        Id = Id, SampleBlock = SampleBlock, SampleScale = SampleScale,
         Layer = Layer,
         Type = Type,
         Description = Description,
@@ -32,11 +38,12 @@ public sealed class ManualEntry
 
     public LegendEntry ToLegendEntry(string? customStatusName = null) => new()
     {
+        SampleBlock = SampleBlock, SampleScale = SampleScale,
         Status = Status,
         CustomStatusName = customStatusName,
         Discipline = "XX",
         Hoofdgroep = string.IsNullOrWhiteSpace(Hoofdgroep) ? "HM" : Hoofdgroep.ToUpperInvariant(),
-        Element = Slug(Description),
+        Element = !string.IsNullOrEmpty(Id) ? "EIGEN_" + Id : Slug(Description),
         Description = Description.Trim(),
         DescriptionSource = DescriptionSource.Handmatig,
         LayersByType = new Dictionary<NlcsDrawType, string> { [Type] = Layer.Trim() },

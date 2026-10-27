@@ -16,7 +16,16 @@ public sealed class LegendEntry
 
     public required string Element { get; init; }
 
-    public required string Description { get; init; }
+    public required string Description { get; set; }
+
+    public IReadOnlyList<LegendSource> Sources { get; init; } = Array.Empty<LegendSource>();
+    public string SourceNotice { get; set; } = "";
+    public string VariantDetails { get; set; } = "";
+    public bool ExcludedBySource { get; set; }
+    public bool? SourceExcluded { get; set; }
+    public string SampleBlock { get; init; } = "";
+    public double SampleScale { get; init; } = 1000;
+    public bool Retained { get; init; }
 
     public IReadOnlyList<string> Netbeheerders { get; init; } = Array.Empty<string>();
 
@@ -46,6 +55,7 @@ public sealed class LegendEntry
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).ToArray();
             var text = values.Length == 0 ? description : description + " (" + string.Join(", ", values) + ")";
             var extra = KlicSummary.Description(KlicObjects, KlicDescriptionFields);
+            if (Retained) text += " (bron ontbreekt of uitgeschakeld)";
             return extra.Length == 0 ? text : text + " · " + extra;
         }
     }
@@ -92,6 +102,7 @@ public sealed class LegendEntry
 
     public string RenderIdentity { get; init; } = string.Empty;
     public string FullRenderIdentity { get; init; } = string.Empty;
+    public string SampleIdentity { get; set; } = string.Empty;
 
     public string SelectionIdentity { get; init; } = string.Empty;
     public string LegacySelectionIdentity { get; init; } = string.Empty;

@@ -87,6 +87,38 @@ internal static class LegendViewport
         return width <= viewport.Width + 1e-8 && height <= viewport.Height + 1e-8;
     }
 
+    internal static IEnumerable<Viewport> Linked(Database db, Transaction tr, string legendId)
+    {
+        foreach (DBDictionaryEntry item in (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead))
+        {
+            var layout = (Layout)tr.GetObject(item.Value, OpenMode.ForRead);
+            if (layout.ModelType) continue;
+            foreach (ObjectId id in (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForRead))
+                if (tr.GetObject(id, OpenMode.ForRead) is Viewport viewport && Read(viewport, tr) is { } link && link.Id == legendId)
+                    yield return viewport;
+        }
+    }
+
+    internal static LegendSettings FitSettings(Database db, Transaction tr, LegendDefinition legend, out double maximumWidth)
+    {
+        maximumWidth = double.MaxValue;
+        var settings = legend.Settings.Clone();
+        if (!settings.FitExistingWindow) return settings;
+        var viewports = Linked(db, tr, legend.Id).ToArray();
+        if (viewports.Length == 0) return settings;
+        double width = viewports.Min(v => v.Width) - 2 * settings.ViewportMarginMm;
+        double height = viewports.Min(v => v.Height) - 2 * settings.ViewportMarginMm;
+        double border = settings.DrawBorder ? 2 * settings.BorderMarginMm : 0;
+        double minimum = settings.SwatchWidthMm + settings.TextGapMm + 3 * settings.TextHeightMm
+            + (settings.IncludeQuantities ? settings.QuantityColumnWidthMm : 0) + border;
+        if (width < minimum || height <= 0) throw new InvalidOperationException("Het legendavenster is te klein voor leesbare tekst. Vergroot het kader; de bestaande legenda blijft staan.");
+        settings.MaxLegendHeightMm = settings.MaxLegendHeightMm > 0 ? Math.Min(settings.MaxLegendHeightMm, height) : height;
+        settings.ColumnWidthMm = Math.Min(settings.ColumnWidthMm, width - border);
+        settings.RemarksWidthMm = Math.Min(settings.RemarksWidthMm, width - border);
+        maximumWidth = settings.ToModel(width);
+        return settings;
+    }
+
     public static bool Sync(Database db, Transaction tr, LegendDefinition legend)
     {
         if (!LegendManagement.TryGetGroupExtents(db, tr, legend.GroupName, out var bounds)) return true;
@@ -101,7 +133,7 @@ internal static class LegendViewport
                 if (Read(viewport, tr) is not { } link || link.Id != legend.Id) continue;
                 viewport.UpgradeOpen();
                 SetLayer(viewport, db, tr, legend.Settings);
-                fits &= Align(viewport, legend.Settings, bounds, link.Automatic);
+                fits &= Align(viewport, legend.Settings, bounds, link.Automatic && !legend.Settings.FitExistingWindow);
             }
         }
         return fits;

@@ -18,7 +18,7 @@ public partial class Commands
     // wissen en opbouwen binnen dezelfde transactie
     private static UpdateResult BuildManagedLegend(
         Database db, Transaction tr, LegendRegistry registry, LegendDefinition def,
-        out int rows, out string note)
+        out int rows, out string note, bool preserveRows = true)
     {
         rows = 0;
         note = string.Empty;
@@ -34,7 +34,7 @@ public partial class Commands
                 note = missing > 0
                     ? $"alle {missing} bronobjecten ontbreken"
                     : "geen bronobjecten meer";
-                return UpdateResult.NoEntries;
+                if (def.Settings.ManualEntries.Count == 0 && def.Rows.Count == 0) return UpdateResult.NoEntries;
             }
             if (missing > 0)
                 note = $"{missing} bronobject(en) ontbreken";
@@ -42,6 +42,9 @@ public partial class Commands
 
         // eigen tekstkopie gebruiken, niet de gewijzigde globale standaard
         var analysis = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, DescriptionCatalog.Default(), excluded);
+        if (preserveRows) LegendRowSamples.Seed(db, tr, def, analysis);
+        else def.Rows.Clear();
+        analysis = LegendRowSamples.Retain(analysis, def);
         if (analysis.Entries.Count == 0)
             note = AppendNote(note, "geen regels opgenomen; samenstelling behouden");
         int unknownAreas = analysis.Entries.Count(e => e.Metric.HasUnknownArea);
@@ -49,7 +52,13 @@ public partial class Commands
 
         bool hadGeometry = LegendManagement.TryEraseGroup(db, tr, def.GroupName, out var topLeft, keepGroup: true);
 
-        var btrId = LegendBuilder.BuildBlock(db, tr, analysis, def.Settings, out rows, out var issues);
+        var savedRows = new List<SavedLegendRow>();
+        var drawingSettings = LegendViewport.FitSettings(db, tr, def, out var maximumWidth);
+        var btrId = LegendBuilder.BuildBlock(db, tr, analysis, drawingSettings, out rows, out var issues,
+            (entry, sample) => savedRows.Add(entry.Retained
+                ? LegendRowSamples.SaveRetained(def, entry)
+                : LegendRowSamples.Save(db, tr, entry, sample, def.Settings.Scale)), maximumWidth);
+        def.Rows = savedRows;
         if (issues.Count > 0)
             throw new InvalidOperationException($"Legenda niet gewijzigd: {issues[0].Reason}");
         var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
@@ -58,6 +67,8 @@ public partial class Commands
         LegendBuilder.AppendEntity(ms, br);
         tr.AddNewlyCreatedDBObject(br, true);
 
+        if (LegendManagement.TryGetEntityExtents(tr, br, out var builtBounds) && builtBounds.MaxPoint.X - builtBounds.MinPoint.X > maximumWidth + 2 * def.Settings.ToModel(def.Settings.ViewportMarginMm) + 1e-8)
+            throw new InvalidOperationException($"De bijgewerkte legenda is {(builtBounds.MaxPoint.X - builtBounds.MinPoint.X) / def.Settings.ModelUnitsPerPaperMm:0.###} mm breed; beschikbaar is {maximumWidth / def.Settings.ModelUnitsPerPaperMm:0.###} mm. Vergroot het venster of pas de indeling aan; er is niets gewijzigd.");
         if (hadGeometry && LegendManagement.TryGetEntityExtents(tr, br, out var ext))
         {
             var shift = new Vector3d(topLeft.X - ext.MinPoint.X, topLeft.Y - ext.MaxPoint.Y, 0);
@@ -67,7 +78,10 @@ public partial class Commands
 
         FinalizePlacement(tr, db, br, def.Settings, def.GroupName);
         if (!LegendViewport.Sync(db, tr, def))
+        {
+            if (def.Settings.FitExistingWindow) throw new InvalidOperationException("De legenda past niet binnen het bestaande venster; de vorige legenda is behouden. Vergroot het venster of pas de indeling aan.");
             note = AppendNote(note, "een gekoppeld legenda-venster is te klein; vergroot het kader of maak een automatisch venster");
+        }
         return UpdateResult.Updated;
     }
 
@@ -95,7 +109,7 @@ public partial class Commands
     {
         var settings = LoadGlobalDefaults();
         settings.KnownEntryKeys.Clear();
-        return ApplyTargetSettings(editor, database, target, settings, "Resetten");
+        return ApplySettingsAndRebuild(editor, database, target.LegendId, settings, resetRows: true);
     }
 
     private static string AppendNote(string note, string extra) =>
@@ -104,6 +118,7 @@ public partial class Commands
     private static void PurgePending(Database db)
     {
         PurgeOrphanLegendBlocks(db);
+        LegendRowSamples.Prune(db);
     }
 
     [CommandMethod("NLCSLEGENDABEHEER", CommandFlags.Modal)]
@@ -190,6 +205,17 @@ public partial class Commands
         {
             ids = LegendManagement.ActiveRegistry(db, tr, LegendStore.Load(db, tr)).Legends.Select(l => l.Id).ToList();
             tr.Commit();
+        }
+        if (!HostEnvironment.IsCoreConsole)
+        {
+            var changes = new List<LegendChange>();
+            using var preview = db.TransactionManager.StartTransaction();
+            var stored = LegendStore.Load(db, preview);
+            foreach (var id in ids)
+                if (stored.FindById(id) is { } definition)
+                    changes.AddRange(PreviewChanges(db, definition).Select(c => c with { Description = definition.Name + " · " + c.Description }));
+            using var dialog = new UpdatePreviewDialog("alle legenda's", changes);
+            if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK) return;
         }
         // afzonderlijke transacties per legenda
         foreach (var id in ids)
@@ -439,7 +465,7 @@ public partial class Commands
         }
     }
 
-    private string? ApplySettingsAndRebuild(Editor ed, Database db, string id, LegendSettings newSettings)
+    private string? ApplySettingsAndRebuild(Editor ed, Database db, string id, LegendSettings newSettings, bool resetRows = false)
     {
         try
         {
@@ -450,7 +476,7 @@ public partial class Commands
                 var def = reg.FindById(id);
                 if (def is null) { ed.WriteMessage("\nLegenda niet meer gevonden."); return "Legenda niet meer gevonden."; }
                 def.Settings.CopyFrom(newSettings);
-                r = BuildManagedLegend(db, tr, reg, def, out _, out note);
+                r = BuildManagedLegend(db, tr, reg, def, out _, out note, preserveRows: !resetRows);
                 if (r == UpdateResult.Updated)
                     LegendStore.Save(db, tr, reg);
                 tr.Commit();

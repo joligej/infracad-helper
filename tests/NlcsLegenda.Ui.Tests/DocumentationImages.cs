@@ -42,14 +42,25 @@ internal static class DocumentationImages
             new ManualEntry { Layer = "PROJECT_GRENS", Description = "Werkgrens", Type = NlcsDrawType.Geometrie } }, allowPicking: true))
             Capture(form, directory, "samenstellen.png", new Size(840, 600), f =>
                 Descendants(f).OfType<TextBox>().Single().Text = "-kl-");
-        Console.WriteLine("Vier documentatiebeelden geschreven met synthetische gegevens.");
+        using (var form = new RowChoiceDialog(entries[7]))
+            Capture(form, directory, "regel-aanpassen.png", new Size(650, 420));
+        using (var form = new UpdatePreviewDialog("Inrichting – demonstratie", new[] {
+            new LegendChange("Toegevoegd", "GWA-put", "Nieuw · Symbool · ONTWERP|N-WE-RI-PUT_GWA-S"),
+            new LegendChange("Voorbeeld gewijzigd", "Waterleiding", "Bestaand · Geometrie · kleur 5 · KLIC|B-WE-KL-WATER-G"),
+            new LegendChange("Bewaard", "Eigen hoogte (m NAP)", "Bron ontbreekt of staat uit; vorig voorbeeld bewaard.") }))
+            Capture(form, directory, "bijwerken.png", new Size(900, 480));
+        Console.WriteLine("Zes documentatiebeelden geschreven met synthetische gegevens.");
     }
 
     private static LegendEntry Entry(string layer, string text, NlcsDrawType type, double quantity, string xref = "")
     {
         if (!NlcsLayerParser.TryParse(layer, out var parsed) || parsed is null) throw new InvalidOperationException(layer);
         return new LegendEntry { Status = parsed.Status, Discipline = parsed.Discipline, Hoofdgroep = parsed.Hoofdgroep,
-            Element = parsed.Element, Description = text, LayersByType = new() { [type] = layer },
+            Element = parsed.Element, Description = text,
+            Sources = new[] { new LegendSource(layer, xref.Length == 0 ? layer : xref + "|" + layer, type,
+                type == NlcsDrawType.Symbool ? (parsed.Element == "BOOM" ? "SGR-BOOM_2E GROOTTE" : "SIE-" + parsed.Element + "-SO") : "", parsed.Status) },
+            VariantDetails = parsed.Element == "BOOM" ? "SGR-BOOM_2E GROOTTE; grootte 1; hoek 0°" : "",
+            LayersByType = new() { [type] = layer },
             SourceLayers = new[] { new NlcsLayerSource(layer, xref.Length == 0 ? layer : xref + "|" + layer, xref) },
             Metric = type == NlcsDrawType.Symbool ? new((int)quantity, 0, 0)
                 : type == NlcsDrawType.Geometrie ? new(1, quantity, 0) : new(1, 0, quantity) };

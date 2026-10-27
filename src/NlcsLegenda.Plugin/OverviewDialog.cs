@@ -53,6 +53,7 @@ internal sealed class OverviewDialog : LegendDialog
     private readonly Dictionary<LegendEntry, string[]> _rowValues = new();
     private readonly Dictionary<(LegendEntry, string), string> _fieldValues = new();
     private readonly Func<string, IReadOnlyList<LegendExample>>? _loadExamples;
+    private readonly Action<Form, OverviewLegend, LegendEntry>? _showExample;
     private bool _loading;
     private string? _analysisError;
     private readonly List<Button> _actions = new();
@@ -61,12 +62,14 @@ internal sealed class OverviewDialog : LegendDialog
 
     public OverviewDialog(IReadOnlyList<OverviewLegend> legends, Func<IReadOnlyList<OverviewLegend>, string?> save,
         Func<OverviewLegend, IReadOnlyList<LegendEntry>>? analyze = null,
-        Func<string, IReadOnlyList<LegendExample>>? loadExamples = null)
+        Func<string, IReadOnlyList<LegendExample>>? loadExamples = null,
+        Action<Form, OverviewLegend, LegendEntry>? showExample = null)
     {
         _legends = legends;
         _save = save;
         _analyze = analyze;
         _loadExamples = loadExamples;
+        _showExample = showExample;
         Text = "NLCS Legenda – overzicht";
         Font = SystemFonts.MessageBoxFont;
         ClientSize = new Size(960, 620);
@@ -89,6 +92,8 @@ internal sealed class OverviewDialog : LegendDialog
             return button;
         }
         ActionButton("Vernieuwen", () => { Current.NeedsAnalysis = true; LoadLegend(); }).Enabled = _analyze is not null;
+        _actions.Add(ActionButton("Regel aanpassen…", EditRow));
+        _actions.Add(ActionButton("Bron koppelen…", MatchSource));
         _example = ActionButton("Voorbeeld…", EditExample);
         _actions.Add(_example);
         _actions.Add(ActionButton("KLIC-instellingen…", EditKlic));
@@ -176,7 +181,7 @@ internal sealed class OverviewDialog : LegendDialog
     private void ConfigureColumns()
     {
         _grid.Columns.Clear();
-        foreach (var name in new[] { "Status", "Omschrijving", "Weergave", "Netbeheerder", "Soort", "Hoeveelheid", "Bronlagen", "Samengevoegd" }
+        foreach (var name in new[] { "Status", "Omschrijving", "Weergave", "Variant", "Netbeheerder", "Soort", "Hoeveelheid", "Bronlagen", "Samengevoegd" }
             .Concat(Current.Settings.Klic.Columns.Select(k => KlicFields.Find(k)!.Label)).Concat(new[] { "Broncontrole" }))
             _grid.Columns.Add(new DataGridViewTextBoxColumn
             {
@@ -186,6 +191,7 @@ internal sealed class OverviewDialog : LegendDialog
                 Visible = name switch
                 {
                     "Weergave" => _entries.Any(e => e.AppearanceLabel.Length > 0),
+                    "Variant" => _entries.Any(e => e.VariantDetails.Length > 0),
                     "Netbeheerder" => _entries.Any(e => e.Netbeheerders.Count > 0),
                     "Samengevoegd" => _entries.Any(e => e.MergedMembers.Count > 0),
                     "Broncontrole" => _entries.Any(e => RowValues(e)[^1].Length > 0),
@@ -240,7 +246,8 @@ internal sealed class OverviewDialog : LegendDialog
     {
         if (_rowValues.TryGetValue(entry, out var cached)) return cached;
         var issues = LayerMetric.MergeIssues(KlicSummary.Issues(entry.KlicObjects), entry.Metric.AreaIssue) ?? string.Empty;
-        var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, entry.AppearanceLabel, string.Join(", ", entry.Netbeheerders),
+        if (entry.SourceNotice.Length > 0) issues += " " + entry.SourceNotice;
+        var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, entry.AppearanceLabel, entry.VariantDetails, string.Join(", ", entry.Netbeheerders),
                 string.Join(", ", entry.LayersByType.Keys), entry.QuantityText(Current.Settings.QuantityDecimals, Current.Settings.UnitArea, Current.Settings.UnitLength, Current.Settings.UnitCount),
                 string.Join(Environment.NewLine, entry.SourceLayers.Select(s => s.SourceLayerName).Distinct()), string.Join(", ", entry.MergedMembers) };
         values.AddRange(Current.Settings.Klic.Columns.Select(k => KlicSummary.Field(entry.KlicObjects, k)));
@@ -318,6 +325,42 @@ internal sealed class OverviewDialog : LegendDialog
         }
     }
 
+    private void MatchSource()
+    {
+        if (Current.Id.Length == 0 || _grid.CurrentRow is not { } row) return;
+        var previous = _visible[row.Index];
+        using var dialog = new SourceMatchDialog(previous, _entries.Where(e => e != previous),
+            _showExample is null ? null : (form, entry) => _showExample(form, Current, entry));
+        if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Selected is not { } source) return;
+        ChangeMerges(() => {
+            var choice = LegendContinuity.SetChoice(Current.Settings, source, ChoiceScope.Variant,
+                description: previous.Description, example: dialog.KeepExample ? previous.SampleBlock : null,
+                automaticExample: !dialog.KeepExample);
+            choice.PreviousRowId = previous.Retained ? previous.Element["BEWAARD_".Length..] : "";
+            choice.ExampleScale = previous.SampleScale;
+            int index = Current.Settings.ManualEntryOrder.IndexOf(LegendOrder.Key(previous));
+            if (index >= 0) Current.Settings.ManualEntryOrder[index] = LegendOrder.Key(source);
+            if (previous.IsManual && !previous.Retained) Current.Settings.ManualEntries.RemoveAll(m => m.ToLegendEntry().Element == previous.Element);
+        });
+    }
+
+    private void EditRow()
+    {
+        if (Current.Id.Length == 0 || _grid.CurrentRow is not { } row) return;
+        var entry = _visible[row.Index];
+        using var dialog = new RowChoiceDialog(entry);
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        ChangeMerges(() => {
+            if (entry.IsManual && !entry.Retained)
+            {
+                var manual = Current.Settings.ManualEntries.FirstOrDefault(m => m.ToLegendEntry().Element == entry.Element);
+                if (manual is not null) manual.Description = dialog.Description;
+                if (dialog.Excluded) Current.Settings.ExcludedEntries.UnionWith(entry.ExclusionKeys);
+            }
+            else LegendContinuity.SetChoice(Current.Settings, entry, dialog.Scope, dialog.Description, dialog.Excluded);
+        });
+    }
+
     private void EditExample()
     {
         if (Current.Id.Length == 0 || _grid.CurrentRow is not { } row) return;
@@ -341,6 +384,8 @@ internal sealed class OverviewDialog : LegendDialog
                 string key = LegendOrder.Key(entry);
                 if (dialog.SelectedBlock is null) Current.Settings.ExampleOverrides.Remove(key);
                 else Current.Settings.ExampleOverrides[key] = dialog.SelectedBlock;
+                if (entry.Sources.Count > 0)
+                    LegendContinuity.SetChoice(Current.Settings, entry, ChoiceScope.Variant, example: dialog.SelectedBlock, automaticExample: dialog.SelectedBlock is null);
             }
             if (_analyze is not null) Current.Entries = _analyze(Current);
             Current.Changed = true; LoadEntries();

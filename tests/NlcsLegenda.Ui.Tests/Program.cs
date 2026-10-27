@@ -49,6 +49,9 @@ internal static class Program
             DiagnosticRun.Execute(() => CheckCustomizationRoundtrip(), Errors.Add, "CheckCustomizationRoundtrip");
             DiagnosticRun.Execute(() => CheckStatusReassignment(), Errors.Add, "CheckStatusReassignment");
             Func<Form>[] factories = {
+                () => new RowChoiceDialog(Entry("Boom")),
+                () => new SourceMatchDialog(Entry("Eigen hoogte"), new[] { Entry("Hoogte NAP") }),
+                () => new UpdatePreviewDialog("Legenda", new[] { new LegendChange("Voorbeeld gewijzigd", "Boom", "xref | laag | bestaand | blauw") }),
                 () => new OverviewDialog(new[] { new OverviewLegend { Id = "test", Name = "Voorbeeld", Settings = new(), Entries = new[] { Entry("Regel") } } }, _ => null),
                 () => new LayerChoiceDialog(new[] { new ManualEntry { Layer = "N-WE-GR-BOOM-V", Description = "Boom" } }),
                 () => new ExampleDialog("voorbeelden.dwg", _ => new[] { new LegendExample("b", "Scheidingband met tekst en meerdere lijnen", "WEG", 200, Array.Empty<string>()) }),
@@ -90,12 +93,12 @@ internal static class Program
         Application.DoEvents();
         CheckButtons(form);
         Check(Descendants(form).All(c => c is not TextBox || c.Height >= c.Font.Height), form.Text + ": teksthoogte");
-        if (form is ExampleDialog && output is not null)
+        if (form is ExampleDialog or RowChoiceDialog or SourceMatchDialog or UpdatePreviewDialog && output is not null)
         {
             Directory.CreateDirectory(output);
             using var image = new Bitmap(form.Width, form.Height);
             form.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
-            image.Save(Path.Join(output, $"examples-{scale:0.00}.png"));
+            image.Save(Path.Join(output, $"{form.GetType().Name}-{scale:0.00}.png"));
         }
         var controls = Descendants(form).ToArray();
         string title = form.Text;
@@ -278,13 +281,16 @@ internal static class Program
     private static void CheckCustomizationRoundtrip()
     {
         var settings = new LegendSettings { ManualEntries = new() {
-            new() { Layer = "EIGEN", Type = NlcsDrawType.Symbool, SymbolBlock = "PUT", Description = "Put", Hoofdgroep = "RI", Status = NlcsStatus.Overig },
+            new() { Layer = "EIGEN", Type = NlcsDrawType.Symbool, SymbolBlock = "PUT", Description = "Put", Hoofdgroep = "RI", Status = NlcsStatus.Overig,
+                Id = "overgenomen", SampleBlock = "PUT", SampleScale = 500 },
             new() { Layer = "EIGEN", Type = NlcsDrawType.Arcering, HatchPattern = "ANSI31", Description = "Vlak", Hoofdgroep = "VH" } } };
         using (var dialog = new LegendManageDialog(Array.Empty<EntryCheckItem>(), settings))
         {
             OpenOffscreen(dialog);
             var actual = dialog.ManualEntries;
             Check(actual[0].SymbolBlock == "PUT", "Samenstellen behoudt het eigen symboolblok");
+            Check(actual[0].Id == "overgenomen" && actual[0].SampleBlock == "PUT" && actual[0].SampleScale == 500,
+                "Samenstellen behoudt identiteit en maat van een overgenomen voorbeeld");
             Check(actual[0].Hoofdgroep == "RI" && actual[1].Hoofdgroep == "VH", "Samenstellen behoudt eigen hoofdgroepen");
             Check(actual[0].Status == NlcsStatus.Overig, "Samenstellen behoudt status Overig");
             Check(actual[1].HatchPattern == "ANSI31", "Samenstellen behoudt eigen arceringspatroon");

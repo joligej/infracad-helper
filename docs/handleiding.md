@@ -27,7 +27,10 @@ legenda als globale standaard voor nieuwe legenda's.
 
 Is het ontwerp veranderd, dan tekent `NLCSLEGENDAUPDATE` de legenda opnieuw op precies
 dezelfde plek. Instellingen, uitsluitingen en handmatige samenstellingen blijven bewaard
-voor bestaande regels, ook na een schaalwijziging of heropenen. Nieuwe bronregels worden
+voor bestaande bronobjecten, ook na een kleur-, stijl- of schaalwijziging en na heropenen.
+Vooraf verschijnt een overzicht van toegevoegde, verdwenen, gesplitste en samengevoegde
+regels, gewijzigde voorbeelden en bronmeldingen. Annuleren laat de legenda staan.
+Dit overzicht verschijnt ook bij Alles bijwerken. Nieuwe bronregels worden
 volgens de opgeslagen filters toegevoegd. Ook een volledig uitgevinkte legenda blijft
 beschikbaar om later weer aan te vullen.
 
@@ -159,6 +162,67 @@ werken alleen op de zichtbare zoekresultaten. Kleurvarianten staan afzonderlijk
 in de lijst en behouden hun eigen keuze.
 
 ![Samenstellen met een zoekfilter op kabel- en leidinglagen](samenstellen.png)
+
+### Blijvende regels en bronkeuzes
+
+![Wijzigingen vooraf bekijken, met demonstratiegegevens](bijwerken.png)
+
+Met **Regel overnemen** (`NLCSLEGENDAOVERNEMEN`) voeg je een handmatig getekende regel
+aan een bestaande beheerde legenda toe. Kies de omschrijving, selecteer alleen het
+bijbehorende voorbeeld en kies de status. De plug-in bewaart een lokale kopie van het
+voorbeeld, met tekst en vorm. De geselecteerde oude tekst en het voorbeeld worden pas
+vervangen als de nieuwe legenda is opgebouwd. Een eigen hoogte of controlesymbool kan
+zo via Samenstellen worden onderhouden. De brontekening of xref wordt niet aangepast.
+
+**Overzicht → Regel aanpassen** koppelt een eigen omschrijving of uitsluiting aan:
+
+- deze variant: dezelfde bronobjecten, ook als hun kleur of stijl verandert;
+- deze bronlaag en objectsoort: ook toekomstige objecten op die laag;
+- dit bronsymbool op deze laag: ook nieuwe exemplaren van hetzelfde bronblok.
+
+![Een eigen omschrijving en toepassingsbereik kiezen](regel-aanpassen.png)
+
+De keuzes blijven per status gelden. Een uitgesloten bestaande kabel sluit dus niet
+vanzelf ook een nieuwe kabel uit. Een specifieke keuze voor één variant gaat vóór een
+bredere laagkeuze. De bronlaag en het bronblok hoeven niet te worden hernoemd.
+
+In de kolom **Variant** staan bronblok, grootte, draairichting en weergave. Expliciete
+boomklassen zoals `SGR-BOOM_2E GROOTTE` heten **Boom 2e grootte**. Alleen een volgnummer
+zoals `_01` wordt niet als grootteklasse uitgelegd. Grootte, rotatie en attribuuttekst
+zijn apart samen te voegen in Instellingen. Betekenisvolle klassen of puttypen kun je
+bewust combineren via **Overzicht → Samenvoegen**, met een gekozen hoofdvoorbeeld.
+
+**Putten zonder afzonderlijke putnummers** staat standaard aan onder Bijwerken in de
+instellingen. Bekende nummerattributen zoals `PUTNUMMER`, `PUTNR` en `PUT_ID` veroorzaken
+dan geen extra regels en worden niet in het voorbeeld getekend. Puttypen en statussen
+blijven behouden. Tekst die als gewone geometrie in een blok is getekend, wordt niet
+blind verwijderd; neem daarvoor een schoon eigen voorbeeld over en koppel dat.
+
+Als een bron ontbreekt, ontladen is of uitstaat, blijft de oude regel standaard staan
+met **(bron ontbreekt of uitgeschakeld)**. Er wordt geen actuele hoeveelheid verzonnen.
+Bewuste uitsluitingen krijgen voorrang. Zet **Vorige regels bewaren** uit om deze
+terugval niet te gebruiken. Als oude regels niet eenduidig gekoppeld kunnen worden,
+kiest de plug-in geen willekeurige bron.
+
+Via **Overzicht → Bron koppelen** kies je de juiste huidige regel. De lijst toont bron,
+objectsoort, symbool, status en weergave. Je kunt beide voorbeelden in CAD bekijken en
+kiezen of het oude voorbeeld behouden moet blijven. Na koppelen verdwijnt de losse
+bewaarde regel. De keuze wordt in de DWG opgeslagen.
+
+De legenda volgt globale laaginstellingen van het kader, inclusief xref-laagafwijkingen,
+kleur, lijntype, lijndikte en transparantie. Afwijkingen die alleen in een viewport gelden
+worden bij Broncontrole gemeld. Daardoor kan de kaart in zo'n viewport bewust anders
+ogen. De legenda neemt die afwijkingen niet stilzwijgend over.
+
+**Binnen het bestaande legendavenster blijven** staat standaard aan. De kolombreedte
+en hoogte houden rekening met tekstomloop, opmerkingen, eigen regels en schaalbalk.
+Venstergrootte, plaats, plotschaal en teksthoogte blijven behouden. Past de inhoud niet
+leesbaar, dan wordt de update teruggedraaid met een melding; het venster groeit niet
+over andere bladonderdelen heen. Zonder gekoppeld venster geldt de ingestelde opmaak.
+
+Bronkoppelingen en overgenomen voorbeelden horen bij de DWG. Bewaar die DWG als basis
+voor later gebruik; een los JSON-profiel bevat geen CAD-geometrie. Globale standaarden
+nemen geen koppelingen naar afzonderlijke bronobjecten over.
 
 ### Overzicht en eigen volgorde
 
@@ -352,6 +416,7 @@ een opzet met collega's kunt delen.
 | Commando | Doet |
 |----------|------|
 | `NLCSLEGENDA` | Legenda genereren en met de muis plaatsen (hele tekening of selectie). |
+| `NLCSLEGENDAOVERNEMEN` | Getekende tekst, voorbeeld en status als blijvende regel overnemen. |
 | `NLCSLEGENDAUPDATE` | Een legenda opnieuw tekenen op dezelfde plek; bij meerdere kies je welke. |
 | `NLCSLEGENDABEHEER` | Legenda's bekijken, bijwerken, hernoemen, opzoeken, verwijderen, en per legenda instellingen aanpassen, overnemen, dupliceren of de bron wijzigen. |
 | `NLCSLEGENDAELEMENT` | Klik een object aan en zie of en waarom het in de gekozen legenda komt. |

@@ -67,6 +67,14 @@ internal static class RibbonIcons
                 g.DrawLine(pen, 16 * s, 20 * s, 24 * s, 20 * s);
                 break;
 
+            case "NLCSLEGENDAOVERNEMEN":
+                g.DrawRectangle(pen, 7 * s, 8 * s, 9 * s, 6 * s);
+                g.DrawLine(pen, 19 * s, 11 * s, 25 * s, 11 * s);
+                g.DrawLine(pen, 8 * s, 22 * s, 23 * s, 22 * s);
+                g.DrawLine(pen, 16 * s, 17 * s, 16 * s, 25 * s);
+                FillTriangle(g, fill, s, 16, 26, 12, 22, 20, 22);
+                break;
+
             case "NLCSLEGENDAUPDATE":
                 g.DrawArc(pen, 9 * s, 9 * s, 14 * s, 14 * s, 30, 265);
                 FillTriangle(g, fill, s, 22.5f, 7.5f, 25.5f, 12.5f, 19.5f, 12.5f);
