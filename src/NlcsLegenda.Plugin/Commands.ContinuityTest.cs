@@ -29,8 +29,8 @@ public partial class Commands
             if (BuildManagedLegend(db, tr, registry, def, out _, out _) != UpdateResult.Updated) throw new InvalidOperationException("Startlegenda ontbreekt.");
             var excludedIds = LegendManagement.CollectManagedIds(db, tr, registry);
             var analysis = DrawingAnalyzer.Analyze(db, tr, settings, excludedIds: excludedIds);
-            var a = analysis.Entries.Single(e => e.Metric.Length == 10);
-            var b = analysis.Entries.Single(e => e.Metric.Length == 20);
+            var a = analysis.Entries.Single(e => Math.Abs(e.Metric.Length - 10) < 1e-8);
+            var b = analysis.Entries.Single(e => Math.Abs(e.Metric.Length - 20) < 1e-8);
             settings.ExcludedEntries.UnionWith(a.ExclusionKeys);
             LegendContinuity.SetChoice(settings, b, ChoiceScope.Variant, "Eigen transportleiding");
             settings.SortMode = LegendSortMode.Handmatig;
@@ -86,7 +86,7 @@ public partial class Commands
         var ids = new List<ObjectId>();
         for (int i = 0; i < 2; i++)
         {
-            using var reference = new BlockReference(new Point3d(60 + i * 5, 0, 0), block.ObjectId) { LayerId = layer };
+            using var reference = new BlockReference(new Point3d(60 + i * 5.0, 0, 0), block.ObjectId) { LayerId = layer };
             ReviewAppend(ReviewModel(db, tr), tr, reference); ids.Add(reference.ObjectId);
             using var value = new AttributeReference(); value.SetAttributeFromBlock(attribute, reference.BlockTransform); value.TextString = "GW" + (101 + i);
             reference.AttributeCollection.AppendAttribute(value); tr.AddNewlyCreatedDBObject(value, true);
@@ -133,13 +133,13 @@ public partial class Commands
             {
                 var timer = System.Diagnostics.Stopwatch.StartNew();
                 var before = definition.Settings.Clone();
-                System.IO.File.WriteAllText(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "real-before.json"),
+                System.IO.File.WriteAllText(System.IO.Path.Join(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "real-before.json"),
                     System.Text.Json.JsonSerializer.Serialize(new { definition.Name, definition.Settings,
                         windows = LegendViewport.Linked(doc.Database, tr, definition.Id).Select(v => new { v.Width, v.Height, v.CustomScale }) }, LegendSettings.JsonOptions));
                 var probe = DrawingAnalyzer.Analyze(doc.Database, tr, definition.Settings.Clone(), excludedIds: LegendManagement.CollectManagedIds(doc.Database, tr, registry));
                 LegendRowSamples.Seed(doc.Database, tr, definition, probe);
                 probe = LegendRowSamples.Retain(probe, definition);
-                System.IO.File.WriteAllText(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "real-analysis.json"),
+                System.IO.File.WriteAllText(System.IO.Path.Join(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "real-analysis.json"),
                     System.Text.Json.JsonSerializer.Serialize(probe.Entries.Select(e => new { e.Description, e.RenderIdentity, e.Status, e.PrimaryLayer, e.Retained, e.SampleBlock, Sources = e.SourceLayers }), LegendSettings.JsonOptions));
                 var viewports = LegendViewport.Linked(doc.Database, tr, definition.Id).Select(v => (v.ObjectId, v.Width, v.Height, v.CenterPoint)).ToArray();
                 if (BuildManagedLegend(doc.Database, tr, registry, definition, out int rows, out var note) != UpdateResult.Updated)
@@ -154,14 +154,14 @@ public partial class Commands
                 foreach (var item in viewports)
                 {
                     var viewport = (Viewport)tr.GetObject(item.ObjectId, OpenMode.ForRead);
-                    if (definition.Settings.FitExistingWindow && (viewport.Width != item.Width || viewport.Height != item.Height || viewport.CenterPoint != item.CenterPoint))
+                    if (definition.Settings.FitExistingWindow && (Math.Abs(viewport.Width - item.Width) > 1e-8 || Math.Abs(viewport.Height - item.Height) > 1e-8 || viewport.CenterPoint.DistanceTo(item.CenterPoint) > 1e-8))
                         throw new InvalidOperationException("Bestaand venster verplaatst of vergroot.");
                 }
                 report.Add(new { definition.Name, rows, repeated, firstMs, repeatMs = timer.Elapsed.TotalMilliseconds, note,
                     descriptions = first, manual = definition.Settings.ManualEntries.Select(m => m.Description).ToArray() });
             }
             LegendStore.Save(doc.Database, tr, registry); tr.Commit(); PurgePending(doc.Database);
-            System.IO.File.WriteAllText(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "real-continuity.json"),
+            System.IO.File.WriteAllText(System.IO.Path.Join(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "real-continuity.json"),
                 System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
             doc.Editor.WriteMessage("\nCONTINUITYREAL herhaalde update, teksten, eigen regels en vensters -> OK");
         }, message => doc.Editor.WriteMessage(message), "ContinuityReal");

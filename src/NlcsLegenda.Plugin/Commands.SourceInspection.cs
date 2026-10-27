@@ -36,7 +36,7 @@ public partial class Commands
                 }
                 files.Add(new { path, blocks = blockData });
             }
-            string output = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "source-inspection.json");
+            string output = System.IO.Path.Join(System.IO.Path.GetDirectoryName(doc.Database.Filename)!, "source-inspection.json");
             System.IO.File.WriteAllText(output, System.Text.Json.JsonSerializer.Serialize(files, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
             doc.Editor.WriteMessage("\nSOURCEINSPECTION -> OK");
         }, message => doc.Editor.WriteMessage(message), "SourceInspection");

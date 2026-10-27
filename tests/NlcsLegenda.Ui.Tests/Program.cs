@@ -289,7 +289,7 @@ internal static class Program
             OpenOffscreen(dialog);
             var actual = dialog.ManualEntries;
             Check(actual[0].SymbolBlock == "PUT", "Samenstellen behoudt het eigen symboolblok");
-            Check(actual[0].Id == "overgenomen" && actual[0].SampleBlock == "PUT" && actual[0].SampleScale == 500,
+            Check(actual[0].Id == "overgenomen" && actual[0].SampleBlock == "PUT" && Math.Abs(actual[0].SampleScale - 500) < 1e-8,
                 "Samenstellen behoudt identiteit en maat van een overgenomen voorbeeld");
             Check(actual[0].Hoofdgroep == "RI" && actual[1].Hoofdgroep == "VH", "Samenstellen behoudt eigen hoofdgroepen");
             Check(actual[0].Status == NlcsStatus.Overig, "Samenstellen behoudt status Overig");

@@ -211,9 +211,8 @@ public partial class Commands
             var changes = new List<LegendChange>();
             using var preview = db.TransactionManager.StartTransaction();
             var stored = LegendStore.Load(db, preview);
-            foreach (var id in ids)
-                if (stored.FindById(id) is { } definition)
-                    changes.AddRange(PreviewChanges(db, definition).Select(c => c with { Description = definition.Name + " · " + c.Description }));
+            foreach (var definition in ids.Select(stored.FindById).OfType<LegendDefinition>())
+                changes.AddRange(PreviewChanges(db, definition).Select(c => c with { Description = definition.Name + " · " + c.Description }));
             using var dialog = new UpdatePreviewDialog("alle legenda's", changes);
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK) return;
         }

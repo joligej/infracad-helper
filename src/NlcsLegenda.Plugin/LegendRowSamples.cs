@@ -72,8 +72,8 @@ internal static class LegendRowSamples
             using var mapping = new IdMapping();
             db.DeepCloneObjects(objects, block.ObjectId, mapping, false);
         }
-        foreach (ObjectId id in block.Cast<ObjectId>().ToArray())
-            if (tr.GetObject(id, OpenMode.ForWrite) is DBText text) LegendBuilder.SymbolTextToMText(block, tr, text);
+        foreach (var text in block.Cast<ObjectId>().ToArray().Select(id => tr.GetObject(id, OpenMode.ForWrite)).OfType<DBText>())
+            LegendBuilder.SymbolTextToMText(block, tr, text);
         var bounds = new Extents3d();
         bool hasBounds = false;
         foreach (ObjectId id in block)
@@ -112,14 +112,13 @@ internal static class LegendRowSamples
     {
         if (!legend.Settings.RetainMissingRows || legend.Rows.Count == 0) return analysis;
         var entries = analysis.Entries.ToList();
-        foreach (var row in legend.Rows.Where(r => !r.Manual && r.SampleBlock.Length > 0))
+        foreach (var row in legend.Rows.Where(r => !r.Manual && r.SampleBlock.Length > 0 && legend.Settings.IncludedStatuses.Contains(r.Status)))
         {
             if (entries.Any(e => LegendContinuity.Related(row.Sources, e.Sources) || row.OrderKey == LegendOrder.Key(e))) continue;
             var retained = row.RetainedEntry();
             LegendContinuity.ApplyChoices(legend.Settings, new() { retained });
             if (retained.SourceExcluded ?? row.ExclusionKeys.Any(legend.Settings.IsEntryExcluded)) continue;
             if (legend.Settings.RowChoices.Any(c => c.PreviousRowId == row.Id && entries.Any(c.Matches))) continue;
-            if (!legend.Settings.IncludedStatuses.Contains(row.Status)) continue;
             entries.Add(retained);
             int index = legend.Settings.ManualEntryOrder.IndexOf(row.OrderKey);
             if (index >= 0) legend.Settings.ManualEntryOrder[index] = LegendOrder.Key(retained);

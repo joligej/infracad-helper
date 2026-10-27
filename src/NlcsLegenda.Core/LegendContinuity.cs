@@ -39,9 +39,8 @@ public static class LegendContinuity
                 if (remap.TryGetValue(merge.MainKey, out var main) && main.Count == 1) merge.MainKey = main[0];
             }
         }
-        foreach (var entry in entries.Where(e => e.Sources.Count > 0))
+        foreach (var row in entries.Where(e => e.Sources.Count > 0).Select(SourceRow.From))
         {
-            var row = SourceRow.From(entry);
             history.RemoveAll(old => old.SelectionKey == row.SelectionKey);
             history.Add(row);
         }
