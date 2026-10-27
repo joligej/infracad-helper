@@ -6,6 +6,12 @@ namespace NlcsLegenda.Plugin;
 
 public sealed class AnalysisResult
 {
+    public IReadOnlyList<LegendChange> Coverage { get; init; } = Array.Empty<LegendChange>();
+    public AnalysisResult WithEntries(IReadOnlyList<LegendEntry> entries) => new() {
+        Coverage = Coverage, Entries = entries, EntryObjects = EntryObjects, HatchSamples = HatchSamples, SymbolSamples = SymbolSamples,
+        LayerStyles = LayerStyles, UsedNlcsLayerCount = UsedNlcsLayerCount, UsedCustomLayerCount = UsedCustomLayerCount,
+        DescribedLayerCount = DescribedLayerCount, AttrDescribedLayerCount = AttrDescribedLayerCount, ExcludedNlcsLayerCount = ExcludedNlcsLayerCount };
+
     public IReadOnlyDictionary<string, IReadOnlySet<ObjectId>> EntryObjects { get; init; } =
         new Dictionary<string, IReadOnlySet<ObjectId>>();
 
@@ -53,6 +59,10 @@ public static class DrawingAnalyzer
 {
     private sealed class Collector
     {
+        public readonly Dictionary<string, List<LegendSource>> Sources = new(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<(string Layer, NlcsDrawType Type), int> Unmapped = new();
+        public readonly Dictionary<string, string> Choices = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<(string Id, NlcsStatus Status, NlcsDrawType Type)> Exclusions = new();
         public bool TrackSources;
         public required string[] KlicGroupFields;
         public readonly Dictionary<ObjectId, (bool Inherits, LayerDisplayStyle Style)> SourceStyles = new();
@@ -111,6 +121,8 @@ public static class DrawingAnalyzer
         var timer = reportTimings is null ? null : System.Diagnostics.Stopwatch.StartNew();
         using var klic = new KlicSourceMetadata(settings.Klic, db, tr);
         var c = new Collector { Klic = klic, TrackSources = trackSources, KlicGroupFields = settings.KlicGroupFields().ToArray() };
+        c.Exclusions = settings.SourceRows.Where(r => settings.IsEntryExcluded(r.SelectionKey)).SelectMany(r => r.Sources)
+            .Select(s => (s.Id, s.Status, s.Type)).ToHashSet();
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (excludedIds is { Count: > 0 })
             c.Excluded = new HashSet<ObjectId>(excludedIds);
@@ -142,6 +154,8 @@ public static class DrawingAnalyzer
 
         var renderIds = c.Styles.ToDictionary(kv => kv.Key, kv => StyleSignature(kv.Value), StringComparer.OrdinalIgnoreCase);
 
+        string ChoiceSuffix(string name) => c.Choices.GetValueOrDefault(name) is { Length: > 0 } choice ? "|CHOICE:" + choice : "";
+
         string RenderId(string name, bool grouping = true)
         {
             if (c.SymbolSamples.ContainsKey(name)) return string.Empty;
@@ -149,7 +163,7 @@ public static class DrawingAnalyzer
             if (grouping && settings.MergeLineScales && c.Parsed[name].DrawType is NlcsDrawType.Geometrie or NlcsDrawType.Vlak)
                 baseId = StyleSignature(c.Styles[name], ignoreScale: true);
             var hatch = c.Hatches.TryGetValue(name, out var h) ? HatchSignature(h, grouping: grouping ? settings : null) : string.Empty;
-            return (baseId ?? string.Empty) + "|" + hatch;
+            return (baseId ?? string.Empty) + "|" + hatch + ChoiceSuffix(name);
         }
 
         IReadOnlyList<AppearanceValue> AppearanceValues(string name)
@@ -183,16 +197,41 @@ public static class DrawingAnalyzer
             catalog,
             name => RenderId(name),
             name => c.CustomDesc.ContainsKey(name) ? DescriptionSource.EigenKoppeling : (DescriptionSource?)null,
-            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.GroupIdentity(settings) : null,
+            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.GroupIdentity(settings) + ChoiceSuffix(name) : null,
             name => c.KlicObjects.TryGetValue(name, out var objects) ? objects : Array.Empty<KlicObjectData>(),
             name => c.Styles.TryGetValue(name, out var style) ? $"{style.Color} / {LayerNaming.LocalName(style.Linetype)}" : null,
             name => c.SymbolSamples.ContainsKey(name) ? "" : renderIds.GetValueOrDefault(name)
-                + "|" + HatchSignature(c.Hatches.GetValueOrDefault(name), sourceScale: true),
-            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.SelectionIdentity : null,
+                + "|" + HatchSignature(c.Hatches.GetValueOrDefault(name), sourceScale: true) + ChoiceSuffix(name),
+            name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.SelectionIdentity + ChoiceSuffix(name) : null,
             settings.MergeIdenticalStatuses
                 ? name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.RenderIdentity : RenderId(name, grouping: false) : null,
-            settings.MergeLineScales || settings.MergeHatchScales || settings.MergeHatchAngles ? AppearanceValues : null);
+            settings.MergeLineScales || settings.MergeHatchScales || settings.MergeHatchAngles ? AppearanceValues : null,
+            name => c.Sources.GetValueOrDefault(name) ?? new());
 
+        foreach (var entry in entries)
+        {
+            var details = new List<string>();
+            foreach (var name in entry.SourceRenderLayers)
+            {
+                if (c.SymbolSamples.TryGetValue(name, out var symbol))
+                {
+                    details.Add($"{LayerNaming.LocalName(symbol.BlockName)}; grootte {symbol.Transform.XAxis.Length:0.###}; hoek {Math.Atan2(symbol.Transform.XAxis.Y, symbol.Transform.XAxis.X) * 180 / Math.PI:0.#}°");
+                    if (symbol.AttributeIdentity.Length > 0) details.Add("Attribuuttekst verschilt: optie Attribuutteksten samenvoegen");
+                }
+                if (c.Styles.TryGetValue(name, out var display)) details.Add($"{display.Color}; {LayerNaming.LocalName(display.Linetype)}; lijnschaal {display.LinetypeScale:0.###}; {display.LineWeight}; transparantie {100 - display.Transparency.Alpha * 100 / 255}%");
+            }
+            entry.VariantDetails = string.Join(Environment.NewLine, details.Distinct());
+            entry.SampleIdentity = string.Join(";", entry.SourceRenderLayers.Select(name =>
+                SampleSignature(c.Styles[name], c.Hatches.GetValueOrDefault(name), c.SymbolSamples.GetValueOrDefault(name)))
+                .Distinct().OrderBy(value => value, StringComparer.Ordinal));
+            if (settings.ExampleOverrides.TryGetValue(LegendOrder.Key(entry), out var selectedExample) && selectedExample.Length > 0)
+                entry.SampleIdentity = "voorbeeld:" + selectedExample;
+            var overrides = entry.Sources.Select(s => s.Layer).Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(name => c.Layers.Has(name) && ((LayerTableRecord)tr.GetObject(c.Layers[name], OpenMode.ForRead)).HasOverrides).ToArray();
+            if (overrides.Length > 0) entry.SourceNotice += " Viewportafwijkingen op: " + string.Join(", ", overrides) + ". Legenda gebruikt de globale laagweergave.";
+            var variants = entry.Sources.Select(s => SymbolDescription.Variant(s.Symbol)).Where(s => s.Length > 0).Distinct().ToArray();
+            if (variants.Length > 0) entry.SourceNotice += " Grootteklasse uit bronblok: " + string.Join(", ", variants) + ".";
+        }
         if (timer is not null)
         {
             timer.Stop();
@@ -200,6 +239,7 @@ public static class DrawingAnalyzer
         }
         return new AnalysisResult
         {
+            Coverage = c.Unmapped.Select(p => new LegendChange("Niet gekoppeld", p.Key.Layer, $"{p.Value} zichtbare objecten ({p.Key.Type}); koppel via Eigen lagen of neem een eigen regel over.")).ToArray(),
             Entries = entries,
             EntryObjects = !trackSources ? new Dictionary<string, IReadOnlySet<ObjectId>>() : entries.GroupBy(LegendSettings.SelectionKey).ToDictionary(g => g.Key,
                 g => (IReadOnlySet<ObjectId>)g.SelectMany(e => e.SourceRenderLayers.Count > 0 ? (IEnumerable<string>)e.SourceRenderLayers : e.LayersByType.Values)
@@ -297,7 +337,16 @@ public static class DrawingAnalyzer
         else
         {
             parsed = c.ParseLayer(layerName);
-            if (parsed is null) return;
+            if (parsed is null)
+            {
+                NlcsDrawType? unknownType = ent switch { Hatch => NlcsDrawType.Arcering, BlockReference => NlcsDrawType.Symbool, Curve => NlcsDrawType.Geometrie, _ => null };
+                if (unknownType is { } type && settings.IsDrawTypeIncluded(type) && LayerNaming.LocalName(layerName) != "0")
+                {
+                    var unmappedKey = (sourceXref.Length > 0 ? sourceXref + "|" + LayerNaming.LocalName(layerName) : layerName, type);
+                    c.Unmapped[unmappedKey] = c.Unmapped.GetValueOrDefault(unmappedKey) + 1;
+                }
+                return;
+            }
             metadata = c.Klic.Read(ent, sourceXref);
             parsed = CopyLayer(parsed, sourceXref, metadata.Provider,
                 metadata.GroupKey(c.KlicGroupFields));
@@ -350,7 +399,10 @@ public static class DrawingAnalyzer
                 }
             }
             symbol = new SymbolSample(blockName, identity, SymbolTransform.From(transform * br.BlockTransform))
-            { ReferenceId = br.ObjectId, SourceXref = sourceXref, NormalizedDefinitionIdentity = normalized, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers),
+            { ReferenceId = br.ObjectId, SourceXref = sourceXref, NormalizedDefinitionIdentity = normalized, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers, settings.GenericManholes && SymbolDescription.IsManhole(blockName, parsed.Element)),
+                OmitManholeNumber = settings.GenericManholes && SymbolDescription.IsManhole(blockName, parsed.Element),
+                Variant = SymbolDescription.Variant(blockName) is { Length: > 0 } treeClass ? treeClass
+                    : settings.GenericManholes ? SymbolDescription.ManholeKind(blockName, parsed.Element) : "",
                 InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceScale = parsed.Scale, TargetScale = settings.Scale };
         }
         if (ent is Curve curve && parsed.DrawType == NlcsDrawType.Symbool)
@@ -364,11 +416,29 @@ public static class DrawingAnalyzer
                 SourceScale = parsed.Scale, TargetScale = settings.Scale
             };
         }
+        string sourceId = sourceXref.ToUpperInvariant() + ":" + ent.ObjectId.NonForwardedHandle;
+        string sourceLayer = sourceXref.Length > 0 ? sourceXref + "|" + LayerNaming.LocalName(layerName) : layerName;
+        string sourceBlock = ent is BlockReference sourceReference
+            ? ((BlockTableRecord)tr.GetObject(sourceReference.IsDynamicBlock ? sourceReference.DynamicBlockTableRecord : sourceReference.BlockTableRecord, OpenMode.ForRead)).Name : "";
+        var sourceInfo = new LegendSource(sourceId, sourceLayer, actualType, LayerNaming.LocalName(sourceBlock), parsed.Status);
+        var choices = settings.RowChoices.Where(choice => choice.Matches(sourceInfo))
+            .OrderBy(choice => choice.Scope == ChoiceScope.Layer ? 0 : choice.Scope == ChoiceScope.ObjectKind ? 1 : 2).ToArray();
+        bool excluded = choices.LastOrDefault(choice => choice.Excluded.HasValue)?.Excluded ?? c.Exclusions.Contains((sourceId, parsed.Status, actualType));
+        string descriptionChoice = choices.LastOrDefault(choice => choice.Description is { Length: > 0 })?.Description ?? "";
+        var chosenExample = choices.LastOrDefault(choice => choice.Example is not null || choice.AutomaticExample);
+        string exampleChoice = chosenExample?.AutomaticExample == true ? ""
+            : chosenExample?.Example == "" ? "uit tekening" : chosenExample?.Example ?? "";
+        string choiceId = excluded || descriptionChoice.Length > 0 || exampleChoice.Length > 0
+            ? Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
+                System.Text.Json.JsonSerializer.Serialize(new object[] { excluded, descriptionChoice, exampleChoice })))) : "";
         metadata ??= c.Klic.Read(ent, sourceXref);
         string appearance = SampleSignature(style, hatch, symbol);
-        string key = parsed.GroupKey + "\u0001" + parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + parsed.KlicGroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance;
+        string key = parsed.GroupKey + "\u0001" + parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + parsed.KlicGroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance + "\u0001" + choiceId;
         (rule is null ? c.NlcsSourceLayers : c.CustomSourceLayers).Add(layerName);
         c.Parsed[key] = parsed;
+        if (!c.Sources.TryGetValue(key, out var sources)) c.Sources[key] = sources = new();
+        sources.Add(sourceInfo);
+        c.Choices[key] = choiceId;
         if (c.TrackSources)
         {
             if (!c.Objects.TryGetValue(key, out var sourceObjects)) c.Objects[key] = sourceObjects = new();
@@ -661,18 +731,18 @@ public static class DrawingAnalyzer
 
     private sealed record LayerSample(NlcsLayerName Parsed, string Signature, LayerMetric Metric,
         HatchSample? Hatch, SymbolSample? Symbol, LayerDisplayStyle Style, string? Description,
-        Dictionary<string, int>? Attributes, IReadOnlyList<KlicObjectData> KlicObjects, IReadOnlySet<ObjectId> Objects);
+        Dictionary<string, int>? Attributes, IReadOnlyList<KlicObjectData> KlicObjects, IReadOnlySet<ObjectId> Objects, IReadOnlyList<LegendSource> Sources, string Choice);
 
     private static void CoalesceNlcsSources(Collector c)
     {
         var samples = c.NlcsRawKeys.Select(key => new LayerSample(c.Parsed[key],
-            SampleSignature(c.Styles[key], c.Hatches.GetValueOrDefault(key), c.SymbolSamples.GetValueOrDefault(key)),
+            SampleSignature(c.Styles[key], c.Hatches.GetValueOrDefault(key), c.SymbolSamples.GetValueOrDefault(key)) + c.Choices.GetValueOrDefault(key),
             c.Metrics.GetValueOrDefault(key), c.Hatches.GetValueOrDefault(key), c.SymbolSamples.GetValueOrDefault(key),
             c.Styles[key], c.CustomDesc.GetValueOrDefault(key), c.AttrOms.GetValueOrDefault(key),
             c.KlicObjects.TryGetValue(key, out var objects) ? objects : Array.Empty<KlicObjectData>(),
-            c.Objects.GetValueOrDefault(key) ?? EmptyObjectIds)).ToList();
+            c.Objects.GetValueOrDefault(key) ?? EmptyObjectIds, c.Sources.GetValueOrDefault(key) ?? new(), c.Choices.GetValueOrDefault(key) ?? "")).ToList();
         c.Parsed.Clear(); c.Metrics.Clear(); c.Hatches.Clear(); c.SymbolSamples.Clear();
-        c.Objects.Clear();
+        c.Objects.Clear(); c.Sources.Clear(); c.Choices.Clear();
         c.Styles.Clear(); c.CustomDesc.Clear(); c.AttrOms.Clear(); c.NlcsRawKeys.Clear(); c.KlicObjects.Clear();
 
         foreach (var logical in samples.GroupBy(x => x.Parsed.GroupKey + "\u0001" + x.Parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + x.Parsed.KlicGroupKey).OrderBy(x => x.Key, StringComparer.Ordinal))
@@ -711,6 +781,8 @@ public static class DrawingAnalyzer
                     c.KlicObjects[key] = KlicSummary.Combine(members.SelectMany(x => x.KlicObjects)).ToList();
                     c.Metrics[key] = members.Aggregate(LayerMetric.Empty, (total, x) => total + x.Metric);
                     c.Styles[key] = rep.Style;
+                    c.Choices[key] = rep.Choice;
+                    c.Sources[key] = members.SelectMany(m => m.Sources).Distinct().ToList();
                     if (c.TrackSources) c.Objects[key] = members.SelectMany(m => m.Objects).ToHashSet();
                     if (rep.Hatch is not null) c.Hatches[key] = rep.Hatch;
                     if (rep.Symbol is not null) c.SymbolSamples[key] = rep.Symbol;
@@ -825,13 +897,14 @@ public static class DrawingAnalyzer
     }
 
     private static string AttributeIdentity(BlockReference reference, Transaction tr,
-        LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible)
+        LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible, bool omitManholeNumber = false)
     {
         var parts = new List<string>();
         var inverse = reference.BlockTransform.Inverse();
         foreach (ObjectId id in reference.AttributeCollection)
         {
             var source = (AttributeReference)tr.GetObject(id, OpenMode.ForRead);
+            if (omitManholeNumber && SymbolDescription.IsNumberAttribute(source.Tag)) continue;
             if (string.IsNullOrWhiteSpace(source.TextString) || !includeInvisible && (source.Invisible || !source.Visible)) continue;
             using var copy = (AttributeReference)source.Clone();
             LegendBuilder.TransformPlanarSymbol(copy, inverse);

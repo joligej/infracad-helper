@@ -108,8 +108,8 @@ public static class LegendLayoutEngine
         double maxColHeight = s.MaxLegendHeightMm > 0 ? s.ToModel(s.MaxLegendHeightMm) : double.MaxValue;
         if (maxColHeight < double.MaxValue)
         {
-            columnsNeeded = int.MaxValue;
-            columnBudget = double.MaxValue;
+            columnsNeeded = s.Columns > 0 ? Math.Min(s.Columns, Math.Max(1, entries.Count)) : int.MaxValue;
+            columnBudget = s.Columns > 0 ? totalEntryHeight / columnsNeeded : double.MaxValue;
             maxRowsCap = maxRows;
         }
         else if (s.Columns > 0)

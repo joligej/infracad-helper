@@ -20,7 +20,8 @@ public static class LegendGrouping
         Func<string, IReadOnlyList<KlicObjectData>>? klicObjects = null,
         Func<string, string?>? appearanceLabel = null, Func<string, string?>? selectionIdentity = null,
         Func<string, string?>? symbolSelectionIdentity = null, Func<string, string?>? fullRenderIdentity = null,
-        Func<string, IReadOnlyList<AppearanceValue>>? appearanceValues = null)
+        Func<string, IReadOnlyList<AppearanceValue>>? appearanceValues = null,
+        Func<string, IReadOnlyList<LegendSource>>? sources = null)
     {
         // eigen legendateksten boven de catalogus
         var descriptions = catalog ?? DescriptionCatalog.Default();
@@ -76,6 +77,7 @@ public static class LegendGrouping
             var objects = KlicSummary.Combine(group.SelectMany(l => klicObjects?.Invoke(l.EffectiveRenderLayerName) ?? Array.Empty<KlicObjectData>()));
             entries.Add(new LegendEntry
             {
+                Sources = group.SelectMany(l => sources?.Invoke(l.EffectiveRenderLayerName) ?? Array.Empty<LegendSource>()).Distinct().ToArray(),
                 Status = representative.Status,
                 CustomStatusName = settings.FindCustomStatus(LegendSettings.EntryKey(representative))?.Name,
                 Discipline = representative.Discipline,
@@ -125,9 +127,13 @@ public static class LegendGrouping
             entries.Add(custom is null ? basic : blank.ToLegendEntry(custom));
         }
 
+        LegendContinuity.Reconcile(settings, entries, final: false);
+        LegendContinuity.ApplyChoices(settings, entries);
         settings.RememberEntries(entries);
-        entries.RemoveAll(e => settings.IsEntryExcluded(LegendSettings.SelectionKey(e)));
-        return Sort(ManualMergeGroup.Apply(Merge(entries, settings), settings.ManualMergeGroups, settings.ShowMergedValues), settings);
+        entries.RemoveAll(e => e.SourceExcluded ?? settings.IsEntryExcluded(LegendSettings.SelectionKey(e)));
+        var merged = Merge(entries, settings);
+        LegendContinuity.Reconcile(settings, merged, final: true);
+        return Sort(ManualMergeGroup.Apply(merged, settings.ManualMergeGroups, settings.ShowMergedValues), settings);
     }
 
     private static string RenderId(
@@ -179,7 +185,7 @@ public static class LegendGrouping
                 ? dimensions.Where(d => d != GroupDimension.Materiaal).ToArray() : dimensions;
             var metadata = KlicSummary.WithoutMergedFields(e.KlicGroupKey, metadataDimensions);
             var types = string.Join(",", e.LayersByType.Keys.OrderBy(t => t));
-            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{e.IsKlic}|{content}|{metadata}|{types}|{renderPart}";
+            return $"{statusPart}|{e.Discipline}|{e.Hoofdgroep}|{e.IsKlic}|{content}|{metadata}|{types}|{renderPart}|{(settings.RowChoices.Any(c => c.Description is { Length: > 0 } && c.Matches(e)) ? e.Description : "")}";
         }
 
         List<LegendEntry> MergeGroups(IEnumerable<LegendEntry> source, bool acrossStatuses)
@@ -212,6 +218,8 @@ public static class LegendGrouping
         foreach (var e in group) metric += e.Metric;
         return new LegendEntry
         {
+            Sources = group.SelectMany(e => e.Sources).Distinct().ToArray(),
+            SourceNotice = string.Join(" ", group.Select(e => e.SourceNotice).Where(t => t.Length > 0).Distinct()),
             Status = rep.Status,
             CustomStatusName = rep.CustomStatusName,
             Discipline = rep.Discipline,
@@ -310,6 +318,12 @@ public static class LegendGrouping
             }
         }
 
+        if ((SymbolDescription.Variant(blockName).Length > 0 || settings.GenericManholes && blockName is not null && SymbolDescription.IsManhole(blockName, representative.Element))
+            && SymbolDescription.Describe(blockName, representative) is { } semanticText)
+        {
+            source = DescriptionSource.Bloknaam;
+            return semanticText;
+        }
         if (layerDescription is not null)
         {
             foreach (var layer in group.OrderBy(l => TypePriority(l.DrawType)))

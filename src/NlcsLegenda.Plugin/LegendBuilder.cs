@@ -16,7 +16,8 @@ public static class LegendBuilder
 
     public static ObjectId BuildBlock(
         Database db, Transaction tr, AnalysisResult analysis, LegendSettings s,
-        out int rowCount, out IReadOnlyList<RenderIssue> issues)
+        out int rowCount, out IReadOnlyList<RenderIssue> issues,
+        Action<LegendEntry, IReadOnlyList<ObjectId>>? capture = null, double maximumWidth = double.MaxValue)
     {
         rowCount = 0;
         var issueList = new List<RenderIssue>();
@@ -60,6 +61,16 @@ public static class LegendBuilder
         {
             foreach (var entry in analysis.Entries)
             {
+                if (entry.SampleBlock.Length > 0)
+                {
+                    if (!bt.Has(entry.SampleBlock)) throw new InvalidOperationException($"Het bewaarde voorbeeld voor '{entry.Description}' ontbreekt.");
+                    if (!TryInsertSymbol(btr, tr, db, imports, entry.SampleBlock, "0", SymbolTransform.Identity, null,
+                        0, 0, s.Scale / entry.SampleScale, true, out var savedIds, out var savedError)) throw new InvalidOperationException(savedError);
+                    var box = new Extents3d();
+                    foreach (var savedId in savedIds) box.AddExtents(((Entity)tr.GetObject(savedId, OpenMode.ForRead)).GeometricExtents);
+                    symbols.Add(entry, new PreparedSymbol(savedIds, box.MaxPoint.X - box.MinPoint.X, box.MaxPoint.Y - box.MinPoint.Y, true));
+                    continue;
+                }
                 string key = LegendOrder.Key(entry);
                 bool chosen = exampleChoices.TryGetValue(key, out var name);
                 if (!chosen && entry.ManualMergeId.Length > 0
@@ -78,6 +89,11 @@ public static class LegendBuilder
                     example = chosen ? examples.Examples.FirstOrDefault(e => e.BlockName == name)
                         : LegendExample.Match(examples.Examples, entry, s.Scale);
                     if (example is not null) exampleId = examples.Import(db, tr, example);
+                }
+                if (example is null && chosen && name is not null && name.StartsWith("NLCS_ROW_", StringComparison.Ordinal) && bt.Has(name))
+                {
+                    var choice = s.RowChoices.LastOrDefault(c => c.Example == name && c.Matches(entry));
+                    if (choice is not null) { example = new LegendExample(name, entry.Description, "Eigen voorbeeld", choice.ExampleScale, Array.Empty<string>()); exampleId = bt[name]; }
                 }
                 if (example is null && hasSaved)
                 {
@@ -139,7 +155,7 @@ public static class LegendBuilder
 
         double MeasureTextHeight(string text, double width)
         {
-            using var mt = CreateDescription(db, s, styleId, text, Math.Max(textH * 3, width - TextBearing(tr, styleId, textH)));
+            using var mt = CreateDescription(db, s, styleId, text, Math.Max(textH * 3, width - TextBearing(tr, styleId, textH)), maximumWidth < double.MaxValue);
             return mt.ActualHeight;
         }
         double MeasureHeadingHeight(string text, double height)
@@ -166,8 +182,20 @@ public static class LegendBuilder
             if (layoutSettings.MaxLegendHeightMm <= 0)
                 throw new InvalidOperationException("De maximale hoogte is te klein voor de opmerkingen en schaalbalk. Vergroot de hoogte of zet deze op 0.");
         }
-        var layout = LegendLayoutEngine.Compute(analysis.Entries, layoutSettings, MeasureTextHeight,
-            entry => symbols.TryGetValue(entry, out var symbol) ? symbol.Height : 0, MeasureHeadingHeight);
+        LegendLayout layout;
+        for (int attempt = 0; ; attempt++)
+        {
+            layout = LegendLayoutEngine.Compute(analysis.Entries, layoutSettings, MeasureTextHeight,
+                entry => symbols.TryGetValue(entry, out var symbol) ? symbol.Height : 0, MeasureHeadingHeight);
+            double borderWidth = s.DrawBorder ? 2 * margin : 0;
+            if (layout.Width + borderWidth <= maximumWidth + 1e-8) break;
+            double available = (maximumWidth - borderWidth - (layout.Columns - 1) * s.ToModel(s.ColumnGapMm)) / layout.Columns;
+            double minimum = sampleColumnWidth + textGap + textH * 3 + (s.IncludeQuantities ? s.ToModel(s.QuantityColumnWidthMm) : 0);
+            if (attempt >= 6 || available < minimum || available >= colWidth - 1e-8)
+                throw new InvalidOperationException($"De regels passen niet leesbaar binnen het bestaande legendavenster ({layout.Columns} kolommen, voorbeeldbreedte {sampleColumnWidth / s.ModelUnitsPerPaperMm:0.#} mm, beschikbaar {maximumWidth / s.ModelUnitsPerPaperMm:0.#} mm). Vergroot het venster of pas de indeling aan; de vorige legenda blijft staan.");
+            colWidth = available;
+            layoutSettings.ColumnWidthMm = colWidth / s.ModelUnitsPerPaperMm;
+        }
         if (s.MaxLegendHeightMm > 0 && layout.Height + extraHeight > s.ToModel(s.MaxLegendHeightMm) + 1e-8)
             throw new InvalidOperationException("Een regel past niet binnen de maximale legendahoogte. Vergroot de hoogte of zet deze op 0.");
         foreach (var item in layout.Items)
@@ -194,7 +222,7 @@ public static class LegendBuilder
                     {
                         DrawEntry(btr, tr, db, imports, item, analysis, s,
                             swatchW, swatchH, textGap, textH, colWidth, styleId, sampleColumnWidth,
-                            symbols.GetValueOrDefault(item.Entry!));
+                            symbols.GetValueOrDefault(item.Entry!), capture, maximumWidth < double.MaxValue);
                         rowCount++;
                     }
                     catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
@@ -404,7 +432,8 @@ public static class LegendBuilder
     private static void DrawEntry(
         BlockTableRecord btr, Transaction tr, Database db, SymbolImportSession imports, LegendPlacement item, AnalysisResult analysis,
         LegendSettings s, double swatchW, double swatchH, double textGap, double textH,
-        double colWidth, ObjectId styleId, double sampleColumnWidth, PreparedSymbol? prepared)
+        double colWidth, ObjectId styleId, double sampleColumnWidth, PreparedSymbol? prepared,
+        Action<LegendEntry, IReadOnlyList<ObjectId>>? capture, bool fitWindow)
     {
         var entry = item.Entry!;
         double x = item.X;
@@ -510,6 +539,8 @@ public static class LegendBuilder
                     .Select(layer => analysis.LayerStyles.GetValueOrDefault(layer.Key)).OfType<LayerDisplayStyle>())
                     ApplyEntityStyle(entity, style, imports);
 
+        capture?.Invoke(entry, rowEntities);
+
         if (s.DrawSwatchFrame)
         {
             double frameHeight = Math.Max(swatchH, prepared?.Height ?? 0);
@@ -527,7 +558,7 @@ public static class LegendBuilder
             if (textColWidth < textH * 3)
                 textColWidth = textH * 3;
 
-            var mt = CreateDescription(db, s, styleId, entry.DisplayDescription, textColWidth);
+            var mt = CreateDescription(db, s, styleId, entry.DisplayDescription, textColWidth, fitWindow);
             // gelijke basislijn met en zonder onderlengte
             mt.Attachment = AttachmentPoint.TopLeft;
             mt.Location = new Point3d(x + sampleColumnWidth + textGap + TextBearing(tr, styleId, textH),
@@ -550,7 +581,7 @@ public static class LegendBuilder
     }
 
     private static MText CreateDescription(Database db, LegendSettings s, ObjectId styleId,
-        string text, double width)
+        string text, double width, bool fitWindow = false)
     {
         var mt = new MText();
         SetLegendDefaults(mt, db);
@@ -573,12 +604,12 @@ public static class LegendBuilder
         }
         // templateafstand voor korte labels; leesruimte voor lange alinea's
         if (Math.Abs(s.LineSpacingFactor - TemplateDefaults.LineSpacingFactor) < 1e-9
-            && mt.ActualHeight > mt.TextHeight * 3)
+            && mt.ActualHeight > mt.TextHeight * (fitWindow ? 1.4 : 3))
             mt.LineSpacingFactor = 1;
         return mt;
     }
 
-    private static bool TryInsertSymbol(
+    internal static bool TryInsertSymbol(
         BlockTableRecord btr, Transaction tr, Database db, SymbolImportSession imports, string blockName, string layer,
         SymbolTransform sourceTransform, SymbolSample? sample,
         double centerX, double centerY, double modelPerPaperMm, bool includeInvisible,
@@ -745,7 +776,7 @@ public static class LegendBuilder
     }
 
     // bronkopieën alleen hergebruiken binnen één bouwactie
-    private sealed class SymbolImportSession(Database host, Transaction tr) : IDisposable
+    internal sealed class SymbolImportSession(Database host, Transaction tr) : IDisposable
     {
         private readonly ResourceScope _resources = new();
         private readonly Dictionary<(Database, string), SymbolSnapshot> _sources = new();
@@ -1010,6 +1041,7 @@ public static class LegendBuilder
                 foreach (ObjectId attributeId in reference.AttributeCollection)
                 {
                     var attribute = (AttributeReference)tr.GetObject(attributeId, OpenMode.ForWrite);
+                    if (sample?.OmitManholeNumber == true && SymbolDescription.IsNumberAttribute(attribute.Tag)) continue;
                     if (string.IsNullOrWhiteSpace(attribute.TextString) || !includeInvisible && (attribute.Invisible || !attribute.Visible)) continue;
                     var attributeLayer = DrawingAnalyzer.EntityLayerStyle(attribute, tr, inheritedLayer);
                     var attributeStyle = DrawingAnalyzer.EntityStyle(attribute, tr, parentStyle, attributeLayer);
@@ -1034,6 +1066,7 @@ public static class LegendBuilder
                 bool hasAttributeValues = reference.ObjectId != probe.ObjectId || sample is not null && !sample.ReferenceId.IsNull;
                 foreach (var piece in ordered.OfType<Entity>().Where(piece =>
                     !(piece is AttributeDefinition { Constant: false } && hasAttributeValues)
+                    && !(piece is AttributeDefinition number && sample?.OmitManholeNumber == true && SymbolDescription.IsNumberAttribute(number.Tag))
                     && !(piece is AttributeDefinition { Invisible: true } && !includeInvisible)))
                 {
                     if (piece.LinetypeId.Database != db || piece.LayerId.Database != db)

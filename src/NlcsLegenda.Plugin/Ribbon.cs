@@ -114,6 +114,7 @@ internal static class RibbonBuilder
             ("Resetten", "NLCSLEGENDARESET", "Begin opnieuw met de globale standaard; bron, naam en positie blijven behouden."),
             ("Overzicht", "NLCSLEGENDAINFO", "Bekijk alle regels en pas de volgorde aan."));
         AddPanel(tab, "Inhoud",
+            ("Regel overnemen", "NLCSLEGENDAOVERNEMEN", "Neem een getekende omschrijving en voorbeeld blijvend over."),
             ("Samenstellen", "NLCSLEGENDASAMENSTELLEN", "Regels uitvinken en eigen regels toevoegen."),
             ("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN", "De tekst per element bewerken."),
             ("Elementtekst", "NLCSLEGENDATEKST", "Eén aangeklikte regel aanpassen."),

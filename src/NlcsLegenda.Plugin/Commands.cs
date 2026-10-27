@@ -120,7 +120,9 @@ public partial class Commands
                 ReportAnalysis(ed, analysis);
 
                 ed.WriteMessage($"\nLegenda tekenen ({analysis.Entries.Count} regels)...");
-                btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _, out var issues);
+                var savedRows = new List<SavedLegendRow>();
+                btrId = LegendBuilder.BuildBlock(db, tr, analysis, settings, out _, out var issues,
+                    (entry, sample) => savedRows.Add(LegendRowSamples.Save(db, tr, entry, sample, settings.Scale)));
                 ReportRenderIssues(ed, issues);
                 int unknownAreas = analysis.Entries.Count(e => e.Metric.HasUnknownArea);
                 if (unknownAreas > 0) ed.WriteMessage($"\n{unknownAreas} regel(s) met onbekend oppervlak (? m²); zie de bronmeldingen in Overzicht.");
@@ -144,6 +146,8 @@ public partial class Commands
                 {
                     var def = PlaceLegendAtPoint(
                         tr, db, registry, settings, selection, btrId, br, jig.Position);
+                    def.Rows = savedRows;
+                    LegendStore.Save(db, tr, registry);
                     ed.WriteMessage($"\n\"{def.Name}\" geplaatst ({def.Scope.ToDisplay()}).");
                 }
                 tr.Commit();
@@ -463,6 +467,17 @@ public partial class Commands
 
             if (target is not null)
             {
+                using (var linked = db.TransactionManager.StartTransaction())
+                {
+                    var paperId = SymbolUtilityServices.GetBlockPaperSpaceId(db);
+                    var found = LegendViewport.Linked(db, linked, target.Id).Where(v => v.OwnerId == paperId).ToArray();
+                    if (found.Length > 0)
+                    {
+                        foreach (var viewport in found) { viewport.UpgradeOpen(); LegendViewport.SetLayer(viewport, db, linked, settings);
+                            LegendViewport.Align(viewport, settings, new Extents3d(min, max), automatic: false); }
+                        linked.Commit(); ed.WriteMessage("\nHet bestaande legendavenster op deze layout is bijgewerkt."); return;
+                    }
+                }
                 var mode = new PromptKeywordOptions("\nLegenda-venster [Nieuw/Bestaand] <Nieuw>:") { AllowNone = true };
                 mode.Keywords.Add("Nieuw"); mode.Keywords.Add("Bestaand"); mode.Keywords.Default = "Nieuw";
                 var answer = ed.GetKeywords(mode);
@@ -625,6 +640,7 @@ public partial class Commands
                 return;
             }
 
+            if (!HostEnvironment.IsCoreConsole && !PreviewUpdate(db, target)) return;
             UpdateResult result;
             int rows = 0;
             string note = string.Empty;
@@ -1063,8 +1079,7 @@ public partial class Commands
             using var dialog = new LegendManageDialog(items, settings, BuildLayerChoices(db, settings), addLayer, allowPicking: true);
             dialog.SaveChanges = () =>
             {
-                settings.ExcludedEntries = dialog.ExcludedKeys;
-                settings.ManualEntries = dialog.ManualEntries;
+                dialog.ApplyTo(settings);
                 return ApplyTargetSettings(ed, db, target, settings, "Samenstelling");
             };
             if (AcWindows.ShowModalDialog(dialog) != WinForms.DialogResult.OK)

@@ -17,6 +17,12 @@ public class SettingsUiMapTests
 
     private static readonly Dictionary<string, Surface> Map = new()
     {
+        [nameof(LegendSettings.RowChoices)] = new("Overzicht > Regel aanpassen", Binding.Subdialog),
+        [nameof(LegendSettings.SourceRows)] = new("(intern: bronkoppeling)", Binding.Intern),
+        [nameof(LegendSettings.FinalSourceRows)] = new("(intern: bronkoppeling)", Binding.Intern),
+        [nameof(LegendSettings.FitExistingWindow)] = new("Bronnen en inhoud", Binding.CheckBox),
+        [nameof(LegendSettings.RetainMissingRows)] = new("Bronnen en inhoud", Binding.CheckBox),
+        [nameof(LegendSettings.GenericManholes)] = new("Bronnen en inhoud", Binding.CheckBox),
         [nameof(LegendSettings.ExampleLibraryPath)] = new("Overzicht > Voorbeeld > Bibliotheek", Binding.Subdialog),
         [nameof(LegendSettings.ExampleOverrides)] = new("Overzicht > Voorbeeld", Binding.Subdialog),
         [nameof(LegendSettings.ShowMergedValues)] = new("Samenvoegen", Binding.CheckBox),

@@ -77,7 +77,9 @@ public static class LegendOrder
     {
         var previous = choices.ToArray();
         var aligned = Align(previous.Select(p => p.Key).ToArray(), entries.Select(Key).ToArray());
-        return previous.Select((pair, index) => (Key: aligned[index], pair.Value)).ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
+        return previous.Select((pair, index) => (Key: aligned[index], pair.Value, Exact: pair.Key == aligned[index]))
+            .GroupBy(p => p.Key, StringComparer.Ordinal).Where(g => g.Any(p => p.Exact) || g.Select(p => p.Value).Distinct().Count() == 1)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.Exact).First().Value, StringComparer.Ordinal);
     }
 
     public static List<string> Remember(IReadOnlyList<string> previous, IEnumerable<LegendEntry> ordered)

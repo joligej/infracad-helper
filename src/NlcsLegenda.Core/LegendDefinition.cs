@@ -37,6 +37,8 @@ public sealed class LegendDefinition
     [JsonRequired]
     public LegendSettings Settings { get; set; } = new();
 
+    public List<SavedLegendRow> Rows { get; set; } = new();
+
     public string CreatedWithVersion { get; set; } = string.Empty;
 
     public LegendDefinition Clone() => new()
@@ -47,6 +49,7 @@ public sealed class LegendDefinition
         SourceHandles = new List<string>(SourceHandles),
         GroupName = GroupName,
         Settings = Settings.Clone(),
+        Rows = Rows.Select(r => r.Clone()).ToList(),
         CreatedWithVersion = CreatedWithVersion
     };
 }

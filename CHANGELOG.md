@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.38.0 - 2026-10-27
+
+- Getekende regels zijn over te nemen met tekst, status en een lokaal bewaard voorbeeld. Ook eigen hoogte- en controlesymbolen blijven zo beschikbaar na bijwerken en heropenen.
+- Overzicht kan omschrijvingen, voorbeelden en uitsluitingen aan bronobjecten, bronlagen of symboolsoorten koppelen. Kleur- en stijlwijzigingen laten deze keuzes en de handmatige volgorde intact.
+- Bijwerken toont vooraf toegevoegde, verdwenen, gesplitste en samengevoegde regels, gewijzigde voorbeelden en ontbrekende bronkoppelingen. Regels waarvan de bron ontbreekt of uitstaat blijven desgewenst herkenbaar bewaard. Bron koppelen bewaart een expliciete keuze.
+- Putnummers worden standaard niet als afzonderlijke regels of willekeurige voorbeeldtekst gebruikt. Puttypen en statussen blijven onderscheiden. Expliciete boomgrootteklassen in bloknamen krijgen een leesbare omschrijving.
+- Bestaande legendavensters behouden standaard hun maat en plaats. De indeling past zich aan de beschikbare breedte en hoogte aan; als leesbare inhoud niet past, blijft de vorige legenda behouden. Opnieuw plaatsen hergebruikt een gekoppeld venster op dezelfde layout.
+- Overzicht verklaart symboolvarianten en meldt viewportafwijkingen. De legenda gebruikt de globale laagweergave van het kader. Gekozen en bewaarde xref-voorbeelden gebruiken lokale CAD-afhankelijkheden.
+
 ## 1.37.0 - 2026-10-26
 
 - Samenvoegkeuzes staan bij elkaar. Lijnen, vlakken, arceringen, vlakvullingen en symbolen kunnen eigen keuzes krijgen, afzonderlijk voor KLIC en overige lagen. Per type kun je terug naar de standaardkeuzes.

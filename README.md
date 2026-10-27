@@ -30,6 +30,7 @@ Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitle
 | Onderdeel | Mogelijkheden |
 | --- | --- |
 | Inhoud | Regels en kleurvarianten kiezen, door lagen zoeken, objecten aanklikken om uit te sluiten |
+| Bijwerken | Wijzigingen vooraf bekijken; eigen regels, bronkeuzes en uitsluitingen bewaren bij gewijzigde weergave |
 | Volgorde en teksten | Handmatig ordenen, samenvoegen met een hoofdobject, eigen omschrijvingen en statussen |
 | Opmaak | Schaal, maten, kolommen, notities, hoeveelheden, schaalbalk en passende symbolen |
 | Voorbeelden | Bronweergave of een volledig voorbeeld uit een DWG-bibliotheek |

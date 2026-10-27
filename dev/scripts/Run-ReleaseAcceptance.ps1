@@ -9,7 +9,7 @@ param(
     [string]$TemplatePath,
     [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('mergeregression','viewportregression','xrefchoiceregression','examplerevision','exampleappearance','colorcomposition','choices','resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('continuity','mergeregression','viewportregression','xrefchoiceregression','examplerevision','exampleappearance','colorcomposition','choices','resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -30,6 +30,9 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ continuityreal=@('NLCSLEGENDACONTINUITYREAL','CONTINUITYREAL herhaalde update, teksten, eigen regels en vensters -> OK')
+ continuity=@('NLCSLEGENDACONTINUITYTEST','CONTINUITY kleurconvergentie, uitsluiting, eigen tekst, ontbrekende bron en eigen hoogte -> OK','NLCSLEGENDACONTINUITYVERIFY','CONTINUITYVERIFY opgeslagen regels en voorbeelden na heropenen -> OK')
+ sourceinspection=@('NLCSLEGENDASOURCEINSPECTION','SOURCEINSPECTION -> OK')
  mergeregression=@('NLCSLEGENDAMERGEREGRESSION','MERGEREGRESSION lijnschaal, arceerschaal/hoek, kleur/patroon, hoeveelheden, uitsluiting en herstel -> OK','NLCSLEGENDAMERGEVERIFY','MERGEREGRESSION na heropenen: keuzes en bijwerken behouden -> OK')
  viewportregression=@('NLCSLEGENDAVIEWPORTREGRESSION','VIEWPORTREGRESSION ankers, lagen, handmatig kader en schaal op 200/500/1000 -> OK')
  xrefchoiceregression=@('NLCSLEGENDAXREFCHOICEREGRESSION','XREFCHOICEREGRESSION alleen-lezen/vergrendeld, eigen symbool, grootte en normalisatie -> OK')

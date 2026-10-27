@@ -472,6 +472,17 @@ public sealed class LegendSettings
     public List<ManualEntry> ManualEntries { get; set; } = new();
 
     [Browsable(false)]
+    public List<RowChoice> RowChoices { get; set; } = new();
+    [Browsable(false)]
+    public List<SourceRow> SourceRows { get; set; } = new();
+    [Browsable(false)]
+    public List<SourceRow> FinalSourceRows { get; set; } = new();
+    public bool FitExistingWindow { get; set; } = true;
+    public bool RetainMissingRows { get; set; } = true;
+    public bool GenericManholes { get; set; } = true;
+
+
+    [Browsable(false)]
     public List<BlankEntry> BlankEntries { get; set; } = new();
 
     [Browsable(false)]
@@ -589,6 +600,11 @@ public sealed class LegendSettings
         }
         ExcludedEntries.ExceptWith(migrated);
         KnownEntryKeys.ExceptWith(migrated);
+        // volledig uitgezette oude varianten volgen zonder brede uitsluiting toe te voegen
+        var fullyExcluded = KnownEntryKeys.GroupBy(WithoutStyle, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1 && g.All(IsEntryExcluded)).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in current.Where(k => !KnownEntryKeys.Contains(k) && fullyExcluded.Contains(WithoutStyle(k))))
+            ExcludedEntries.Add(key);
         var previous = KnownEntryKeys.Concat(ExcludedEntries).Distinct(StringComparer.OrdinalIgnoreCase)
             .GroupBy(WithoutStyle, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToArray(), StringComparer.OrdinalIgnoreCase);
         // alleen een unieke regel volgen bij gewijzigde weergave
@@ -649,6 +665,9 @@ public sealed class LegendSettings
         foreach (var p in typeof(LegendSettings).GetProperties().Where(p => p is { CanRead: true, CanWrite: true } && !IsCollectionProperty(p)))
             p.SetValue(this, p.GetValue(other));
 
+        RowChoices = other.RowChoices.Select(c => c.Clone()).ToList();
+        SourceRows = other.SourceRows.Select(r => r.Clone()).ToList();
+        FinalSourceRows = other.FinalSourceRows.Select(r => r.Clone()).ToList();
         Klic = other.Klic.Clone();
         ExampleOverrides = new Dictionary<string, string>(other.ExampleOverrides, StringComparer.Ordinal);
         IncludedStatuses = new HashSet<NlcsStatus>(other.IncludedStatuses);
@@ -719,7 +738,7 @@ public sealed class LegendSettings
     }
 
     private static bool IsCollectionProperty(System.Reflection.PropertyInfo p) =>
-        p.Name is nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
+        p.Name is nameof(RowChoices) or nameof(SourceRows) or nameof(FinalSourceRows) or nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries) or nameof(KnownEntryKeys)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
             or nameof(CustomLayerRules) or nameof(BlankEntries) or nameof(ManualMergeGroups) or nameof(NonKlicMergedDimensions)
@@ -789,6 +808,15 @@ public sealed class LegendSettings
         IncludedStatuses ??= new HashSet<NlcsStatus>();
         IncludedDrawTypes ??= new HashSet<NlcsDrawType>();
         ManualEntryOrder = (ManualEntryOrder ?? new List<string>()).Where(k => !string.IsNullOrWhiteSpace(k)).Distinct(StringComparer.Ordinal).ToList();
+        RowChoices ??= new();
+        SourceRows ??= new();
+        FinalSourceRows ??= new();
+        if (RowChoices.Any(c => c is null || c.Sources is null || c.Sources.Any(s => s is null || !s.IsValid)
+                || !Enum.IsDefined(c.Scope) || c.SavedRowId is null || c.PreviousRowId is null
+                || !double.IsFinite(c.ExampleScale) || c.ExampleScale <= 0)
+            || SourceRows.Concat(FinalSourceRows).Any(r => r is null || r.Sources is null
+                || r.Sources.Any(s => s is null || !s.IsValid) || r.SelectionKey is null || r.OrderKey is null || r.Description is null))
+            throw new JsonException("De opgeslagen bronkoppelingen zijn ongeldig; de bestaande keuzes blijven behouden.");
         ManualEntries ??= new List<ManualEntry>();
         ExampleOverrides = new Dictionary<string, string>(ExampleOverrides ?? new(), StringComparer.Ordinal);
         ExampleLibraryPath ??= string.Empty;

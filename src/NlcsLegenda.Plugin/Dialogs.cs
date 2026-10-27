@@ -303,6 +303,10 @@ internal sealed class SettingsDialog : LegendDialog
         sources.Controls[0].Controls.Add(xrefs);
         root.Controls.Add(sources);
 
+        root.Controls.Add(Group("Bijwerken",
+            BoundCheck("Binnen het bestaande legendavenster blijven", () => _settings.FitExistingWindow, v => _settings.FitExistingWindow = v),
+            BoundCheck("Vorige regels bewaren als een bron ontbreekt of uitstaat", () => _settings.RetainMissingRows, v => _settings.RetainMissingRows = v),
+            BoundCheck("Putten zonder afzonderlijke putnummers", () => _settings.GenericManholes, v => _settings.GenericManholes = v)));
         root.Controls.Add(Group("Elementsoorten",
             BoundCheck("Geometrie / lijnen", () => _settings.ToonGeometrie, v => _settings.ToonGeometrie = v),
             BoundCheck("Vlakken", () => _settings.ToonVlakken, v => _settings.ToonVlakken = v),
@@ -672,8 +676,7 @@ internal sealed class SettingsDialog : LegendDialog
         using var dlg = new LegendManageDialog(composition, _settings, _layerChoices);
         void Apply()
         {
-            _settings.ExcludedEntries = dlg.ExcludedKeys;
-            _settings.ManualEntries = dlg.ManualEntries;
+            dlg.ApplyTo(_settings);
             RefreshGrids();
         }
         dlg.ApplyRequested += (_, _) => Apply();

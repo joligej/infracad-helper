@@ -7,6 +7,8 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
     public Autodesk.AutoCAD.DatabaseServices.ObjectId ReferenceId { get; init; }
 
     public bool IsPrimitive { get; init; }
+    public bool OmitManholeNumber { get; init; }
+    public string Variant { get; init; } = "";
 
     public string NormalizedDefinitionIdentity { get; init; } = string.Empty;
 
@@ -16,7 +18,7 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
         if (settings.MergeSymbolRotations) transform = transform.WithoutRotation();
         string definition = settings.MergeSymbolSizes && NormalizedDefinitionIdentity.Length > 0
             ? NormalizedDefinitionIdentity : DefinitionIdentity;
-        return $"S:{definition}:{transform.Signature}"
+        return $"S:{(Variant.Length > 0 ? Variant + ":" : "")}{definition}:{transform.Signature}"
             + (settings.MergeSymbolAttributes || AttributeIdentity.Length == 0 ? "" : ":" + AttributeIdentity);
     }
 
@@ -41,7 +43,7 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
         + (AttributeIdentity.Length == 0 ? string.Empty : ":" + AttributeIdentity);
 
     public string RenderIdentity =>
-        $"S:{DefinitionIdentity}:{RenderTransform.Signature}" + (AttributeIdentity.Length == 0 ? string.Empty : ":" + AttributeIdentity);
+        $"S:{(Variant.Length > 0 ? Variant + ":" : "")}{DefinitionIdentity}:{RenderTransform.Signature}" + (AttributeIdentity.Length == 0 ? string.Empty : ":" + AttributeIdentity);
 }
 
 public readonly record struct SymbolTransform(Vector3d XAxis, Vector3d YAxis, Vector3d ZAxis)

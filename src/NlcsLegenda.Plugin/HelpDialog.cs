@@ -16,9 +16,16 @@ internal sealed class HelpDialog : LegendDialog
             "Kies de hele tekening of een selectie, en zet de legenda op een plek naast de\n" +
             "tekening. De legenda komt op de eigen NLCS-lagen, dus kleur en lijntype kloppen."),
         ("Bijwerken",
-            "Is het ontwerp veranderd? Klik op Bijwerken.\n\n" +
+            "Is het ontwerp veranderd? Klik op Bijwerken. Eerst zie je wat er verandert.\n\n" +
             "De legenda wordt opnieuw getekend op dezelfde plek. Wijzig de tekst via de\n" +
             "instellingen of Elementtekst, niet met de hand in de legenda zelf."),
+        ("Blijvende regels",
+            "Regel overnemen kopieert getekende tekst, voorbeeld en status naar de legenda.\n\n" +
+            "Overzicht → Regel aanpassen bewaart een eigen omschrijving of uitsluiting voor\n" +
+            "dezelfde bronobjecten, bronlaag of symboolsoort. Kleuren mogen daarna veranderen.\n\n" +
+            "Ontbreekt een bron, dan blijft de vorige regel herkenbaar bewaard. Bron koppelen\n" +
+            "toont mogelijke bronnen en laat het bestaande of nieuwe voorbeeld bekijken.\n" +
+            "De keuze blijft in de DWG bewaard."),
         ("Meerdere legenda's",
             "Je kunt meerdere legenda's naast elkaar hebben, elk met een eigen bron en\n" +
             "instellingen.\n\n" +
@@ -95,6 +102,7 @@ internal sealed class HelpDialog : LegendDialog
         ("Commando's",
             "NLCSLEGENDA — legenda maken\n" +
             "NLCSLEGENDAUPDATE — bijwerken met behoud van eigen keuzes\n" +
+            "NLCSLEGENDAOVERNEMEN — getekende regel blijvend opnemen\n" +
             "NLCSLEGENDARESET — eigen keuzes vervangen door de globale standaard\n" +
             "NLCSLEGENDABEHEER — legenda's beheren\n" +
             "NLCSLEGENDAINFO — overzicht zonder tekenen\n" +

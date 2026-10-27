@@ -28,6 +28,9 @@ internal sealed class EntryCheckItem
 
 public sealed class ManualRow
 {
+    public string? Id { get; set; }
+    public string SampleBlock { get; set; } = "";
+    public double SampleScale { get; set; } = 1000;
     public string Laag { get; set; } = string.Empty;
 
     public string Type { get; set; } = "Lijn";
@@ -204,6 +207,20 @@ internal sealed class LegendManageDialog : LegendDialog
 
     public HashSet<string> ExcludedKeys => _tree.Model.ExcludedKeys();
 
+    public void ApplyTo(LegendSettings settings)
+    {
+        var excluded = ExcludedKeys;
+        foreach (var item in _allEntries)
+        {
+            bool before = settings.IsEntryExcluded(item.Key), after = excluded.Contains(item.Key);
+            if (before == after) continue;
+            var source = settings.SourceRows.LastOrDefault(row => row.SelectionKey == item.Key);
+            if (source is not null) settings.RowChoices.Add(new RowChoice { Sources = new(source.Sources), Scope = ChoiceScope.Variant, Excluded = after });
+        }
+        settings.ExcludedEntries = excluded;
+        settings.ManualEntries = ManualEntries;
+    }
+
     public List<ManualEntry> ManualEntries
     {
         get
@@ -214,6 +231,7 @@ internal sealed class LegendManageDialog : LegendDialog
             {
                 list.Add(new ManualEntry
                 {
+                    Id = row.Id, SampleBlock = row.Blok == row.SampleBlock && row.Type == "Symbool" ? row.SampleBlock : "", SampleScale = row.SampleScale,
                     Layer = row.Laag.Trim(),
                     Type = ToDrawType(row.Type),
                     Description = row.Omschrijving.Trim(),
@@ -270,6 +288,7 @@ internal sealed class LegendManageDialog : LegendDialog
 
     private static ManualRow ToRow(ManualEntry m) => new()
         {
+            Id = m.Id, SampleBlock = m.SampleBlock, SampleScale = m.SampleScale,
             Laag = m.Layer,
             Type = FromDrawType(m.Type),
             Omschrijving = m.Description,
