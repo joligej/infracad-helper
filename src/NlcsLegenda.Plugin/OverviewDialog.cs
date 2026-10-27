@@ -333,8 +333,9 @@ internal sealed class OverviewDialog : LegendDialog
             _showExample is null ? null : (form, entry) => _showExample(form, Current, entry));
         if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Selected is not { } source) return;
         ChangeMerges(() => {
+            if (!previous.IsManual) LegendContinuity.SetChoice(Current.Settings, previous, ChoiceScope.Variant, excluded: true);
             var choice = LegendContinuity.SetChoice(Current.Settings, source, ChoiceScope.Variant,
-                description: previous.Description, example: dialog.KeepExample ? previous.SampleBlock : null,
+                description: previous.Description, excluded: false, example: dialog.KeepExample ? previous.SampleBlock : null,
                 automaticExample: !dialog.KeepExample);
             choice.PreviousRowId = previous.Retained ? previous.Element["BEWAARD_".Length..] : "";
             choice.ExampleScale = previous.SampleScale;
