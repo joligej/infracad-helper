@@ -112,9 +112,9 @@ internal static class LegendRowSamples
     {
         if (!legend.Settings.RetainMissingRows || legend.Rows.Count == 0) return analysis;
         var entries = analysis.Entries.ToList();
-        foreach (var row in legend.Rows.Where(r => !r.Manual && r.SampleBlock.Length > 0 && legend.Settings.IncludedStatuses.Contains(r.Status)))
+        foreach (var row in legend.Rows.Where(r => !r.Manual && r.SampleBlock.Length > 0 && legend.Settings.IncludedStatuses.Contains(r.Status))
+            .Where(r => !entries.Any(e => LegendContinuity.Related(r.Sources, e.Sources) || r.OrderKey == LegendOrder.Key(e))))
         {
-            if (entries.Any(e => LegendContinuity.Related(row.Sources, e.Sources) || row.OrderKey == LegendOrder.Key(e))) continue;
             var retained = row.RetainedEntry();
             LegendContinuity.ApplyChoices(legend.Settings, new() { retained });
             if (retained.SourceExcluded ?? row.ExclusionKeys.Any(legend.Settings.IsEntryExcluded)) continue;
