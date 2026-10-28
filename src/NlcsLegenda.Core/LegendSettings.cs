@@ -225,11 +225,13 @@ public sealed class LegendSettings
     public void SetDetailLevel(bool compact)
     {
         foreach (bool klic in new[] { true, false })
-        foreach (var type in new[] { NlcsDrawType.Geometrie, NlcsDrawType.Vlak })
         {
-            foreach (var dimension in new[] { GroupDimension.Diameter, GroupDimension.Materiaal, GroupDimension.Nummer })
-                SetMergeDimension(klic, type, dimension, compact);
-            SetMergeDimension(klic, type, GroupDimension.Soort, false);
+            foreach (var type in new[] { NlcsDrawType.Geometrie, NlcsDrawType.Vlak })
+            {
+                foreach (var dimension in new[] { GroupDimension.Diameter, GroupDimension.Materiaal, GroupDimension.Nummer })
+                    SetMergeDimension(klic, type, dimension, compact);
+                SetMergeDimension(klic, type, GroupDimension.Soort, false);
+            }
         }
         MergeIdenticalStatuses = false;
         ShowMergedValues = !compact;

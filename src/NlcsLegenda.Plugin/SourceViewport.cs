@@ -61,7 +61,7 @@ internal sealed class SourceViewport
             rectangle.AddVertexAt(3, new(_paperBounds.MinPoint.X, _paperBounds.MaxPoint.Y), 0, 0, 0);
             rectangle.Closed = true;
             using var plane = new Plane(Point3d.Origin, Vector3d.ZAxis);
-            var crossings = new Point3dCollection();
+            using var crossings = new Point3dCollection();
             projected.IntersectWith(_clip ?? rectangle, Intersect.OnBothOperands, plane, crossings, IntPtr.Zero, IntPtr.Zero);
             return crossings.Count > 0;
         }
@@ -71,7 +71,7 @@ internal sealed class SourceViewport
         using var box = new Polyline();
         for (int i = 0; i < corners.Length; i++) box.AddVertexAt(i, corners[i], 0, 0, 0);
         box.Closed = true;
-        var hits = new Point3dCollection();
+        using var hits = new Point3dCollection();
         box.IntersectWith(_clip, Intersect.OnBothOperands, hits, IntPtr.Zero, IntPtr.Zero);
         if (hits.Count > 0) return true;
         if (corners.Any(Contains)) return true;
@@ -87,7 +87,7 @@ internal sealed class SourceViewport
         var start = new Point3d(point.X, point.Y, 0);
         if (_clip!.GetClosestPointTo(start, false).DistanceTo(start) < 1e-8) return true;
         using var ray = new Ray { BasePoint = start, UnitDir = new Vector3d(1, 0.123456789, 0).GetNormal() };
-        var hits = new Point3dCollection();
+        using var hits = new Point3dCollection();
         ray.IntersectWith(_clip, Intersect.OnBothOperands, hits, IntPtr.Zero, IntPtr.Zero);
         return hits.Cast<Point3d>().Distinct().Count() % 2 != 0;
     }

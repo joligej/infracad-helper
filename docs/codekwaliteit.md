@@ -1,5 +1,14 @@
 # Codekwaliteit
 
+## Controle voor 1.39.0
+
+De kaartselectie ruimt tijdelijke puntverzamelingen na de snijberekening direct op.
+De zes nieuwe meldingen over instellingenvelden betreffen controls die via `Group`
+aan de controlboom van het formulier worden toegevoegd. WinForms ruimt ze bij het
+sluiten van het formulier op; de vensterproef controleert dit op vier schermschalen.
+De exacte vergelijking met schaal 1 in de CAD-proef controleert behoud van een
+ongewijzigd ingestelde waarde, geen berekend resultaat.
+
 De ronde na 1.32.3 begon met 142 CodeQL-meldingen: 111 over brede
 foutafhandeling, 27 over lussen en 4 over het vrijgeven van objecten.
 Ze hadden niveau `note`. De scanconfiguratie is niet versmald en meldingen

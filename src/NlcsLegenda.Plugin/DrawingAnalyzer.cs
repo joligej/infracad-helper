@@ -359,7 +359,7 @@ public static class DrawingAnalyzer
                     string childSource = string.IsNullOrEmpty(sourceXref) ? def.Name : sourceXref + "|" + LayerNaming.LocalName(def.Name);
                     var sourceDb = def.GetXrefDatabase(false);
                     if (sourceDb is not null) c.DrawingIds[childSource] = (sourceXref.Length > 0 ? c.DrawingIds.GetValueOrDefault(sourceXref) + ">" : "")
-                        + sourceDb.FingerprintGuid.ToString() + ":" + br.ObjectId.NonForwardedHandle;
+                        + sourceDb.FingerprintGuid + ":" + br.ObjectId.NonForwardedHandle;
                     if (settings.IsXrefIncluded(childSource))
                         CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested,
                             sourceXref: childSource, inheritedStyle: effectiveStyle, inheritedLayerStyle: layerStyle);
