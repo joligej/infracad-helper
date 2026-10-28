@@ -55,7 +55,7 @@ public partial class Commands
         {
             var definition = registry.FindById(legendId)
                 ?? throw new InvalidOperationException("Legenda niet meer gevonden.");
-            if (definition.Scope == LegendScope.Selection)
+            if (definition.Scope == LegendScope.Selection && definition.Settings.SourceViewportHandles.Count == 0)
                 selection = LegendManagement.ResolveHandles(db, definition.SourceHandles, out _)
                     .Where(id => !excluded.Contains(id)).ToArray();
         }

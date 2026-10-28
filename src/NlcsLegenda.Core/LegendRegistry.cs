@@ -57,6 +57,10 @@ public sealed class LegendRegistry
                 || (!string.IsNullOrEmpty(l.GroupName) && !groups.Add(l.GroupName)))
                 throw new JsonException("Legenda-gegevens bevatten een ontbrekende of dubbele identiteit.");
             l.Name ??= string.Empty;
+            l.SpaceHandle ??= string.Empty;
+            if (!double.IsFinite(l.WindowWidthMm) || l.WindowWidthMm < 0
+                || !double.IsFinite(l.WindowHeightMm) || l.WindowHeightMm < 0)
+                throw new JsonException("De begrenzing van de overgenomen legenda is ongeldig.");
             if (l.GroupName is null || l.SourceHandles is null || l.Settings is null || !Enum.IsDefined(l.Scope))
                 throw new JsonException("De opgeslagen bronselectie, groep of instellingen zijn ongeldig.");
             l.Rows ??= new();

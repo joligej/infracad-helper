@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.39.0 - 2026-10-28
+
+- Broncontrole verklaart verborgen, niet-plottende, uitgesloten en niet herkende objecten. Een specifieke opnamekeuze kan een brede uitsluiting doorbreken zonder andere onderdelen terug te zetten.
+- Kaartvensters bepalen desgewenst brongebied en laagweergave. Meerdere layouts kunnen dezelfde legenda voeden; overlappende vensters tellen dezelfde weergave niet dubbel.
+- Getekende regels kunnen een eigen beheerde legenda in dezelfde papierlayout worden. Lege registraties worden veilig opgeruimd; gevulde of bewust bewaarde regels blijven staan.
+- Projectomschrijvingen zijn te delen via een gekozen bestand. Bekende beheerdersnamen krijgen leesbare labels, met behoud van de volledige brongegevens. Compacte en gedetailleerde lijnregels zijn met één keuze in te stellen.
+- Bij bronbestanden met dezelfde identiteit blijven keuzes ook na een naamswijziging gekoppeld. Niet eenduidige oudere koppelingen worden behouden voor controle.
+- Kolommen balanceren op gemeten tekst-, symbool- en kophoogte. Statusgroepen kunnen bijeenblijven zolang ze passen. Bijna witte stalen krijgen optioneel een dunne plotbare rand op een eigen legendalaag.
+
 ## 1.38.1 - 2026-10-28
 
 - Lijntypen uit xrefs krijgen zelfstandige legendadefinities, ook als AutoCAD ze al als afhankelijke records in de hoofdtekening heeft geladen. Streep-, tekst- en shapepatronen behouden hun patroon, kleur en lijndikte na aanmaken, bijwerken, opslaan en AUDIT.

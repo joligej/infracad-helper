@@ -97,7 +97,12 @@ kies je tussen tekeningnotities en de KLIC-waarschuwing.
 
 Bij de standaardregelafstand krijgen lange omschrijvingen extra leesruimte. De compacte
 afstand uit de template blijft voor korte labels gelden. De berekening van de
-kolomhoogte gebruikt de werkelijk getekende teksthoogte.
+kolomhoogte gebruikt de werkelijk getekende teksthoogte, symbolen en koppen. **Kolommen
+balanceren** verdeelt ook automatisch gekozen kolommen op die hoogte. Met **Statusgroep
+bijeenhouden als die in één kolom past** begint een passende groep zo nodig in de volgende
+kolom. Een grotere groep loopt door met een herhaalde kop; koppen staan altijd bij een regel.
+**Lichte voorbeelden omranden bij plotten** geeft bijna witte stalen een dunne plotbare rand
+op een eigen legendalaag. De algemene hulplaag blijft niet plotbaar.
 
 De legenda is bedoeld voor modelruimte in meters. Papiermaten worden eenmaal met de
 gekozen schaal omgerekend. Symbolen behouden hun modelmaat; een expliciete NLCS-schaalvariant
@@ -168,7 +173,9 @@ in de lijst en behouden hun eigen keuze.
 ![Wijzigingen vooraf bekijken, met demonstratiegegevens](bijwerken.png)
 
 Met **Regel overnemen** (`NLCSLEGENDAOVERNEMEN`) voeg je een handmatig getekende regel
-aan een bestaande beheerde legenda toe. Kies de omschrijving, selecteer alleen het
+aan een bestaande beheerde legenda toe. Kies **NieuweLegenda** als er nog geen beheerde
+legenda is. De overgenomen regel blijft in dezelfde modelruimte of papierlayout.
+Kies de omschrijving, selecteer alleen het
 bijbehorende voorbeeld en kies de status. De plug-in bewaart een lokale kopie van het
 voorbeeld, met tekst en vorm. De geselecteerde oude tekst en het voorbeeld worden pas
 vervangen als de nieuwe legenda is opgebouwd. Een eigen hoogte of controlesymbool kan
@@ -209,10 +216,33 @@ objectsoort, symbool, status en weergave. Je kunt beide voorbeelden in CAD bekij
 kiezen of het oude voorbeeld behouden moet blijven. Na koppelen verdwijnt de losse
 bewaarde regel. De keuze wordt in de DWG opgeslagen.
 
-De legenda volgt globale laaginstellingen van het kader, inclusief xref-laagafwijkingen,
-kleur, lijntype, lijndikte en transparantie. Afwijkingen die alleen in een viewport gelden
-worden bij Broncontrole gemeld. Daardoor kan de kaart in zo'n viewport bewust anders
-ogen. De legenda neemt die afwijkingen niet stilzwijgend over.
+Zonder gekozen kaartvensters volgt de legenda de globale laaginstellingen van het
+kader, inclusief xref-laagafwijkingen. Onder **Bronnen en inhoud → Kaartvensters kiezen**
+kun je de kaarten aanwijzen die bij de legenda horen. Alleen hun zichtbare kaartgebied
+telt mee; een overzichtskaart blijft buiten de bronkeuze als je die niet selecteert.
+Dezelfde bron met dezelfde weergave wordt bij overlappende vensters één keer geteld.
+
+**Kaartvensters** (`NLCSLEGENDABRONVENSTER`) biedt **Toevoegen**: ga naar een andere
+layout en voeg daar vensters aan dezelfde legenda toe. Zo kan één legenda meerdere
+bladen volgen. Kies **HeleTekening** om de vensterselectie te wissen. Globale standaarden
+nemen deze tekeninggebonden selectie niet over.
+
+Bij gekozen kaartvensters staat **Laagweergave uit de gekozen kaartvensters** standaard
+aan. Kleur, lijntype, lijndikte, transparantie en de zichtbare delen van symbolen volgen
+dan die vensters. Uitzetten gebruikt de globale kleuren en stijlen, terwijl de
+kaartbegrenzing en bevroren lagen blijven gelden. Broncontrole meldt viewportafwijkingen.
+De algemene lagen, kaartvensters en bronobjecten worden hiervoor niet gewijzigd.
+Perspectiefvensters worden geweigerd; kies een orthogonale kaartweergave.
+
+**Broncontrole** (`NLCSLEGENDABRONCONTROLE`) toont ook niet opgenomen objecten: verborgen,
+niet plotbaar, buiten de kaart, onbekende laag of bewust uitgesloten. Je kunt door deze
+lijst zoeken. Een individuele regel weer aanvinken in Samenstellen maakt een uitzondering
+op de opgeslagen brede uitsluiting; overige uitgesloten regels blijven uit. Filters voor
+xref, status en objectsoort blijven gelden.
+
+**Beheer → Opschonen** verwijdert alleen lege registraties zonder regels, eigen inhoud,
+groepsgeometrie of gekoppeld venster. Bij bijwerken gebeurt dezelfde controle.
+Een ontbrekende bron met bewaarde legendaregels wordt niet als lege legenda verwijderd.
 
 **Binnen het bestaande legendavenster blijven** staat standaard aan. De kolombreedte
 en hoogte houden rekening met tekstomloop, opmerkingen, eigen regels en schaalbalk.
@@ -416,6 +446,8 @@ een opzet met collega's kunt delen.
 | Commando | Doet |
 |----------|------|
 | `NLCSLEGENDA` | Legenda genereren en met de muis plaatsen (hele tekening of selectie). |
+| `NLCSLEGENDABRONCONTROLE` | Verklaring van opgenomen, ontbrekende en uitgesloten bronnen bekijken. |
+| `NLCSLEGENDABRONVENSTER` | Kaartvensters kiezen of toevoegen, ook op andere layouts. |
 | `NLCSLEGENDAOVERNEMEN` | Getekende tekst, voorbeeld en status als blijvende regel overnemen. |
 | `NLCSLEGENDAUPDATE` | Een legenda opnieuw tekenen op dezelfde plek; bij meerdere kies je welke. |
 | `NLCSLEGENDABEHEER` | Legenda's bekijken, bijwerken, hernoemen, opzoeken, verwijderen, en per legenda instellingen aanpassen, overnemen, dupliceren of de bron wijzigen. |
@@ -451,6 +483,28 @@ De globale bestanden staan in `%APPDATA%\NlcsLegenda\settings.json` en
 `omschrijvingen.json`. **Bestanden** (`NLCSLEGENDACONFIG`) toont de paden.
 Voorbeelden: [instellingen](../deploy/settings.sample.json) en
 [omschrijvingen](../deploy/omschrijvingen.sample.json).
+
+### Projectomschrijvingen delen
+
+Onder **Teksten** kies je een projectbestand met **Projectbestand kiezen…** of maak je er een met
+**Projectbestand opslaan…**. Selecteer hetzelfde bestand bij andere legenda’s om korte
+projectnamen te delen, bijvoorbeeld Rijbaan of een projectspecifieke naam voor een drain.
+De bronlagen en bloknamen blijven gelijk. Een eigen omschrijving per variant of in de
+lokale omschrijvingen gaat vóór het projectbestand. Kies het projectbestand alleen als
+globale standaard wanneer het ook voor nieuwe legenda’s moet gelden.
+
+Het bestand moet bereikbaar blijven; bij een ontbrekend of ongeldig bestand blijft de
+vorige legenda behouden en wordt de oorzaak gemeld. Neem het bestand mee naar een andere
+computer en kies daar het nieuwe pad. Het [voorbeeldbestand](../deploy/projectomschrijvingen.sample.json)
+bevat omschrijvingen en optionele aliassen voor beheerders. **Leesbare beheerdernamen**
+verkort bekende namen in de zichtbare tekst. De volledige bronnaam blijft in de brongegevens. Met **Beheerdernamen in de legenda tonen**
+kun je deze toevoeging afzonderlijk aan- of uitzetten, ook bij gekozen KLIC-tekstvelden.
+
+Onder **Legenda → Detailniveau** zetten **Compacte lijnregels** en **Gedetailleerde lijnregels** de
+keuzes voor diameter, materiaal, nummer en het tonen van samengevoegde waarden tegelijk.
+Leidingsoorten en statussen blijven apart; symboolkeuzes worden niet veranderd.
+Voor Info en Overig toont Broncontrole alleen functies die uit de bronlaag zijn af te
+leiden. Geef een eigen tekst via Regel aanpassen als de bron onvoldoende betekenis geeft.
 
 ## Export gebruiken
 

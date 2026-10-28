@@ -9,7 +9,7 @@ param(
     [string]$TemplatePath,
     [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('linetypes','continuity','mergeregression','viewportregression','xrefchoiceregression','examplerevision','exampleappearance','colorcomposition','choices','resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('projectlegends','linetypes','continuity','mergeregression','viewportregression','xrefchoiceregression','examplerevision','exampleappearance','colorcomposition','choices','resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -22,7 +22,12 @@ $PluginPath=(Resolve-Path -LiteralPath $PluginPath).Path
 $pluginHash=(Get-FileHash -LiteralPath $PluginPath -Algorithm SHA256).Hash
 if(!$TemplatePath){$TemplatePath=Join-Path $env:APPDATA "Autodesk/C3D $AcadVersion/enu/Template/AutoCAD Template/acad.dwt"}
 $TemplatePath=(Resolve-Path -LiteralPath $TemplatePath).Path
-$templateHash=(Get-FileHash -LiteralPath $TemplatePath -Algorithm SHA256).Hash
+function Get-TemplateHash {
+ $stream=[IO.File]::Open($TemplatePath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
+ try { [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($stream)) }
+ finally { $stream.Dispose() }
+}
+$templateHash=Get-TemplateHash
 if(!$OutputDirectory){$OutputDirectory=Join-Path $repoRoot ('artifacts/acceptance/'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+$AcadVersion)}
 $OutputDirectory=[IO.Path]::GetFullPath($OutputDirectory)
 if(Test-Path -LiteralPath $OutputDirectory){throw 'Kies een nieuwe uitvoermap; bestaande resultaten worden niet overschreven.'}
@@ -30,6 +35,7 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ projectlegends=@('NLCSLEGENDAPROJECTTEST','PROJECTLEGENDS kaartgebied, bronredenen, laagweergave, leeg herstel en handmatige layoutregel -> OK','NLCSLEGENDAPROJECTVERIFY','PROJECTVERIFY kaartkeuze en handmatig voorbeeld na heropenen -> OK')
  linetypes=@('NLCSLEGENDALINETYPETEST','LINETYPES nieuw opgebouwde streep-, tekst- en shapepatronen zelfstandig -> OK',"_.AUDIT`n_Y`nNLCSLEGENDALINETYPEVERIFY`n_.AUDIT`n_Y`nNLCSLEGENDALINETYPEVERIFY",'LINETYPEVERIFY patroon, kleur en lijndikte na audit, heropenen en nieuwe varianten -> OK')
  continuityreal=@('NLCSLEGENDACONTINUITYREAL','CONTINUITYREAL herhaalde update, teksten, eigen regels en vensters -> OK')
  continuity=@('NLCSLEGENDACONTINUITYTEST','CONTINUITY kleurconvergentie, uitsluiting, eigen tekst, ontbrekende bron en eigen hoogte -> OK','NLCSLEGENDACONTINUITYVERIFY','CONTINUITYVERIFY opgeslagen regels en voorbeelden na heropenen -> OK')
@@ -201,5 +207,5 @@ foreach($case in $Cases){
   Run-Case "$case-reopen" $drawing $commands $expected
  }
 }
-if((Get-FileHash -LiteralPath $TemplatePath -Algorithm SHA256).Hash -ne $templateHash){throw 'Templatebron gewijzigd.'}
+if((Get-TemplateHash) -ne $templateHash){throw 'Templatebron gewijzigd.'}
 Write-Output "ACCEPTANCE PASS: $($results.Count) runs; bron ongewijzigd; resultaten in $OutputDirectory"

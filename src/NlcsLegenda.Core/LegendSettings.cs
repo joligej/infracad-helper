@@ -8,6 +8,13 @@ namespace NlcsLegenda.Core;
 // papiermillimeters naar modelmeters via de plotschaal
 public sealed class LegendSettings
 {
+    public string ProjectDescriptionsPath { get; set; } = "";
+    public bool ReadableProviderNames { get; set; } = true;
+    public bool ShowProviderNames { get; set; } = true;
+    public bool OutlineLightSamples { get; set; } = true;
+    public List<string> SourceViewportHandles { get; set; } = new();
+    public bool UseViewportAppearance { get; set; } = true;
+
     public const int CurrentSchemaVersion = 1;
 
     [Browsable(false)]
@@ -215,6 +222,19 @@ public sealed class LegendSettings
         foreach (var rule in MergeRules.Where(r => r.Klic)) rule.Dimensions.Remove(GroupDimension.Materiaal);
     }
 
+    public void SetDetailLevel(bool compact)
+    {
+        foreach (bool klic in new[] { true, false })
+        foreach (var type in new[] { NlcsDrawType.Geometrie, NlcsDrawType.Vlak })
+        {
+            foreach (var dimension in new[] { GroupDimension.Diameter, GroupDimension.Materiaal, GroupDimension.Nummer })
+                SetMergeDimension(klic, type, dimension, compact);
+            SetMergeDimension(klic, type, GroupDimension.Soort, false);
+        }
+        MergeIdenticalStatuses = false;
+        ShowMergedValues = !compact;
+    }
+
     public void ResetMergeDimensions(bool klic, NlcsDrawType type) =>
         MergeRules.RemoveAll(r => r.Klic == klic && r.Type == type);
 
@@ -302,6 +322,8 @@ public sealed class LegendSettings
 
     [Category("Kolommen"), DisplayName("Kolommen balanceren")]
     public bool BalanceColumns { get; set; } = true;
+
+    public bool KeepStatusGroupsTogether { get; set; }
 
     [Category("Kolommen"), DisplayName("Max. hoogte (mm, 0 = uit)")]
     public double MaxLegendHeightMm { get; set; } = 0.0;
@@ -665,6 +687,7 @@ public sealed class LegendSettings
         foreach (var p in typeof(LegendSettings).GetProperties().Where(p => p is { CanRead: true, CanWrite: true } && !IsCollectionProperty(p)))
             p.SetValue(this, p.GetValue(other));
 
+        SourceViewportHandles = new(other.SourceViewportHandles);
         RowChoices = other.RowChoices.Select(c => c.Clone()).ToList();
         SourceRows = other.SourceRows.Select(r => r.Clone()).ToList();
         FinalSourceRows = other.FinalSourceRows.Select(r => r.Clone()).ToList();
@@ -717,6 +740,7 @@ public sealed class LegendSettings
         Columns = d.Columns;
         MaxRowsPerColumn = d.MaxRowsPerColumn;
         BalanceColumns = d.BalanceColumns;
+        KeepStatusGroupsTogether = d.KeepStatusGroupsTogether;
         MaxLegendHeightMm = d.MaxLegendHeightMm;
         IncludeGroupHeaders = d.IncludeGroupHeaders;
         IncludeHoofdgroepHeaders = d.IncludeHoofdgroepHeaders;
@@ -738,7 +762,7 @@ public sealed class LegendSettings
     }
 
     private static bool IsCollectionProperty(System.Reflection.PropertyInfo p) =>
-        p.Name is nameof(RowChoices) or nameof(SourceRows) or nameof(FinalSourceRows) or nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
+        p.Name is nameof(SourceViewportHandles) or nameof(RowChoices) or nameof(SourceRows) or nameof(FinalSourceRows) or nameof(IncludedStatuses) or nameof(IncludedDrawTypes) or nameof(ExcludedDisciplines)
             or nameof(ExcludedHoofdgroepen) or nameof(ExcludedEntries) or nameof(KnownEntryKeys)
             or nameof(XrefInclusion) or nameof(ManualEntries) or nameof(CustomStatuses)
             or nameof(CustomLayerRules) or nameof(BlankEntries) or nameof(ManualMergeGroups) or nameof(NonKlicMergedDimensions)
@@ -749,11 +773,11 @@ public sealed class LegendSettings
 
     public bool IsIncluded(NlcsLayerName layer) => ExplainExclusion(layer) is null;
 
-    public string? ExplainExclusion(NlcsLayerName layer)
+    public string? ExplainExclusion(NlcsLayerName layer, bool includeException = false)
     {
         var key = EntryKey(layer);
         // uitvinken en xref-uitsluiting vóór eigen status
-        if (IsEntryExcluded(key)) return "de regel is handmatig uitgevinkt";
+        if (!includeException && IsEntryExcluded(key)) return "de regel is handmatig uitgevinkt";
         if (layer.IsXref && !IsXrefIncluded(layer.XrefName))
             return $"xref '{layer.XrefName}' wordt niet meegenomen";
         // eigen status boven status-, discipline- en hoofdgroepfilters
@@ -802,6 +826,8 @@ public sealed class LegendSettings
     // ongevoeligheid voor hoofdletters herstellen na deserialisatie
     public LegendSettings Normalize()
     {
+        ProjectDescriptionsPath = (ProjectDescriptionsPath ?? "").Trim();
+        SourceViewportHandles = (SourceViewportHandles ?? new()).Where(h => !string.IsNullOrWhiteSpace(h)).Select(h => h.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (SchemaVersion < 1 || SchemaVersion > CurrentSchemaVersion)
             throw new NotSupportedException($"Profielversie {SchemaVersion} wordt niet ondersteund.");
         Klic = (Klic ?? new KlicOptions()).Clone();

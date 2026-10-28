@@ -105,9 +105,9 @@ internal static class LegendViewport
         var settings = legend.Settings.Clone();
         if (!settings.FitExistingWindow) return settings;
         var viewports = Linked(db, tr, legend.Id).ToArray();
-        if (viewports.Length == 0) return settings;
-        double width = viewports.Min(v => v.Width) - 2 * settings.ViewportMarginMm;
-        double height = viewports.Min(v => v.Height) - 2 * settings.ViewportMarginMm;
+        if (viewports.Length == 0 && (legend.WindowWidthMm <= 0 || legend.WindowHeightMm <= 0)) return settings;
+        double width = viewports.Length > 0 ? viewports.Min(v => v.Width) - 2 * settings.ViewportMarginMm : legend.WindowWidthMm;
+        double height = viewports.Length > 0 ? viewports.Min(v => v.Height) - 2 * settings.ViewportMarginMm : legend.WindowHeightMm;
         double border = settings.DrawBorder ? 2 * settings.BorderMarginMm : 0;
         double minimum = settings.SwatchWidthMm + settings.TextGapMm + 3 * settings.TextHeightMm
             + (settings.IncludeQuantities ? settings.QuantityColumnWidthMm : 0) + border;

@@ -86,7 +86,7 @@ public partial class Commands
         var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
         var definition = LegendManagement.ActiveRegistry(db, tr, registry).FindById(item.Id);
         if (item.Id.Length > 0 && definition is null) throw new InvalidOperationException("Deze legenda is niet meer aanwezig.");
-        var selected = definition?.Scope == LegendScope.Selection
+        var selected = definition?.Scope == LegendScope.Selection && item.Settings.SourceViewportHandles.Count == 0
             ? LegendManagement.ResolveHandles(db, definition.SourceHandles, out _).Where(id => !excluded.Contains(id)).ToArray() : null;
         var result = DrawingAnalyzer.Analyze(db, tr, item.Settings, selected, DescriptionCatalog.Default(), excluded);
         if (definition is not null)

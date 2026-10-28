@@ -170,12 +170,12 @@ public static class KlicSummary
     public static IReadOnlyList<KlicObjectData> Combine(IEnumerable<KlicObjectData> objects) =>
         objects.DistinctBy(o => o.Identity).ToArray();
 
-    public static string Field(IEnumerable<KlicObjectData> objects, string key)
+    public static string Field(IEnumerable<KlicObjectData> objects, string key, Func<string, string>? displayValue = null)
     {
         var data = objects.ToArray();
         if (!data.Any(o => o.HasData)) return "";
         return string.Join("; ", data.SelectMany(o => o.Values(key) is { Count: > 0 } values ? values : new[] { "" })
-            .Select(v => KlicFields.Format(key, v)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase));
+            .Select(v => displayValue?.Invoke(KlicFields.Format(key, v)) ?? KlicFields.Format(key, v)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase));
     }
 
     public static string Issues(IEnumerable<KlicObjectData> objects) => string.Join("; ", objects.SelectMany(o =>
@@ -185,7 +185,8 @@ public static class KlicSummary
     public static string Sources(IEnumerable<KlicObjectData> objects, string key) => string.Join("; ",
         objects.SelectMany(o => o.Selected(key)).Select(r => KlicFields.SourceLabel(r.Source)).Distinct().Order());
 
-    public static string Description(IEnumerable<KlicObjectData> objects, IEnumerable<string> fields) =>
-        string.Join(" · ", KlicFields.Valid(fields).Select(k => (Key: k, Value: Field(objects, k)))
+    public static string Description(IEnumerable<KlicObjectData> objects, IEnumerable<string> fields, IReadOnlyDictionary<string, string>? providerLabels = null) =>
+        string.Join(" · ", KlicFields.Valid(fields).Select(k => (Key: k, Value: Field(objects, k,
+            k == "Netbeheerder" && providerLabels is not null ? v => providerLabels.GetValueOrDefault(v, v) : null)))
             .Where(x => x.Value.Length > 0).Select(x => KlicFields.Find(x.Key)!.Label + ": " + x.Value));
 }

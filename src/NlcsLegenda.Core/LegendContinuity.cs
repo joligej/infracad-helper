@@ -2,21 +2,37 @@ namespace NlcsLegenda.Core;
 
 public static class LegendContinuity
 {
+    public static bool InclusionException(LegendSettings settings, LegendSource source) => settings.RowChoices
+        .Where(c => c.Matches(source) && c.Excluded.HasValue)
+        .OrderBy(c => c.Scope == ChoiceScope.Layer ? 0 : c.Scope == ChoiceScope.ObjectKind ? 1 : 2)
+        .LastOrDefault()?.Excluded == false;
+
     public static bool Related(IEnumerable<LegendSource> previous, IEnumerable<LegendSource> current)
     {
-        var ids = previous.Select(s => (s.Id, s.Status, s.Type)).ToHashSet();
-        return current.Any(s => ids.Contains((s.Id, s.Status, s.Type)));
+        var old = previous.ToArray();
+        var ids = old.SelectMany(s => s.IdentityKeys.Select(id => (id, s.Status, s.Type))).ToHashSet();
+        var legacy = old.Where(s => s.DrawingId.Length == 0).Select(s => (s.Id, s.Status, s.Type)).ToHashSet();
+        return current.Any(s => legacy.Contains((s.Id, s.Status, s.Type))
+            || s.IdentityKeys.Any(id => ids.Contains((id, s.Status, s.Type)))
+            || s.DrawingId.Length == 0 && old.Any(s.SameObject));
     }
 
     public static void Reconcile(LegendSettings settings, IReadOnlyList<LegendEntry> entries, bool final)
     {
         var history = final ? settings.FinalSourceRows : settings.SourceRows;
-        var index = history.SelectMany(r => r.Sources.Select(s => (s.Id, s.Status, s.Type, Row: r)))
+        var sources = entries.SelectMany(e => e.Sources).GroupBy(s => (s.Id, s.Status, s.Type)).ToDictionary(g => g.Key, g => g.First());
+        foreach (var row in history)
+            for (int i = 0; i < row.Sources.Count; i++)
+            {
+                var old = row.Sources[i];
+                if (old.DrawingId.Length == 0 && sources.TryGetValue((old.Id, old.Status, old.Type), out var current)) row.Sources[i] = current;
+            }
+        var index = history.SelectMany(r => r.Sources.SelectMany(s => s.IdentityKeys.Select(id => (Id: id, s.Status, s.Type, Row: r))))
             .GroupBy(p => (p.Id, p.Status, p.Type)).ToDictionary(g => g.Key, g => g.Select(p => p.Row).Distinct().ToArray());
         var remap = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var entry in entries.Where(e => e.Sources.Count > 0))
         {
-            var previous = entry.Sources.SelectMany(s => index.GetValueOrDefault((s.Id, s.Status, s.Type)) ?? Array.Empty<SourceRow>()).Distinct().ToArray();
+            var previous = entry.Sources.SelectMany(s => s.IdentityKeys.SelectMany(id => index.GetValueOrDefault((id, s.Status, s.Type)) ?? Array.Empty<SourceRow>())).Distinct().ToArray();
             string key = LegendSettings.SelectionKey(entry), order = LegendOrder.Key(entry);
             if (!final && !settings.KnownEntryKeys.Contains(key) && previous.Any(r => settings.IsEntryExcluded(r.SelectionKey))) settings.ExcludedEntries.Add(key);
             var examples = previous.Where(r => settings.ExampleOverrides.ContainsKey(r.OrderKey))
@@ -45,17 +61,18 @@ public static class LegendContinuity
             history.Add(row);
         }
         // verdwenen bronnen bewaren; vervangen voorgangers niet eindeloos opstapelen
-        var currentIds = entries.SelectMany(e => e.Sources).Select(s => (s.Id, s.Status, s.Type)).ToHashSet();
+        var currentIds = entries.SelectMany(e => e.Sources).SelectMany(s => s.IdentityKeys.Select(id => (id, s.Status, s.Type))).ToHashSet();
         var keysNow = entries.Select(LegendSettings.SelectionKey).ToHashSet();
         history.RemoveAll(r => !keysNow.Contains(r.SelectionKey) && r.Sources.Count > 0
-            && r.Sources.All(s => currentIds.Contains((s.Id, s.Status, s.Type))));
+            && r.Sources.All(s => s.IdentityKeys.Any(id => currentIds.Contains((id, s.Status, s.Type)))));
     }
 
     public static void ApplyChoices(LegendSettings settings, List<LegendEntry> entries)
     {
+        var index = new RowChoiceIndex(settings.RowChoices);
         foreach (var entry in entries)
         {
-            var choices = settings.RowChoices.Where(c => c.Matches(entry)).OrderBy(c => c.Scope == ChoiceScope.Layer ? 0 : c.Scope == ChoiceScope.ObjectKind ? 1 : 2).ToArray();
+            var choices = index.Find(entry.Sources).Concat(settings.RowChoices.Where(c => c.SavedRowId.Length > 0 && c.Matches(entry))).Distinct().ToArray();
             foreach (var choice in choices)
             {
                 if (choice.Description is { Length: > 0 }) entry.Description = choice.Description;

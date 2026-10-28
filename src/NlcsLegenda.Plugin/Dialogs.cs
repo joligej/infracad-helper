@@ -67,6 +67,7 @@ internal sealed class SettingsDialog : LegendDialog
     private bool _syncing;
     private readonly DialogSaveState? _saveState;
     private readonly IReadOnlyList<ManualEntry> _layerChoices;
+    private readonly Action<Form, LegendSettings>? _sourcePicker;
 
     public event EventHandler? ApplyRequested;
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -75,9 +76,10 @@ internal sealed class SettingsDialog : LegendDialog
     public SettingsDialog(LegendSettings settings, string contextLabel,
         IReadOnlyList<EntryCheckItem>? composition = null, IReadOnlyList<string>? xrefNames = null,
         Func<LegendSettings, IReadOnlyList<EntryCheckItem>>? compositionSource = null,
-        IReadOnlyList<ManualEntry>? layerChoices = null)
+        IReadOnlyList<ManualEntry>? layerChoices = null, Action<Form, LegendSettings>? sourcePicker = null)
     {
         _composition = composition;
+        _sourcePicker = sourcePicker;
         _layerChoices = layerChoices ?? Array.Empty<ManualEntry>();
         _compositionSource = compositionSource;
         _xrefNames = xrefNames ?? Array.Empty<string>();
@@ -286,6 +288,15 @@ internal sealed class SettingsDialog : LegendDialog
         defaults.Controls[0].Controls.Add(resetFormat);
         defaults.Controls[0].Controls.Add(resetAll);
         root.Controls.Add(defaults);
+        var detail = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top };
+        foreach (bool compact in new[] { true, false })
+        {
+            var button = new Button { Text = compact ? "Compacte lijnregels" : "Gedetailleerde lijnregels", AutoSize = true };
+            button.Click += (_, _) => { _settings.SetDetailLevel(compact); SyncAll(); };
+            detail.Controls.Add(button);
+        }
+        root.Controls.Add(Group("Detailniveau", detail,
+            new Label { Text = "Compact combineert materiaal, diameter en volgnummer bij lijnen. Gedetailleerd houdt die apart. Soorten en statussen blijven onderscheiden; je andere keuzes blijven staan.", AutoSize = true }));
         page.Controls.Add(root);
         return page;
     }
@@ -302,6 +313,18 @@ internal sealed class SettingsDialog : LegendDialog
             XrefChoice());
         sources.Controls[0].Controls.Add(xrefs);
         root.Controls.Add(sources);
+        var sourceSummary = new Label { AutoSize = true };
+        _resync.Add(() => sourceSummary.Text = _settings.SourceViewportHandles.Count == 0
+            ? "Hele tekening of de opgeslagen objectselectie."
+            : $"{_settings.SourceViewportHandles.Count} kaartvenster(s) gekozen. Overige vensters tellen niet mee.");
+        var pickViews = new Button { Text = "Kaartvensters kiezen…", AutoSize = true, Enabled = _sourcePicker is not null };
+        pickViews.Click += (_, _) => { _sourcePicker?.Invoke(this, _settings); SyncAll(); };
+        var clearViews = new Button { Text = "Kaartgebied wissen", AutoSize = true };
+        clearViews.Click += (_, _) => { _settings.SourceViewportHandles.Clear(); SyncAll(); };
+        root.Controls.Add(Group("Kaartgebied", sourceSummary, pickViews, clearViews,
+            BoundCheck("Laagweergave uit de gekozen kaartvensters", () => _settings.UseViewportAppearance, v => _settings.UseViewportAppearance = v),
+            new Label { Text = "Zonder kaartvensters geldt de algemene laagweergave. Laat het overzichtskaartje buiten de bronselectie.", AutoSize = true }));
+        sourceSummary.Text = _settings.SourceViewportHandles.Count == 0 ? "Geen kaartvensters gekozen." : $"{_settings.SourceViewportHandles.Count} kaartvenster(s) gekozen.";
 
         root.Controls.Add(Group("Bijwerken",
             BoundCheck("Binnen het bestaande legendavenster blijven", () => _settings.FitExistingWindow, v => _settings.FitExistingWindow = v),
@@ -454,6 +477,7 @@ internal sealed class SettingsDialog : LegendDialog
 
         root.Controls.Add(Group("Weergave",
             BoundCheck("Kader rond legenda", () => _settings.DrawBorder, v => _settings.DrawBorder = v),
+            BoundCheck("Lichte voorbeelden omranden bij plotten", () => _settings.OutlineLightSamples, v => _settings.OutlineLightSamples = v),
             BoundCheck("Kader per voorbeeldvak", () => _settings.DrawSwatchFrame, v => _settings.DrawSwatchFrame = v),
             BoundCheck("Symboolblokken invoegen", () => _settings.InsertSymbolBlocks, v => _settings.InsertSymbolBlocks = v),
             BoundCheck("Exploderen bij plaatsen", () => _settings.ExplodeOnPlace, v => _settings.ExplodeOnPlace = v)));
@@ -468,6 +492,7 @@ internal sealed class SettingsDialog : LegendDialog
             IntRow("Vast aantal (0 = auto):", () => _settings.Columns, v => _settings.Columns = v, 0, 20),
             IntRow("Max. regels per kolom:", () => _settings.MaxRowsPerColumn, v => _settings.MaxRowsPerColumn = v, 1, 1000, 80),
             BoundCheck("Kolommen balanceren", () => _settings.BalanceColumns, v => _settings.BalanceColumns = v),
+            BoundCheck("Statusgroep bijeenhouden als die in één kolom past", () => _settings.KeepStatusGroupsTogether, v => _settings.KeepStatusGroupsTogether = v),
             NumRow("Max. hoogte (mm, 0 = uit):", () => _settings.MaxLegendHeightMm, v => _settings.MaxLegendHeightMm = v, 0, 10000, 1, 5)));
         root.Controls.Add(Group("Stijl en lagen",
             TextRow("Tekststijl (leeg = NLCS-ISO):", () => _settings.TextStyle, v => _settings.TextStyle = v, 180),
@@ -487,6 +512,32 @@ internal sealed class SettingsDialog : LegendDialog
         root.Controls.Add(Group("Omschrijvingen",
             BoundCheck("Omschrijvingen tonen", () => _settings.IncludeText, v => _settings.IncludeText = v),
             BoundCheck("Algemeen deel tonen", () => _settings.IncludeGeneralDescription, v => _settings.IncludeGeneralDescription = v)));
+        root.Controls.Add(BoundCheck("Beheerdernamen in de legenda tonen", () => _settings.ShowProviderNames, v => _settings.ShowProviderNames = v));
+        root.Controls.Add(BoundCheck("Leesbare beheerdernamen (broncode blijft bewaard)", () => _settings.ReadableProviderNames, v => _settings.ReadableProviderNames = v));
+        root.Controls.Add(TextRow("Projectomschrijvingen (.json):", () => _settings.ProjectDescriptionsPath, v => _settings.ProjectDescriptionsPath = v, 240));
+        var projectButtons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top };
+        var openProject = new Button { Text = "Projectbestand kiezen…", AutoSize = true };
+        openProject.Click += (_, _) =>
+        {
+            using var dialog = new OpenFileDialog { Filter = "Projectomschrijvingen (*.json)|*.json", CheckFileExists = true };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            try { ProjectDescriptions.Load(dialog.FileName); _settings.ProjectDescriptionsPath = dialog.FileName; SyncAll(); }
+            catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { MessageBox.Show(this, ex.Message, "Projectomschrijvingen"); }
+        };
+        var saveProject = new Button { Text = "Projectbestand opslaan…", AutoSize = true };
+        saveProject.Click += (_, _) =>
+        {
+            using var dialog = new SaveFileDialog { Filter = "Projectomschrijvingen (*.json)|*.json", DefaultExt = "json", FileName = "projectomschrijvingen.json" };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            try
+            {
+                var profile = _settings.ProjectDescriptionsPath.Length > 0 ? ProjectDescriptions.Load(_settings.ProjectDescriptionsPath) : new ProjectDescriptions();
+                profile.Descriptions.MergeFrom(_settings.DescriptionOverrides); profile.Save(dialog.FileName);
+                _settings.ProjectDescriptionsPath = dialog.FileName; SyncAll();
+            }
+            catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { MessageBox.Show(this, ex.Message, "Projectomschrijvingen"); }
+        };
+        projectButtons.Controls.Add(openProject); projectButtons.Controls.Add(saveProject); root.Controls.Add(projectButtons);
         root.Controls.Add(TextRow("Scheidingsteken alg./spec.:", () => _settings.GeneralSeparator, v => _settings.GeneralSeparator = v, 120));
         root.Controls.Add(Group("Statuslabels",
             TextRow("Nieuw:", () => _settings.LabelNieuw, v => _settings.LabelNieuw = v, 160),

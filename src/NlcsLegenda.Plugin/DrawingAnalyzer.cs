@@ -59,13 +59,22 @@ public static class DrawingAnalyzer
 {
     private sealed class Collector
     {
+        public readonly Dictionary<string, string> DrawingIds = new(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<(string Layer, string Kind, string Reason), int> Skipped = new();
+        public void Skip(Entity entity, string xref, string reason)
+        {
+            var key = (xref.Length > 0 ? xref + "|" + LayerNaming.LocalName(entity.Layer) : entity.Layer, entity.GetType().Name, reason);
+            Skipped[key] = Skipped.GetValueOrDefault(key) + 1;
+        }
         public readonly Dictionary<string, List<LegendSource>> Sources = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<(string Layer, NlcsDrawType Type), int> Unmapped = new();
         public readonly Dictionary<string, string> Choices = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<(string Id, NlcsStatus Status, NlcsDrawType Type)> Exclusions = new();
         public bool TrackSources;
         public required string[] KlicGroupFields;
-        public readonly Dictionary<ObjectId, (bool Inherits, LayerDisplayStyle Style)> SourceStyles = new();
+        public SourceViewport? Viewport;
+        public readonly Dictionary<string, ObjectId> SeenViews = new();
+        public readonly Dictionary<(ObjectId, ObjectId), (bool Inherits, LayerDisplayStyle Style)> SourceStyles = new();
         public readonly Dictionary<string, NlcsLayerName?> SourceLayers = new(StringComparer.Ordinal);
 
         public NlcsLayerName? ParseLayer(string name)
@@ -80,10 +89,11 @@ public static class DrawingAnalyzer
 
         public LayerDisplayStyle LayerStyle(Entity entity, Transaction tr, LayerDisplayStyle? parent)
         {
-            if (!SourceStyles.TryGetValue(entity.LayerId, out var source))
+            var key = (entity.LayerId, Viewport?.Id ?? ObjectId.Null);
+            if (!SourceStyles.TryGetValue(key, out var source))
             {
-                source = (LayerNaming.LocalName(entity.Layer) == "0", EntityLayerStyle(entity, tr));
-                SourceStyles.Add(entity.LayerId, source);
+                source = (LayerNaming.LocalName(entity.Layer) == "0", EntityLayerStyle(entity, tr, viewport: Viewport?.Appearance == true ? Viewport.Id : ObjectId.Null));
+                SourceStyles.Add(key, source);
             }
             return source.Inherits && parent is not null ? parent : source.Style;
         }
@@ -105,6 +115,8 @@ public static class DrawingAnalyzer
         public HashSet<ObjectId> Excluded = new();
         public LayerTable? Layers;
         public required KlicSourceMetadata Klic;
+        public required RowChoiceIndex ChoiceIndex;
+        public readonly Dictionary<string, LegendSource> CurrentSources = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, List<KlicObjectData>> KlicObjects = new(StringComparer.OrdinalIgnoreCase);
     }
 
@@ -120,26 +132,35 @@ public static class DrawingAnalyzer
     {
         var timer = reportTimings is null ? null : System.Diagnostics.Stopwatch.StartNew();
         using var klic = new KlicSourceMetadata(settings.Klic, db, tr);
-        var c = new Collector { Klic = klic, TrackSources = trackSources, KlicGroupFields = settings.KlicGroupFields().ToArray() };
+        var c = new Collector { Klic = klic, ChoiceIndex = new(settings.RowChoices), TrackSources = trackSources, KlicGroupFields = settings.KlicGroupFields().ToArray() };
         c.Exclusions = settings.SourceRows.Where(r => settings.IsEntryExcluded(r.SelectionKey)).SelectMany(r => r.Sources)
-            .Select(s => (s.Id, s.Status, s.Type)).ToHashSet();
+            .SelectMany(s => s.IdentityKeys.Select(id => (id, s.Status, s.Type))).ToHashSet();
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
         if (excludedIds is { Count: > 0 })
             c.Excluded = new HashSet<ObjectId>(excludedIds);
         // cycli stoppen, herhaalde invoegingen afzonderlijk tellen
         var path = new HashSet<ObjectId>();
 
-        if (selection is not null)
+        var views = SourceViewport.Read(db, tr, settings);
+        foreach (var view in views.Length == 0 ? new SourceViewport?[] { null } : views)
         {
-            foreach (var entity in selection.Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>())
-                Process(entity, tr, c, settings, path, 0, Matrix3d.Identity, sourceXref: string.Empty);
-        }
-        else
-        {
-            var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
-            CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, sourceXref: string.Empty);
+            c.Viewport = view;
+            if (selection is not null)
+            {
+                foreach (var entity in selection.Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>())
+                    Process(entity, tr, c, settings, path, 0, Matrix3d.Identity, sourceXref: string.Empty);
+            }
+            else
+            {
+                var msId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+                CollectFromBlock(msId, tr, c, settings, path, 0, Matrix3d.Identity, sourceXref: string.Empty);
+            }
         }
 
+        foreach (var choice in settings.RowChoices)
+            for (int i = 0; i < choice.Sources.Count; i++)
+                if (choice.Sources[i].DrawingId.Length == 0 && c.CurrentSources.TryGetValue(choice.Sources[i].Id, out var source))
+                    choice.Sources[i] = source;
         CoalesceNlcsSources(c);
 
         var parsedLayers = c.Parsed.Values
@@ -187,6 +208,14 @@ public static class DrawingAnalyzer
 
         double analysisMilliseconds = timer?.Elapsed.TotalMilliseconds ?? 0;
         timer?.Restart();
+        ProjectDescriptions? project = null;
+        if (settings.ProjectDescriptionsPath.Length > 0)
+        {
+            project = ProjectDescriptions.Load(settings.ProjectDescriptionsPath);
+            catalog = (catalog ?? DescriptionCatalog.Default()).Clone();
+            catalog.MergeFrom(project.Descriptions);
+        }
+        var omitted = new List<LegendEntry>();
         var entries = LegendGrouping.Build(
             parsedLayers, settings,
             name => c.CustomDesc.TryGetValue(name, out var cd) ? cd
@@ -206,10 +235,13 @@ public static class DrawingAnalyzer
             settings.MergeIdenticalStatuses
                 ? name => c.SymbolSamples.TryGetValue(name, out var sample) ? sample.RenderIdentity : RenderId(name, grouping: false) : null,
             settings.MergeLineScales || settings.MergeHatchScales || settings.MergeHatchAngles ? AppearanceValues : null,
-            name => c.Sources.GetValueOrDefault(name) ?? new());
+            name => c.Sources.GetValueOrDefault(name) ?? new(), omitted.Add, project?.Descriptions);
 
         foreach (var entry in entries)
         {
+            if (settings.ReadableProviderNames)
+                entry.ProviderLabels = entry.Netbeheerders.Concat(entry.KlicObjects.SelectMany(o => o.Values("Netbeheerder")))
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(p => p, p => ProjectDescriptions.ProviderName(p, project?.Providers), StringComparer.OrdinalIgnoreCase);
             var details = new List<string>();
             foreach (var name in entry.SourceRenderLayers)
             {
@@ -218,7 +250,7 @@ public static class DrawingAnalyzer
                     details.Add($"{LayerNaming.LocalName(symbol.BlockName)}; grootte {symbol.Transform.XAxis.Length:0.###}; hoek {Math.Atan2(symbol.Transform.XAxis.Y, symbol.Transform.XAxis.X) * 180 / Math.PI:0.#}°");
                     if (symbol.AttributeIdentity.Length > 0) details.Add("Attribuuttekst verschilt: optie Attribuutteksten samenvoegen");
                 }
-                if (c.Styles.TryGetValue(name, out var display)) details.Add($"{display.Color}; {LayerNaming.LocalName(display.Linetype)}; lijnschaal {display.LinetypeScale:0.###}; {display.LineWeight}; transparantie {100 - display.Transparency.Alpha * 100 / 255}%");
+                if (c.Styles.TryGetValue(name, out var display)) details.Add($"{display.Color}; {LayerNaming.LocalName(display.Linetype)}; lijnschaal {display.LinetypeScale:0.###}; {display.LineWeight}; transparantie {(display.Transparency.Method == Autodesk.AutoCAD.Colors.TransparencyMethod.ByAlpha ? (100 - display.Transparency.Alpha * 100 / 255) + "%" : display.Transparency.Method == Autodesk.AutoCAD.Colors.TransparencyMethod.ByBlock ? "volgens blok" : "volgens laag")}");
             }
             entry.VariantDetails = string.Join(Environment.NewLine, details.Distinct());
             entry.SampleIdentity = string.Join(";", entry.SourceRenderLayers.Select(name =>
@@ -228,7 +260,15 @@ public static class DrawingAnalyzer
                 entry.SampleIdentity = "voorbeeld:" + selectedExample;
             var overrides = entry.Sources.Select(s => s.Layer).Distinct(StringComparer.OrdinalIgnoreCase)
                 .Where(name => c.Layers.Has(name) && ((LayerTableRecord)tr.GetObject(c.Layers[name], OpenMode.ForRead)).HasOverrides).ToArray();
-            if (overrides.Length > 0) entry.SourceNotice += " Viewportafwijkingen op: " + string.Join(", ", overrides) + ". Legenda gebruikt de globale laagweergave.";
+            if (overrides.Length > 0) entry.SourceNotice += " Viewportafwijkingen op: " + string.Join(", ", overrides) + (settings.SourceViewportHandles.Count > 0 && settings.UseViewportAppearance ? ". Legenda volgt de gekozen kaartvensters." : ". Legenda gebruikt de globale laagweergave.");
+            if (entry.Description.Equals("Info", StringComparison.OrdinalIgnoreCase) || entry.Description.Equals("Overig", StringComparison.OrdinalIgnoreCase))
+            {
+                var functions = entry.SourceLayers.Select(s => NlcsLayerParser.TryParse(s.SourceLayerName, out var source) ? source?.Element : null)
+                    .Where(element => element is not null).Select(element => ElementProperties.From(element!).Uitvoering)
+                    .Where(value => value.Length > 0).Distinct().Select(StandardTexts.Humanize).ToArray();
+                entry.SourceNotice += functions.Length > 0 ? " Bronfuncties: " + string.Join(", ", functions) + ". Uitvoering apart houden via Samenvoegen."
+                    : " Functie niet nader beschreven door de bron. Bekijk bronlaag, objectsoort en voorbeeld; een eigen omschrijving kan per variant of bronlaag.";
+            }
             var variants = entry.Sources.Select(s => SymbolDescription.Variant(s.Symbol)).Where(s => s.Length > 0).Distinct().ToArray();
             if (variants.Length > 0) entry.SourceNotice += " Grootteklasse uit bronblok: " + string.Join(", ", variants) + ".";
         }
@@ -239,7 +279,9 @@ public static class DrawingAnalyzer
         }
         return new AnalysisResult
         {
-            Coverage = c.Unmapped.Select(p => new LegendChange("Niet gekoppeld", p.Key.Layer, $"{p.Value} zichtbare objecten ({p.Key.Type}); koppel via Eigen lagen of neem een eigen regel over.")).ToArray(),
+            Coverage = c.Unmapped.Select(p => new LegendChange("Niet gekoppeld", p.Key.Layer, $"{p.Value} zichtbare objecten ({p.Key.Type}); koppel via Eigen lagen of neem een eigen regel over."))
+                .Concat(c.Skipped.Select(p => new LegendChange("Niet opgenomen", p.Key.Layer, $"{p.Value} objecten ({p.Key.Kind}): {p.Key.Reason}.")))
+                .Concat(omitted.Select(e => new LegendChange("Uitgesloten", e.Description, LegendUpdatePlan.Describe(e) + "; opgeslagen keuze in Samenstellen of Overzicht."))).ToArray(),
             Entries = entries,
             EntryObjects = !trackSources ? new Dictionary<string, IReadOnlySet<ObjectId>>() : entries.GroupBy(LegendSettings.SelectionKey).ToDictionary(g => g.Key,
                 g => (IReadOnlySet<ObjectId>)g.SelectMany(e => e.SourceRenderLayers.Count > 0 ? (IEnumerable<string>)e.SourceRenderLayers : e.LayersByType.Values)
@@ -278,12 +320,19 @@ public static class DrawingAnalyzer
         if (c.Excluded.Contains(ent.ObjectId))
             return;
 
+        if (c.Viewport is { } viewport)
+        {
+            if (viewport.Frozen(ent.LayerId)) { c.Skip(ent, sourceXref, "laag is bevroren in kaartvenster " + viewport.Id.Handle); return; }
+            if (!viewport.Intersects(ent, tr, transform)) { c.Skip(ent, sourceXref, "buiten kaartvenster " + viewport.Id.Handle); return; }
+        }
         if (!settings.IncludeInvisibleLayers)
         {
-            if (!ent.Visible) return;
+            if (!ent.Visible) { c.Skip(ent, sourceXref, "object is verborgen"); return; }
             bool inheritsVisibleLayer = inheritedLayerStyle is not null && LayerNaming.LocalName(ent.Layer) == "0";
-            if (!inheritsVisibleLayer && !IsVisible(ent.Layer, tr, c)) return;
+            if (!inheritsVisibleLayer && !IsVisible(ent.Layer, tr, c)) { c.Skip(ent, sourceXref, "laag staat uit of is bevroren"); return; }
         }
+        if (!((LayerTableRecord)tr.GetObject(ent.LayerId, OpenMode.ForRead)).IsPlottable)
+        { c.Skip(ent, sourceXref, "laag staat op niet plotten"); return; }
         var layerStyle = c.LayerStyle(ent, tr, inheritedLayerStyle);
         var effectiveStyle = EntityStyle(ent, tr, inheritedStyle, layerStyle, transform);
         var block = ent as BlockReference;
@@ -308,9 +357,13 @@ public static class DrawingAnalyzer
                 if (def.IsFromExternalReference)
                 {
                     string childSource = string.IsNullOrEmpty(sourceXref) ? def.Name : sourceXref + "|" + LayerNaming.LocalName(def.Name);
+                    var sourceDb = def.GetXrefDatabase(false);
+                    if (sourceDb is not null) c.DrawingIds[childSource] = (sourceXref.Length > 0 ? c.DrawingIds.GetValueOrDefault(sourceXref) + ">" : "")
+                        + sourceDb.FingerprintGuid.ToString() + ":" + br.ObjectId.NonForwardedHandle;
                     if (settings.IsXrefIncluded(childSource))
                         CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested,
                             sourceXref: childSource, inheritedStyle: effectiveStyle, inheritedLayerStyle: layerStyle);
+                    else c.Skip(ent, childSource, "xref is uitgesloten in Bronnen en inhoud");
                 }
                 else
                 {
@@ -332,7 +385,7 @@ public static class DrawingAnalyzer
             metadata = c.Klic.Read(ent, sourceXref);
             parsed = CopyLayer(parsed!, sourceXref, metadata.Provider,
                 metadata.GroupKey(c.KlicGroupFields));
-            if (!settings.IsIncluded(parsed)) return;
+
         }
         else
         {
@@ -350,11 +403,7 @@ public static class DrawingAnalyzer
             metadata = c.Klic.Read(ent, sourceXref);
             parsed = CopyLayer(parsed, sourceXref, metadata.Provider,
                 metadata.GroupKey(c.KlicGroupFields));
-            if (!settings.IsIncluded(parsed))
-            {
-                c.ExcludedNlcs.Add(parsed.LocalName);
-                return;
-            }
+
         }
         var actualType = parsed!.DrawType;
         if (rule is null)
@@ -363,7 +412,12 @@ public static class DrawingAnalyzer
             else if (ent is Hatch && actualType == NlcsDrawType.Geometrie) actualType = NlcsDrawType.Arcering;
             parsed = CopyLayer(parsed, sourceXref, parsed.Netbeheerder, parsed.KlicGroupKey, actualType);
         }
-        if (!settings.IsDrawTypeIncluded(actualType) || !EntityMatchesType(ent, actualType)) return;
+        var sourceInfo = SourceInfo(ent, tr, sourceXref, actualType, parsed.Status, c.DrawingIds.GetValueOrDefault(sourceXref) ?? (sourceXref.Length == 0 ? ent.Database.FingerprintGuid.ToString() : ""));
+        if (settings.ExplainExclusion(parsed, c.ChoiceIndex.Includes(sourceInfo)) is { } exclusion)
+        { c.ExcludedNlcs.Add(parsed.LocalName); c.Skip(ent, sourceXref, exclusion); return; }
+        if (!settings.IsDrawTypeIncluded(actualType))
+        { c.Skip(ent, sourceXref, "objectsoort staat uit in Bronnen en inhoud"); return; }
+        if (!EntityMatchesType(ent, actualType)) return;
 
         HatchSample? hatch = ent is Hatch h ? HatchSample.From(h, transform) : null;
         if (hatch is not null)
@@ -378,14 +432,14 @@ public static class DrawingAnalyzer
         SymbolSample? symbol = null;
         if (ent is BlockReference br && parsed.DrawType == NlcsDrawType.Symbool)
         {
-            if (!HasSymbolGeometry(br.BlockTableRecord, tr, settings.IncludeInvisibleLayers, new HashSet<ObjectId>())) return;
+            if (!HasSymbolGeometry(br.BlockTableRecord, tr, settings.IncludeInvisibleLayers, new HashSet<ObjectId>(), c.Viewport)) return;
             string blockName = ((BlockTableRecord)tr.GetObject(br.BlockTableRecord, OpenMode.ForRead)).Name;
             if (string.IsNullOrWhiteSpace(blockName)) return;
             var id = br.BlockTableRecord;
-            var cacheKey = (id, StyleSignature(style) + "|" + StyleSignature(layerStyle));
+            var cacheKey = (id, StyleSignature(style) + "|" + StyleSignature(layerStyle) + "|" + c.Viewport?.Id);
             if (!c.SymbolDefinitionIdentities.TryGetValue(cacheKey, out var identity))
             {
-                identity = SymbolDefinitionIdentity(id, ent.Database, tr, style, layerStyle, settings.IncludeInvisibleLayers);
+                identity = SymbolDefinitionIdentity(id, ent.Database, tr, style, layerStyle, settings.IncludeInvisibleLayers, c.Viewport);
                 c.SymbolDefinitionIdentities[cacheKey] = identity;
             }
             string normalized = "";
@@ -394,12 +448,12 @@ public static class DrawingAnalyzer
                 var normalizedKey = (id, cacheKey.Item2 + "|normalized");
                 if (!c.SymbolDefinitionIdentities.TryGetValue(normalizedKey, out normalized!))
                 {
-                    normalized = NormalizedBlockIdentity(id, ent.Database, tr, style, layerStyle, settings.IncludeInvisibleLayers);
+                    normalized = NormalizedBlockIdentity(id, ent.Database, tr, style, layerStyle, settings.IncludeInvisibleLayers, c.Viewport);
                     c.SymbolDefinitionIdentities[normalizedKey] = normalized;
                 }
             }
             symbol = new SymbolSample(blockName, identity, SymbolTransform.From(transform * br.BlockTransform))
-            { ReferenceId = br.ObjectId, SourceXref = sourceXref, NormalizedDefinitionIdentity = normalized, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers, settings.GenericManholes && SymbolDescription.IsManhole(blockName, parsed.Element)),
+            { ReferenceId = br.ObjectId, ViewIdentity = c.Viewport?.Id ?? ObjectId.Null, SourceViewportId = c.Viewport?.Appearance == true ? c.Viewport.Id : ObjectId.Null, FrozenLayers = c.Viewport?.FrozenLayers ?? EmptyObjectIds, SourceXref = sourceXref, NormalizedDefinitionIdentity = normalized, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers, settings.GenericManholes && SymbolDescription.IsManhole(blockName, parsed.Element), c.Viewport),
                 OmitManholeNumber = settings.GenericManholes && SymbolDescription.IsManhole(blockName, parsed.Element),
                 Variant = SymbolDescription.Variant(blockName) is { Length: > 0 } treeClass ? treeClass
                     : settings.GenericManholes ? SymbolDescription.ManholeKind(blockName, parsed.Element) : "",
@@ -416,14 +470,10 @@ public static class DrawingAnalyzer
                 SourceScale = parsed.Scale, TargetScale = settings.Scale
             };
         }
-        string sourceId = sourceXref.ToUpperInvariant() + ":" + ent.ObjectId.NonForwardedHandle;
-        string sourceLayer = sourceXref.Length > 0 ? sourceXref + "|" + LayerNaming.LocalName(layerName) : layerName;
-        string sourceBlock = ent is BlockReference sourceReference
-            ? ((BlockTableRecord)tr.GetObject(sourceReference.IsDynamicBlock ? sourceReference.DynamicBlockTableRecord : sourceReference.BlockTableRecord, OpenMode.ForRead)).Name : "";
-        var sourceInfo = new LegendSource(sourceId, sourceLayer, actualType, LayerNaming.LocalName(sourceBlock), parsed.Status);
-        var choices = settings.RowChoices.Where(choice => choice.Matches(sourceInfo))
-            .OrderBy(choice => choice.Scope == ChoiceScope.Layer ? 0 : choice.Scope == ChoiceScope.ObjectKind ? 1 : 2).ToArray();
-        bool excluded = choices.LastOrDefault(choice => choice.Excluded.HasValue)?.Excluded ?? c.Exclusions.Contains((sourceId, parsed.Status, actualType));
+        string sourceId = sourceInfo.Id;
+        c.CurrentSources[sourceInfo.Id] = sourceInfo;
+        var choices = c.ChoiceIndex.Find(new[] { sourceInfo });
+        bool excluded = choices.LastOrDefault(choice => choice.Excluded.HasValue)?.Excluded ?? sourceInfo.IdentityKeys.Any(id => c.Exclusions.Contains((id, parsed.Status, actualType)));
         string descriptionChoice = choices.LastOrDefault(choice => choice.Description is { Length: > 0 })?.Description ?? "";
         var chosenExample = choices.LastOrDefault(choice => choice.Example is not null || choice.AutomaticExample);
         string exampleChoice = chosenExample?.AutomaticExample == true ? ""
@@ -433,6 +483,12 @@ public static class DrawingAnalyzer
                 System.Text.Json.JsonSerializer.Serialize(new object[] { excluded, descriptionChoice, exampleChoice })))) : "";
         metadata ??= c.Klic.Read(ent, sourceXref);
         string appearance = SampleSignature(style, hatch, symbol);
+        if (c.Viewport is { } view)
+        {
+            string duplicate = sourceId + "|" + appearance + "|" + transform;
+            if (c.SeenViews.TryGetValue(duplicate, out var seen) && seen != view.Id) return;
+            c.SeenViews.TryAdd(duplicate, view.Id);
+        }
         string key = parsed.GroupKey + "\u0001" + parsed.Netbeheerder.ToUpperInvariant() + "\u0001" + parsed.KlicGroupKey + "\u0001" + sourceXref + "\u0001" + layerName + "\u0001" + appearance + "\u0001" + choiceId;
         (rule is null ? c.NlcsSourceLayers : c.CustomSourceLayers).Add(layerName);
         c.Parsed[key] = parsed;
@@ -472,6 +528,14 @@ public static class DrawingAnalyzer
         }
     }
 
+    private static LegendSource SourceInfo(Entity entity, Transaction tr, string xref, NlcsDrawType type, NlcsStatus status, string drawingId)
+    {
+        string block = entity is BlockReference br
+            ? ((BlockTableRecord)tr.GetObject(br.IsDynamicBlock ? br.DynamicBlockTableRecord : br.BlockTableRecord, OpenMode.ForRead)).Name : "";
+        return new LegendSource(xref.ToUpperInvariant() + ":" + entity.ObjectId.NonForwardedHandle,
+            xref.Length > 0 ? xref + "|" + LayerNaming.LocalName(entity.Layer) : entity.Layer, type, LayerNaming.LocalName(block), status) { DrawingId = drawingId, SourceHandle = entity.ObjectId.NonForwardedHandle.ToString() };
+    }
+
     private static bool IsBlockPartVisible(Entity entity, LayerTableRecord layer)
     {
         if (!entity.Visible) return false;
@@ -479,7 +543,7 @@ public static class DrawingAnalyzer
         return !layer.IsOff && !layer.IsFrozen;
     }
 
-    private static bool HasSymbolGeometry(ObjectId id, Transaction tr, bool includeInvisible, HashSet<ObjectId> path)
+    private static bool HasSymbolGeometry(ObjectId id, Transaction tr, bool includeInvisible, HashSet<ObjectId> path, SourceViewport? viewport = null)
     {
         if (!path.Add(id)) return false;
         try
@@ -488,8 +552,8 @@ public static class DrawingAnalyzer
                 if (tr.GetObject(child, OpenMode.ForRead) is Entity entity)
                 {
                     var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                    if (!layer.IsPlottable || !includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
-                    if (entity is not BlockReference nested || HasSymbolGeometry(nested.BlockTableRecord, tr, includeInvisible, path)) return true;
+                    if (viewport?.Frozen(entity.LayerId) == true || !layer.IsPlottable || !includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
+                    if (entity is not BlockReference nested || HasSymbolGeometry(nested.BlockTableRecord, tr, includeInvisible, path, viewport)) return true;
                 }
             return false;
         }
@@ -504,17 +568,11 @@ public static class DrawingAnalyzer
         TypeSuffix = p.TypeSuffix, DrawType = drawType ?? p.DrawType, Scale = p.Scale
     };
 
-    internal static LayerDisplayStyle EntityLayerStyle(Entity entity, Transaction tr, LayerDisplayStyle? parentLayer = null)
+    internal static LayerDisplayStyle EntityLayerStyle(Entity entity, Transaction tr, LayerDisplayStyle? parentLayer = null, ObjectId viewport = default)
     {
         var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
         if (LayerNaming.LocalName(layer.Name) == "0" && parentLayer is not null) return parentLayer;
-        var linetype = (LinetypeTableRecord)tr.GetObject(layer.LinetypeObjectId, OpenMode.ForRead);
-        return new LayerDisplayStyle
-        {
-            Color = layer.Color, Linetype = linetype.Name,
-            LinetypeIdentity = LinetypeSignature(layer.LinetypeObjectId, tr),
-            LineWeight = layer.LineWeight, Transparency = TransparencyValue.From(layer.Transparency)
-        };
+        return SourceViewport.LayerStyle(layer, tr, viewport);
     }
 
     internal static LayerDisplayStyle EntityStyle(Entity entity, Transaction tr,
@@ -851,13 +909,13 @@ public static class DrawingAnalyzer
     }
 
     private static string NormalizedBlockIdentity(ObjectId id, Database db, Transaction tr,
-        LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible)
+        LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible, SourceViewport? viewport = null)
     {
         var entities = ((BlockTableRecord)tr.GetObject(id, OpenMode.ForRead)).Cast<ObjectId>()
             .Select(item => tr.GetObject(item, OpenMode.ForRead)).OfType<Entity>().Where(entity =>
             {
                 var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                return layer.IsPlottable && (includeInvisible || IsBlockPartVisible(entity, layer));
+                return viewport?.Frozen(entity.LayerId) != true && layer.IsPlottable && (includeInvisible || IsBlockPartVisible(entity, layer));
             }).ToArray();
         // alleen volledig vergelijkbare geometrie; anders de oorspronkelijke identiteit
         if (entities.Length == 0 || entities.Any(e => e is not (Line or Circle or Arc or Polyline or Ellipse or Spline or DBText or MText or Hatch { IsSolidFill: true })))
@@ -883,21 +941,21 @@ public static class DrawingAnalyzer
                 solid.PatternSpace = 1;
                 solid.PatternDouble = false;
             }
-            parts.Add(SymbolEntitySignature(copy, db, tr, new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible));
+            parts.Add(SymbolEntitySignature(copy, db, tr, new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible, viewport));
         }
         parts.Sort(StringComparer.Ordinal);
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join("\n", parts))));
     }
 
-    private static string SymbolDefinitionIdentity(ObjectId definitionId, Database host, Transaction tr, LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible)
+    private static string SymbolDefinitionIdentity(ObjectId definitionId, Database host, Transaction tr, LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible, SourceViewport? viewport = null)
     {
-        string content = BlockContentSignature(definitionId, host, tr, new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible);
+        string content = BlockContentSignature(definitionId, host, tr, new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible, viewport);
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(content)));
     }
 
     private static string AttributeIdentity(BlockReference reference, Transaction tr,
-        LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible, bool omitManholeNumber = false)
+        LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible, bool omitManholeNumber = false, SourceViewport? viewport = null)
     {
         var parts = new List<string>();
         var inverse = reference.BlockTransform.Inverse();
@@ -908,15 +966,15 @@ public static class DrawingAnalyzer
             if (string.IsNullOrWhiteSpace(source.TextString) || !includeInvisible && (source.Invisible || !source.Visible)) continue;
             using var copy = (AttributeReference)source.Clone();
             LegendBuilder.TransformPlanarSymbol(copy, inverse);
-            if (!((LayerTableRecord)tr.GetObject(source.LayerId, OpenMode.ForRead)).IsPlottable) continue;
-            var layer = EntityLayerStyle(source, tr, parentLayer);
+            if (viewport?.Frozen(source.LayerId) == true || !((LayerTableRecord)tr.GetObject(source.LayerId, OpenMode.ForRead)).IsPlottable) continue;
+            var layer = EntityLayerStyle(source, tr, parentLayer, viewport?.Appearance == true ? viewport.Id : ObjectId.Null);
             var style = EntityStyle(source, tr, parent, layer);
             using var multiline = source.IsMTextAttribute ? source.MTextAttribute : null;
             if (multiline is not null)
             {
                 LegendBuilder.TransformPlanarSymbol(multiline, inverse);
                 parts.Add(source.Tag + ":" + SymbolEntitySignature(multiline, reference.Database, tr,
-                    new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible));
+                    new HashSet<ObjectId>(), 0, parent, parentLayer, includeInvisible, viewport));
             }
             else
             {
@@ -938,7 +996,7 @@ public static class DrawingAnalyzer
     }
 
     private static string BlockContentSignature(
-        ObjectId definitionId, Database host, Transaction tr, HashSet<ObjectId> path, int depth, LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible)
+        ObjectId definitionId, Database host, Transaction tr, HashSet<ObjectId> path, int depth, LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible, SourceViewport? viewport = null)
     {
         if (depth > MaxDepth) throw new InvalidOperationException("Symbool is te diep genest.");
         if (!path.Add(definitionId)) return string.Empty;
@@ -951,8 +1009,8 @@ public static class DrawingAnalyzer
                 if (tr.GetObject(id, OpenMode.ForRead) is Entity entity)
                 {
                     var layer = (LayerTableRecord)tr.GetObject(entity.LayerId, OpenMode.ForRead);
-                    if (!layer.IsPlottable || !includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
-                    entities.Add(SymbolEntitySignature(entity, host, tr, path, depth, parent, parentLayer, includeInvisible));
+                    if (viewport?.Frozen(entity.LayerId) == true || !layer.IsPlottable || !includeInvisible && !IsBlockPartVisible(entity, layer)) continue;
+                    entities.Add(SymbolEntitySignature(entity, host, tr, path, depth, parent, parentLayer, includeInvisible, viewport));
                 }
             entities.Sort(StringComparer.Ordinal);
             return string.Join("\n", entities);
@@ -964,9 +1022,9 @@ public static class DrawingAnalyzer
     }
 
     private static string SymbolEntitySignature(
-        Entity entity, Database host, Transaction tr, HashSet<ObjectId> path, int depth, LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible)
+        Entity entity, Database host, Transaction tr, HashSet<ObjectId> path, int depth, LayerDisplayStyle parent, LayerDisplayStyle parentLayer, bool includeInvisible, SourceViewport? viewport = null)
     {
-        var layerStyle = EntityLayerStyle(entity, tr, parentLayer);
+        var layerStyle = EntityLayerStyle(entity, tr, parentLayer, viewport?.Appearance == true ? viewport.Id : ObjectId.Null);
         var style = EntityStyle(entity, tr, parent, layerStyle);
         var parts = new List<string>
         {
@@ -1049,11 +1107,11 @@ public static class DrawingAnalyzer
                 }
                 break;
             case BlockReference nested:
-                var attributes = AttributeIdentity(nested, tr, style, layerStyle, includeInvisible);
+                var attributes = AttributeIdentity(nested, tr, style, layerStyle, includeInvisible, viewport: viewport);
                 if (attributes.Length > 0) parts.Add(attributes);
                 parts.Add($"B:{PointSignature(nested.Position)}:"
                     + $"{SymbolTransform.From(nested.BlockTransform).Signature}:"
-                    + BlockContentSignature(nested.BlockTableRecord, host, tr, path, depth + 1, style, layerStyle, includeInvisible));
+                    + BlockContentSignature(nested.BlockTableRecord, host, tr, path, depth + 1, style, layerStyle, includeInvisible, viewport));
                 break;
             default:
                 if (entity is Curve curve)

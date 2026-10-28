@@ -21,7 +21,7 @@ public partial class Commands
         var registry = LegendStore.Load(db, tr);
         var working = definition.Clone();
         var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
-        var selected = working.Scope == LegendScope.Selection ? LegendManagement.ResolveHandles(db, working.SourceHandles, out _) : null;
+        var selected = working.Scope == LegendScope.Selection && working.Settings.SourceViewportHandles.Count == 0 ? LegendManagement.ResolveHandles(db, working.SourceHandles, out _) : null;
         var analysis = DrawingAnalyzer.Analyze(db, tr, working.Settings, selected, DescriptionCatalog.Default(), excluded);
         LegendRowSamples.Seed(db, tr, working, analysis);
         analysis = LegendRowSamples.Retain(analysis, working);
@@ -35,7 +35,14 @@ public partial class Commands
         if (doc is null || !RequireInteractive(doc.Editor, "NLCSLEGENDAOVERNEMEN")) return;
         try
         {
-            if (!ResolveMutationTarget(doc.Editor, doc.Database, out var target, pickVerb: "een regel toevoegen aan")) return;
+            var target = MutationTarget.Global;
+            var mode = new PromptKeywordOptions("\nBestaande getekende regel [BestaandeLegenda/NieuweLegenda]", "BestaandeLegenda NieuweLegenda") { AllowNone = true };
+            using (var check = doc.Database.TransactionManager.StartTransaction())
+                mode.Keywords.Default = LegendManagement.ActiveRegistry(doc.Database, check, LegendStore.Load(doc.Database, check)).Legends.Count == 0 ? "NieuweLegenda" : "BestaandeLegenda";
+            var answer = doc.Editor.GetKeywords(mode);
+            if (answer.Status != PromptStatus.OK) return;
+            bool create = answer.StringResult == "NieuweLegenda";
+            if (!create && !ResolveMutationTarget(doc.Editor, doc.Database, out target, pickVerb: "een regel toevoegen aan")) return;
             var textResult = doc.Editor.GetEntity("\nKies de omschrijving van de bestaande regel: ");
             if (textResult.Status != PromptStatus.OK) return;
             var selected = doc.Editor.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelecteer alleen het voorbeeld bij deze regel (zonder omschrijving of kader): " });
@@ -50,10 +57,12 @@ public partial class Commands
             var status = doc.Editor.GetKeywords(statusChoice);
             if (status.Status != PromptStatus.OK) return;
             var registry = LegendStore.Load(doc.Database, tr);
-            var definition = registry.FindById(target.LegendId) ?? throw new InvalidOperationException("De legenda ontbreekt.");
+            var definition = create ? CreateAdoptedLegend(doc.Database, tr, registry, textResult.ObjectId, ids)
+                : registry.FindById(target.LegendId) ?? throw new InvalidOperationException("De legenda ontbreekt.");
             AdoptRow(doc.Database, tr, definition, ids, text, Enum.Parse<NlcsStatus>(status.StringResult));
             // origineel pas verwijderen binnen dezelfde geslaagde wijziging
-            foreach (var id in ids.Append(textResult.ObjectId)) ((Entity)tr.GetObject(id, OpenMode.ForWrite)).Erase();
+            if (!create)
+                foreach (var id in ids.Append(textResult.ObjectId)) ((Entity)tr.GetObject(id, OpenMode.ForWrite)).Erase();
             if (BuildManagedLegend(doc.Database, tr, registry, definition, out _, out _) != UpdateResult.Updated)
                 throw new InvalidOperationException("De regel kon niet worden opgenomen.");
             LegendStore.Save(doc.Database, tr, registry); tr.Commit();
@@ -61,6 +70,23 @@ public partial class Commands
             doc.Editor.WriteMessage("\nRegel overgenomen; tekst, status en voorbeeld blijven bij volgende updates bewaard.");
         }
         catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex)) { doc.Editor.WriteMessage("\nOvernemen afgebroken; bestaande regel behouden: " + ex.Message); }
+    }
+
+    internal static LegendDefinition CreateAdoptedLegend(Database db, Transaction tr, LegendRegistry registry,
+        ObjectId description, IReadOnlyList<ObjectId> sample)
+    {
+        var text = (Entity)tr.GetObject(description, OpenMode.ForRead);
+        var owner = (BlockTableRecord)tr.GetObject(text.OwnerId, OpenMode.ForRead);
+        if (!owner.IsLayout || sample.Any(id => ((Entity)tr.GetObject(id, OpenMode.ForRead)).OwnerId != owner.ObjectId))
+            throw new InvalidOperationException("Kies omschrijving en voorbeeld in dezelfde model- of papierruimte.");
+        var settings = new LegendSettings { IncludeTitle = false, IncludeGroupHeaders = false, IncludeFooter = false,
+            IncludeRemarks = false, IncludeScaleBar = false, FitExistingWindow = true, Columns = 1 };
+        if (!((Layout)tr.GetObject(owner.LayoutId, OpenMode.ForRead)).ModelType) settings.Scale = 1000;
+        var definition = new LegendDefinition { Name = registry.NextDefaultName(), Scope = LegendScope.Selection,
+            GroupName = LegendRegistry.NewGroupName(), Settings = settings, SpaceHandle = owner.Handle.ToString() };
+        LegendManagement.AddToGroup(db, tr, definition.GroupName, sample.Append(description));
+        registry.Add(definition);
+        return definition;
     }
 
     internal static ManualEntry AdoptRow(Database db, Transaction tr, LegendDefinition definition,

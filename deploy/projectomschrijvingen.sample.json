@@ -1,0 +1,25 @@
+{
+  "Descriptions": {
+    "Elementen": {
+      "OG|WEG_RIJWEG": {
+        "Specifiek": "Rijbaan"
+      },
+      "OG|WEG_RIJWIELPAD": {
+        "Specifiek": "Fietspad"
+      },
+      "OG|WEG_VOETPAD": {
+        "Specifiek": "Voetpad"
+      },
+      "OG|WEG_VOETPAD_TRAP": {
+        "Specifiek": "Trap"
+      },
+      "IE|MEUBILAIR_FONTEIN": {
+        "Specifiek": "Fontein"
+      },
+      "AM|AS": {
+        "Specifiek": "Ontwerpas"
+      }
+    }
+  },
+  "Providers": {}
+}

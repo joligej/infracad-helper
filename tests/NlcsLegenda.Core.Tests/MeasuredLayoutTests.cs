@@ -53,4 +53,43 @@ public class MeasuredLayoutTests
         Assert.Equal("Eigen notitie", settings.RemarksText);
         Assert.Equal("Eigen kop", settings.LabelNieuw);
     }
+    [Fact]
+    public void FixedWindowHeightBalancesAutomaticColumnsIncludingMultilineRows()
+    {
+        var settings = new LegendSettings { Scale = 1000, IncludeTitle = false, BalanceColumns = true,
+            MaxLegendHeightMm = 150, MaxRowsPerColumn = 1000 };
+        var entries = Enumerable.Range(0, 23).Select(i => Entry(i < 14 ? NlcsStatus.Bestaand : NlcsStatus.Nieuw, "Regel " + i)).ToArray();
+        var layout = LegendLayoutEngine.Compute(entries, settings, (text, width) => text.EndsWith("2") ? 15 : 3);
+        var columns = layout.Items.GroupBy(i => i.Column).Select(g => g.Max(i => -i.YTop + i.RowHeight)).ToArray();
+        Assert.Equal(2, columns.Length);
+        Assert.True(Math.Abs(columns[0] - columns[1]) < 30, string.Join(",", columns));
+        Assert.All(layout.Items.Where(i => i.Kind == LegendItemKind.Entry), i => Assert.True(-i.YTop + i.RowHeight <= 150));
+        Assert.Equal(entries, layout.Items.Where(i => i.Kind == LegendItemKind.Entry).Select(i => i.Entry));
+    }
+    [Fact]
+    public void WholeStatusGroupMovesTogetherButOversizedGroupCanContinue()
+    {
+        var settings = new LegendSettings { Scale = 1000, IncludeTitle = false, BalanceColumns = false,
+            KeepStatusGroupsTogether = true, MaxLegendHeightMm = 50, MaxRowsPerColumn = 100 };
+        var entries = Enumerable.Range(0, 8).Select(i => Entry(i < 3 ? NlcsStatus.Bestaand : NlcsStatus.Nieuw, "Regel " + i)).ToArray();
+        var layout = LegendLayoutEngine.Compute(entries, settings);
+        var newRows = layout.Items.Where(i => i.Entry?.Status == NlcsStatus.Nieuw).ToArray();
+        Assert.Single(newRows.Select(i => i.Column).Distinct());
+        Assert.NotEqual(layout.Items.First(i => i.Entry is not null).Column, newRows[0].Column);
+        settings.MaxLegendHeightMm = 30;
+        layout = LegendLayoutEngine.Compute(entries, settings);
+        Assert.True(layout.Items.Where(i => i.Entry?.Status == NlcsStatus.Nieuw).Select(i => i.Column).Distinct().Count() > 1);
+        Assert.All(layout.Items.GroupBy(i => i.Column), c => Assert.Contains(c, i => i.Kind == LegendItemKind.Entry));
+    }
+    [Fact]
+    public void AlternatingManualStatusGroupsBalanceWithoutReordering()
+    {
+        var settings = new LegendSettings { Scale = 1000, IncludeTitle = false, Columns = 2,
+            MaxLegendHeightMm = 0, MaxRowsPerColumn = 100 };
+        var entries = Enumerable.Range(0, 8).Select(i => Entry(i % 2 == 0 ? NlcsStatus.Bestaand : NlcsStatus.Nieuw, "Regel " + i)).ToArray();
+        var layout = LegendLayoutEngine.Compute(entries, settings);
+        var rows = layout.Items.Where(i => i.Kind == LegendItemKind.Entry).ToArray();
+        Assert.Equal(entries, rows.Select(i => i.Entry));
+        Assert.Equal(new[] { 4, 4 }, rows.GroupBy(i => i.Column).Select(g => g.Count()));
+    }
 }

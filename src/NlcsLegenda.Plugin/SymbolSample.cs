@@ -7,6 +7,9 @@ public sealed record SymbolSample(string BlockName, string DefinitionIdentity, S
     public Autodesk.AutoCAD.DatabaseServices.ObjectId ReferenceId { get; init; }
 
     public bool IsPrimitive { get; init; }
+    public Autodesk.AutoCAD.DatabaseServices.ObjectId ViewIdentity { get; init; }
+    public Autodesk.AutoCAD.DatabaseServices.ObjectId SourceViewportId { get; init; }
+    public IReadOnlySet<Autodesk.AutoCAD.DatabaseServices.ObjectId> FrozenLayers { get; init; } = new HashSet<Autodesk.AutoCAD.DatabaseServices.ObjectId>();
     public bool OmitManholeNumber { get; init; }
     public string Variant { get; init; } = "";
 

@@ -41,6 +41,9 @@ public sealed class LegendEntry
     public string KlicGroupKey { get; init; } = string.Empty;
     public IReadOnlyList<string> KlicDescriptionFields { get; init; } = Array.Empty<string>();
 
+    public bool ShowProviderNames { get; set; } = true;
+    public IReadOnlyDictionary<string, string> ProviderLabels { get; set; } = new Dictionary<string, string>();
+
     public string DisplayDescription
     {
         get
@@ -51,10 +54,10 @@ public sealed class LegendEntry
                 foreach (var provider in Netbeheerders)
                     description = ElementProperties.WithoutProviderSuffix(description, provider);
             var values = (ShowMergedValues ? MergedValues : Array.Empty<string>())
-                .Concat(ShowMergedValues || Netbeheerders.Count <= 1 ? Netbeheerders : Array.Empty<string>())
+                .Concat(ShowProviderNames && (ShowMergedValues || Netbeheerders.Count <= 1) ? Netbeheerders.Select(p => ProviderLabels.GetValueOrDefault(p, p)) : Array.Empty<string>())
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).ToArray();
             var text = values.Length == 0 ? description : description + " (" + string.Join(", ", values) + ")";
-            var extra = KlicSummary.Description(KlicObjects, KlicDescriptionFields);
+            var extra = KlicSummary.Description(KlicObjects, KlicDescriptionFields.Where(f => ShowProviderNames || f != "Netbeheerder"), ProviderLabels);
             if (Retained) text += " (bron ontbreekt of uitgeschakeld)";
             return extra.Length == 0 ? text : text + " · " + extra;
         }
