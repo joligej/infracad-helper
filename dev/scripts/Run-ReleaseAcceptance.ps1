@@ -9,7 +9,7 @@ param(
     [string]$TemplatePath,
     [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('continuity','mergeregression','viewportregression','xrefchoiceregression','examplerevision','exampleappearance','colorcomposition','choices','resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('linetypes','continuity','mergeregression','viewportregression','xrefchoiceregression','examplerevision','exampleappearance','colorcomposition','choices','resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -30,6 +30,7 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ linetypes=@('NLCSLEGENDALINETYPETEST','LINETYPES nieuw opgebouwde streep-, tekst- en shapepatronen zelfstandig -> OK',"_.AUDIT`n_Y`nNLCSLEGENDALINETYPEVERIFY`n_.AUDIT`n_Y`nNLCSLEGENDALINETYPEVERIFY",'LINETYPEVERIFY patroon, kleur en lijndikte na audit, heropenen en nieuwe varianten -> OK')
  continuityreal=@('NLCSLEGENDACONTINUITYREAL','CONTINUITYREAL herhaalde update, teksten, eigen regels en vensters -> OK')
  continuity=@('NLCSLEGENDACONTINUITYTEST','CONTINUITY kleurconvergentie, uitsluiting, eigen tekst, ontbrekende bron en eigen hoogte -> OK','NLCSLEGENDACONTINUITYVERIFY','CONTINUITYVERIFY opgeslagen regels en voorbeelden na heropenen -> OK')
  sourceinspection=@('NLCSLEGENDASOURCEINSPECTION','SOURCEINSPECTION -> OK')
@@ -159,6 +160,7 @@ _Y
  if($actual -match '(?im)^.*(?:->\s*FAIL|totaal:?\s*(?:->\s*)?FAIL|\bFAIL:|fatale fout|\berror:|\bfout:|Unknown command|Invalid option keyword|An error occurred during save|overgeslagen|GEEN VERSCHIL|host zonder NLCS-content|geen papier-layout).*$'){
   $failures.Add($Matches[0])
  }
+ if($Name.StartsWith('linetypes') -and $actual -match 'Total errors found [1-9]'){$failures.Add('AUDIT vindt fouten in een lijnvoorbeeld.')}
  $result=[pscustomobject]@{Case=$Name;Passed=($failures.Count -eq 0);ExitCode=$exitCode;Failures=@($failures);Log=(Join-Path $dir "$Name.log");PluginHash=$pluginHash;ProfileValuesChecked=$run.ProfileValuesChecked;Isolated=[bool]$Isolated}
  $results.Add($result)
  $results | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'results.json') -Encoding utf8
@@ -178,6 +180,9 @@ foreach($case in $Cases){
  if($specs[$case].Count -eq 4){
   $expected=@($specs[$case][3])
   Run-Case "$case-verify" $drawing $specs[$case][2] $expected
+ }
+ if($case -eq 'linetypes'){
+  Run-Case 'linetypes-reopen' $drawing "_.AUDIT`n_N`nNLCSLEGENDALINETYPECHECK" @('Total errors found 0 fixed 0','LINETYPECHECK opgeslagen varianten na tweede heropening -> OK')
  }
  if($case -eq 'snapshot'){
   Run-Case 'snapshot-verify' $drawing "NLCSLEGENDASNAPSHOTVERIFY`nNLCSLEGENDASTABILITYTEST" @('SNAPSHOTVERIFY herladen bron; nieuwe symboolvorm -> OK','STABILITY updates=50','STABILITY orphan blocks=0 -> OK')

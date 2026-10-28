@@ -33,6 +33,15 @@ beschikbaar is; vervangende fonts kunnen tekstbreedtes veranderen.
 Rechtstreekse edits aan de getekende legenda verdwijnen bij bijwerken.
 Gebruik de instellingen, **Elementtekst**, **Samenstellen** en **Overzicht**.
 
+## Een streeplijn wordt doorgetrokken na AUDIT
+
+Vanaf 1.38.1 maakt de plugin zelfstandige lijntypen voor xref-voorbeelden, inclusief
+bijbehorende tekst- en shapedefinities. Dit geldt ook voor nieuwe kleur- en
+stijlvarianten. Werk een bestaande legenda eenmaal bij om de voorbeelden opnieuw
+uit de bereikbare bron op te bouwen. De bron-xrefs worden daarbij niet aangepast.
+Een bewust bewaard voorbeeld zonder bereikbare bron behoudt zijn opgeslagen vorm;
+een eerder door AUDIT verwijderd patroon kan dan niet uit de bron worden hersteld.
+
 ## Er staat `? m²`
 
 Een bronarcering heeft geen betrouwbaar meetbaar oppervlak. **Overzicht** toont

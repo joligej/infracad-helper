@@ -1082,10 +1082,11 @@ public static class DrawingAnalyzer
         return name;
     }
 
-    private static string TextStyleContent(TextStyleTableRecord style) => string.Join(":",
+    internal static string TextStyleContent(TextStyleTableRecord style) => string.Join(":",
         style.FileName.ToUpperInvariant(), style.BigFontFileName.ToUpperInvariant(),
         NumberSignature(style.TextSize), NumberSignature(style.XScale), NumberSignature(style.ObliquingAngle),
-        style.IsVertical, style.IsShapeFile, style.Font.TypeFace, style.Font.Bold, style.Font.Italic);
+        style.IsVertical, style.IsShapeFile, style.Font.TypeFace, style.Font.Bold, style.Font.Italic,
+        style.FlagBits, style.Font.CharacterSet, style.Font.PitchAndFamily);
 
     private static string LocalName(string name) => LayerNaming.LocalName(name).Trim();
 

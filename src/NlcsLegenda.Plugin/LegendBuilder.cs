@@ -782,7 +782,6 @@ public static class LegendBuilder
         private readonly Dictionary<(Database, string), SymbolSnapshot> _sources = new();
         private readonly Dictionary<(ObjectId, string), ObjectId> _definitions = new();
         private readonly List<ObjectId> _importedBlocks = new();
-        private readonly Dictionary<Database, Database> _linetypeSources = new();
 
         public ObjectId ResolveLinetype(LayerDisplayStyle style)
         {
@@ -790,23 +789,7 @@ public static class LegendBuilder
             if (style.LinetypeIdentity == "Continuous" || style.Linetype.Equals("Continuous", StringComparison.OrdinalIgnoreCase)) return table["Continuous"];
             if (!table.Has(style.Linetype))
                 throw new InvalidOperationException($"Linetype '{style.Linetype}' ontbreekt.");
-            var id = table[style.Linetype];
-            if (id.OriginalDatabase == host) return id;
-            string importedName = "NLCS_LT_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-                System.Text.Encoding.UTF8.GetBytes(style.LinetypeIdentity)))[..20];
-            if (table.Has(importedName)) return table[importedName];
-            if (!_linetypeSources.TryGetValue(id.OriginalDatabase, out var source))
-                _linetypeSources.Add(id.OriginalDatabase, source = _resources.Own(OpenXrefSnapshot(id.OriginalDatabase)));
-            using var sourceTr = source.TransactionManager.StartTransaction();
-            var sourceTable = (LinetypeTable)sourceTr.GetObject(source.LinetypeTableId, OpenMode.ForRead);
-            var sourceId = sourceTable[LayerNaming.LocalName(style.Linetype)];
-            using var ids = new ObjectIdCollection { sourceId };
-            using var mapping = new IdMapping();
-            source.WblockCloneObjects(ids, host.LinetypeTableId, mapping, DuplicateRecordCloning.MangleName, false);
-            var imported = mapping[sourceId].Value;
-            ((LinetypeTableRecord)tr.GetObject(imported, OpenMode.ForWrite)).Name = importedName;
-            sourceTr.Commit();
-            return imported;
+            return LegendLinetypes.Resolve(host, tr, table[style.Linetype]);
         }
 
         public Hatch CopyHatch(HatchSample sample, ObjectId owner)
@@ -1107,10 +1090,19 @@ public static class LegendBuilder
     private static void ValidateHostLinetypeReferences(Database db, Transaction tr, ObjectId blockRecordId)
     {
         var visited = new HashSet<ObjectId>();
+        var checkedSymbols = new HashSet<ObjectId>();
         void Check(ObjectId id)
         {
-            if (!id.IsNull && (id.Database != db || id.OriginalDatabase != db))
+            if (id.IsNull) return;
+            if (id.Database != db || id.OriginalDatabase != db)
                 throw new InvalidOperationException("Een legenda-afhankelijkheid hoort niet bij de hostdatabase.");
+            if (!checkedSymbols.Add(id)) return;
+            var value = tr.GetObject(id, OpenMode.ForRead);
+            if (value is SymbolTableRecord { IsDependent: true })
+                throw new InvalidOperationException("Een legenda bevat nog een xref-afhankelijke definitie.");
+            if (value is LayerTableRecord layer) Check(layer.LinetypeObjectId);
+            if (value is LinetypeTableRecord type)
+                for (int i = 0; i < type.NumDashes; i++) Check(type.ShapeStyleAt(i));
         }
         void Visit(ObjectId id)
         {
@@ -1447,7 +1439,10 @@ public static class LegendBuilder
         {
             var existing = (LayerTableRecord)tr.GetObject(lt[name], OpenMode.ForRead);
             if (LayerMatchesStyle(tr, existing, style))
+            {
+                existing.UpgradeOpen(); existing.LinetypeObjectId = imports.ResolveLinetype(style);
                 return name;
+            }
         }
 
         string styledName = nameExists ? StyledLayerName(name, style) : name;
@@ -1455,7 +1450,10 @@ public static class LegendBuilder
         {
             var existing = (LayerTableRecord)tr.GetObject(lt[styledName], OpenMode.ForRead);
             if (LayerMatchesStyle(tr, existing, style))
+            {
+                existing.UpgradeOpen(); existing.LinetypeObjectId = imports.ResolveLinetype(style);
                 return styledName;
+            }
             styledName = StyledLayerName(name, style, collision + 1);
         }
 
