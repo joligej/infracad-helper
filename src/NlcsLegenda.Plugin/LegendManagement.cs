@@ -19,6 +19,22 @@ internal static class LegendManagement
         };
     }
 
+    internal static IReadOnlyList<string> PruneEmpty(Database db, Transaction tr, LegendRegistry registry, string keepId = "")
+    {
+        var removed = new List<string>();
+        var groups = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
+        foreach (var definition in registry.Legends.Where(d => d.Id != keepId && d.Rows.Count == 0
+            && d.Settings.ManualEntries.Count == 0 && d.Settings.BlankEntries.Count == 0
+            && !LegendViewport.Linked(db, tr, d.Id).Any()).ToArray())
+        {
+            Group? group = groups.Contains(definition.GroupName) ? tr.GetObject(groups.GetAt(definition.GroupName), OpenMode.ForRead) as Group : null;
+            if (group?.GetAllEntityIds().Any(id => !id.IsNull && id.IsValid && !id.IsErased) == true) continue;
+            if (group is not null) { group.UpgradeOpen(); group.Erase(); }
+            registry.Remove(definition.Id); removed.Add(definition.Name);
+        }
+        return removed;
+    }
+
     public static HashSet<ObjectId> CollectManagedIds(Database db, Transaction tr, LegendRegistry registry)
     {
         var ids = new HashSet<ObjectId>();

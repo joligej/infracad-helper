@@ -39,11 +39,15 @@ public sealed class LegendDefinition
 
     public List<SavedLegendRow> Rows { get; set; } = new();
 
+    public string SpaceHandle { get; set; } = "";
+    public double WindowWidthMm { get; set; }
+    public double WindowHeightMm { get; set; }
+
     public string CreatedWithVersion { get; set; } = string.Empty;
 
     public LegendDefinition Clone() => new()
     {
-        Id = Id,
+        Id = Id, SpaceHandle = SpaceHandle, WindowWidthMm = WindowWidthMm, WindowHeightMm = WindowHeightMm,
         Name = Name,
         Scope = Scope,
         SourceHandles = new List<string>(SourceHandles),

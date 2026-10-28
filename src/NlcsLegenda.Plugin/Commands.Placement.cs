@@ -6,10 +6,10 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    private static List<ObjectId> ExplodeToModelspace(Transaction tr, Database db, BlockReference br)
+    private static List<ObjectId> ExplodeIntoOwnerSpace(Transaction tr, Database db, BlockReference br)
     {
         var ms = (BlockTableRecord)tr.GetObject(
-            SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+            br.OwnerId, OpenMode.ForWrite);
         var rows = ((BlockTableRecord)tr.GetObject(br.BlockTableRecord, OpenMode.ForRead)).Cast<ObjectId>()
             .Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Entity>()
             .Where(e => LegendManagement.RowToken(e) is not null)
@@ -38,7 +38,7 @@ public partial class Commands
         List<ObjectId> ids;
         if (s.ExplodeOnPlace)
         {
-            ids = ExplodeToModelspace(tr, db, br);
+            ids = ExplodeIntoOwnerSpace(tr, db, br);
             if (ids.Count > 0) br.Erase();
             else ids.Add(br.ObjectId);
         }

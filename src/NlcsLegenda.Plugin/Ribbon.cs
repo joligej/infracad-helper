@@ -119,6 +119,8 @@ internal static class RibbonBuilder
             ("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN", "De tekst per element bewerken."),
             ("Elementtekst", "NLCSLEGENDATEKST", "Eén aangeklikte regel aanpassen."),
             ("Statussen", "NLCSLEGENDASTATUS", "Eigen statussen maken en regels toewijzen."),
+            ("Broncontrole", "NLCSLEGENDABRONCONTROLE", "Bekijk waarom regels ontbreken en welke bronnen meetellen."),
+            ("Kaartvensters", "NLCSLEGENDABRONVENSTER", "Kies de kaartvensters waarvan inhoud en uiterlijk worden overgenomen."),
             ("Xrefs", "NLCSLEGENDAXREFS", "Kiezen welke xrefs meetellen."),
             ("Laagnaam", "NLCSLEGENDALAAGNAAM", "Een NLCS-laagnaam bewerken."));
         AddPanel(tab, "Uitvoer",

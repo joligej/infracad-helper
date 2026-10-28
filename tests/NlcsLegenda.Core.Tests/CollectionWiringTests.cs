@@ -9,6 +9,7 @@ public class CollectionWiringTests
 {
     private static readonly HashSet<string> Covered = new()
     {
+        nameof(LegendSettings.SourceViewportHandles),
         nameof(LegendSettings.IncludedStatuses),
         nameof(LegendSettings.IncludedDrawTypes),
         nameof(LegendSettings.MergedDimensions),
@@ -55,6 +56,7 @@ public class CollectionWiringTests
     private static LegendSettings Populated()
     {
         var s = new LegendSettings();
+        s.SourceViewportHandles.Add("AB12");
         s.RowChoices.Add(new RowChoice { Description = "Eigen boom", Sources = { new(":A1", "BOOM", NlcsDrawType.Symbool, "Boom", NlcsStatus.Nieuw) } });
         s.SourceRows.Add(new SourceRow { SelectionKey = "a", Sources = new(s.RowChoices[0].Sources) });
         s.FinalSourceRows.Add(s.SourceRows[0].Clone());
@@ -85,6 +87,7 @@ public class CollectionWiringTests
     {
         var back = LegendSettings.FromJson(Populated().ToJson());
 
+        Assert.Equal(new[] { "AB12" }, back.SourceViewportHandles);
         Assert.Equal(new[] { NlcsStatus.Nieuw }, back.IncludedStatuses);
         Assert.Equal(new[] { NlcsDrawType.Symbool }, back.IncludedDrawTypes);
         Assert.Contains(GroupDimension.Soort, back.MergedDimensions);

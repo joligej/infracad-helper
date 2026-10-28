@@ -21,7 +21,7 @@ public static class LegendGrouping
         Func<string, string?>? appearanceLabel = null, Func<string, string?>? selectionIdentity = null,
         Func<string, string?>? symbolSelectionIdentity = null, Func<string, string?>? fullRenderIdentity = null,
         Func<string, IReadOnlyList<AppearanceValue>>? appearanceValues = null,
-        Func<string, IReadOnlyList<LegendSource>>? sources = null)
+        Func<string, IReadOnlyList<LegendSource>>? sources = null, Action<LegendEntry>? excludedEntry = null, DescriptionCatalog? projectDescriptions = null)
     {
         // eigen legendateksten boven de catalogus
         var descriptions = catalog ?? DescriptionCatalog.Default();
@@ -31,9 +31,11 @@ public static class LegendGrouping
             descriptions.MergeFrom(settings.DescriptionOverrides);
         }
         var groups = new Dictionary<string, List<NlcsLayerName>>();
+        var choices = new RowChoiceIndex(settings.RowChoices);
 
         // uitgeschakelde soorten ook buiten de hoeveelheden
-        foreach (var layer in usedLayers.Where(layer => settings.IsIncluded(layer)
+        foreach (var layer in usedLayers.Where(layer => settings.ExplainExclusion(layer,
+            sources?.Invoke(layer.EffectiveRenderLayerName).Any(source => choices.Includes(source)) == true) is null
             && SwatchTypes.Contains(layer.DrawType) && settings.IsDrawTypeIncluded(layer.DrawType)))
         {
 
@@ -89,9 +91,10 @@ public static class LegendGrouping
                 MergedValues = Array.Empty<string>(),
                 AppearanceValues = group.SelectMany(l => appearanceValues?.Invoke(l.EffectiveRenderLayerName) ?? Array.Empty<AppearanceValue>()).Distinct().ToArray(),
                 ShowMergedValues = settings.ShowMergedValues,
+                ShowProviderNames = settings.ShowProviderNames,
                 KlicDescriptionFields = settings.Klic.DescriptionFields.ToArray(),
                 Description = ResolveDescription(
-                    group, representative, settings, layerDescription, descriptions, descriptionSourceOf, blockName, out var descSource),
+                    group, representative, settings, layerDescription, descriptions, descriptionSourceOf, blockName, projectDescriptions, out var descSource),
                 DescriptionSource = descSource,
                 LayersByType = byType,
                 SourceRenderLayers = group.Select(layer => layer.EffectiveRenderLayerName).Distinct().ToArray(),
@@ -130,7 +133,12 @@ public static class LegendGrouping
         LegendContinuity.Reconcile(settings, entries, final: false);
         LegendContinuity.ApplyChoices(settings, entries);
         settings.RememberEntries(entries);
-        entries.RemoveAll(e => e.SourceExcluded ?? settings.IsEntryExcluded(LegendSettings.SelectionKey(e)));
+        entries.RemoveAll(e =>
+        {
+            bool excluded = e.SourceExcluded ?? settings.IsEntryExcluded(LegendSettings.SelectionKey(e));
+            if (excluded) excludedEntry?.Invoke(e);
+            return excluded;
+        });
         var merged = Merge(entries, settings);
         LegendContinuity.Reconcile(settings, merged, final: true);
         return Sort(ManualMergeGroup.Apply(merged, settings.ManualMergeGroups, settings.ShowMergedValues), settings);
@@ -232,6 +240,7 @@ public static class LegendGrouping
             MergedValues = values ?? rep.MergedValues,
             AppearanceValues = group.SelectMany(e => e.AppearanceValues).Distinct().ToArray(),
             ShowMergedValues = showValues,
+            ShowProviderNames = rep.ShowProviderNames,
             SourceEntryKeys = group.SelectMany(e => e.ExclusionKeys).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             DescriptionSource = rep.DescriptionSource,
             LayersByType = rep.LayersByType,
@@ -304,7 +313,7 @@ public static class LegendGrouping
     private static string ResolveDescription(
         List<NlcsLayerName> group, NlcsLayerName representative, LegendSettings settings,
         Func<string, string?>? layerDescription, DescriptionCatalog catalog,
-        Func<string, DescriptionSource?>? descriptionSourceOf, string? blockName, out DescriptionSource source)
+        Func<string, DescriptionSource?>? descriptionSourceOf, string? blockName, DescriptionCatalog? projectDescriptions, out DescriptionSource source)
     {
         // tekstvolgorde: eigen tekst, bron, catalogus, nette laagnaam
         if (settings.DescriptionOverrides.Elementen.Count > 0)
@@ -316,6 +325,12 @@ public static class LegendGrouping
                 source = DescriptionSource.Catalogus;
                 return overridden;
             }
+        }
+
+        if (projectDescriptions is not null)
+        {
+            var projectText = projectDescriptions.Describe(representative, settings.IncludeGeneralDescription, out bool projectMatched, settings.GeneralSeparator);
+            if (projectMatched) { source = DescriptionSource.Catalogus; return projectText; }
         }
 
         if ((SymbolDescription.Variant(blockName).Length > 0 || settings.GenericManholes && blockName is not null && SymbolDescription.IsManhole(blockName, representative.Element))

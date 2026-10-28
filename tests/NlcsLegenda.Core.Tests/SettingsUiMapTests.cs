@@ -17,6 +17,12 @@ public class SettingsUiMapTests
 
     private static readonly Dictionary<string, Surface> Map = new()
     {
+        [nameof(LegendSettings.ProjectDescriptionsPath)] = new("Teksten > Projectomschrijvingen", Binding.Text),
+        [nameof(LegendSettings.ShowProviderNames)] = new("Teksten", Binding.CheckBox),
+        [nameof(LegendSettings.ReadableProviderNames)] = new("Teksten", Binding.CheckBox),
+        [nameof(LegendSettings.OutlineLightSamples)] = new("Opmaak", Binding.CheckBox),
+        [nameof(LegendSettings.SourceViewportHandles)] = new("Bronnen en inhoud > Kaartvensters kiezen", Binding.Subdialog),
+        [nameof(LegendSettings.UseViewportAppearance)] = new("Bronnen en inhoud", Binding.CheckBox),
         [nameof(LegendSettings.RowChoices)] = new("Overzicht > Regel aanpassen", Binding.Subdialog),
         [nameof(LegendSettings.SourceRows)] = new("(intern: bronkoppeling)", Binding.Intern),
         [nameof(LegendSettings.FinalSourceRows)] = new("(intern: bronkoppeling)", Binding.Intern),
@@ -59,6 +65,7 @@ public class SettingsUiMapTests
         [nameof(LegendSettings.IncludeHoofdgroepHeaders)] = new("Opmaak", Binding.CheckBox),
         [nameof(LegendSettings.Columns)] = new("Opmaak", Binding.Numeric),
         [nameof(LegendSettings.MaxRowsPerColumn)] = new("Opmaak", Binding.Numeric),
+        [nameof(LegendSettings.KeepStatusGroupsTogether)] = new("Opmaak", Binding.CheckBox),
         [nameof(LegendSettings.BalanceColumns)] = new("Opmaak", Binding.CheckBox),
         [nameof(LegendSettings.MaxLegendHeightMm)] = new("Opmaak", Binding.Numeric),
         [nameof(LegendSettings.TextStyle)] = new("Opmaak", Binding.Text),

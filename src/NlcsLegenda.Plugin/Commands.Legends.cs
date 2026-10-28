@@ -23,9 +23,10 @@ public partial class Commands
         rows = 0;
         note = string.Empty;
 
+        LegendManagement.PruneEmpty(db, tr, registry, def.Id);
         var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
         ObjectId[]? selection = null;
-        if (def.Scope == LegendScope.Selection)
+        if (def.Scope == LegendScope.Selection && def.Settings.SourceViewportHandles.Count == 0)
         {
             selection = LegendManagement.ResolveHandles(db, def.SourceHandles, out var missing)
                 .Where(id => !excluded.Contains(id)).ToArray();
@@ -61,7 +62,15 @@ public partial class Commands
         def.Rows = savedRows;
         if (issues.Count > 0)
             throw new InvalidOperationException($"Legenda niet gewijzigd: {issues[0].Reason}");
-        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
+        var ownerId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+        if (def.SpaceHandle.Length > 0)
+        {
+            var owners = LegendManagement.ResolveHandles(db, new[] { def.SpaceHandle }, out _);
+            if (owners.Length != 1 || tr.GetObject(owners[0], OpenMode.ForRead) is not BlockTableRecord { IsLayout: true })
+                throw new InvalidOperationException("De ruimte van de overgenomen legenda ontbreekt; kies opnieuw waar de legenda hoort.");
+            ownerId = owners[0];
+        }
+        var ms = (BlockTableRecord)tr.GetObject(ownerId, OpenMode.ForWrite);
         using var br = new BlockReference(hadGeometry ? topLeft : ComputeInsertPoint(db, def.Settings), btrId);
         LegendBuilder.SetLegendDefaults(br, db);
         LegendBuilder.AppendEntity(ms, br);
@@ -138,7 +147,14 @@ public partial class Commands
                 LegendRegistry registry;
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
-                    registry = LegendManagement.ActiveRegistry(db, tr, LegendStore.Load(db, tr));
+                    var stored = LegendStore.Load(db, tr);
+                    var removed = LegendManagement.PruneEmpty(db, tr, stored);
+                    if (removed.Count > 0)
+                    {
+                        LegendStore.Save(db, tr, stored);
+                        ed.WriteMessage("\nLege registraties verwijderd: " + string.Join(", ", removed));
+                    }
+                    registry = LegendManagement.ActiveRegistry(db, tr, stored);
                     tr.Commit();
                 }
 
@@ -157,6 +173,7 @@ public partial class Commands
                 }
 
                 var pko = new PromptKeywordOptions("\nActie");
+                pko.Keywords.Add("Opschonen");
                 pko.Keywords.Add("Bijwerken");
                 pko.Keywords.Add("Alles");
                 pko.Keywords.Add("Resetten");
@@ -177,6 +194,15 @@ public partial class Commands
 
                 switch (res.StringResult)
                 {
+                    case "Opschonen":
+                        using (var tr = db.TransactionManager.StartTransaction())
+                        {
+                            var stored = LegendStore.Load(db, tr);
+                            var removed = LegendManagement.PruneEmpty(db, tr, stored);
+                            LegendStore.Save(db, tr, stored); tr.Commit();
+                            ed.WriteMessage("\nLege registraties verwijderd: " + (removed.Count > 0 ? string.Join(", ", removed) : "geen"));
+                        }
+                        break;
                     case "Bijwerken": NlcsLegendaUpdate(); break;
                     case "Alles": UpdateAllLegends(ed, db); break;
                     case "Resetten": NlcsLegendaReset(); break;

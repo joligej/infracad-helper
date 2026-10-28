@@ -46,7 +46,7 @@ internal sealed class RowChoiceDialog : LegendDialog
 
 internal sealed class UpdatePreviewDialog : LegendDialog
 {
-    public UpdatePreviewDialog(string name, IReadOnlyList<LegendChange> changes)
+    public UpdatePreviewDialog(string name, IReadOnlyList<LegendChange> changes, bool inspectionOnly = false)
     {
         Text = "Bijwerken – " + name; ClientSize = new Size(950, 580); MinimumSize = new Size(540, 330);
         StartPosition = FormStartPosition.CenterParent; ShowIcon = false; ShowInTaskbar = false;
@@ -58,8 +58,15 @@ internal sealed class UpdatePreviewDialog : LegendDialog
         foreach (var change in changes) grid.Rows.Add(change.Change, change.Description, change.Details);
         var summary = new Label { Text = changes.Count == 0 ? "Geen wijzigingen gevonden." : string.Join(" · ", changes.GroupBy(c => c.Change).Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}")),
             Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10), MaximumSize = new Size(880, 0) };
-        var buttons = new ButtonBar(withApply: false); buttons.Ok.Text = "Bijwerken"; AcceptButton = buttons.Ok; CancelButton = buttons.Cancel;
-        Controls.Add(grid); Controls.Add(summary); Controls.Add(buttons);
+        var buttons = new ButtonBar(withApply: false); buttons.Ok.Text = inspectionOnly ? "Sluiten" : "Bijwerken"; AcceptButton = buttons.Ok; CancelButton = buttons.Cancel;
+        var search = new TextBox { Dock = DockStyle.Top, PlaceholderText = "Zoek omschrijving, bronlaag, objectsoort of reden" };
+        search.TextChanged += (_, _) =>
+        {
+            grid.CurrentCell = null;
+            foreach (DataGridViewRow row in grid.Rows)
+                row.Visible = LayerSearch.Matches(string.Join(" ", row.Cells.Cast<DataGridViewCell>().Select(c => c.Value?.ToString())), search.Text);
+        };
+        Controls.Add(grid); Controls.Add(search); Controls.Add(summary); Controls.Add(buttons);
     }
 }
 

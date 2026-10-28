@@ -2,9 +2,20 @@ namespace NlcsLegenda.Core;
 
 public sealed record LegendSource(string Id, string Layer, NlcsDrawType Type, string Symbol, NlcsStatus Status)
 {
+    public string DrawingId { get; init; } = "";
+    public string SourceHandle { get; init; } = "";
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IEnumerable<string> IdentityKeys => DrawingId.Length > 0 && SourceHandle.Length > 0
+        ? new[] { "DWG:" + DrawingId + ":" + SourceHandle } : new[] { Id };
+    public bool SameObject(LegendSource other) => Status == other.Status && Type == other.Type
+        && (DrawingId.Length == 0 || other.DrawingId.Length == 0 ? Id == other.Id
+            : DrawingId == other.DrawingId && SourceHandle == other.SourceHandle);
+    public bool SameLayer(LegendSource other) => LayerKey == other.LayerKey || DrawingId.Length > 0
+        && DrawingId == other.DrawingId && LayerNaming.LocalName(Layer).Equals(LayerNaming.LocalName(other.Layer), StringComparison.OrdinalIgnoreCase);
+
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsValid => !string.IsNullOrWhiteSpace(Id) && !string.IsNullOrWhiteSpace(Layer)
-        && Symbol is not null && Enum.IsDefined(Type) && Enum.IsDefined(Status);
+        && Symbol is not null && DrawingId is not null && SourceHandle is not null && Enum.IsDefined(Type) && Enum.IsDefined(Status);
     [System.Text.Json.Serialization.JsonIgnore]
     public string Category => $"{Layer}|{Type}|{Symbol}|{Status}".ToUpperInvariant();
     [System.Text.Json.Serialization.JsonIgnore]
@@ -32,9 +43,9 @@ public sealed class RowChoice
     public bool Matches(LegendSource current) => Sources.Any(old =>
         current.Status == old.Status && current.Type == old.Type && (Scope switch
         {
-            ChoiceScope.Layer => current.LayerKey == old.LayerKey,
-            ChoiceScope.ObjectKind => current.Category == old.Category,
-            _ => current.Id == old.Id
+            ChoiceScope.Layer => current.SameLayer(old),
+            ChoiceScope.ObjectKind => current.SameLayer(old) && current.Symbol.Equals(old.Symbol, StringComparison.OrdinalIgnoreCase),
+            _ => current.SameObject(old)
         }));
 }
 

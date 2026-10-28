@@ -58,6 +58,15 @@ public static class LegendLayoutEngine
         Func<LegendEntry, double>? minimumRowHeight = null,
         Func<string, double, double>? measureHeadingHeight = null)
     {
+        if (s.BalanceColumns && s.Columns == 0)
+        {
+            var measured = s.Clone(); measured.BalanceColumns = false;
+            var limit = Compute(entries, measured, measureTextHeight, minimumRowHeight, measureHeadingHeight);
+            if (limit.Columns <= 1) return limit;
+            measured.Columns = limit.Columns;
+            var balanced = Compute(entries, measured, measureTextHeight, minimumRowHeight, measureHeadingHeight);
+            return balanced.Columns <= limit.Columns ? balanced : limit;
+        }
         double titleH = s.ToModel(s.TitleTextHeightMm);
         double headerH = s.ToModel(s.HeaderTextHeightMm);
         double subHeaderH = headerH;
@@ -102,6 +111,22 @@ public static class LegendLayoutEngine
             totalEntryHeight += rh + rowGap;
         }
 
+        int CountHeaders(int start, int end, bool subgroup)
+        {
+            int count = 0; string? status = null, hoofd = null;
+            for (int i = start; i < end; i++)
+            {
+                var row = entries[i];
+                if (status != row.StatusGroupId) { status = row.StatusGroupId; hoofd = null; if (!subgroup) count++; }
+                if (subgroup && !row.IsBlank && !string.Equals(hoofd, row.Hoofdgroep, StringComparison.OrdinalIgnoreCase))
+                { count++; hoofd = row.Hoofdgroep; }
+            }
+            return count;
+        }
+        int statusHeaders = s.IncludeGroupHeaders ? CountHeaders(0, entries.Count, false) : 0;
+        int groupHeaders = s.IncludeHoofdgroepHeaders ? CountHeaders(0, entries.Count, true) : 0;
+        double totalContentHeight = totalEntryHeight + statusHeaders * headerBand + groupHeaders * subHeaderBand
+            + Math.Max(0, statusHeaders - 1) * statusGap;
         int columnsNeeded;
         double columnBudget;
         int maxRowsCap;
@@ -109,19 +134,19 @@ public static class LegendLayoutEngine
         if (maxColHeight < double.MaxValue)
         {
             columnsNeeded = s.Columns > 0 ? Math.Min(s.Columns, Math.Max(1, entries.Count)) : int.MaxValue;
-            columnBudget = s.Columns > 0 ? totalEntryHeight / columnsNeeded : double.MaxValue;
+            columnBudget = s.Columns > 0 ? (totalContentHeight + (columnsNeeded - 1) * (s.IncludeGroupHeaders ? headerBand : 0)) / columnsNeeded : double.MaxValue;
             maxRowsCap = maxRows;
         }
         else if (s.Columns > 0)
         {
             columnsNeeded = Math.Min(s.Columns, Math.Max(1, entries.Count));
-            columnBudget = totalEntryHeight / columnsNeeded;
+            columnBudget = (totalContentHeight + (columnsNeeded - 1) * (s.IncludeGroupHeaders ? headerBand : 0)) / columnsNeeded;
             maxRowsCap = int.MaxValue;
         }
         else if (s.BalanceColumns && entries.Count > maxRows)
         {
             columnsNeeded = (int)Math.Ceiling(entries.Count / (double)maxRows);
-            columnBudget = totalEntryHeight / columnsNeeded;
+            columnBudget = (totalContentHeight + (columnsNeeded - 1) * (s.IncludeGroupHeaders ? headerBand : 0)) / columnsNeeded;
             maxRowsCap = maxRows;
         }
         else
@@ -150,6 +175,7 @@ public static class LegendLayoutEngine
         int col = 0;
         double y = colTop;
         int rows = 0;
+        bool keepCurrentGroup = false;
         double colHeight = 0.0;
         NlcsStatus? curStatus = null;
         string? curGroupId = null;
@@ -163,7 +189,9 @@ public static class LegendLayoutEngine
             var entry = entries[i];
 
             bool needStatusHeader = false;
-            if (curGroupId != entry.StatusGroupId)
+            bool statusChanged = curGroupId != entry.StatusGroupId;
+            double groupHeight = 0;
+            if (statusChanged)
             {
                 curGroupId = entry.StatusGroupId;
                 curStatus = entry.Status;
@@ -172,17 +200,29 @@ public static class LegendLayoutEngine
                 needStatusHeader = s.IncludeGroupHeaders;
             }
 
+            if (statusChanged)
+            {
+                int end = i;
+                while (end < entries.Count && entries[end].StatusGroupId == entry.StatusGroupId) end++;
+                groupHeight = entryHeights.Skip(i).Take(end - i).Sum() + (end - i) * rowGap
+                    + (s.IncludeGroupHeaders ? headerBand : 0);
+                if (s.IncludeHoofdgroepHeaders)
+                    groupHeight += CountHeaders(i, end, true) * subHeaderBand;
+                keepCurrentGroup = s.KeepStatusGroupsTogether && end - i <= maxRowsCap
+                    && groupHeight + titleBandUsed <= maxColHeight;
+            }
             bool columnBroke = false;
             bool reserveColumns = columnsNeeded != int.MaxValue && entries.Count - i <= columnsNeeded - col - 1;
-            bool budgetReached = rows >= 1 && col < columnsNeeded - 1
-                && (reserveColumns || colHeight + entryHeights[i] * 0.5 >= columnBudget);
+            bool groupNeedsColumn = rows > 0 && statusChanged && keepCurrentGroup && -y + statusGap + groupHeight > maxColHeight;
             double extraHeader = needStatusHeader ? headerBand + (rows > 0 ? statusGap : 0) : 0;
             if (s.IncludeHoofdgroepHeaders && !entry.IsBlank
                 && !string.Equals(curHoofd, entry.Hoofdgroep, StringComparison.OrdinalIgnoreCase))
                 extraHeader += subHeaderBand;
+            bool budgetReached = rows >= 1 && col < columnsNeeded - 1 && (!keepCurrentGroup || statusChanged)
+                && (reserveColumns || colHeight + (keepCurrentGroup ? groupHeight : extraHeader + entryHeights[i] + rowGap) * 0.5 >= columnBudget);
             bool heightExceeded = rows >= 1 && maxColHeight < double.MaxValue
                 && -y + extraHeader + entryHeights[i] > maxColHeight;
-            if (rows >= maxRowsCap || budgetReached || heightExceeded)
+            if (rows >= maxRowsCap || budgetReached || heightExceeded || groupNeedsColumn)
             {
                 col++;
                 y = colTop;
@@ -194,7 +234,7 @@ public static class LegendLayoutEngine
             if (needStatusHeader || (columnBroke && s.IncludeGroupHeaders))
             {
                 if (rows > 0)
-                    y -= statusGap;
+                { y -= statusGap; colHeight += statusGap; }
                 items.Add(new LegendPlacement
                 {
                     Kind = LegendItemKind.Header, X = ColX(col), YTop = y,
@@ -202,6 +242,7 @@ public static class LegendLayoutEngine
                 });
                 minY = Math.Min(minY, y - headerH);
                 y -= headerBand;
+                colHeight += headerBand;
             }
 
             // blanco regels zonder hoofdgroep of subkop
@@ -220,6 +261,7 @@ public static class LegendLayoutEngine
                 });
                 minY = Math.Min(minY, y - subHeaderH);
                 y -= subHeaderBand;
+                colHeight += subHeaderBand;
             }
 
             var entryRowLines = entryLines[i];

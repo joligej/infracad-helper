@@ -541,12 +541,21 @@ public static class LegendBuilder
 
         capture?.Invoke(entry, rowEntities);
 
-        if (s.DrawSwatchFrame)
+        bool lightSample = s.OutlineLightSamples && entry.LayersByType.Values
+            .Where(analysis.LayerStyles.ContainsKey).Select(k => analysis.LayerStyles[k].Color)
+            .Any(color => (color.ColorMethod != ColorMethod.ByAci || color.ColorIndex != 7) && color.Red > 225 && color.Green > 225 && color.Blue > 225);
+        if (s.DrawSwatchFrame || lightSample)
         {
+            string frameLayer = s.SwatchFrameLayer;
+            if (lightSample)
+            {
+                frameLayer = "NLCS_LEGENDA_LICHT_KADER";
+                EnsureLayer(tr, db, frameLayer, 7, weight: LineWeight.LineWeight013);
+            }
             double frameHeight = Math.Max(swatchH, prepared?.Height ?? 0);
             double frameWidth = Math.Max(swatchW, prepared?.Width ?? 0);
             var frame = MakeRectangle(btr.Database, x + (sampleColumnWidth - frameWidth) / 2,
-                midY - frameHeight / 2, frameWidth, frameHeight, s.SwatchFrameLayer);
+                midY - frameHeight / 2, frameWidth, frameHeight, frameLayer);
             rowEntities.Add(AppendEntity(btr, frame));
             tr.AddNewlyCreatedDBObject(frame, true);
         }
@@ -627,6 +636,9 @@ public static class LegendBuilder
                 failureReason = $"Symboolblok '{blockName}' ontbreekt in de hostdatabase.";
                 return false;
             }
+            imports.ViewIdentity = sample?.ViewIdentity ?? ObjectId.Null;
+            imports.SourceViewportId = sample?.SourceViewportId ?? ObjectId.Null;
+            imports.FrozenLayers = sample?.FrozenLayers ?? new HashSet<ObjectId>();
             bool probeOk;
             if (sample is { IsPrimitive: true })
             {
@@ -779,8 +791,11 @@ public static class LegendBuilder
     internal sealed class SymbolImportSession(Database host, Transaction tr) : IDisposable
     {
         private readonly ResourceScope _resources = new();
-        private readonly Dictionary<(Database, string), SymbolSnapshot> _sources = new();
-        private readonly Dictionary<(ObjectId, string), ObjectId> _definitions = new();
+        public ObjectId ViewIdentity { get; set; }
+        public ObjectId SourceViewportId { get; set; }
+        public IReadOnlySet<ObjectId> FrozenLayers { get; set; } = new HashSet<ObjectId>();
+        private readonly Dictionary<(Database, string, ObjectId), SymbolSnapshot> _sources = new();
+        private readonly Dictionary<(ObjectId, string, ObjectId), ObjectId> _definitions = new();
         private readonly List<ObjectId> _importedBlocks = new();
 
         public ObjectId ResolveLinetype(LayerDisplayStyle style)
@@ -797,9 +812,9 @@ public static class LegendBuilder
             var original = sample.SourceId.OriginalDatabase;
             if (original == host) return (Hatch)((Hatch)tr.GetObject(sample.SourceId, OpenMode.ForRead)).Clone();
             string prefix = string.IsNullOrEmpty(sample.SourceXref) ? string.Empty : sample.SourceXref + "|";
-            var key = (original, prefix);
+            var key = (original, prefix, ViewIdentity);
             if (!_sources.TryGetValue(key, out var snapshot))
-                _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(original, prefix)));
+                _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(original, prefix + ViewIdentity)));
             ObjectId copyId;
             using (var sourceTr = snapshot.Database.TransactionManager.StartTransaction())
             {
@@ -826,9 +841,9 @@ public static class LegendBuilder
             else
             {
                 string prefix = string.IsNullOrEmpty(sourceXref) ? string.Empty : sourceXref + "|";
-                var key = (sourceId.OriginalDatabase, prefix);
+                var key = (sourceId.OriginalDatabase, prefix, ViewIdentity);
                 if (!_sources.TryGetValue(key, out var snapshot))
-                    _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(sourceId.OriginalDatabase, prefix)));
+                    _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(sourceId.OriginalDatabase, prefix + ViewIdentity)));
                 sourceId = snapshot.Database.GetObjectId(false, sourceId.NonForwardedHandle, 0);
                 ids.Clear(); ids.Add(sourceId);
                 snapshot.Database.WblockCloneObjects(ids, owner, mapping, DuplicateRecordCloning.Ignore, false);
@@ -848,7 +863,7 @@ public static class LegendBuilder
                 var source = (BlockReference)tr.GetObject(sourceId, OpenMode.ForRead);
                 Import(source.BlockTableRecord, sourceXref);
                 string prefix = string.IsNullOrEmpty(sourceXref) ? string.Empty : sourceXref + "|";
-                var snapshot = _sources[(sourceId.OriginalDatabase, prefix)];
+                var snapshot = _sources[(sourceId.OriginalDatabase, prefix, ViewIdentity)];
                 var localId = snapshot.Database.GetObjectId(false, sourceId.NonForwardedHandle, 0);
                 ids.Clear(); ids.Add(localId);
                 snapshot.Database.WblockCloneObjects(ids, owner, mapping, DuplicateRecordCloning.Ignore, false);
@@ -871,10 +886,10 @@ public static class LegendBuilder
             int separator = definition.Name.LastIndexOf('|');
             string xrefPrefix = sourceXref is null ? (separator >= 0 ? definition.Name[..(separator + 1)] : string.Empty)
                 : string.IsNullOrEmpty(sourceXref) ? string.Empty : sourceXref + "|";
-            if (_definitions.TryGetValue((definitionId, xrefPrefix), out var cached)) return cached;
-            var key = (original, xrefPrefix);
+            if (_definitions.TryGetValue((definitionId, xrefPrefix, ViewIdentity), out var cached)) return cached;
+            var key = (original, xrefPrefix, ViewIdentity);
             if (!_sources.TryGetValue(key, out var snapshot))
-                _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(original, xrefPrefix)));
+                _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(original, xrefPrefix + ViewIdentity)));
             // anonieme xref-blokken krijgen in de host een andere naam
             var sourceId = snapshot.Database.GetObjectId(false, definitionId.NonForwardedHandle, 0);
             using var ids = new ObjectIdCollection { sourceId };
@@ -887,21 +902,16 @@ public static class LegendBuilder
                 {
                     var from = (LayerTableRecord)tr.GetObject(hostLayers[xrefPrefix + layerName], OpenMode.ForRead);
                     var to = (LayerTableRecord)tr.GetObject(pair.Value, OpenMode.ForWrite);
-                    to.Color = from.Color; to.LineWeight = from.LineWeight; to.Transparency = from.Transparency;
-                    to.IsOff = from.IsOff; to.IsFrozen = from.IsFrozen; to.IsPlottable = from.IsPlottable;
-                    var lt = (LinetypeTableRecord)tr.GetObject(from.LinetypeObjectId, OpenMode.ForRead);
-                    to.LinetypeObjectId = ResolveLinetype(new LayerDisplayStyle
-                    {
-                        Color = from.Color,
-                        Linetype = lt.Name,
-                        LinetypeIdentity = DrawingAnalyzer.LinetypeSignature(from.LinetypeObjectId, tr)
-                    });
+                    var style = SourceViewport.LayerStyle(from, tr, SourceViewportId);
+                    to.Color = style.Color; to.LineWeight = style.LineWeight; to.Transparency = style.Transparency.ToAutoCadValue();
+                    to.IsOff = from.IsOff; to.IsFrozen = from.IsFrozen || FrozenLayers.Contains(from.ObjectId); to.IsPlottable = from.IsPlottable;
+                    to.LinetypeObjectId = ResolveLinetype(style);
                 }
             var mapped = mapping[sourceId];
             if (mapped.Value.IsNull || mapped.Value.Database != host)
                 throw new InvalidOperationException("Het symbool is niet naar de hostdatabase gekopieerd.");
 
-            _definitions.Add((definitionId, xrefPrefix), mapped.Value);
+            _definitions.Add((definitionId, xrefPrefix, ViewIdentity), mapped.Value);
             return mapped.Value;
         }
 
@@ -1026,9 +1036,9 @@ public static class LegendBuilder
                     var attribute = (AttributeReference)tr.GetObject(attributeId, OpenMode.ForWrite);
                     if (sample?.OmitManholeNumber == true && SymbolDescription.IsNumberAttribute(attribute.Tag)) continue;
                     if (string.IsNullOrWhiteSpace(attribute.TextString) || !includeInvisible && (attribute.Invisible || !attribute.Visible)) continue;
-                    var attributeLayer = DrawingAnalyzer.EntityLayerStyle(attribute, tr, inheritedLayer);
+                    var attributeLayer = DrawingAnalyzer.EntityLayerStyle(attribute, tr, inheritedLayer, sample?.SourceViewportId ?? ObjectId.Null);
                     var attributeStyle = DrawingAnalyzer.EntityStyle(attribute, tr, parentStyle, attributeLayer);
-                    if (!((LayerTableRecord)tr.GetObject(attribute.LayerId, OpenMode.ForRead)).IsPlottable) continue;
+                    if (!((LayerTableRecord)tr.GetObject(attribute.LayerId, OpenMode.ForRead)).IsPlottable || sample?.FrozenLayers.Contains(attribute.LayerId) == true) continue;
                     using var multiline = attribute.IsMTextAttribute ? attribute.MTextAttribute : null;
                     var text = multiline ?? SymbolTextToMText(btr, tr, attribute);
                     if (multiline is not null)
@@ -1056,10 +1066,10 @@ public static class LegendBuilder
                         throw new InvalidOperationException("Een symboolafhankelijkheid hoort niet bij de hostdatabase.");
                     if (!includeInvisible && !piece.Visible) continue;
                     var pieceLayer = (LayerTableRecord)tr.GetObject(piece.LayerId, OpenMode.ForRead);
-                    if (!pieceLayer.IsPlottable) continue;
+                    if (!pieceLayer.IsPlottable || sample?.FrozenLayers.Contains(piece.LayerId) == true) continue;
                     if (!includeInvisible && LayerNaming.LocalName(pieceLayer.Name) != "0" && (pieceLayer.IsOff || pieceLayer.IsFrozen)) continue;
                     piece.Visible = true;
-                    var pieceLayerStyle = DrawingAnalyzer.EntityLayerStyle(piece, tr, inheritedLayer);
+                    var pieceLayerStyle = DrawingAnalyzer.EntityLayerStyle(piece, tr, inheritedLayer, sample?.SourceViewportId ?? ObjectId.Null);
                     var pieceStyle = DrawingAnalyzer.EntityStyle(piece, tr, parentStyle, pieceLayerStyle);
                     if (piece is Hatch hatch) hatch.BackgroundColor = DrawingAnalyzer.ResolveColor(hatch.BackgroundColor, parentStyle, pieceLayerStyle);
                     if (piece.Layer == "0") piece.LayerId = reference.LayerId;

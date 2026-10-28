@@ -736,7 +736,7 @@ public partial class Commands
             var target = MutationTarget.Global;
             if (!globalDefaults && !ResolveMutationTarget(ed, db, out target)) { ed.WriteMessage("\nGeannuleerd."); return; }
             var settings = GetTargetSettings(db, target);
-            using var dialog = new SettingsDialog(settings, target.ContextLabel, xrefNames: CollectXrefNames(db),
+            using var dialog = new SettingsDialog(settings, target.ContextLabel, sourcePicker: target.IsGlobal ? null : PickSourceViews, xrefNames: CollectXrefNames(db),
                 compositionSource: current => BuildCompositionItems(db, current, target.IsGlobal ? null : target.LegendId),
                 layerChoices: BuildLayerChoices(db, settings));
             dialog.SaveChanges = () => ApplyTargetSettings(ed, db, target, dialog.Settings, "Instellingen");
@@ -4344,7 +4344,7 @@ public partial class Commands
         try
         {
             var working = s.Clone();
-            using var dialog = new SettingsDialog(working, "Nieuwe legenda", xrefNames: CollectXrefNames(ed.Document.Database));
+            using var dialog = new SettingsDialog(working, "Nieuwe legenda", xrefNames: CollectXrefNames(ed.Document.Database), sourcePicker: PickSourceViews);
             dialog.ApplyRequested += (_, _) =>
             {
                 s.CopyFrom(dialog.Settings);
