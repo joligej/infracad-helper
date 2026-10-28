@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.38.1 - 2026-10-28
+
+- Lijntypen uit xrefs krijgen zelfstandige legendadefinities, ook als AutoCAD ze al als afhankelijke records in de hoofdtekening heeft geladen. Streep-, tekst- en shapepatronen behouden hun patroon, kleur en lijndikte na aanmaken, bijwerken, opslaan en AUDIT.
+- Bestaande legendalagen met een afhankelijke lijntypeverwijzing worden bij het opbouwen hersteld. Nieuwe kleur- en stijlvarianten gebruiken direct geldige definities; bron-xrefs blijven ongewijzigd.
+
 ## 1.38.0 - 2026-10-27
 
 - Getekende regels zijn over te nemen met tekst, status en een lokaal bewaard voorbeeld. Ook eigen hoogte- en controlesymbolen blijven zo beschikbaar na bijwerken en heropenen.
