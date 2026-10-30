@@ -85,9 +85,8 @@ internal static class LinkedLegendExamples
                 return owner.Cast<ObjectId>().FirstOrDefault(id => id.NonForwardedHandle.ToString().Equals(handle, StringComparison.OrdinalIgnoreCase));
             return LegendManagement.ResolveHandles(db, new[] { handle }, out _).FirstOrDefault();
         }
-        foreach (var handle in link.ContainerHandles)
+        foreach (var id in link.ContainerHandles.Select(Find))
         {
-            var id = Find(handle);
             if (id.IsNull || id.IsErased || tr.GetObject(id, OpenMode.ForRead) is not BlockReference reference)
                 throw new InvalidOperationException("Een gekoppeld bronblok of een xref ontbreekt.");
             RequireVisible(reference);
@@ -170,8 +169,13 @@ internal static class LinkedLegendExamples
             else
             {
                 double width = settings.ToModel(settings.SwatchWidthMm), gap = settings.ToModel(settings.SwatchHeightMm) / 2;
-                Add(new Line(Point3d.Origin, new(width, 0, 0)));
-                if (link.Component.EndsWith("Walls", StringComparison.Ordinal)) Add(new Line(new(0, gap, 0), new(width, gap, 0)));
+                using var line = new Line(Point3d.Origin, new(width, 0, 0));
+                Add(line);
+                if (link.Component.EndsWith("Walls", StringComparison.Ordinal))
+                {
+                    using var other = new Line(new(0, gap, 0), new(width, gap, 0));
+                    Add(other);
+                }
             }
             result = LegendRowSamples.Capture(db, tr, ids);
             foreach (var id in ids) tr.GetObject(id, OpenMode.ForWrite).Erase();
@@ -186,9 +190,10 @@ internal static class LinkedLegendExamples
         var table = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
         var block = (BlockTableRecord)tr.GetObject(table[name], OpenMode.ForRead);
         var entities = block.Cast<ObjectId>().Select(id => tr.GetObject(id, OpenMode.ForWrite)).OfType<Entity>().ToArray();
-        var bounds = new Extents3d(); bool any = false;
-        foreach (var entity in entities) if (LegendManagement.TryGetEntityExtents(tr, entity, out var extent)) { bounds.AddExtents(extent); any = true; }
-        if (!any) throw new InvalidOperationException("Het bronvoorbeeld heeft geen zichtbare geometrie.");
+        var extents = entities.Select(e => LegendManagement.TryGetEntityExtents(tr, e, out var box) ? box : (Extents3d?)null).OfType<Extents3d>().ToArray();
+        if (extents.Length == 0) throw new InvalidOperationException("Het bronvoorbeeld heeft geen zichtbare geometrie.");
+        var bounds = new Extents3d();
+        foreach (var extent in extents) bounds.AddExtents(extent);
         double factor = Math.Min(width / Math.Max(1e-9, bounds.MaxPoint.X - bounds.MinPoint.X), height / Math.Max(1e-9, bounds.MaxPoint.Y - bounds.MinPoint.Y));
         var center = bounds.MinPoint + (bounds.MaxPoint - bounds.MinPoint) / 2;
         var transform = Matrix3d.Scaling(factor, Point3d.Origin) * Matrix3d.Displacement(-center.GetAsVector());

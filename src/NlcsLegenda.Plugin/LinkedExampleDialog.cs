@@ -30,7 +30,9 @@ internal sealed class LinkedExampleDialog : LegendDialog
         var form = new TableLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 1, Padding = new Padding(12) };
         form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         void Field(string label, Control control) { form.Controls.Add(new Label { Text = label, AutoSize = true, Padding = new Padding(0, 8, 0, 2) }); form.Controls.Add(control); }
-        _target.Items.Add(new Target(null)); foreach (var m in definition.Settings.ManualEntries) _target.Items.Add(new Target(m)); _target.SelectedIndex = 0;
+        _target.Items.Add(new Target(null));
+        foreach (var m in definition.Settings.ManualEntries) _target.Items.Add(new Target(m));
+        _target.SelectedIndex = 0;
         _description.Items.AddRange(new object[] { "Bestaand maaiveld", "Ontwerpmaaiveld", "IT-riool", "GWA-riool", "GWA-put", "Overlap rioolkruising" });
         _status.Items.AddRange(Enum.GetValues<NlcsStatus>().Cast<object>().ToArray()); _status.SelectedItem = NlcsStatus.Bestaand;
         if (components.Count == 0) _component.Items.Add(new Component(null)); else foreach (var c in components) _component.Items.Add(new Component(c));

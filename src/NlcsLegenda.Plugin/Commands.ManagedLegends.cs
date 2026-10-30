@@ -34,9 +34,8 @@ public partial class Commands
             if (AcWindows.ShowModalDialog(dialog) != System.Windows.Forms.DialogResult.OK) return;
             if (dialog.Locked && !definition.CompositionLocked) LegendComposition.Lock(definition);
             definition.CompositionLocked = dialog.Locked;
-            foreach (var entry in dialog.Approved)
-                if (!definition.ApprovedRows.Any(r => r.OrderKey == LegendOrder.Key(entry)))
-                    definition.ApprovedRows.Add(new SavedLegendRow { Description = entry.DisplayDescription, Status = entry.Status,
+            foreach (var entry in dialog.Approved.Where(e => !definition.ApprovedRows.Any(r => r.OrderKey == LegendOrder.Key(e))))
+                definition.ApprovedRows.Add(new SavedLegendRow { Description = entry.DisplayDescription, Status = entry.Status,
                         CustomStatusName = entry.CustomStatusName, OrderKey = LegendOrder.Key(entry), Sources = entry.Sources.ToList(),
                         ExclusionKeys = entry.ExclusionKeys.ToList(), Appearance = LegendUpdatePlan.Appearance(entry) });
             if (BuildManagedLegend(doc.Database, tr, registry, definition, out _, out var note) != UpdateResult.Updated)
@@ -142,9 +141,9 @@ public partial class Commands
             var active = LegendManagement.ActiveRegistry(doc.Database, tr, registry);
             var rows = active.Legends.SelectMany(l => ManagedLegendExamples.CurrentRows(doc.Database, tr, l)
                 .Select(r => new SheetLegendRow(Path.GetFileName(doc.Name), l.Id, r))).ToList();
-            foreach (var file in files.FileNames.Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (var file in files.FileNames.Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(file => !Path.GetFullPath(file).Equals(Path.GetFullPath(doc.Name), StringComparison.OrdinalIgnoreCase)))
             {
-                if (Path.GetFullPath(file).Equals(Path.GetFullPath(doc.Name), StringComparison.OrdinalIgnoreCase)) continue;
                 using var source = new Database(false, true);
                 source.ReadDwgFile(file, FileOpenMode.OpenForReadAndAllShare, false, ""); source.CloseInput(true);
                 using var read = source.TransactionManager.StartTransaction();

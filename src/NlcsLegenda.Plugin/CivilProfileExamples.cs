@@ -31,24 +31,18 @@ internal static class CivilProfileExamples
     private static ViewOverride? Override(Entity source, Entity view, Transaction tr)
     {
         var part = ModelPart(source, tr); var collection = Property(view, Collection(part));
-        try
+        using var ownedCollection = collection as IDisposable;
+        if (collection is not IEnumerable items) return null;
+        foreach (var item in items.Cast<object>())
         {
-            if (collection is not IEnumerable items) return null;
-            foreach (var item in items.Cast<object>())
-            {
-                try
-                {
-                    var id = Id(item, PartProperty(part)); if (id.IsNull) continue;
-                    var candidate = tr.GetObject(id, OpenMode.ForRead) as Entity;
-                    if (candidate is not null && candidate.GetType().Name == "ProfileViewPart") id = Id(candidate, "ModelPartId");
-                    if (!id.IsNull && id.NonForwardedHandle == part.ObjectId.NonForwardedHandle)
-                        return new(Property(item, "Draw") is not false, Property(item, "UseOverrideStyle") is true, Id(item, "OverrideStyleId"));
-                }
-                finally { (item as IDisposable)?.Dispose(); }
-            }
-            return null;
+            using var ownedItem = item as IDisposable;
+            var id = Id(item, PartProperty(part)); if (id.IsNull) continue;
+            var candidate = tr.GetObject(id, OpenMode.ForRead) as Entity;
+            if (candidate is not null && candidate.GetType().Name == "ProfileViewPart") id = Id(candidate, "ModelPartId");
+            if (!id.IsNull && id.NonForwardedHandle == part.ObjectId.NonForwardedHandle)
+                return new(Property(item, "Draw") is not false, Property(item, "UseOverrideStyle") is true, Id(item, "OverrideStyleId"));
         }
-        finally { (collection as IDisposable)?.Dispose(); }
+        return null;
     }
 
     private static DBObject Style(Entity source, Transaction tr, string viewHandle)
@@ -106,9 +100,9 @@ internal static class CivilProfileExamples
             foreach (var component in Enum.GetValues(method.GetParameters()[0].ParameterType))
             {
                 var display = method.Invoke(style, new[] { component });
-                try { if (display is not null && SupportedComponent(component.ToString()!) && Property(display, "Visible") is true)
-                    result.Add(new(component.ToString()!, prefix + " · " + Label(component.ToString()!), viewHandle)); }
-                finally { (display as IDisposable)?.Dispose(); }
+                using var ownedDisplay = display as IDisposable;
+                if (display is not null && SupportedComponent(component.ToString()!) && Property(display, "Visible") is true)
+                    result.Add(new(component.ToString()!, prefix + " · " + Label(component.ToString()!), viewHandle));
             }
         }
         if (views.Length > 0)
@@ -135,31 +129,28 @@ internal static class CivilProfileExamples
         var method = style.GetType().GetMethod("GetDisplayStyleProfile") ?? throw new InvalidOperationException("De Civil 3D-profielstijl wordt niet ondersteund.");
         var component = Enum.Parse(method.GetParameters()[0].ParameterType, link.Component);
         var display = method.Invoke(style, new[] { component }) ?? throw new InvalidOperationException("De Civil 3D-weergave ontbreekt.");
-        try
-        {
-            if (Property(display, "Visible") is not true) throw new InvalidOperationException("De gekoppelde Civil 3D-stijlcomponent staat uit.");
-            var layerName = Property(display, "Layer") as string ?? source.Layer;
-            var layers = (LayerTable)tr.GetObject(source.Database.LayerTableId, OpenMode.ForRead);
-            string prefix = source.Layer.Contains('|') ? source.Layer[..(source.Layer.LastIndexOf('|') + 1)] : "";
-            if (layers.Has(prefix + layerName)) layerName = prefix + layerName;
-            var layer = LayerNaming.LocalName(layerName) == "0" ? parentLayer ?? DrawingAnalyzer.EntityLayerStyle(source, tr, viewport: viewport)
-                : layers.Has(layerName) ? SourceViewport.LayerStyle((LayerTableRecord)tr.GetObject(layers[layerName], OpenMode.ForRead), tr, viewport)
-                : throw new InvalidOperationException("De laag van de Civil 3D-stijl ontbreekt: " + layerName);
-            var color = Property(display, "Color") as Autodesk.AutoCAD.Colors.Color ?? layer.Color;
-            string line = Property(display, "Linetype") as string ?? "ByLayer";
-            var inherited = line.Equals("ByLayer", StringComparison.OrdinalIgnoreCase) ? layer
-                : line.Equals("ByBlock", StringComparison.OrdinalIgnoreCase) ? parent ?? layer : null;
-            var lines = (LinetypeTable)tr.GetObject(source.Database.LinetypeTableId, OpenMode.ForRead);
-            if (inherited is null && lines.Has(prefix + line)) line = prefix + line;
-            string identity = inherited?.LinetypeIdentity ?? (lines.Has(line) ? DrawingAnalyzer.LinetypeSignature(lines[line], tr)
-                : throw new InvalidOperationException("Het lijntype van de Civil 3D-stijl ontbreekt: " + line));
-            var weight = Property(display, "Lineweight") is LineWeight value ? value : LineWeight.ByLayer;
-            return new LayerDisplayStyle { Color = DrawingAnalyzer.ResolveColor(color, parent, layer),
-                Linetype = inherited?.Linetype ?? line, LinetypeIdentity = identity,
-                LinetypeScale = Property(display, "LinetypeScale") is double scale ? scale : 1,
-                LineWeight = weight == LineWeight.ByLayer ? layer.LineWeight : weight == LineWeight.ByBlock ? parent?.LineWeight ?? layer.LineWeight : weight,
-                Transparency = layer.Transparency };
-        }
-        finally { (display as IDisposable)?.Dispose(); }
+        using var ownedDisplay = display as IDisposable;
+        if (Property(display, "Visible") is not true) throw new InvalidOperationException("De gekoppelde Civil 3D-stijlcomponent staat uit.");
+        var layerName = Property(display, "Layer") as string ?? source.Layer;
+        var layers = (LayerTable)tr.GetObject(source.Database.LayerTableId, OpenMode.ForRead);
+        string prefix = source.Layer.Contains('|') ? source.Layer[..(source.Layer.LastIndexOf('|') + 1)] : "";
+        if (layers.Has(prefix + layerName)) layerName = prefix + layerName;
+        var layer = LayerNaming.LocalName(layerName) == "0" ? parentLayer ?? DrawingAnalyzer.EntityLayerStyle(source, tr, viewport: viewport)
+            : layers.Has(layerName) ? SourceViewport.LayerStyle((LayerTableRecord)tr.GetObject(layers[layerName], OpenMode.ForRead), tr, viewport)
+            : throw new InvalidOperationException("De laag van de Civil 3D-stijl ontbreekt: " + layerName);
+        var color = Property(display, "Color") as Autodesk.AutoCAD.Colors.Color ?? layer.Color;
+        string line = Property(display, "Linetype") as string ?? "ByLayer";
+        var inherited = line.Equals("ByLayer", StringComparison.OrdinalIgnoreCase) ? layer
+            : line.Equals("ByBlock", StringComparison.OrdinalIgnoreCase) ? parent ?? layer : null;
+        var lines = (LinetypeTable)tr.GetObject(source.Database.LinetypeTableId, OpenMode.ForRead);
+        if (inherited is null && lines.Has(prefix + line)) line = prefix + line;
+        string identity = inherited?.LinetypeIdentity ?? (lines.Has(line) ? DrawingAnalyzer.LinetypeSignature(lines[line], tr)
+            : throw new InvalidOperationException("Het lijntype van de Civil 3D-stijl ontbreekt: " + line));
+        var weight = Property(display, "Lineweight") is LineWeight value ? value : LineWeight.ByLayer;
+        return new LayerDisplayStyle { Color = DrawingAnalyzer.ResolveColor(color, parent, layer),
+            Linetype = inherited?.Linetype ?? line, LinetypeIdentity = identity,
+            LinetypeScale = Property(display, "LinetypeScale") is double scale ? scale : 1,
+            LineWeight = weight == LineWeight.ByLayer ? layer.LineWeight : weight == LineWeight.ByBlock ? parent?.LineWeight ?? layer.LineWeight : weight,
+            Transparency = layer.Transparency };
     }
 }
