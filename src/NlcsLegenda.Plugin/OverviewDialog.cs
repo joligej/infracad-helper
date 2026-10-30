@@ -348,14 +348,7 @@ internal sealed class OverviewDialog : LegendDialog
                 manual.ExampleMode = dialog.KeepExample ? ExampleMode.Fixed : ExampleMode.FollowSource;
                 return;
             }
-            if (!previous.IsManual) LegendContinuity.SetChoice(Current.Settings, previous, ChoiceScope.Variant, excluded: true);
-            var choice = LegendContinuity.SetChoice(Current.Settings, source, ChoiceScope.Variant,
-                description: previous.Description, excluded: false, example: dialog.KeepExample ? previous.SampleBlock : null,
-                automaticExample: !dialog.KeepExample);
-            choice.PreviousRowId = previous.Retained ? previous.Element["BEWAARD_".Length..] : previous.ApprovedRowId;
-            choice.ExampleScale = previous.SampleScale;
-            int index = Current.Settings.ManualEntryOrder.IndexOf(LegendOrder.Key(previous));
-            if (index >= 0) Current.Settings.ManualEntryOrder[index] = LegendOrder.Key(source);
+            LegendContinuity.LinkRow(Current.Settings, previous, source, dialog.KeepExample);
         });
     }
 

@@ -51,6 +51,20 @@ public class ManagedLegendTests
     }
 
     [Fact]
+    public void LinkingRetainedSplitLeavesTheOtherVariantAvailableAsProposal()
+    {
+        var a = Entry("A", "groen"); var b = Entry("B", "blauw");
+        var old = Saved(a); old.OrderKey = "oud-gecombineerd"; old.Sources.AddRange(b.Sources);
+        var legend = new LegendDefinition { Rows = new() { old } }; LegendComposition.Lock(legend);
+        LegendContinuity.LinkRow(legend.Settings, old.RetainedEntry(), a, keepExample: false);
+        LegendContinuity.ApplyChoices(legend.Settings, new() { a, b });
+        Assert.NotEqual(true, b.SourceExcluded);
+        var result = LegendComposition.Apply(legend, new[] { a, b });
+        Assert.Same(a, Assert.Single(result.Entries)); Assert.Same(b, Assert.Single(result.Proposals));
+        Assert.Equal(old.Id, a.ApprovedRowId);
+    }
+
+    [Fact]
     public void SwappedStyleCombinationsAreReported()
     {
         var a = new[] { new ExampleDisplay("rood", "streep", 25, 0), new ExampleDisplay("blauw", "continu", 25, 0) };

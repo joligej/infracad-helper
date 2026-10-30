@@ -86,6 +86,17 @@ public static class LegendContinuity
         }
     }
 
+    public static void LinkRow(LegendSettings settings, LegendEntry previous, LegendEntry source, bool keepExample)
+    {
+        if (!previous.IsManual && !previous.Retained) SetChoice(settings, previous, ChoiceScope.Variant, excluded: true);
+        var choice = SetChoice(settings, source, ChoiceScope.Variant, description: previous.Description, excluded: false,
+            example: keepExample ? previous.SampleBlock : null, automaticExample: !keepExample);
+        choice.PreviousRowId = previous.Retained ? previous.Element["BEWAARD_".Length..] : previous.ApprovedRowId;
+        choice.ExampleScale = previous.SampleScale;
+        int index = settings.ManualEntryOrder.IndexOf(LegendOrder.Key(previous));
+        if (index >= 0) settings.ManualEntryOrder[index] = LegendOrder.Key(source);
+    }
+
     public static RowChoice SetChoice(LegendSettings settings, LegendEntry entry, ChoiceScope scope,
         string? description = null, bool? excluded = null, string? example = null, bool automaticExample = false)
     {
