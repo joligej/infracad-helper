@@ -177,6 +177,21 @@ public class ManagedLegendTests
     }
 
     [Fact]
+    public void SheetComparisonDetectsSwappedDescriptionsBetweenColorVariants()
+    {
+        var a = Saved(Entry("A")); var b = Saved(Entry("B"));
+        a.Description = "Leiding links"; b.Description = "Leiding rechts";
+        a.ExampleDisplay = new() { new("rood", "streep", 25, 0) };
+        b.ExampleDisplay = new() { new("blauw", "streep", 25, 0) };
+        var changedA = a.Clone(); var changedB = b.Clone();
+        changedA.Description = b.Description; changedB.Description = a.Description;
+        var rows = new[] { new SheetLegendRow("0060", "l1", a), new SheetLegendRow("0060", "l1", b),
+            new SheetLegendRow("0061", "l2", changedA), new SheetLegendRow("0061", "l2", changedB) };
+        var difference = Assert.Single(LegendSheetComparison.Compare(rows, Array.Empty<SheetComparisonException>()));
+        Assert.Contains("anders gekoppeld", difference.Details);
+    }
+
+    [Fact]
     public void ManualRuleWithoutComparableIdentityIsReportedInsteadOfClaimingAgreement()
     {
         var row = new SavedLegendRow { Description = "Eigen markering", Manual = true };

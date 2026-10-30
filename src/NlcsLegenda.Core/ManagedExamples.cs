@@ -77,14 +77,16 @@ public static class LegendSheetComparison
             string Set(IEnumerable<string> values) => System.Text.Json.JsonSerializer.Serialize(values.Distinct().OrderBy(v => v, StringComparer.Ordinal));
             bool descriptions = sheets.Select(g => Set(g.Select(r => r.Row.Description.Trim()))).Distinct(StringComparer.Ordinal).Count() > 1;
             bool appearance = sheets.Select(g => Set(g.Select(r => DisplayKey(r.Row)))).Distinct(StringComparer.Ordinal).Count() > 1;
-            if (!descriptions && !appearance) continue;
+            bool pairing = sheets.Select(g => Set(g.Select(r => r.Row.Description.Trim() + "\0" + DisplayKey(r.Row)))).Distinct(StringComparer.Ordinal).Count() > 1;
+            if (!descriptions && !appearance && !pairing) continue;
             string details = string.Join(Environment.NewLine, items.Select(r => r.Sheet + " · " + r.Row.Description
                 + " · " + (r.Row.ExampleMode == ExampleMode.Fixed ? "vast voorbeeld" : "bron volgen")
                 + " · " + string.Join("; ", r.Row.ExampleDisplay.Select(d => d.Description))));
             string fingerprint = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
                 string.Join("\n", items.Select(r => r.Sheet + "|" + r.LegendId + "|" + r.Row.Description + "|" + DisplayKey(r.Row))))));
             results.Add(new(group.Key, fingerprint, items[0].Row.Description,
-                (descriptions ? "Andere omschrijving. " : "") + (appearance ? "Andere weergave. " : "") + Environment.NewLine + details,
+                (descriptions ? "Andere omschrijving. " : "") + (appearance ? "Andere weergave. " : "")
+                    + (!descriptions && !appearance && pairing ? "Omschrijving en weergave zijn anders gekoppeld. " : "") + Environment.NewLine + details,
                 accepted.Contains(new(group.Key, fingerprint))));
         }
         return results;
