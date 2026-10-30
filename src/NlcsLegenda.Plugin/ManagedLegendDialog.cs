@@ -18,7 +18,7 @@ internal sealed class CompositionDialog : LegendDialog
         StartPosition = FormStartPosition.CenterParent; ShowIcon = false; ShowInTaskbar = false;
         _locked.Checked = definition.CompositionLocked;
         _grid.CurrentCellDirtyStateChanged += (_, _) => { if (_grid.IsCurrentCellDirty) _grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
-        _grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Goedkeuren", FillWeight = 55 });
+        _grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Goedkeuren", AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells });
         _grid.Columns.Add("description", "Voorstel"); _grid.Columns.Add("source", "Bron en status");
         _grid.Columns[1].ReadOnly = _grid.Columns[2].ReadOnly = true; _grid.Columns[2].FillWeight = 220;
         foreach (var entry in proposals)
@@ -46,10 +46,10 @@ internal sealed class SheetComparisonDialog : LegendDialog
         .Where(r => Equals(r.Cells[0].Value, true)).Select(r => (SheetDifference)r.Tag!).Select(d => new SheetComparisonException(d.Key, d.Fingerprint)).ToArray();
     public SheetComparisonDialog(IReadOnlyList<SheetDifference> differences)
     {
-        Text = "Legendas tussen bladen vergelijken"; ClientSize = new Size(1000, 600); MinimumSize = new Size(540, 350);
+        Text = "Legenda's tussen bladen vergelijken"; ClientSize = new Size(1000, 600); MinimumSize = new Size(540, 350);
         StartPosition = FormStartPosition.CenterParent; ShowIcon = false; ShowInTaskbar = false;
         _grid.CurrentCellDirtyStateChanged += (_, _) => { if (_grid.IsCurrentCellDirty) _grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
-        _grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Bewuste uitzondering", FillWeight = 55 });
+        _grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Uitzondering", AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells });
         _grid.Columns.Add("description", "Onderdeel"); _grid.Columns.Add("details", "Verschillen");
         _grid.Columns[1].ReadOnly = _grid.Columns[2].ReadOnly = true; _grid.Columns[2].FillWeight = 250;
         foreach (var d in differences) _grid.Rows[_grid.Rows.Add(d.Accepted, d.Description, d.Details)].Tag = d;
