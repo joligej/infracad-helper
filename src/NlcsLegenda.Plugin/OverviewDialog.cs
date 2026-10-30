@@ -12,6 +12,7 @@ internal sealed class OverviewLegend
     public required string Name { get; init; }
     public required LegendSettings Settings { get; init; }
     public required IReadOnlyList<LegendEntry> Entries { get; set; }
+    public IReadOnlyList<LegendEntry> SourceCandidates { get; set; } = Array.Empty<LegendEntry>();
     public bool Changed { get; set; }
     public bool NeedsAnalysis { get; set; }
     public override string ToString() => Name;
@@ -54,6 +55,8 @@ internal sealed class OverviewDialog : LegendDialog
     private readonly Dictionary<(LegendEntry, string), string> _fieldValues = new();
     private readonly Func<string, IReadOnlyList<LegendExample>>? _loadExamples;
     private readonly Action<Form, OverviewLegend, LegendEntry>? _showExample;
+    private readonly Func<OverviewLegend, IReadOnlyList<LegendEntry>>? _sourceCandidates;
+    private readonly Action<OverviewLegend, ManualEntry, LegendEntry>? _linkSource;
     private bool _loading;
     private string? _analysisError;
     private readonly List<Button> _actions = new();
@@ -63,13 +66,15 @@ internal sealed class OverviewDialog : LegendDialog
     public OverviewDialog(IReadOnlyList<OverviewLegend> legends, Func<IReadOnlyList<OverviewLegend>, string?> save,
         Func<OverviewLegend, IReadOnlyList<LegendEntry>>? analyze = null,
         Func<string, IReadOnlyList<LegendExample>>? loadExamples = null,
-        Action<Form, OverviewLegend, LegendEntry>? showExample = null)
+        Action<Form, OverviewLegend, LegendEntry>? showExample = null,
+        Func<OverviewLegend, IReadOnlyList<LegendEntry>>? sourceCandidates = null,
+        Action<OverviewLegend, ManualEntry, LegendEntry>? linkSource = null)
     {
         _legends = legends;
         _save = save;
         _analyze = analyze;
         _loadExamples = loadExamples;
-        _showExample = showExample;
+        _showExample = showExample; _sourceCandidates = sourceCandidates; _linkSource = linkSource;
         Text = "NLCS Legenda – overzicht";
         Font = SystemFonts.MessageBoxFont;
         ClientSize = new Size(960, 620);
@@ -247,7 +252,7 @@ internal sealed class OverviewDialog : LegendDialog
         if (_rowValues.TryGetValue(entry, out var cached)) return cached;
         var issues = LayerMetric.MergeIssues(KlicSummary.Issues(entry.KlicObjects), entry.Metric.AreaIssue) ?? string.Empty;
         if (entry.SourceNotice.Length > 0) issues += " " + entry.SourceNotice;
-        var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, entry.AppearanceLabel, entry.VariantDetails, string.Join(", ", entry.Netbeheerders),
+        var values = new List<string> { entry.CustomStatusName ?? Current.Settings.StatusLabel(entry.Status), entry.DisplayDescription, (entry.ExampleMode == ExampleMode.Fixed ? "Vast voorbeeld" : "Bron volgen") + (entry.AppearanceLabel.Length > 0 ? " · " + entry.AppearanceLabel : ""), entry.VariantDetails, string.Join(", ", entry.Netbeheerders),
                 string.Join(", ", entry.LayersByType.Keys), entry.QuantityText(Current.Settings.QuantityDecimals, Current.Settings.UnitArea, Current.Settings.UnitLength, Current.Settings.UnitCount),
                 string.Join(Environment.NewLine, entry.SourceLayers.Select(s => s.SourceLayerName).Distinct()), string.Join(", ", entry.MergedMembers) };
         values.AddRange(Current.Settings.Klic.Columns.Select(k => KlicSummary.Field(entry.KlicObjects, k)));
@@ -329,19 +334,21 @@ internal sealed class OverviewDialog : LegendDialog
     {
         if (Current.Id.Length == 0 || _grid.CurrentRow is not { } row) return;
         var previous = _visible[row.Index];
-        using var dialog = new SourceMatchDialog(previous, _entries.Where(e => e != previous),
+        try { if (_sourceCandidates is not null) Current.SourceCandidates = _sourceCandidates(Current); }
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { MessageBox.Show(this, ex.Message, "Bronnen", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+        using var dialog = new SourceMatchDialog(previous, Current.SourceCandidates.Concat(_entries).Distinct().Where(e => e != previous),
             _showExample is null ? null : (form, entry) => _showExample(form, Current, entry));
         if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Selected is not { } source) return;
         ChangeMerges(() => {
-            if (!previous.IsManual) LegendContinuity.SetChoice(Current.Settings, previous, ChoiceScope.Variant, excluded: true);
-            var choice = LegendContinuity.SetChoice(Current.Settings, source, ChoiceScope.Variant,
-                description: previous.Description, excluded: false, example: dialog.KeepExample ? previous.SampleBlock : null,
-                automaticExample: !dialog.KeepExample);
-            choice.PreviousRowId = previous.Retained ? previous.Element["BEWAARD_".Length..] : "";
-            choice.ExampleScale = previous.SampleScale;
-            int index = Current.Settings.ManualEntryOrder.IndexOf(LegendOrder.Key(previous));
-            if (index >= 0) Current.Settings.ManualEntryOrder[index] = LegendOrder.Key(source);
-            if (previous.IsManual && !previous.Retained) Current.Settings.ManualEntries.RemoveAll(m => m.ToLegendEntry().Element == previous.Element);
+            if (previous.IsManual && !previous.Retained)
+            {
+                var manual = Current.Settings.ManualEntries.Single(m => m.ToLegendEntry().Element == previous.Element);
+                if (_linkSource is null) throw new InvalidOperationException("Gebruik Gekoppeld voorbeeld om deze eigen regel aan een bronobject te koppelen.");
+                _linkSource(Current, manual, source);
+                manual.ExampleMode = dialog.KeepExample ? ExampleMode.Fixed : ExampleMode.FollowSource;
+                return;
+            }
+            LegendContinuity.LinkRow(Current.Settings, previous, source, dialog.KeepExample);
         });
     }
 
@@ -355,10 +362,20 @@ internal sealed class OverviewDialog : LegendDialog
             if (entry.IsManual && !entry.Retained)
             {
                 var manual = Current.Settings.ManualEntries.FirstOrDefault(m => m.ToLegendEntry().Element == entry.Element);
-                if (manual is not null) manual.Description = dialog.Description;
+                if (manual is not null) { manual.Description = dialog.Description; manual.ExampleMode = dialog.ExampleMode; manual.ComparisonKey = dialog.ComparisonKey; }
                 if (dialog.Excluded) Current.Settings.ExcludedEntries.UnionWith(entry.ExclusionKeys);
             }
-            else LegendContinuity.SetChoice(Current.Settings, entry, dialog.Scope, dialog.Description, dialog.Excluded);
+            else
+            {
+                var choice = LegendContinuity.SetChoice(Current.Settings, entry, dialog.Scope, dialog.Description, dialog.Excluded);
+                choice.ComparisonKey = dialog.ComparisonKey;
+                if (entry.CanFollowSource && dialog.ExampleMode != entry.ExampleMode)
+                {
+                    bool follow = dialog.ExampleMode == ExampleMode.FollowSource;
+                    choice = LegendContinuity.SetChoice(Current.Settings, entry, dialog.Scope, example: follow ? null : entry.CapturedSampleBlock, automaticExample: follow);
+                    choice.ExampleScale = entry.CapturedSampleScale;
+                }
+            }
         });
     }
 

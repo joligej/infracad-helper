@@ -65,7 +65,7 @@ public static class LegendBuilder
                 {
                     if (!bt.Has(entry.SampleBlock)) throw new InvalidOperationException($"Het bewaarde voorbeeld voor '{entry.Description}' ontbreekt.");
                     if (!TryInsertSymbol(btr, tr, db, imports, entry.SampleBlock, "0", SymbolTransform.Identity, null,
-                        0, 0, s.Scale / entry.SampleScale, true, out var savedIds, out var savedError)) throw new InvalidOperationException(savedError);
+                        0, 0, s.RenderScale / entry.SampleScale, true, out var savedIds, out var savedError)) throw new InvalidOperationException(savedError);
                     var box = new Extents3d();
                     foreach (var savedId in savedIds) box.AddExtents(((Entity)tr.GetObject(savedId, OpenMode.ForRead)).GeometricExtents);
                     symbols.Add(entry, new PreparedSymbol(savedIds, box.MaxPoint.X - box.MinPoint.X, box.MaxPoint.Y - box.MinPoint.Y, true));
@@ -104,9 +104,9 @@ public static class LegendBuilder
                 if (example is null) continue;
                 if (!chosen && !ExampleColorsMatch(tr, exampleId, entry, analysis)) continue;
                 using var reference = new BlockReference(Point3d.Origin, exampleId)
-                { ScaleFactors = new Scale3d(s.Scale / example.Scale), Layer = "0" };
+                { ScaleFactors = new Scale3d(s.RenderScale / example.Scale), Layer = "0" };
                 AppendEntity(btr, reference); tr.AddNewlyCreatedDBObject(reference, true);
-                double factor = s.Scale / example.Scale;
+                double factor = s.RenderScale / example.Scale;
                 reference.TransformBy(Matrix3d.Displacement(new Vector3d(-example.AnchorX * factor, -example.AnchorY * factor, 0)));
                 var bounds = reference.GeometricExtents;
                 symbols.Add(entry, new PreparedSymbol(new[] { reference.ObjectId },
@@ -324,7 +324,8 @@ public static class LegendBuilder
         double barH = s.ToModel(s.ScaleBarHeightMm);
         double labelH = s.ToModel(1.8);
         double barBottom = top - barH - s.ToModel(1.0) - labelH;
-        double barWidth = segMeters * segments;
+        double segmentWidth = segMeters * s.RenderScale / s.Scale;
+        double barWidth = segmentWidth * segments;
 
         var frame = MakeRectangle(btr.Database, left, barBottom, barWidth, barH, s.FrameLayer);
         AppendEntity(btr, frame);
@@ -332,8 +333,8 @@ public static class LegendBuilder
 
         for (int i = 0; i < segments; i++)
         {
-            double x0 = left + i * segMeters;
-            var seg = MakeRectangle(btr.Database, x0, barBottom + (i % 2 == 0 ? barH / 2 : 0), segMeters, barH / 2, s.FrameLayer);
+            double x0 = left + i * segmentWidth;
+            var seg = MakeRectangle(btr.Database, x0, barBottom + (i % 2 == 0 ? barH / 2 : 0), segmentWidth, barH / 2, s.FrameLayer);
             var segId = AppendEntity(btr, seg);
             tr.AddNewlyCreatedDBObject(seg, true);
             AddSolidFill(btr, tr, segId, s.FrameLayer);
@@ -347,7 +348,7 @@ public static class LegendBuilder
             string label = i == segments
                 ? $"{meters.ToString("0.##", nl)}{s.UnitLength}"
                 : meters.ToString("0.##", nl);
-            AddTextCentered(btr, tr, label, new Point3d(left + i * segMeters, labelY, 0), labelH, s.TextLayer, styleId);
+            AddTextCentered(btr, tr, label, new Point3d(left + i * segmentWidth, labelY, 0), labelH, s.TextLayer, styleId);
         }
 
         return (barBottom, left + barWidth);
@@ -480,7 +481,7 @@ public static class LegendBuilder
                 IsSolid = pattern.Equals("SOLID", StringComparison.OrdinalIgnoreCase)
             } : analysis.HatchSamples.GetValueOrDefault(hatchLayer);
             rowEntities.Add(AddHatch(btr, tr, imports, sampleX, bottom, swatchW, swatchH, renderLayers[hatchLayer], sample,
-                s.HatchScaleFactor * (sample?.ScaleForLegend(s.Scale) ?? 1)));
+                s.HatchScaleFactor * (sample?.ScaleForLegend(s.RenderScale) ?? 1)));
         }
 
         if (prepared?.IsExample != true && entry.GeometryLayer is { } geoLayer)
@@ -832,6 +833,46 @@ public static class LegendBuilder
             return (Hatch)tr.GetObject(mapping[copyId].Value, OpenMode.ForWrite);
         }
 
+        public ObjectId ImportExploded(ObjectId sourceId, string sourceXref)
+        {
+            ObjectId Explode(Database database, Transaction transaction, ObjectId id)
+            {
+                var table = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForWrite);
+                using var block = new BlockTableRecord { Name = "NLCS_ROW_" + Guid.NewGuid().ToString("N") };
+                table.Add(block); transaction.AddNewlyCreatedDBObject(block, true);
+                var previous = HostApplicationServices.WorkingDatabase;
+                try
+                {
+                    HostApplicationServices.WorkingDatabase = database;
+                    using var pieces = new TransientObjects(); ((Entity)transaction.GetObject(id, OpenMode.ForRead)).Explode(pieces.Items);
+                    foreach (var entity in pieces.Items.Cast<DBObject>().OfType<Entity>())
+                    {
+                        entity.SetDatabaseDefaults(database);
+                        block.AppendEntity(entity); transaction.AddNewlyCreatedDBObject(entity, true);
+                    }
+                }
+                finally { HostApplicationServices.WorkingDatabase = previous; }
+                return block.ObjectId;
+            }
+            if (sourceId.OriginalDatabase == host)
+            {
+                var local = Explode(host, tr, sourceId); _importedBlocks.Add(local); return local;
+            }
+            string prefix = sourceXref.Length > 0 ? sourceXref + "|" : "";
+            var key = (sourceId.OriginalDatabase, prefix, ViewIdentity);
+            if (!_sources.TryGetValue(key, out var snapshot))
+                _sources.Add(key, snapshot = _resources.Own(new SymbolSnapshot(sourceId.OriginalDatabase, prefix + ViewIdentity)));
+            ObjectId copy;
+            using (var sourceTr = snapshot.Database.TransactionManager.StartTransaction())
+            {
+                var original = snapshot.Database.GetObjectId(false, sourceId.NonForwardedHandle, 0);
+                copy = Explode(snapshot.Database, sourceTr, original); sourceTr.Commit();
+            }
+            using var ids = new ObjectIdCollection { copy }; using var mapping = new IdMapping();
+            snapshot.Database.WblockCloneObjects(ids, host.BlockTableId, mapping, DuplicateRecordCloning.Ignore, false);
+            TrackBlocks(mapping); return mapping[copy].Value;
+        }
+
         public Entity ImportPrimitive(ObjectId sourceId, ObjectId owner, string sourceXref)
         {
             using var ids = new ObjectIdCollection { sourceId };
@@ -1088,7 +1129,7 @@ public static class LegendBuilder
         return result;
     }
 
-    private static void ApplyEntityStyle(Entity entity, LayerDisplayStyle style, SymbolImportSession imports)
+    internal static void ApplyEntityStyle(Entity entity, LayerDisplayStyle style, SymbolImportSession imports)
     {
         entity.Color = style.Color;
         entity.LineWeight = style.LineWeight;

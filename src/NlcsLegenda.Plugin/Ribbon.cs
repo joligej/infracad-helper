@@ -114,6 +114,9 @@ internal static class RibbonBuilder
             ("Resetten", "NLCSLEGENDARESET", "Begin opnieuw met de globale standaard; bron, naam en positie blijven behouden."),
             ("Overzicht", "NLCSLEGENDAINFO", "Bekijk alle regels en pas de volgorde aan."));
         AddPanel(tab, "Inhoud",
+            ("Samenstelling vastzetten", "NLCSLEGENDAVASTZETTEN", "Bewaar goedgekeurde regels; nieuwe regels alleen als voorstel."),
+            ("Gekoppeld voorbeeld", "NLCSLEGENDAVOORBEELDKOPPELEN", "Neem een bronobject of Civil 3D-profielcomponent als beheerd voorbeeld op."),
+            ("Bladen vergelijken", "NLCSLEGENDAVERGELIJKEN", "Vergelijk teksten en voorbeelden; bewaar bewuste uitzonderingen."),
             ("Regel overnemen", "NLCSLEGENDAOVERNEMEN", "Neem een getekende omschrijving en voorbeeld blijvend over."),
             ("Samenstellen", "NLCSLEGENDASAMENSTELLEN", "Regels uitvinken en eigen regels toevoegen."),
             ("Omschrijvingen", "NLCSLEGENDAOMSCHRIJVINGEN", "De tekst per element bewerken."),
@@ -124,6 +127,7 @@ internal static class RibbonBuilder
             ("Xrefs", "NLCSLEGENDAXREFS", "Kiezen welke xrefs meetellen."),
             ("Laagnaam", "NLCSLEGENDALAAGNAAM", "Een NLCS-laagnaam bewerken."));
         AddPanel(tab, "Uitvoer",
+            ("Naar model of layout", "NLCSLEGENDAVERPLAATSEN", "Verplaats de legenda met behoud van papiermaten en keuzes."),
             ("Viewport", "NLCSLEGENDAVIEWPORT", "Maak een viewport rond de legenda."),
             ("Exporteren", "NLCSLEGENDAEXPORT", "Schrijf de regels weg als CSV en JSON."),
             ("Batch", "NLCSLEGENDABATCH", "Alle tekeningen in een map in één uittrekstaat."));

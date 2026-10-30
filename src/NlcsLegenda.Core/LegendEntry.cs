@@ -19,6 +19,16 @@ public sealed class LegendEntry
     public required string Description { get; set; }
 
     public IReadOnlyList<LegendSource> Sources { get; init; } = Array.Empty<LegendSource>();
+    public string ComparisonKey { get; set; } = "";
+    public string CapturedSampleBlock { get; set; } = "";
+    public double CapturedSampleScale { get; set; } = 1000;
+    public bool CanFollowSource { get; set; } = true;
+    public string ApprovedRowId { get; set; } = "";
+    public bool MissingSource { get; set; } = true;
+    public ExampleMode ExampleMode { get; set; } = ExampleMode.FollowSource;
+    public IReadOnlyList<ExampleDisplay> SourceDisplay { get; set; } = Array.Empty<ExampleDisplay>();
+    public IReadOnlyList<ExampleDisplay> ExampleDisplay { get; set; } = Array.Empty<ExampleDisplay>();
+    public string SourceAppearance { get; set; } = "";
     public string SourceNotice { get; set; } = "";
     public string VariantDetails { get; set; } = "";
     public bool ExcludedBySource { get; set; }
@@ -58,7 +68,7 @@ public sealed class LegendEntry
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).ToArray();
             var text = values.Length == 0 ? description : description + " (" + string.Join(", ", values) + ")";
             var extra = KlicSummary.Description(KlicObjects, KlicDescriptionFields.Where(f => ShowProviderNames || f != "Netbeheerder"), ProviderLabels);
-            if (Retained) text += " (bron ontbreekt of uitgeschakeld)";
+            if (Retained && MissingSource) text += " (bron ontbreekt of uitgeschakeld)";
             return extra.Length == 0 ? text : text + " · " + extra;
         }
     }

@@ -9,6 +9,10 @@ internal sealed class RowChoiceDialog : LegendDialog
     private readonly TextBox _description = new() { Dock = DockStyle.Top };
     private readonly ComboBox _scope = new() { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _exclude = new() { Text = "Uit de legenda houden", AutoSize = true, Dock = DockStyle.Top };
+    private readonly ComboBox _exampleMode = new() { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly TextBox _comparison = new() { Dock = DockStyle.Top };
+    public string ComparisonKey => _comparison.Text.Trim();
+    public ExampleMode ExampleMode => (ExampleMode)_exampleMode.SelectedIndex;
     public string Description => _description.Text.Trim();
     public bool Excluded => _exclude.Checked;
     public ChoiceScope Scope => (ChoiceScope)_scope.SelectedIndex;
@@ -16,9 +20,12 @@ internal sealed class RowChoiceDialog : LegendDialog
     {
         Text = "Legendaregel aanpassen"; ClientSize = new Size(650, 420); MinimumSize = new Size(440, 310);
         StartPosition = FormStartPosition.CenterParent; ShowIcon = false; ShowInTaskbar = false;
-        var details = new TextBox { Multiline = true, ReadOnly = true, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical, TabStop = false,
+        var details = new TextBox { Multiline = true, ReadOnly = true, Dock = DockStyle.Top, Height = 135, ScrollBars = ScrollBars.Vertical, TabStop = false,
             Text = LegendUpdatePlan.Describe(entry) + Environment.NewLine + entry.VariantDetails + Environment.NewLine + Environment.NewLine + VariantExplanation(entry) };
-        _description.Text = entry.Description;
+        _description.Text = entry.Description; _comparison.Text = entry.ComparisonKey;
+        _exampleMode.Items.AddRange(new object[] { "Bron volgen (actuele weergave)", "Voorbeeld vastzetten (afwijkingen melden)" });
+        _exampleMode.SelectedIndex = (int)entry.ExampleMode;
+        _exampleMode.Enabled = entry.CanFollowSource && (entry.CapturedSampleBlock.Length > 0 || entry.SampleBlock.Length > 0);
         _scope.Items.AddRange(new object[] { "Deze variant", "Deze bronlaag en objectsoort", "Dit bronsymbool op deze laag" });
         _scope.SelectedIndex = 0;
         _scope.Enabled = !entry.IsManual && !entry.Retained;
@@ -27,8 +34,13 @@ internal sealed class RowChoiceDialog : LegendDialog
         top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         top.Controls.Add(new Label { Text = "Eigen omschrijving", AutoSize = true }); top.Controls.Add(_description);
         top.Controls.Add(new Label { Text = "Toepassen op", AutoSize = true }); top.Controls.Add(_scope); top.Controls.Add(_exclude);
+        top.Controls.Add(new Label { Text = entry.CanFollowSource ? "Voorbeeld" : "Voorbeeld (koppel eerst een bron om deze te volgen)", AutoSize = true });
+        top.Controls.Add(_exampleMode);
+        top.Controls.Add(new Label { Text = "Onderdeelnaam voor vergelijking tussen bladen (optioneel)", AutoSize = true }); top.Controls.Add(_comparison);
         var buttons = new ButtonBar(withApply: false); AcceptButton = buttons.Ok; CancelButton = buttons.Cancel;
-        Controls.Add(details); Controls.Add(top); Controls.Add(buttons);
+        var content = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        content.Controls.Add(details); content.Controls.Add(top);
+        Controls.Add(content); Controls.Add(buttons);
         ActiveControl = _description;
     }
 

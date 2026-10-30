@@ -39,6 +39,10 @@ public sealed class LegendDefinition
 
     public List<SavedLegendRow> Rows { get; set; } = new();
 
+    public bool CompositionLocked { get; set; }
+    public List<SavedLegendRow> ApprovedRows { get; set; } = new();
+    public List<SheetComparisonException> ComparisonExceptions { get; set; } = new();
+
     public string SpaceHandle { get; set; } = "";
     public double WindowWidthMm { get; set; }
     public double WindowHeightMm { get; set; }
@@ -48,7 +52,9 @@ public sealed class LegendDefinition
     public LegendDefinition Clone() => new()
     {
         Id = Id, SpaceHandle = SpaceHandle, WindowWidthMm = WindowWidthMm, WindowHeightMm = WindowHeightMm,
-        Name = Name,
+        Name = Name, CompositionLocked = CompositionLocked,
+        ApprovedRows = ApprovedRows.Select(r => r.Clone()).ToList(),
+        ComparisonExceptions = ComparisonExceptions.ToList(),
         Scope = Scope,
         SourceHandles = new List<string>(SourceHandles),
         GroupName = GroupName,

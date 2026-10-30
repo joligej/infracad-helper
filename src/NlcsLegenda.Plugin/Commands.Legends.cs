@@ -32,20 +32,25 @@ public partial class Commands
                 .Where(id => !excluded.Contains(id)).ToArray();
             if (selection.Length == 0)
             {
-                note = missing > 0
-                    ? $"alle {missing} bronobjecten ontbreken"
-                    : "geen bronobjecten meer";
+                if (def.SourceHandles.Count > 0)
+                    note = missing > 0 ? $"alle {missing} bronobjecten ontbreken" : "de gekoppelde bronselectie bevat geen bruikbare objecten";
                 if (def.Settings.ManualEntries.Count == 0 && def.Rows.Count == 0) return UpdateResult.NoEntries;
             }
             if (missing > 0)
                 note = $"{missing} bronobject(en) ontbreken";
         }
 
+        LinkedLegendExamples.Refresh(db, tr, def);
         // eigen tekstkopie gebruiken, niet de gewijzigde globale standaard
-        var analysis = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, DescriptionCatalog.Default(), excluded);
+        var analysis = DrawingAnalyzer.Analyze(db, tr, def.Settings, selection, DescriptionCatalog.Default(), excluded,
+            trackSuppressedContents: def.Settings.RetainMissingRows && (def.Rows.Count > 0 || def.ApprovedRows.Count > 0));
         if (preserveRows) LegendRowSamples.Seed(db, tr, def, analysis);
-        else def.Rows.Clear();
+        else { def.Rows.Clear(); def.ApprovedRows.Clear(); def.CompositionLocked = false; }
+        analysis = ManagedLegendExamples.Prepare(db, tr, def, analysis);
         analysis = LegendRowSamples.Retain(analysis, def);
+        var composition = LegendComposition.Apply(def, analysis.Entries);
+        analysis = analysis.WithEntries(composition.Entries);
+        if (composition.Proposals.Count > 0) note = AppendNote(note, $"{composition.Proposals.Count} voorstel(len) niet toegevoegd; bekijk Samenstelling vastzetten");
         if (analysis.Entries.Count == 0)
             note = AppendNote(note, "geen regels opgenomen; samenstelling behouden");
         int unknownAreas = analysis.Entries.Count(e => e.Metric.HasUnknownArea);
@@ -58,8 +63,9 @@ public partial class Commands
         var btrId = LegendBuilder.BuildBlock(db, tr, analysis, drawingSettings, out rows, out var issues,
             (entry, sample) => savedRows.Add(entry.Retained
                 ? LegendRowSamples.SaveRetained(def, entry)
-                : LegendRowSamples.Save(db, tr, entry, sample, def.Settings.Scale)), maximumWidth);
+                : LegendRowSamples.Save(db, tr, entry, sample, drawingSettings.RenderScale)), maximumWidth);
         def.Rows = savedRows;
+        LegendComposition.Remember(def, savedRows);
         if (issues.Count > 0)
             throw new InvalidOperationException($"Legenda niet gewijzigd: {issues[0].Reason}");
         var ownerId = SymbolUtilityServices.GetBlockModelSpaceId(db);
@@ -76,8 +82,8 @@ public partial class Commands
         LegendBuilder.AppendEntity(ms, br);
         tr.AddNewlyCreatedDBObject(br, true);
 
-        if (LegendManagement.TryGetEntityExtents(tr, br, out var builtBounds) && builtBounds.MaxPoint.X - builtBounds.MinPoint.X > maximumWidth + 2 * def.Settings.ToModel(def.Settings.ViewportMarginMm) + 1e-8)
-            throw new InvalidOperationException($"De bijgewerkte legenda is {(builtBounds.MaxPoint.X - builtBounds.MinPoint.X) / def.Settings.ModelUnitsPerPaperMm:0.###} mm breed; beschikbaar is {maximumWidth / def.Settings.ModelUnitsPerPaperMm:0.###} mm. Vergroot het venster of pas de indeling aan; er is niets gewijzigd.");
+        if (LegendManagement.TryGetEntityExtents(tr, br, out var builtBounds) && builtBounds.MaxPoint.X - builtBounds.MinPoint.X > maximumWidth + 2 * drawingSettings.ToModel(def.Settings.ViewportMarginMm) + 1e-8)
+            throw new InvalidOperationException($"De bijgewerkte legenda is {(builtBounds.MaxPoint.X - builtBounds.MinPoint.X) / drawingSettings.ModelUnitsPerPaperMm:0.###} mm breed; beschikbaar is {maximumWidth / drawingSettings.ModelUnitsPerPaperMm:0.###} mm. Vergroot het venster of pas de indeling aan; er is niets gewijzigd.");
         if (hadGeometry && LegendManagement.TryGetEntityExtents(tr, br, out var ext))
         {
             var shift = new Vector3d(topLeft.X - ext.MinPoint.X, topLeft.Y - ext.MaxPoint.Y, 0);

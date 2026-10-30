@@ -226,6 +226,8 @@ public static class LegendGrouping
         foreach (var e in group) metric += e.Metric;
         return new LegendEntry
         {
+            SampleBlock = rep.SampleBlock, SampleScale = rep.SampleScale, ExampleMode = rep.ExampleMode,
+            ComparisonKey = rep.ComparisonKey, CanFollowSource = rep.CanFollowSource,
             Sources = group.SelectMany(e => e.Sources).Distinct().ToArray(),
             SourceNotice = string.Join(" ", group.Select(e => e.SourceNotice).Where(t => t.Length > 0).Distinct()),
             Status = rep.Status,

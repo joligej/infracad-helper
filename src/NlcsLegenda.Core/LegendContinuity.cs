@@ -76,12 +76,25 @@ public static class LegendContinuity
             foreach (var choice in choices)
             {
                 if (choice.Description is { Length: > 0 }) entry.Description = choice.Description;
+                if (choice.ComparisonKey is not null) entry.ComparisonKey = choice.ComparisonKey;
+                if (choice.Mode.HasValue) entry.ExampleMode = choice.Mode.Value;
                 if (choice.AutomaticExample) settings.ExampleOverrides.Remove(LegendOrder.Key(entry));
                 else if (choice.Example is not null) settings.ExampleOverrides[LegendOrder.Key(entry)] = choice.Example;
             }
             entry.SourceExcluded = choices.LastOrDefault(c => c.Excluded.HasValue)?.Excluded;
             entry.ExcludedBySource = entry.SourceExcluded == true;
         }
+    }
+
+    public static void LinkRow(LegendSettings settings, LegendEntry previous, LegendEntry source, bool keepExample)
+    {
+        if (!previous.IsManual && !previous.Retained) SetChoice(settings, previous, ChoiceScope.Variant, excluded: true);
+        var choice = SetChoice(settings, source, ChoiceScope.Variant, description: previous.Description, excluded: false,
+            example: keepExample ? previous.SampleBlock : null, automaticExample: !keepExample);
+        choice.PreviousRowId = previous.Retained ? previous.Element["BEWAARD_".Length..] : previous.ApprovedRowId;
+        choice.ExampleScale = previous.SampleScale;
+        int index = settings.ManualEntryOrder.IndexOf(LegendOrder.Key(previous));
+        if (index >= 0) settings.ManualEntryOrder[index] = LegendOrder.Key(source);
     }
 
     public static RowChoice SetChoice(LegendSettings settings, LegendEntry entry, ChoiceScope scope,
@@ -107,6 +120,7 @@ public static class LegendContinuity
         if (example is not null || automaticExample)
         {
             choice.Example = example; choice.AutomaticExample = automaticExample;
+            choice.Mode = automaticExample ? ExampleMode.FollowSource : ExampleMode.Fixed;
         }
         return choice;
     }

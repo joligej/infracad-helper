@@ -66,6 +66,7 @@ public partial class Commands
             settings.UseViewportAppearance = true;
             var registry = LegendStore.Load(db, tr);
             var empty = new LegendDefinition { Name = "Leeg", GroupName = LegendRegistry.NewGroupName() }; registry.Add(empty);
+            LegendStore.Save(db, tr, registry);
             var definition = new LegendDefinition { Name = "Kaartlegenda", GroupName = LegendRegistry.NewGroupName(), Settings = settings }; registry.Add(definition);
             if (BuildManagedLegend(db, tr, registry, definition, out int count, out _) != UpdateResult.Updated || count != 1)
                 throw new InvalidOperationException("Kaartlegenda ontbreekt.");

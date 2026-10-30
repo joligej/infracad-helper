@@ -42,6 +42,7 @@ internal static class Program
             DiagnosticRun.Execute(CheckOverviewFatalError, Errors.Add);
             DiagnosticRun.Execute(CheckTreeImagesDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckOwnedFontsDisposed, Errors.Add);
+            DiagnosticRun.Execute(CheckManagedChoices, Errors.Add);
             DiagnosticRun.Execute(CheckManualMerging, Errors.Add);
             DiagnosticRun.Execute(CheckKlicRefresh, Errors.Add);
             DiagnosticRun.Execute(() => CheckKlic(args.FirstOrDefault()), Errors.Add, "CheckKlic");
@@ -49,6 +50,9 @@ internal static class Program
             DiagnosticRun.Execute(() => CheckCustomizationRoundtrip(), Errors.Add, "CheckCustomizationRoundtrip");
             DiagnosticRun.Execute(() => CheckStatusReassignment(), Errors.Add, "CheckStatusReassignment");
             Func<Form>[] factories = {
+                () => new CompositionDialog(new LegendDefinition { Name = "Kader 0061", CompositionLocked = true }, new[] { Entry("Nieuwe leiding") }),
+                () => new LinkedExampleDialog(new LegendDefinition { Name = "Profielen" }, new[] { new CivilExampleComponent("Line", "Profielvenster IT-LP-01 · Bestaand maaiveld", "AB") }, "Riool-xref · profielstijl"),
+                () => new SheetComparisonDialog(new[] { new SheetDifference("GWA", "f", "GWA-riool", "0060: rood, streep\n0061: groen, continu", false) }),
                 () => new RowChoiceDialog(Entry("Boom")),
                 () => new SourceMatchDialog(Entry("Eigen hoogte"), new[] { Entry("Hoogte NAP") }),
                 () => new UpdatePreviewDialog("Legenda", new[] { new LegendChange("Voorbeeld gewijzigd", "Boom", "xref | laag | bestaand | blauw") }),
@@ -93,7 +97,7 @@ internal static class Program
         Application.DoEvents();
         CheckButtons(form);
         Check(Descendants(form).All(c => c is not TextBox || c.Height >= c.Font.Height), form.Text + ": teksthoogte");
-        if (form is ExampleDialog or RowChoiceDialog or SourceMatchDialog or UpdatePreviewDialog && output is not null)
+        if (form is ExampleDialog or RowChoiceDialog or SourceMatchDialog or UpdatePreviewDialog or CompositionDialog or LinkedExampleDialog or SheetComparisonDialog && output is not null)
         {
             Directory.CreateDirectory(output);
             using var image = new Bitmap(form.Width, form.Height);
@@ -132,6 +136,7 @@ internal static class Program
     private static void CheckRibbonIcons()
     {
         string[] commands = { "NLCSLEGENDA", "NLCSLEGENDAUPDATE", "NLCSLEGENDARESET", "NLCSLEGENDAINFO",
+            "NLCSLEGENDAVASTZETTEN", "NLCSLEGENDAVOORBEELDKOPPELEN", "NLCSLEGENDAVERGELIJKEN", "NLCSLEGENDAVERPLAATSEN",
             "NLCSLEGENDASAMENSTELLEN", "NLCSLEGENDAOMSCHRIJVINGEN", "NLCSLEGENDATEKST",
             "NLCSLEGENDASTATUS", "NLCSLEGENDAXREFS", "NLCSLEGENDALAAGNAAM",
             "NLCSLEGENDAVIEWPORT", "NLCSLEGENDAEXPORT", "NLCSLEGENDABATCH",
@@ -685,6 +690,30 @@ internal static class Program
         Check(calls.SequenceEqual(new[] { "A", "B", "B", "B" }) && b.Changed && b.Settings.SortMode == LegendSortMode.Handmatig,
             "Vernieuwen leest opnieuw en bewaart nog niet opgeslagen keuzes");
         form.Close();
+    }
+
+    private static void CheckManagedChoices()
+    {
+        using var composition = new CompositionDialog(new LegendDefinition { CompositionLocked = true }, new[] { Entry("Nieuw") });
+        OpenOffscreen(composition);
+        var grid = Descendants(composition).OfType<DataGridView>().Single();
+        Check(composition.Locked && composition.Approved.Count == 0, "vaste samenstelling keurt voorstellen niet vanzelf goed");
+        grid.Rows[0].Cells[0].Value = true;
+        Check(composition.Approved.Single().Description == "Nieuw", "expliciet goedgekeurd voorstel wordt opgeslagen");
+        using var comparison = new SheetComparisonDialog(new[] { new SheetDifference("sleutel", "versie", "Leiding", "Andere kleur", false) });
+        OpenOffscreen(comparison);
+        Descendants(comparison).OfType<DataGridView>().Single().Rows[0].Cells[0].Value = true;
+        Check(comparison.Exceptions.Single() == new SheetComparisonException("sleutel", "versie"), "bladuitzondering bewaart de huidige verschillen");
+        var own = new ManualEntry { Id = "eigen", Layer = "0", Description = "Maaiveld", ComparisonKey = "maaiveld", Status = NlcsStatus.Bestaand,
+            ExampleMode = ExampleMode.Fixed, Link = new() { ObjectHandle = "A", MapViewportHandle = "B" } };
+        var definition = new LegendDefinition(); definition.Settings.ManualEntries.Add(own);
+        using var linked = new LinkedExampleDialog(definition, new[] { new CivilExampleComponent("Line", "Maaiveld", "C") }, "Profiel", new[] { ("B", "Kaartvenster") });
+        OpenOffscreen(linked);
+        Check(linked.MapViewportHandle == "" && linked.Follow, "nieuw voorbeeld gebruikt globale laagweergave en volgt de bron");
+        var target = Descendants(linked).OfType<ComboBox>().Single(c => c.Items.Count > 0 && c.Items[0]!.ToString() == "Nieuwe eigen regel");
+        target.SelectedIndex = 1;
+        Check(ReferenceEquals(linked.Existing, own) && linked.Description == "Maaiveld" && linked.ComparisonKey == "maaiveld"
+            && linked.MapViewportHandle == "B" && !linked.Follow, "bestaande eigen regel behoudt bronmodus en kaartkeuze");
     }
 
     private static void CheckOverview()

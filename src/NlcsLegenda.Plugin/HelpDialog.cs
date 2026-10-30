@@ -26,6 +26,24 @@ internal sealed class HelpDialog : LegendDialog
             "Ontbreekt een bron, dan blijft de vorige regel herkenbaar bewaard. Bron koppelen\n" +
             "toont mogelijke bronnen en laat het bestaande of nieuwe voorbeeld bekijken.\n" +
             "De keuze blijft in de DWG bewaard."),
+        ("Vaste samenstelling",
+            "Samenstelling vastzetten bewaart de goedgekeurde regels. Nieuwe onderdelen verschijnen\n" +
+            "als voorstel; ze worden pas na goedkeuring opgenomen. Bronvolgende voorbeelden blijven\n" +
+            "wel actueel. Eigen regels, uitsluitingen en volgorde blijven behouden.\n\n" +
+            "Bij een onduidelijke splitsing kies je eerst de bron via Overzicht → Bron koppelen."),
+        ("Bronvoorbeelden koppelen",
+            "Gekoppeld voorbeeld verbindt een nieuwe of bestaande eigen regel met een aangeklikt\n" +
+            "bronobject, ook binnen xrefs. Voor Civil 3D kies je het profielvenster en de stijlcomponent.\n\n" +
+            "Bron volgen gebruikt de actuele weergave. Een vast voorbeeld blijft behouden;\n" +
+            "Overzicht meldt kleur-, lijn- en transparantieverschillen. Standaard geldt de globale\n" +
+            "kaderweergave; je kunt ook één kaartvenster kiezen. Bronnen blijven ongewijzigd.\n\n" +
+            "Een oude eigen regel zonder koppeling moet eenmaal aan de bedoelde bron worden gekoppeld."),
+        ("Verplaatsen en vergelijken",
+            "Naar model of layout verplaatst de legenda naar het huidige tabblad en behoudt\n" +
+            "de papiermaten. Verlaat een actief kaartvenster eerst met PSPACE.\n\n" +
+            "Bladen vergelijken leest gekozen DWG's en vergelijkt omschrijvingen en voorbeelden.\n" +
+            "Voor eigen regels kun je een gedeelde onderdeelnaam opgeven. Bewuste uitzonderingen\n" +
+            "blijven bewaard zolang de betreffende teksten en weergaven gelijk blijven."),
         ("Meerdere legenda's",
             "Je kunt meerdere legenda's naast elkaar hebben, elk met een eigen bron en\n" +
             "instellingen.\n\n" +

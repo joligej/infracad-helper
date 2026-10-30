@@ -49,7 +49,13 @@ internal static class DocumentationImages
             new LegendChange("Voorbeeld gewijzigd", "Waterleiding", "Bestaand · Geometrie · kleur 5 · KLIC|B-WE-KL-WATER-G"),
             new LegendChange("Bewaard", "Eigen hoogte (m NAP)", "Bron ontbreekt of staat uit; vorig voorbeeld bewaard.") }))
             Capture(form, directory, "bijwerken.png", new Size(900, 480));
-        Console.WriteLine("Zes documentatiebeelden geschreven met synthetische gegevens.");
+        using (var form = new CompositionDialog(new LegendDefinition { Name = "Inrichting – demonstratie", CompositionLocked = true,
+            Rows = entries.Take(8).Select(e => new SavedLegendRow { Description = e.Description }).ToList() }, entries.Skip(8).ToArray()))
+            Capture(form, directory, "vaste-samenstelling.png", new Size(880, 420));
+        using (var form = new LinkedExampleDialog(new LegendDefinition { Name = "Profielen – demonstratie" },
+            new[] { new CivilExampleComponent("Line", "Lengteprofiel · Maaiveldlijn", "AB") }, "RIOOL | profielonderdeel"))
+            Capture(form, directory, "gekoppeld-voorbeeld.png", new Size(720, 570));
+        Console.WriteLine("Documentatiebeelden geschreven met synthetische gegevens.");
     }
 
     private static LegendEntry Entry(string layer, string text, NlcsDrawType type, double quantity, string xref = "")

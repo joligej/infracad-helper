@@ -99,10 +99,19 @@ internal static class LegendViewport
         }
     }
 
+    internal static bool IsPaperSpace(Database db, Transaction tr, LegendDefinition legend)
+    {
+        if (legend.SpaceHandle.Length == 0) return false;
+        var ids = LegendManagement.ResolveHandles(db, new[] { legend.SpaceHandle }, out _);
+        return ids.Length == 1 && tr.GetObject(ids[0], OpenMode.ForRead) is BlockTableRecord { IsLayout: true } space
+            && !((Layout)tr.GetObject(space.LayoutId, OpenMode.ForRead)).ModelType;
+    }
+
     internal static LegendSettings FitSettings(Database db, Transaction tr, LegendDefinition legend, out double maximumWidth)
     {
         maximumWidth = double.MaxValue;
         var settings = legend.Settings.Clone();
+        settings.PaperSpace = IsPaperSpace(db, tr, legend);
         if (!settings.FitExistingWindow) return settings;
         var viewports = Linked(db, tr, legend.Id).ToArray();
         if (viewports.Length == 0 && (legend.WindowWidthMm <= 0 || legend.WindowHeightMm <= 0)) return settings;
@@ -121,6 +130,7 @@ internal static class LegendViewport
 
     public static bool Sync(Database db, Transaction tr, LegendDefinition legend)
     {
+        if (IsPaperSpace(db, tr, legend)) return true;
         if (!LegendManagement.TryGetGroupExtents(db, tr, legend.GroupName, out var bounds)) return true;
         bool fits = true;
         foreach (DBDictionaryEntry item in (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead))

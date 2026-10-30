@@ -10,6 +10,8 @@
     <Compile Include="../../src/NlcsLegenda.Plugin/KlicDetailsDialog.cs" Link="KlicDetailsDialog.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/ExampleDialog.cs" Link="ExampleDialog.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/RowChoiceDialog.cs" Link="RowChoiceDialog.cs" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/ManagedLegendDialog.cs" Link="ManagedLegendDialog.cs" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/LinkedExampleDialog.cs" Link="LinkedExampleDialog.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/OverviewDialog.cs" Link="OverviewDialog.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/DialogLayout.cs" Link="DialogLayout.cs" />
     <ProjectReference Include="../../src/NlcsLegenda.Core/NlcsLegenda.Core.csproj" />
