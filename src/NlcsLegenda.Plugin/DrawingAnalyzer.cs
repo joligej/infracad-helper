@@ -6,9 +6,10 @@ namespace NlcsLegenda.Plugin;
 
 public sealed class AnalysisResult
 {
+    public IReadOnlySet<string> SuppressedSourceIds { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     public IReadOnlyList<LegendChange> Coverage { get; init; } = Array.Empty<LegendChange>();
     public AnalysisResult WithEntries(IReadOnlyList<LegendEntry> entries) => new() {
-        Coverage = Coverage, Entries = entries, EntryObjects = EntryObjects, HatchSamples = HatchSamples, SymbolSamples = SymbolSamples,
+        SuppressedSourceIds = SuppressedSourceIds, Coverage = Coverage, Entries = entries, EntryObjects = EntryObjects, HatchSamples = HatchSamples, SymbolSamples = SymbolSamples,
         LayerStyles = LayerStyles, UsedNlcsLayerCount = UsedNlcsLayerCount, UsedCustomLayerCount = UsedCustomLayerCount,
         DescribedLayerCount = DescribedLayerCount, AttrDescribedLayerCount = AttrDescribedLayerCount, ExcludedNlcsLayerCount = ExcludedNlcsLayerCount };
 
@@ -61,8 +62,28 @@ public static class DrawingAnalyzer
     {
         public readonly Dictionary<string, string> DrawingIds = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<(string Layer, string Kind, string Reason), int> Skipped = new();
-        public void Skip(Entity entity, string xref, string reason)
+        public bool TrackSuppressedContents;
+        public readonly HashSet<string> Suppressed = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<(ObjectId, string)> _suppressedBlocks = new();
+        public void Skip(Entity entity, Transaction tr, string xref, string reason)
         {
+            Suppressed.Add(xref.ToUpperInvariant() + ":" + entity.ObjectId.NonForwardedHandle);
+            void Contents(Entity current, string source, HashSet<ObjectId> path)
+            {
+                Suppressed.Add(source.ToUpperInvariant() + ":" + current.ObjectId.NonForwardedHandle);
+                if (current is not BlockReference reference || !path.Add(reference.BlockTableRecord)) return;
+                try
+                {
+                    var block = (BlockTableRecord)tr.GetObject(reference.BlockTableRecord, OpenMode.ForRead);
+                    if (block.IsUnloaded) return;
+                    string nested = block.IsFromExternalReference ? (source.Length > 0 ? source + "|" + LayerNaming.LocalName(block.Name) : block.Name) : source;
+                    if (!_suppressedBlocks.Add((block.ObjectId, nested))) return;
+                    foreach (ObjectId id in block)
+                        if (!id.IsErased && tr.GetObject(id, OpenMode.ForRead) is Entity child) Contents(child, nested, path);
+                }
+                finally { path.Remove(reference.BlockTableRecord); }
+            }
+            if (TrackSuppressedContents) Contents(entity, xref, new());
             var key = (xref.Length > 0 ? xref + "|" + LayerNaming.LocalName(entity.Layer) : entity.Layer, entity.GetType().Name, reason);
             Skipped[key] = Skipped.GetValueOrDefault(key) + 1;
         }
@@ -128,11 +149,11 @@ public static class DrawingAnalyzer
         IReadOnlyCollection<ObjectId>? selection = null,
         DescriptionCatalog? catalog = null,
         IReadOnlyCollection<ObjectId>? excludedIds = null,
-        Action<double, double>? reportTimings = null, bool trackSources = false)
+        Action<double, double>? reportTimings = null, bool trackSources = false, bool trackSuppressedContents = false)
     {
         var timer = reportTimings is null ? null : System.Diagnostics.Stopwatch.StartNew();
         using var klic = new KlicSourceMetadata(settings.Klic, db, tr);
-        var c = new Collector { Klic = klic, ChoiceIndex = new(settings.RowChoices), TrackSources = trackSources, KlicGroupFields = settings.KlicGroupFields().ToArray() };
+        var c = new Collector { Klic = klic, ChoiceIndex = new(settings.RowChoices), TrackSources = trackSources, TrackSuppressedContents = trackSuppressedContents, KlicGroupFields = settings.KlicGroupFields().ToArray() };
         c.Exclusions = settings.SourceRows.Where(r => settings.IsEntryExcluded(r.SelectionKey)).SelectMany(r => r.Sources)
             .SelectMany(s => s.IdentityKeys.Select(id => (id, s.Status, s.Type))).ToHashSet();
         c.Layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
@@ -256,8 +277,15 @@ public static class DrawingAnalyzer
             entry.SampleIdentity = string.Join(";", entry.SourceRenderLayers.Select(name =>
                 SampleSignature(c.Styles[name], c.Hatches.GetValueOrDefault(name), c.SymbolSamples.GetValueOrDefault(name)))
                 .Distinct().OrderBy(value => value, StringComparer.Ordinal));
+            entry.SourceAppearance = entry.SampleIdentity;
+            entry.SourceDisplay = entry.SourceRenderLayers.Where(c.Styles.ContainsKey).SelectMany(name => c.SymbolSamples.TryGetValue(name, out var sourceSymbol) && !sourceSymbol.ReferenceId.IsNull
+                ? ManagedLegendExamples.Read(db, tr, new[] { sourceSymbol.ReferenceId }, sourceSymbol.InsertionStyle, sourceSymbol.InsertionLayerStyle, sourceSymbol.SourceViewportId)
+                : new[] { ManagedLegendExamples.Display(c.Styles[name]) }).Distinct().ToArray();
             if (settings.ExampleOverrides.TryGetValue(LegendOrder.Key(entry), out var selectedExample) && selectedExample.Length > 0)
+            {
                 entry.SampleIdentity = "voorbeeld:" + selectedExample;
+                entry.ExampleMode = ExampleMode.Fixed;
+            }
             var overrides = entry.Sources.Select(s => s.Layer).Distinct(StringComparer.OrdinalIgnoreCase)
                 .Where(name => c.Layers.Has(name) && ((LayerTableRecord)tr.GetObject(c.Layers[name], OpenMode.ForRead)).HasOverrides).ToArray();
             if (overrides.Length > 0) entry.SourceNotice += " Viewportafwijkingen op: " + string.Join(", ", overrides) + (settings.SourceViewportHandles.Count > 0 && settings.UseViewportAppearance ? ". Legenda volgt de gekozen kaartvensters." : ". Legenda gebruikt de globale laagweergave.");
@@ -279,6 +307,7 @@ public static class DrawingAnalyzer
         }
         return new AnalysisResult
         {
+            SuppressedSourceIds = c.Suppressed,
             Coverage = c.Unmapped.Select(p => new LegendChange("Niet gekoppeld", p.Key.Layer, $"{p.Value} zichtbare objecten ({p.Key.Type}); koppel via Eigen lagen of neem een eigen regel over."))
                 .Concat(c.Skipped.Select(p => new LegendChange("Niet opgenomen", p.Key.Layer, $"{p.Value} objecten ({p.Key.Kind}): {p.Key.Reason}.")))
                 .Concat(omitted.Select(e => new LegendChange("Uitgesloten", e.Description, LegendUpdatePlan.Describe(e) + "; opgeslagen keuze in Samenstellen of Overzicht."))).ToArray(),
@@ -322,17 +351,17 @@ public static class DrawingAnalyzer
 
         if (c.Viewport is { } viewport)
         {
-            if (viewport.Frozen(ent.LayerId)) { c.Skip(ent, sourceXref, "laag is bevroren in kaartvenster " + viewport.Id.Handle); return; }
-            if (!viewport.Intersects(ent, tr, transform)) { c.Skip(ent, sourceXref, "buiten kaartvenster " + viewport.Id.Handle); return; }
+            if (viewport.Frozen(ent.LayerId)) { c.Skip(ent, tr, sourceXref, "laag is bevroren in kaartvenster " + viewport.Id.Handle); return; }
+            if (!viewport.Intersects(ent, tr, transform)) { c.Skip(ent, tr, sourceXref, "buiten kaartvenster " + viewport.Id.Handle); return; }
         }
         if (!settings.IncludeInvisibleLayers)
         {
-            if (!ent.Visible) { c.Skip(ent, sourceXref, "object is verborgen"); return; }
+            if (!ent.Visible) { c.Skip(ent, tr, sourceXref, "object is verborgen"); return; }
             bool inheritsVisibleLayer = inheritedLayerStyle is not null && LayerNaming.LocalName(ent.Layer) == "0";
-            if (!inheritsVisibleLayer && !IsVisible(ent.Layer, tr, c)) { c.Skip(ent, sourceXref, "laag staat uit of is bevroren"); return; }
+            if (!inheritsVisibleLayer && !IsVisible(ent.Layer, tr, c)) { c.Skip(ent, tr, sourceXref, "laag staat uit of is bevroren"); return; }
         }
         if (!((LayerTableRecord)tr.GetObject(ent.LayerId, OpenMode.ForRead)).IsPlottable)
-        { c.Skip(ent, sourceXref, "laag staat op niet plotten"); return; }
+        { c.Skip(ent, tr, sourceXref, "laag staat op niet plotten"); return; }
         var layerStyle = c.LayerStyle(ent, tr, inheritedLayerStyle);
         var effectiveStyle = EntityStyle(ent, tr, inheritedStyle, layerStyle, transform);
         var block = ent as BlockReference;
@@ -363,7 +392,7 @@ public static class DrawingAnalyzer
                     if (settings.IsXrefIncluded(childSource))
                         CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested,
                             sourceXref: childSource, inheritedStyle: effectiveStyle, inheritedLayerStyle: layerStyle);
-                    else c.Skip(ent, childSource, "xref is uitgesloten in Bronnen en inhoud");
+                    else c.Skip(ent, tr, sourceXref, "xref is uitgesloten in Bronnen en inhoud");
                 }
                 else
                 {
@@ -414,9 +443,9 @@ public static class DrawingAnalyzer
         }
         var sourceInfo = SourceInfo(ent, tr, sourceXref, actualType, parsed.Status, c.DrawingIds.GetValueOrDefault(sourceXref) ?? (sourceXref.Length == 0 ? ent.Database.FingerprintGuid.ToString() : ""));
         if (settings.ExplainExclusion(parsed, c.ChoiceIndex.Includes(sourceInfo)) is { } exclusion)
-        { c.ExcludedNlcs.Add(parsed.LocalName); c.Skip(ent, sourceXref, exclusion); return; }
+        { c.ExcludedNlcs.Add(parsed.LocalName); c.Skip(ent, tr, sourceXref, exclusion); return; }
         if (!settings.IsDrawTypeIncluded(actualType))
-        { c.Skip(ent, sourceXref, "objectsoort staat uit in Bronnen en inhoud"); return; }
+        { c.Skip(ent, tr, sourceXref, "objectsoort staat uit in Bronnen en inhoud"); return; }
         if (!EntityMatchesType(ent, actualType)) return;
 
         HatchSample? hatch = ent is Hatch h ? HatchSample.From(h, transform) : null;

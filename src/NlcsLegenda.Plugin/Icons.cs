@@ -67,6 +67,32 @@ internal static class RibbonIcons
                 g.DrawLine(pen, 16 * s, 20 * s, 24 * s, 20 * s);
                 break;
 
+            case "NLCSLEGENDAVASTZETTEN":
+                g.DrawArc(pen, 11 * s, 6 * s, 10 * s, 12 * s, 180, 180);
+                g.DrawRectangle(pen, 8 * s, 14 * s, 16 * s, 11 * s);
+                g.FillEllipse(fill, 15 * s, 18 * s, 2 * s, 4 * s);
+                break;
+
+            case "NLCSLEGENDAVOORBEELDKOPPELEN":
+                g.DrawEllipse(pen, 6 * s, 8 * s, 12 * s, 9 * s);
+                g.DrawEllipse(pen, 14 * s, 15 * s, 12 * s, 9 * s);
+                g.DrawLine(pen, 12 * s, 13 * s, 20 * s, 20 * s);
+                break;
+
+            case "NLCSLEGENDAVERGELIJKEN":
+                g.DrawRectangle(pen, 6 * s, 8 * s, 8 * s, 16 * s);
+                g.DrawRectangle(pen, 18 * s, 8 * s, 8 * s, 16 * s);
+                g.DrawLine(pen, 10 * s, 14 * s, 22 * s, 14 * s);
+                g.DrawLine(pen, 10 * s, 19 * s, 22 * s, 19 * s);
+                break;
+
+            case "NLCSLEGENDAVERPLAATSEN":
+                g.DrawRectangle(pen, 6 * s, 7 * s, 9 * s, 9 * s);
+                g.DrawRectangle(pen, 17 * s, 18 * s, 9 * s, 9 * s);
+                g.DrawLine(pen, 11 * s, 22 * s, 21 * s, 11 * s);
+                FillTriangle(g, fill, s, 22, 10, 16, 12, 20, 16);
+                break;
+
             case "NLCSLEGENDAOVERNEMEN":
                 g.DrawRectangle(pen, 7 * s, 8 * s, 9 * s, 6 * s);
                 g.DrawLine(pen, 19 * s, 11 * s, 25 * s, 11 * s);

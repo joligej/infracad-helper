@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.40.0 - 2026-10-30
+
+- Samenstelling vastzetten houdt goedgekeurde regels bijeen. Nieuwe brononderdelen blijven voorstellen totdat je ze goedkeurt; gekoppelde voorbeelden blijven wel de actuele bronweergave volgen. Bij een onduidelijke splitsing blijft de vorige regel staan voor een expliciete bronkeuze.
+- Gekoppeld voorbeeld verbindt een nieuwe of bestaande eigen regel met een bronobject, ook binnen xrefs. Kleur, lijntype, lijndikte en transparantie volgen de globale kaderweergave of een gekozen kaartvenster. Een vast voorbeeld blijft behouden; afwijkingen van de bron staan per regel in Overzicht.
+- Civil 3D-profielvoorbeelden gebruiken de lijn-, wand- en putcomponenten van de gekozen profielstijl, inclusief stijloverschrijvingen in het profielvenster. Getekende overlapmarkeringen zijn afzonderlijk te koppelen. Xref-afhankelijkheden worden lokaal overgenomen.
+- Eigen regels zonder verwachte bronkoppeling krijgen geen melding over ontbrekende bronobjecten. Koppelen via Overzicht behoudt hun identiteit, uitsluitingen en volgorde.
+- Naar model of layout verplaatst een beheerde legenda met behoud van papiermaten en instellingen. De legenda blijft bijwerkbaar; in papierruimte staat 'Voorbeelden schematisch' in plaats van een modelschaal.
+- Bladen vergelijken controleert omschrijvingen en voorbeeldweergaven in gekozen DWG's. Bewuste uitzonderingen blijven bewaard zolang de betreffende teksten en weergaven gelijk blijven. Een gedeelde onderdeelnaam maakt ook eigen regels vergelijkbaar.
+
 ## 1.39.0 - 2026-10-28
 
 - Broncontrole verklaart verborgen, niet-plottende, uitgesloten en niet herkende objecten. Een specifieke opnamekeuze kan een brede uitsluiting doorbreken zonder andere onderdelen terug te zetten.

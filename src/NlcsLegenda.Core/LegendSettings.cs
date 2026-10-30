@@ -657,6 +657,7 @@ public sealed class LegendSettings
 
     public string FormatScale()
     {
+        if (PaperSpace) return "Voorbeelden schematisch";
         try
         {
             return string.Format(CultureInfo.InvariantCulture, ScaleFormat, Scale);
@@ -681,7 +682,11 @@ public sealed class LegendSettings
         }
     }
 
-    public double ToModel(double paperMm) => paperMm * Scale / 1000.0;
+    [JsonIgnore, Browsable(false)]
+    public bool PaperSpace { get; set; }
+    [JsonIgnore, Browsable(false)]
+    public double RenderScale => PaperSpace ? 1000 : Scale;
+    public double ToModel(double paperMm) => paperMm * RenderScale / 1000.0;
 
     public void CopyFrom(LegendSettings other)
     {
@@ -771,7 +776,7 @@ public sealed class LegendSettings
             or nameof(MergeRules) or nameof(MergedDimensions) or nameof(DescriptionOverrides) or nameof(ManualEntryOrder) or nameof(Klic) or nameof(ExampleOverrides);
 
     [JsonIgnore, Browsable(false)]
-    public double ModelUnitsPerPaperMm => Scale / 1000.0;
+    public double ModelUnitsPerPaperMm => RenderScale / 1000.0;
 
     public bool IsIncluded(NlcsLayerName layer) => ExplainExclusion(layer) is null;
 
@@ -840,7 +845,7 @@ public sealed class LegendSettings
         SourceRows ??= new();
         FinalSourceRows ??= new();
         if (RowChoices.Any(c => c is null || c.Sources is null || c.Sources.Any(s => s is null || !s.IsValid)
-                || !Enum.IsDefined(c.Scope) || c.SavedRowId is null || c.PreviousRowId is null
+                || !Enum.IsDefined(c.Scope) || c.Mode.HasValue && !Enum.IsDefined(c.Mode.Value) || c.SavedRowId is null || c.PreviousRowId is null
                 || !double.IsFinite(c.ExampleScale) || c.ExampleScale <= 0)
             || SourceRows.Concat(FinalSourceRows).Any(r => r is null || r.Sources is null
                 || r.Sources.Any(s => s is null || !s.IsValid) || r.SelectionKey is null || r.OrderKey is null || r.Description is null))
@@ -871,6 +876,15 @@ public sealed class LegendSettings
         if (ManualEntries.Any(e => e is null) || BlankEntries.Any(e => e is null)
             || CustomStatuses.Any(e => e is null) || CustomLayerRules.Any(e => e is null))
             throw new JsonException("Een profiel bevat een lege regel.");
+        foreach (var manual in ManualEntries)
+        {
+            manual.LinkedSources ??= new(); manual.ComparisonKey ??= "";
+            if (!Enum.IsDefined(manual.ExampleMode) || manual.LinkedSources.Any(s => s is null || !s.IsValid)
+                || manual.Link is { } link && (link.DrawingId is null || link.ObjectHandle is null || link.ObjectHandle.Length == 0
+                    || link.ContainerHandles is null || link.ContainerHandles.Any(h => string.IsNullOrWhiteSpace(h))
+                    || link.Component is null || link.ProfileViewHandle is null || link.MapViewportHandle is null || link.Label is null))
+                throw new JsonException("Een eigen regel bevat een ongeldige bronkoppeling.");
+        }
         foreach (var status in CustomStatuses)
             status.Members ??= new List<string>();
         return this;

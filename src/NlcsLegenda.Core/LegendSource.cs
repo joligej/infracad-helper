@@ -29,14 +29,16 @@ public sealed class RowChoice
     public List<LegendSource> Sources { get; set; } = new();
     public ChoiceScope Scope { get; set; }
     public string? Description { get; set; }
+    public string? ComparisonKey { get; set; }
     public bool? Excluded { get; set; }
     public string? Example { get; set; }
+    public ExampleMode? Mode { get; set; }
     public bool AutomaticExample { get; set; }
     public string SavedRowId { get; set; } = "";
     public double ExampleScale { get; set; } = 1000;
     public string PreviousRowId { get; set; } = "";
     public RowChoice Clone() => new() { Sources = new(Sources), Scope = Scope,
-        Description = Description, Excluded = Excluded, Example = Example, AutomaticExample = AutomaticExample, SavedRowId = SavedRowId,
+        Description = Description, ComparisonKey = ComparisonKey, Excluded = Excluded, Mode = Mode, Example = Example, AutomaticExample = AutomaticExample, SavedRowId = SavedRowId,
         ExampleScale = ExampleScale, PreviousRowId = PreviousRowId };
     public bool Matches(LegendEntry entry) => (SavedRowId.Length > 0 && entry.Element == "BEWAARD_" + SavedRowId)
         || entry.Sources.Any(Matches);

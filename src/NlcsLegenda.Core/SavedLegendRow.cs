@@ -12,16 +12,24 @@ public sealed class SavedLegendRow
     public List<string> ExclusionKeys { get; set; } = new();
     public List<LegendSource> Sources { get; set; } = new();
     public string Appearance { get; set; } = "";
+    public string ComparisonKey { get; set; } = "";
+    public string SourceAppearance { get; set; } = "";
+    public List<ExampleDisplay> SourceDisplay { get; set; } = new();
+    public List<ExampleDisplay> ExampleDisplay { get; set; } = new();
+    public ExampleMode ExampleMode { get; set; } = ExampleMode.FollowSource;
     public bool Manual { get; set; }
     public SavedLegendRow Clone() => new() { Id = Id, Description = Description, Status = Status,
         CustomStatusName = CustomStatusName, SampleBlock = SampleBlock, Scale = Scale, OrderKey = OrderKey,
-        ExclusionKeys = new(ExclusionKeys), Sources = new(Sources), Appearance = Appearance, Manual = Manual };
+        ExclusionKeys = new(ExclusionKeys), Sources = new(Sources), Appearance = Appearance, Manual = Manual, ComparisonKey = ComparisonKey, SourceAppearance = SourceAppearance,
+        SourceDisplay = new(SourceDisplay), ExampleDisplay = new(ExampleDisplay), ExampleMode = ExampleMode };
 
     public LegendEntry RetainedEntry() => new()
     {
         Status = Status, CustomStatusName = CustomStatusName, Discipline = "XX", Hoofdgroep = "HM",
         Element = "BEWAARD_" + Id, Description = Description, DescriptionSource = DescriptionSource.Handmatig,
         SampleBlock = SampleBlock, SampleScale = Scale, Sources = Sources, Retained = true,
+        ComparisonKey = ComparisonKey, ApprovedRowId = Id, ExampleMode = ExampleMode, SourceAppearance = SourceAppearance,
+        SourceDisplay = SourceDisplay, ExampleDisplay = ExampleDisplay,
         SourceEntryKeys = ExclusionKeys, SourceNotice = "Bron ontbreekt of staat uit; vorig voorbeeld bewaard.",
         LayersByType = new() { [NlcsDrawType.Symbool] = "0" }, SymbolBlockName = SampleBlock,
         RenderIdentity = Appearance, AppearanceLabel = "bewaard voorbeeld"

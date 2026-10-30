@@ -31,14 +31,15 @@ Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitle
 | --- | --- |
 | Kaartgebied | Broncontrole met redenen voor ontbrekende regels; gekozen viewports, ook over meerdere layouts |
 | Inhoud | Regels en kleurvarianten kiezen, door lagen zoeken, objecten aanklikken om uit te sluiten |
-| Bijwerken | Wijzigingen vooraf bekijken; eigen regels, bronkeuzes en uitsluitingen bewaren bij gewijzigde weergave |
+| Bijwerken | Goedgekeurde samenstelling vastzetten; nieuwe onderdelen als voorstel, voorbeelden actueel; eigen regels en uitsluitingen behouden |
 | Volgorde en teksten | Gedeelde projectomschrijvingen, leesbare beheerdersnamen, handmatig ordenen, samenvoegen met een hoofdobject, eigen omschrijvingen en statussen |
 | Opmaak | Schaal, maten, kolommen, notities, hoeveelheden, schaalbalk en passende symbolen |
-| Voorbeelden | Bronweergave of een volledig voorbeeld uit een DWG-bibliotheek |
+| Voorbeelden | Bronobjecten en Civil 3D-profielcomponenten koppelen, vastzetten of bronweergave volgen; afwijkingen per regel bekijken |
+| Bladcontrole | Omschrijvingen en weergaven vergelijken, met bewaarde uitzonderingen |
 | Xrefs | Bronnen en lagen doorzoeken en kiezen, ook bij geneste of alleen-lezen bronnen |
 | Samenvoegen | Eigen keuzes per voorbeeldtype; diameters, materialen en andere eigenschappen; optioneel lijnschalen en arceerschalen/-hoeken |
 | KLIC | Netbeheerders en objectgegevens lezen, afzonderlijke samenvoegkeuzes en alle bronwaarden bekijken |
-| Uitvoer | Een gekoppelde viewport die de legenda-schaal volgt, CSV/JSON of een uittrekstaat van een map |
+| Uitvoer | Verplaatsen tussen model en layout met behoud van papiermaten; gekoppelde viewport, CSV/JSON en uittrekstaten |
 
 Elke legenda bewaart haar eigen bron en instellingen in de DWG. **Toepassen**
 werkt de gekozen legenda meteen bij; **Opslaan** past wijzigingen toe en sluit het

@@ -449,6 +449,8 @@ public partial class Commands
                 bool found;
                 if (target is not null)
                 {
+                    if (LegendViewport.IsPaperSpace(db, trExt, target))
+                    { ed.WriteMessage("\nDeze legenda staat al op papier en heeft geen legendavenster nodig."); return; }
                     found = LegendManagement.TryGetGroupExtents(db, trExt, target.GroupName, out var ext);
                     min = found ? ext.MinPoint : Point3d.Origin;
                     max = found ? ext.MaxPoint : Point3d.Origin;

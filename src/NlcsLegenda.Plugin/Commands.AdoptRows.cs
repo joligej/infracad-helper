@@ -22,10 +22,12 @@ public partial class Commands
         var working = definition.Clone();
         var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
         var selected = working.Scope == LegendScope.Selection && working.Settings.SourceViewportHandles.Count == 0 ? LegendManagement.ResolveHandles(db, working.SourceHandles, out _) : null;
-        var analysis = DrawingAnalyzer.Analyze(db, tr, working.Settings, selected, DescriptionCatalog.Default(), excluded);
+        var analysis = DrawingAnalyzer.Analyze(db, tr, working.Settings, selected, DescriptionCatalog.Default(), excluded, trackSuppressedContents: working.Settings.RetainMissingRows);
         LegendRowSamples.Seed(db, tr, working, analysis);
+        analysis = ManagedLegendExamples.Prepare(db, tr, working, analysis);
         analysis = LegendRowSamples.Retain(analysis, working);
-        return LegendUpdatePlan.Compare(working.Rows, analysis.Entries).Concat(analysis.Coverage).ToArray();
+        var composition = LegendComposition.Apply(working, analysis.Entries);
+        return LegendUpdatePlan.Compare(working.Rows, composition.Entries).Concat(composition.Notices).Concat(analysis.Coverage).ToArray();
     }
 
     [CommandMethod("NLCSLEGENDAOVERNEMEN", CommandFlags.Modal)]
@@ -81,7 +83,7 @@ public partial class Commands
             throw new InvalidOperationException("Kies omschrijving en voorbeeld in dezelfde model- of papierruimte.");
         var settings = new LegendSettings { IncludeTitle = false, IncludeGroupHeaders = false, IncludeFooter = false,
             IncludeRemarks = false, IncludeScaleBar = false, FitExistingWindow = true, Columns = 1 };
-        if (!((Layout)tr.GetObject(owner.LayoutId, OpenMode.ForRead)).ModelType) settings.Scale = 1000;
+
         var definition = new LegendDefinition { Name = registry.NextDefaultName(), Scope = LegendScope.Selection,
             GroupName = LegendRegistry.NewGroupName(), Settings = settings, SpaceHandle = owner.Handle.ToString() };
         LegendManagement.AddToGroup(db, tr, definition.GroupName, sample.Append(description));
@@ -94,7 +96,7 @@ public partial class Commands
     {
         var block = LegendRowSamples.Capture(db, tr, sample);
         var manual = new ManualEntry { Id = Guid.NewGuid().ToString("N"), Layer = "0", Type = NlcsDrawType.Symbool,
-            Description = description, Status = status, SymbolBlock = block, SampleBlock = block, SampleScale = definition.Settings.Scale };
+            Description = description, Status = status, SymbolBlock = block, SampleBlock = block, SampleScale = LegendViewport.IsPaperSpace(db, tr, definition) ? 1000 : definition.Settings.Scale };
         definition.Settings.ManualEntries.Add(manual);
         return manual;
     }

@@ -5,7 +5,7 @@ namespace NlcsLegenda.Core;
 
 public sealed class LegendRegistry
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     [JsonRequired]
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
@@ -14,7 +14,7 @@ public sealed class LegendRegistry
     public List<LegendDefinition> Legends { get; set; } = new();
 
     [JsonIgnore]
-    public bool IsSupported => SchemaVersion == CurrentSchemaVersion;
+    public bool IsSupported => SchemaVersion is 2 or CurrentSchemaVersion;
 
     public LegendDefinition? FindById(string? id) =>
         string.IsNullOrEmpty(id) ? null : Legends.FirstOrDefault(l => l.Id == id);
@@ -63,14 +63,19 @@ public sealed class LegendRegistry
                 throw new JsonException("De begrenzing van de overgenomen legenda is ongeldig.");
             if (l.GroupName is null || l.SourceHandles is null || l.Settings is null || !Enum.IsDefined(l.Scope))
                 throw new JsonException("De opgeslagen bronselectie, groep of instellingen zijn ongeldig.");
-            l.Rows ??= new();
-            if (l.Rows.Any(r => r is null || r.Sources is null || r.Sources.Any(s => s is null || !s.IsValid) || r.ExclusionKeys is null
+            l.Rows ??= new(); l.ApprovedRows ??= new(); l.ComparisonExceptions ??= new();
+            if (l.ComparisonExceptions.Any(e => e is null || e.Key is null || e.Fingerprint is null))
+                throw new JsonException("Een bladvergelijking bevat ongeldige uitzonderingen.");
+            if (l.Rows.Concat(l.ApprovedRows).Any(r => r is null || r.Sources is null || r.Sources.Any(s => s is null || !s.IsValid) || r.ExclusionKeys is null
                 || string.IsNullOrWhiteSpace(r.Id) || r.OrderKey is null || r.Appearance is null || !Enum.IsDefined(r.Status)
+                || r.ComparisonKey is null || r.SourceAppearance is null || r.SourceDisplay is null || r.ExampleDisplay is null || !Enum.IsDefined(r.ExampleMode)
+                || r.SourceDisplay.Concat(r.ExampleDisplay).Any(d => d is null || d.Color is null || d.Linetype is null)
                 || r.Description is null || r.SampleBlock is null || r.ExclusionKeys.Any(k => k is null)
                 || !double.IsFinite(r.Scale) || r.Scale <= 0))
                 throw new JsonException("De bewaarde legendaregels zijn ongeldig.");
             l.Settings.Normalize();
         }
+        SchemaVersion = CurrentSchemaVersion;
     }
 
     // ongeldige metadata behouden, geen vervanging door standaardwaarden

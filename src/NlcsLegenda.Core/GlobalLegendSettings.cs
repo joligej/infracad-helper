@@ -55,6 +55,7 @@ public static class GlobalLegendSettings
     {
         var stored = settings.Clone();
         stored.SourceViewportHandles.Clear();
+        stored.ManualEntries.RemoveAll(m => m.Link is not null);
         stored.SourceRows.Clear(); stored.FinalSourceRows.Clear();
         stored.RowChoices.RemoveAll(c => c.Scope == ChoiceScope.Variant);
         var descriptions = stored.DescriptionOverrides;

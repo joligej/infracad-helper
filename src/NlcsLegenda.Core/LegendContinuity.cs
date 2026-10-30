@@ -76,6 +76,8 @@ public static class LegendContinuity
             foreach (var choice in choices)
             {
                 if (choice.Description is { Length: > 0 }) entry.Description = choice.Description;
+                if (choice.ComparisonKey is not null) entry.ComparisonKey = choice.ComparisonKey;
+                if (choice.Mode.HasValue) entry.ExampleMode = choice.Mode.Value;
                 if (choice.AutomaticExample) settings.ExampleOverrides.Remove(LegendOrder.Key(entry));
                 else if (choice.Example is not null) settings.ExampleOverrides[LegendOrder.Key(entry)] = choice.Example;
             }
@@ -107,6 +109,7 @@ public static class LegendContinuity
         if (example is not null || automaticExample)
         {
             choice.Example = example; choice.AutomaticExample = automaticExample;
+            choice.Mode = automaticExample ? ExampleMode.FollowSource : ExampleMode.Fixed;
         }
         return choice;
     }

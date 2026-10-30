@@ -35,7 +35,8 @@ public partial class Commands
                 if (error is null) { doc.Editor.Regen(); AcApp.UpdateScreen(); }
                 return error;
             }, item => AnalyzeOverview(doc.Database, item), path =>
-            { using var tr = doc.Database.TransactionManager.StartTransaction(); using var library = new ExampleLibrary(path, doc.Database, tr); return library.Examples; }, (form, item, entry) => ShowRowPreview(doc, form, item, entry));
+            { using var tr = doc.Database.TransactionManager.StartTransaction(); using var library = new ExampleLibrary(path, doc.Database, tr); return library.Examples; }, (form, item, entry) => ShowRowPreview(doc, form, item, entry), item => OverviewSourceCandidates(doc.Database, item),
+                (item, manual, source) => LinkOverviewSource(doc.Database, item, manual, source));
             AcWindows.ShowModalDialog(dialog);
         }
         catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex)) { doc.Editor.WriteMessage($"\nOverzicht kon niet worden geopend: {ex.Message}"); }
@@ -79,6 +80,25 @@ public partial class Commands
         }
     }
 
+    private static void LinkOverviewSource(Database db, OverviewLegend item, ManualEntry manual, LegendEntry source)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var link = LinkedLegendExamples.Find(db, tr, source.Sources);
+        if (item.Settings.UseViewportAppearance && item.Settings.SourceViewportHandles.Count == 1)
+            link.MapViewportHandle = item.Settings.SourceViewportHandles[0];
+        LinkedLegendExamples.Resolve(db, tr, link);
+        manual.Link = link; manual.LinkedSources = source.Sources.ToList();
+    }
+
+    private static IReadOnlyList<LegendEntry> OverviewSourceCandidates(Database db, OverviewLegend item)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var registry = LegendStore.Load(db, tr);
+        var settings = item.Settings.Clone(); settings.ManualEntries.Clear(); settings.BlankEntries.Clear(); settings.SetAllXrefs(true);
+        var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
+        return DrawingAnalyzer.Analyze(db, tr, settings, excludedIds: excluded).Entries;
+    }
+
     private static IReadOnlyList<LegendEntry> AnalyzeOverview(Database db, OverviewLegend item)
     {
         using var tr = db.TransactionManager.StartTransaction();
@@ -88,7 +108,7 @@ public partial class Commands
         if (item.Id.Length > 0 && definition is null) throw new InvalidOperationException("Deze legenda is niet meer aanwezig.");
         var selected = definition?.Scope == LegendScope.Selection && item.Settings.SourceViewportHandles.Count == 0
             ? LegendManagement.ResolveHandles(db, definition.SourceHandles, out _).Where(id => !excluded.Contains(id)).ToArray() : null;
-        var result = DrawingAnalyzer.Analyze(db, tr, item.Settings, selected, DescriptionCatalog.Default(), excluded);
+        var result = DrawingAnalyzer.Analyze(db, tr, item.Settings, selected, DescriptionCatalog.Default(), excluded, trackSuppressedContents: definition is not null && item.Settings.RetainMissingRows);
         if (definition is not null)
         {
             definition.Settings = item.Settings;
@@ -98,7 +118,12 @@ public partial class Commands
                 LegendStore.Save(db, tr, registry);
                 tr.Commit();
             }
-            definition.Settings = item.Settings; result = LegendRowSamples.Retain(result, definition);
+            definition.Settings = item.Settings;
+            result = ManagedLegendExamples.Prepare(db, tr, definition, result);
+            result = LegendRowSamples.Retain(result, definition);
+            item.SourceCandidates = result.Entries;
+            var composition = LegendComposition.Apply(definition, result.Entries);
+            result = result.WithEntries(composition.Entries);
         }
         return result.Entries;
     }

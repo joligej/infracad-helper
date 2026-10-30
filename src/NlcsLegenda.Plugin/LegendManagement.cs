@@ -23,7 +23,8 @@ internal static class LegendManagement
     {
         var removed = new List<string>();
         var groups = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
-        foreach (var definition in registry.Legends.Where(d => d.Id != keepId && d.Rows.Count == 0
+        var stored = LegendStore.Load(db, tr).Legends.Select(d => d.Id).ToHashSet();
+        foreach (var definition in registry.Legends.Where(d => stored.Contains(d.Id) && d.Id != keepId && d.Rows.Count == 0 && d.ApprovedRows.Count == 0
             && d.Settings.ManualEntries.Count == 0 && d.Settings.BlankEntries.Count == 0
             && !LegendViewport.Linked(db, tr, d.Id).Any()).ToArray())
         {

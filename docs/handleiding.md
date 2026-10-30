@@ -23,6 +23,76 @@ in dezelfde bewerking opnieuw opgebouwd), neem je de instellingen over van een a
 legenda, dupliceer je een legenda, wijzig je de bronselectie of zet je de opmaak van die
 legenda als globale standaard voor nieuwe legenda's.
 
+### Goedgekeurde samenstelling en gekoppelde voorbeelden
+
+Gebruik versie 1.40 of hoger op alle werkplekken die deze nieuwe keuzes bewerken.
+Oudere legenda's worden bij opslaan omgezet; oudere plug-ins kunnen de nieuwe
+legenda-opslag niet bewerken, zodat vastgezette regels en bronkoppelingen beschermd blijven.
+
+**Samenstelling vastzetten** (`NLCSLEGENDAVASTZETTEN`) bewaart de bestaande regels als
+vaste lijst. Bijwerken houdt hun bronweergave actueel, maar voegt nieuwe onderdelen
+alleen toe na goedkeuring in dit venster. Eigen regels die je zelf toevoegt zijn al
+een bewuste keuze. Uitsluitingen en niet-plottende of verborgen bronlagen houden
+voorrang. Uitzetten hervat het automatisch bepalen van de samenstelling; **Resetten**
+wist de vaste samenstelling en begint met de globale standaard.
+
+Bij een niet eenduidige splitsing blijft het vorige voorbeeld staan. Kies eerst in
+**Overzicht → Bron koppelen** welk bronvoorbeeld die regel moet volgen. Keur daarna
+gewenste extra regels goed. Zo worden oude en nieuwe varianten niet ongemerkt dubbel
+opgenomen.
+
+![Een vaste samenstelling met nieuwe voorstellen](vaste-samenstelling.png)
+
+**Gekoppeld voorbeeld** (`NLCSLEGENDAVOORBEELDKOPPELEN`) laat je een bronobject
+rechtstreeks aanwijzen, ook binnen een xref. Kies een nieuwe eigen regel of koppel
+een bestaande eigen regel. De bestaande plaats, identiteit en uitsluitingen blijven
+bewaard. Het bronobject blijft staan en wordt niet gewijzigd.
+
+- **Bron volgen:** het voorbeeld wordt bij bijwerken opnieuw uit de gekoppelde bron
+  opgebouwd. De actuele kleur, het lijntype, de lijndikte en transparantie tellen mee.
+- **Voorbeeld vastzetten:** de huidige afbeelding blijft bewaard. Overzicht meldt
+  verschillen met de gekoppelde bron per regel; een melding verandert het voorbeeld niet.
+- **Laagweergave:** standaard de globale laagweergave van het kader, inclusief
+  aangepaste xref- en KLIC-kleuren. Kies expliciet een kaartvenster om diens
+  laagafwijkingen te gebruiken. Dit kiest de weergave van het voorbeeld; het verandert
+  niet de bronselectie van de hele legenda.
+
+Ook via **Overzicht → Regel aanpassen** kun je de bronmodus wijzigen. Een oude eigen
+regel zonder bronkoppeling blijft een eigen voorbeeld. De plug-in leidt geen bron af
+uit alleen de omschrijving: koppel die eenmaal zelf. Een legenda met uitsluitend
+zulke regels krijgt geen onterechte melding dat er geen bronobjecten meer zijn.
+
+Voor Civil 3D kies je bij het aanklikken van een profielonderdeel het profielvenster
+en de zichtbare stijlcomponent: maaiveldlijn, rioolhartlijn, wanden, put of putarcering.
+Stijloverschrijvingen in het profielvenster gaan vóór de basisstijl. Lijnen en wanden
+worden schematisch weergegeven met hun echte stijl; putvormen komen uit het
+profielonderdeel. Neem overige getekende markeringen, zoals een rode overlap bij een
+kruising, als afzonderlijk gekoppeld bronobject op. De koppeling bewaart de gekozen
+Civil 3D-component; er wordt geen riooltype afgeleid uit alleen zijn kleur.
+
+![Een bronvoorbeeld met een eigen omschrijving koppelen](gekoppeld-voorbeeld.png)
+
+### Verplaatsen en bladen vergelijken
+
+**Naar model of layout** (`NLCSLEGENDAVERPLAATSEN`) plaatst de gekozen legenda in de
+huidige modelruimte of papierlayout. Schakel eerst naar het gewenste tabblad; verlaat
+een actief kaartvenster met `PSPACE`. Kies de legenda en haar nieuwe linkerbovenpunt.
+Papiermaten, inhoud, volgorde en instellingen blijven behouden. Een eigen gekoppeld
+legendavenster wordt verwijderd wanneer de legenda rechtstreeks naar papier gaat.
+De bronkaartvensters blijven staan. In papierruimte vermeldt de voettekst
+**Voorbeelden schematisch**; de kaart- en schaalbalkschaal blijft apart bewaard.
+
+**Bladen vergelijken** (`NLCSLEGENDAVERGELIJKEN`) leest de legenda's in andere gekozen
+DWG's zonder die bestanden te wijzigen. De controle vergelijkt dezelfde bronlaag,
+objectsoort, symboolsoort en status. Voor eigen regels of verschillend benoemde bronnen
+kun je een gedeelde **Onderdeelnaam voor vergelijking tussen bladen** invullen via
+Regel aanpassen of Gekoppeld voorbeeld. Verschillende statussen blijven afzonderlijk.
+
+De lijst toont afwijkende omschrijvingen en weergaven. Vink een bewuste uitzondering
+aan en sla de keuze op. Die keuze blijft in de huidige tekening bewaard en wordt
+opnieuw gevraagd zodra de betrokken tekst of weergave verandert. Regels zonder
+bronkoppeling of gedeelde onderdeelnaam worden als niet vergeleken gemeld.
+
 ### Bijwerken en viewport
 
 Is het ontwerp veranderd, dan tekent `NLCSLEGENDAUPDATE` de legenda opnieuw op precies
@@ -205,9 +275,9 @@ dan geen extra regels en worden niet in het voorbeeld getekend. Puttypen en stat
 blijven behouden. Tekst die als gewone geometrie in een blok is getekend, wordt niet
 blind verwijderd; neem daarvoor een schoon eigen voorbeeld over en koppel dat.
 
-Als een bron ontbreekt, ontladen is of uitstaat, blijft de oude regel standaard staan
+Als een bron ontbreekt of ontladen is, blijft de oude regel standaard staan
 met **(bron ontbreekt of uitgeschakeld)**. Er wordt geen actuele hoeveelheid verzonnen.
-Bewuste uitsluitingen krijgen voorrang. Zet **Vorige regels bewaren** uit om deze
+Bewuste uitsluitingen en verborgen of niet-plottende bronlagen krijgen voorrang. Zet **Vorige regels bewaren** uit om deze
 terugval niet te gebruiken. Als oude regels niet eenduidig gekoppeld kunnen worden,
 kiest de plug-in geen willekeurige bron.
 
