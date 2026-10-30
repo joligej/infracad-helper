@@ -133,11 +133,11 @@ internal static class LegendRowSamples
         if (!legend.Settings.RetainMissingRows || legend.Rows.Count == 0) return analysis;
         var entries = analysis.Entries.ToList();
         foreach (var row in legend.Rows.Concat(legend.CompositionLocked ? legend.ApprovedRows : Enumerable.Empty<SavedLegendRow>()).DistinctBy(r => r.Id).Where(r => !r.Manual && r.SampleBlock.Length > 0 && legend.Settings.IncludedStatuses.Contains(r.Status))
-            .Where(r => !entries.Any(e => LegendContinuity.Related(r.Sources, e.Sources) || r.OrderKey == LegendOrder.Key(e))))
-        {
-            if (row.Sources.Count > 0 && row.Sources.All(source => analysis.SuppressedSourceIds.Contains(source.Id)
+            .Where(r => !entries.Any(e => LegendContinuity.Related(r.Sources, e.Sources) || r.OrderKey == LegendOrder.Key(e)))
+            .Where(r => r.Sources.Count == 0 || !r.Sources.All(source => analysis.SuppressedSourceIds.Contains(source.Id)
                 || !legend.Settings.IsDrawTypeIncluded(source.Type)
-                || source.Layer.Contains('|') && !legend.Settings.IsXrefIncluded(source.Layer[..source.Layer.LastIndexOf('|')]))) continue;
+                || source.Layer.Contains('|') && !legend.Settings.IsXrefIncluded(source.Layer[..source.Layer.LastIndexOf('|')]))))
+        {
             var retained = row.RetainedEntry();
             LegendContinuity.ApplyChoices(legend.Settings, new() { retained });
             if (retained.SourceExcluded ?? row.ExclusionKeys.Any(legend.Settings.IsEntryExcluded)) continue;
