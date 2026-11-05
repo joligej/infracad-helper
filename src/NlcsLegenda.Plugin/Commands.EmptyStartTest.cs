@@ -96,10 +96,17 @@ public partial class Commands
     [CommandMethod("NLCSLEGENDAEMPTYGUISEED", CommandFlags.Modal)]
     public void SeedEmptyGui()
     {
-        var db = AcApp.DocumentManager.MdiActiveDocument.Database;
-        using var tr = db.TransactionManager.StartTransaction();
-        using var line = new Line(Point3d.Origin, new(10, 0, 0)) { LayerId = ReviewLayer(db, tr, "N-WE-KL-WATER-G", 3) };
-        ReviewAppend(ReviewModel(db, tr), tr, line); tr.Commit();
+        var doc = AcApp.DocumentManager.MdiActiveDocument;
+        DiagnosticRun.Execute(() =>
+        {
+            var db = doc.Database;
+            using var tr = db.TransactionManager.StartTransaction();
+            const string name = "N-WE-KL-WATER-G";
+            var layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+            var layer = layers.Has(name) ? layers[name] : ReviewLayer(db, tr, name, 3);
+            using var line = new Line(Point3d.Origin, new(10, 0, 0)) { LayerId = layer };
+            ReviewAppend(ReviewModel(db, tr), tr, line); tr.Commit();
+        }, message => doc.Editor.WriteMessage(message), "EmptyGuiSeed");
     }
 
     [CommandMethod("NLCSLEGENDAEMPTYGUIVERIFY", CommandFlags.Modal)]
@@ -154,7 +161,7 @@ public partial class Commands
             catch (InvalidOperationException) { rejected = true; }
             var saved = (Viewport)tr.GetObject(enabledId, OpenMode.ForRead);
             if (!rejected || layoutBefore != LayoutManager.Current.CurrentLayout || tileBefore != db.TileMode
-                || saved.CustomScale != 2 || saved.CenterPoint != new Point3d(100, 100, 0) || !saved.Locked)
+                || Math.Abs(saved.CustomScale - 2) > 1e-10 || saved.CenterPoint != new Point3d(100, 100, 0) || !saved.Locked)
                 throw new InvalidOperationException("Uitgeschakeld venster geaccepteerd of bronweergave gewijzigd.");
             tr.Commit();
             doc.Editor.WriteMessage("\nSOURCEVIEW inactieve layouts, bewuste uit-stand en bronweergave behouden -> OK");

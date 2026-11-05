@@ -12,10 +12,10 @@ internal static class SourceViewportCatalog
         foreach (var layout in layouts)
         {
             using var ids = layout.GetViewports();
-            var paper = ids.Count > 0 ? ids[0] : ObjectId.Null;
-            var views = ((BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForRead)).Cast<ObjectId>()
-                .Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Viewport>()
-                .Where(v => v.ObjectId != paper && v.Number != 1 && LegendViewport.Read(v, tr) is null)
+            var all = ((BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForRead)).Cast<ObjectId>()
+                .Select(id => tr.GetObject(id, OpenMode.ForRead)).OfType<Viewport>().ToArray();
+            var paper = ids.Count > 0 ? ids[0] : all.FirstOrDefault()?.ObjectId ?? ObjectId.Null;
+            var views = all.Where(v => v.ObjectId != paper && v.Number != 1 && LegendViewport.Read(v, tr) is null)
                 .OrderByDescending(v => v.CenterPoint.Y).ThenBy(v => v.CenterPoint.X).ToArray();
             for (int i = 0; i < views.Length; i++)
             {

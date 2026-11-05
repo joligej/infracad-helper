@@ -23,7 +23,7 @@ internal sealed class SourceViewportDialog : LegendDialog
     private readonly Label _notice = new() { AutoSize = true, Dock = DockStyle.Top, Padding = new Padding(8) };
     private readonly Panel _preview = new() { Dock = DockStyle.Bottom, Height = 180, BackColor = SystemColors.Window };
     private readonly ButtonBar _buttons = new(false);
-    private bool _loading = true;
+    private readonly bool _loading = true;
 
     public List<string> SelectedHandles => _whole.Checked ? new() : CheckedRows().Select(v => v.Handle).ToList();
 
