@@ -246,6 +246,12 @@ public static class LegendBuilder
             tr.AddNewlyCreatedDBObject(border, true);
         }
 
+        if (!btr.Cast<ObjectId>().Any())
+        {
+            const string emptyLayer = "X-XX-AL-LEGENDA-LEEG-G";
+            EnsureLayer(tr, db, emptyLayer, 8, plottable: false);
+            AddText(btr, tr, "Lege legenda", new Point3d(0, -textH, 0), textH, emptyLayer, styleId);
+        }
         ValidateHostLinetypeReferences(db, tr, btrId);
         return btrId;
     }

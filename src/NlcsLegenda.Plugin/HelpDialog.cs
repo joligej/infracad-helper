@@ -15,6 +15,16 @@ internal sealed class HelpDialog : LegendDialog
             "Klik op Genereren.\n\n" +
             "Kies de hele tekening of een selectie, en zet de legenda op een plek naast de\n" +
             "tekening. De legenda komt op de eigen NLCS-lagen, dus kleur en lijntype kloppen."),
+        ("Leeg of blanco beginnen",
+            "Zonder gevonden regels kun je de legenda toch plaatsen. Kies daarna xrefs onder\n" +
+            "Lokale instellingen → Bronnen en inhoud, of voeg eigen regels toe via Samenstellen.\n\n" +
+            "Blanco begint bewust zonder bronregels. Automatische regels blijven voorstellen\n" +
+            "tot je ze goedkeurt via Samenstelling vastzetten of de samenstelling vrijgeeft."),
+        ("Kaartvensters kiezen",
+            "Kies bronvensters van alle layouts uit één lijst, ook vanuit modelruimte.\n" +
+            "Zoek op bladnaam en vergelijk schaal, papiermaat en schematische positie.\n\n" +
+            "Laat overzichtskaartjes en legendavensters buiten de keuze. Verschillende\n" +
+            "kaartschalen veranderen de ingestelde legendaschaal niet."),
         ("Bijwerken",
             "Is het ontwerp veranderd? Klik op Bijwerken. Eerst zie je wat er verandert.\n\n" +
             "De legenda wordt opnieuw getekend op dezelfde plek. Wijzig de tekst via de\n" +

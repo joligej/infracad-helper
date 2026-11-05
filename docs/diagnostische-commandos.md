@@ -45,6 +45,8 @@ maken objecten, legenda's en tijdelijke xrefs aan.
 | `NLCSLEGENDAEIGENHATCHTEST` | Koppelt een echte arcering en een echt blok op eigen lagen en controleert dat de gebouwde legenda echt een Hatch-entiteit en een symboolinvoeging bevat. |
 | `NLCSLEGENDAEIGENBATCHTEST` | Draait de batch op twee tijdelijke DWG's (met/zonder eigen laag) en controleert dat alleen de juiste een eigen regel geeft en de bron-DWG's qua hash onveranderd blijven. |
 | `NLCSLEGENDAEIGENUPDATETEST` | Werkt een eigen-bronlegenda 10 en 50 keer bij en controleert dat rijtal, hoeveelheden en het aantal beheerde blokken stabiel blijven (geen zelfvoeding). |
+| `NLCSLEGENDAEMPTYSTARTTEST` / `NLCSLEGENDAEMPTYSTARTVERIFY` | Lege start, bronnen later inschakelen, blanco voorstellen en bereikbaarheid na heropenen. |
+| `NLCSLEGENDASOURCEVIEWTEST` | Inactieve layouts, bewust uitgezette bronvensters en behoud van de kaartweergave. |
 | `NLCSLEGENDABLANCOTEST` | Controleert dat blanco regels als echte rijen worden gebouwd (leeg vakje, tekst "[blanco]"), de legenda hoger maken en geen renderissue geven. |
 | `NLCSLEGENDAMTEXTTEST` | Controleert dat een complete legenda (alle tekstcategorieën) geen DBText maar alleen MText bevat, zowel behouden als geëxplodeerd, zonder verweesde tekstblokken. |
 | `NLCSLEGENDASYMBOOLTEKSTTEST` | Controleert dat tekst binnen een bronsymbool bij het overnemen MText wordt, zodat de legenda ook dan geen DBText bevat. |

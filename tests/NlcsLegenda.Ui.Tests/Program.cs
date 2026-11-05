@@ -43,6 +43,7 @@ internal static class Program
             DiagnosticRun.Execute(CheckTreeImagesDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckOwnedFontsDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckManagedChoices, Errors.Add);
+            DiagnosticRun.Execute(CheckSourceViews, Errors.Add);
             DiagnosticRun.Execute(CheckManualMerging, Errors.Add);
             DiagnosticRun.Execute(CheckKlicRefresh, Errors.Add);
             DiagnosticRun.Execute(() => CheckKlic(args.FirstOrDefault()), Errors.Add, "CheckKlic");
@@ -50,6 +51,10 @@ internal static class Program
             DiagnosticRun.Execute(() => CheckCustomizationRoundtrip(), Errors.Add, "CheckCustomizationRoundtrip");
             DiagnosticRun.Execute(() => CheckStatusReassignment(), Errors.Add, "CheckStatusReassignment");
             Func<Form>[] factories = {
+                () => new SourceViewportDialog(new[] {
+                    new SourceViewOption("A1", "0061 - details", 1, 200, 200, 300, 360, 480, "Vergrendeld"),
+                    new SourceViewOption("A2", "0061 - details", 2, 5000, 760, 130, 120, 85, "Niet vergrendeld"),
+                    new SourceViewOption("B1", "0064 - rioolkruisingen", 1, 100, 300, 280, 550, 410, "Uitgeschakeld", false) }, new[] { "A1" }),
                 () => new CompositionDialog(new LegendDefinition { Name = "Kader 0061", CompositionLocked = true }, new[] { Entry("Nieuwe leiding") }),
                 () => new LinkedExampleDialog(new LegendDefinition { Name = "Profielen" }, new[] { new CivilExampleComponent("Line", "Profielvenster IT-LP-01 · Bestaand maaiveld", "AB") }, "Riool-xref · profielstijl"),
                 () => new SheetComparisonDialog(new[] { new SheetDifference("GWA", "f", "GWA-riool", "0060: rood, streep\n0061: groen, continu", false) }),
@@ -96,8 +101,13 @@ internal static class Program
         form.ClientSize = new Size(720, 540);
         Application.DoEvents();
         CheckButtons(form);
+        if (form is SourceViewportDialog)
+        {
+            var grid = Descendants(form).OfType<DataGridView>().Single();
+            Check(grid.Height > grid.ColumnHeadersHeight + form.Font.Height * 2, "bronvensterlijst houdt ruimte voor regels op iedere schermschaal");
+        }
         Check(Descendants(form).All(c => c is not TextBox || c.Height >= c.Font.Height), form.Text + ": teksthoogte");
-        if (form is ExampleDialog or RowChoiceDialog or SourceMatchDialog or UpdatePreviewDialog or CompositionDialog or LinkedExampleDialog or SheetComparisonDialog && output is not null)
+        if (form is SourceViewportDialog or ExampleDialog or RowChoiceDialog or SourceMatchDialog or UpdatePreviewDialog or CompositionDialog or LinkedExampleDialog or SheetComparisonDialog && output is not null)
         {
             Directory.CreateDirectory(output);
             using var image = new Bitmap(form.Width, form.Height);
@@ -690,6 +700,32 @@ internal static class Program
         Check(calls.SequenceEqual(new[] { "A", "B", "B", "B" }) && b.Changed && b.Settings.SortMode == LegendSortMode.Handmatig,
             "Vernieuwen leest opnieuw en bewaart nog niet opgeslagen keuzes");
         form.Close();
+    }
+
+    private static void CheckSourceViews()
+    {
+        var views = new[] {
+            new SourceViewOption("A", "Situatie", 1, 500, 100, 100, 160, 120, "Vergrendeld"),
+            new SourceViewOption("B", "Details", 1, 100, 100, 100, 160, 120, "Niet vergrendeld"),
+            new SourceViewOption("C", "Uit", 1, 500, 100, 100, 160, 120, "Uitgeschakeld", false) };
+        using var form = new SourceViewportDialog(views, new[] { "A", "MISSING" });
+        OpenOffscreen(form);
+        var controls = Descendants(form).ToArray();
+        var grid = controls.OfType<DataGridView>().Single();
+        var ok = controls.OfType<Button>().Single(b => b.Text == "Bronkeuze gebruiken");
+        Check(!ok.Enabled && form.SelectedHandles.SequenceEqual(new[] { "A", "MISSING" }), "ontbrekend bronvenster blijft zichtbaar; geen stilzwijgende keuze");
+        grid.Rows[3].Cells[0].Value = false;
+        Check(ok.Enabled && grid.Rows[2].Cells[0].ReadOnly && grid.Rows[3].Cells[0].ReadOnly, "uitgeschakelde of ontbrekende bron niet opnieuw selecteerbaar");
+        controls.OfType<TextBox>().Single().Text = "*tail*";
+        Check(!grid.Rows[0].Visible && grid.Rows[1].Visible && form.SelectedHandles.SequenceEqual(new[] { "A" }), "zoeken op deelnaam behoudt verborgen bronkeuze");
+        grid.Rows[1].Cells[0].Value = true;
+        Check(form.SelectedHandles.SequenceEqual(new[] { "A", "B" }) && controls.OfType<Label>().Any(l => l.Text.Contains("Verschillende kaartschalen")), "meerdere bladen en verschillende kaartschalen zichtbaar");
+        controls.OfType<RadioButton>().Single(r => r.Text.StartsWith("Hele tekening")).Checked = true;
+        Check(form.SelectedHandles.Count == 0 && ok.Enabled, "hele tekening wist de bronbeperking expliciet");
+        controls.OfType<RadioButton>().Single(r => r.Text.StartsWith("Alleen")).Checked = true;
+        Check(form.SelectedHandles.SequenceEqual(new[] { "A", "B" }), "wisselen naar hele tekening behoudt vinkjes tot bevestiging");
+        grid.Rows[0].Cells[0].Value = false; grid.Rows[1].Cells[0].Value = false;
+        Check(!ok.Enabled, "lege kaartselectie vraagt expliciete keuze hele tekening");
     }
 
     private static void CheckManagedChoices()

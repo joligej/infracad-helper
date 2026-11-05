@@ -9,7 +9,7 @@ param(
     [string]$TemplatePath,
     [string]$ReferenceTemplatePath,
     [string]$OutputDirectory,
-    [string[]]$Cases=@('linkedexamples','managed','projectlegends','linetypes','continuity','mergeregression','viewportregression','xrefchoiceregression','examplerevision','exampleappearance','colorcomposition','choices','resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
+    [string[]]$Cases=@('emptystart','sourceview','linkedexamples','managed','projectlegends','linetypes','continuity','mergeregression','viewportregression','xrefchoiceregression','examplerevision','exampleappearance','colorcomposition','choices','resources','presettarget','settingregression','frameregression','hatcharearegression','templateregression','examples','sources','xrefchoices','klic','partialklic','heightlimit','drawingdefaults','exportisolation','batchxref','customization','overview','realsize','templatecontract','templatestyle','scalevariant','livetarget','liveempty','metadata','globalsettings','layermerge','composition','review','snapshot','exportreview','abclocal','abcxref','oldreopen','eigenvis','eigenbatch','properties','entitystyle','dependencies','sampleconflict','placement','render','nested','host','split','style','symbol','hatch','visibility','states','reload','custom','customxref','customany','customhatch','blank','sysvars','mtext','heights','symboltext','oldupdate','isolation','viewport','consumer','layout','paperscale','symboledge','polyownership'),
     [switch]$SkipReopen,
     [switch]$Isolated
 )
@@ -35,6 +35,8 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 $core="C:/Program Files/Autodesk/AutoCAD $AcadVersion/accoreconsole.exe"
 if(!(Test-Path -LiteralPath $core)){throw "Core Console $AcadVersion niet geïnstalleerd."}
 $specs=@{
+ emptystart=@('NLCSLEGENDAEMPTYSTARTTEST','EMPTYSTART lege start, xrefs aan/uit, blanco voorstellen en eigen regels -> OK','NLCSLEGENDAEMPTYSTARTVERIFY','EMPTYSTARTVERIFY lege legenda bereikbaar en bijwerkbaar na heropenen -> OK')
+ sourceview=@('NLCSLEGENDASOURCEVIEWTEST','SOURCEVIEW inactieve layouts, bewuste uit-stand en bronweergave behouden -> OK')
  linkedexamples=@('NLCSLEGENDALINKEDXREFTEST','LINKEDXREF zelfstandige lijn en arcering, actuele kaderkleuren en bronbestand behouden -> OK')
  managed=@('NLCSLEGENDAMANAGEDTEST','MANAGED vaste samenstelling, bronkleuren, niet-plotten, model/papier en gekoppelde eigen regels -> OK','NLCSLEGENDAMANAGEDVERIFY','MANAGEDVERIFY vaste keuzes en broncontrole na heropenen -> OK')
  projectlegends=@('NLCSLEGENDAPROJECTTEST','PROJECTLEGENDS kaartgebied, bronredenen, laagweergave, leeg herstel en handmatige layoutregel -> OK','NLCSLEGENDAPROJECTVERIFY','PROJECTVERIFY kaartkeuze en handmatig voorbeeld na heropenen -> OK')
