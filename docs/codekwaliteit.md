@@ -1,5 +1,19 @@
 # Codekwaliteit
 
+## Controle voor 1.41.0
+
+Kaartvensters worden gelezen zonder het actieve tabblad te wisselen. AutoCADs
+beheerde `Viewport.On` en `Number` geven op inactieve layouts geen bruikbare
+opgeslagen aan/uit-stand. Twee vaste ObjectARX-aanroepen lezen daarom uitsluitend
+DXF-groep 90 van het opgegeven object. De resultaatbuffer wordt direct vrijgegeven;
+er worden geen native gegevens geschreven. De bijbehorende CodeQL-notities over
+native aanroepen zijn beoordeeld. De proef controleert zowel bruikbare vensters op
+een inactief blad als bewust uitgezette vensters, in AutoCAD 2025 en 2027.
+
+De interne papierviewport wordt apart uitgesloten, ook als AutoCAD de actieve
+viewportlijst van een layout nog niet heeft opgebouwd. De vensterproef controleert
+dat de bronlijst bij 100–200% schermschaal ruimte houdt voor leesbare regels.
+
 ## Controle voor 1.39.0
 
 De kaartselectie ruimt tijdelijke puntverzamelingen na de snijberekening direct op.

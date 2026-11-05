@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.41.0 - 2026-11-05
+
+- Genereren plaatst ook zonder gevonden bronregels een beheerde legenda. Daarna kunnen xrefs en eigen regels via de lokale instellingen worden toegevoegd. Als alle zichtbare onderdelen uitstaan, blijft een niet-plotbare hulptekst beschikbaar om de legenda te kiezen.
+- Blanco begint bewust zonder bronregels. Eigen regels kunnen direct worden toegevoegd; automatische regels blijven voorstellen totdat de gebruiker ze goedkeurt of de samenstelling vrijgeeft.
+- Kaartvensters kiezen toont vensters van alle layouts in één doorzoekbare lijst, met schaal, papiermaat, beschikbaarheid en een schematische positie. Meerdere kaartschalen wijzigen de legendaschaal niet. De lijst werkt ook vanuit modelruimte.
+- Kaartvensters op een niet-actief tabblad worden niet meer ten onrechte als uitgeschakeld afgewezen. Bewust uitgezette vensters blijven uitgesloten; bronvensters en actieve layout veranderen niet bij het lezen.
+
 ## 1.40.0 - 2026-10-30
 
 - Samenstelling vastzetten houdt goedgekeurde regels bijeen. Nieuwe brononderdelen blijven voorstellen totdat je ze goedkeurt; gekoppelde voorbeelden blijven wel de actuele bronweergave volgen. Bij een onduidelijke splitsing blijft de vorige regel staan voor een expliciete bronkeuze.

@@ -34,7 +34,6 @@ public partial class Commands
             {
                 if (def.SourceHandles.Count > 0)
                     note = missing > 0 ? $"alle {missing} bronobjecten ontbreken" : "de gekoppelde bronselectie bevat geen bruikbare objecten";
-                if (def.Settings.ManualEntries.Count == 0 && def.Rows.Count == 0) return UpdateResult.NoEntries;
             }
             if (missing > 0)
                 note = $"{missing} bronobject(en) ontbreken";

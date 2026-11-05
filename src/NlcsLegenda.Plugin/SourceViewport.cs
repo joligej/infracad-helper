@@ -16,7 +16,7 @@ internal sealed class SourceViewport
 
     private SourceViewport(Viewport viewport, Transaction tr, bool appearance)
     {
-        if (!viewport.On) throw new InvalidOperationException("Een gekozen kaartvenster staat uit. Schakel het in of kies een ander bronvenster.");
+        if (!ViewportState.IsEnabled(viewport)) throw new InvalidOperationException("Een gekozen kaartvenster staat uit. Schakel het in of kies een ander bronvenster.");
         if (viewport.PerspectiveOn) throw new InvalidOperationException("Kies een kaartvenster zonder perspectief.");
         Id = viewport.ObjectId; Appearance = appearance;
         var toWorld = Matrix3d.Rotation(-viewport.TwistAngle, viewport.ViewDirection, viewport.ViewTarget)

@@ -1532,7 +1532,7 @@ public partial class Commands
         settings.UnitLength = "m";
         settings.QuantityDecimals = 0;
 
-        if (!PromptOptions(ed, settings, out var selection))
+        if (!PromptOptions(ed, settings, out var selection, out _))
         {
             ed.WriteMessage("\nPLACEMENT prompt: geannuleerd.");
             return;

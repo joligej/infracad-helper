@@ -55,6 +55,12 @@ internal static class DocumentationImages
         using (var form = new LinkedExampleDialog(new LegendDefinition { Name = "Profielen – demonstratie" },
             new[] { new CivilExampleComponent("Line", "Lengteprofiel · Maaiveldlijn", "AB") }, "RIOOL | profielonderdeel"))
             Capture(form, directory, "gekoppeld-voorbeeld.png", new Size(720, 570));
+        using (var form = new SourceViewportDialog(new[] {
+            new SourceViewOption("A12", "01 Situatie", 1, 500, 300, 300, 560, 480, "Vergrendeld"),
+            new SourceViewOption("A16", "01 Situatie", 2, 5000, 710, 120, 120, 85, "Vergrendeld"),
+            new SourceViewOption("B24", "02 Details", 1, 100, 210, 310, 350, 400, "Vergrendeld"),
+            new SourceViewOption("B31", "02 Details", 2, 100, 610, 310, 350, 400, "Vergrendeld") }, new[] { "A12" }))
+            Capture(form, directory, "kaartvensters.png", new Size(1000, 640));
         Console.WriteLine("Documentatiebeelden geschreven met synthetische gegevens.");
     }
 

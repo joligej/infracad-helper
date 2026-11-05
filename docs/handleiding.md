@@ -12,6 +12,19 @@ kleur en lijntype kloppen meteen. Wie liever klikt dan typt vindt
 in het lint een tab **NLCS Legenda** met dezelfde functies. Via **Help** in het lint staat
 de basisuitleg ook in AutoCAD zelf.
 
+### Leeg beginnen
+
+Ook zonder gevonden regels kun je een legenda plaatsen. Open daarna **Lokale instellingen →
+Bronnen en inhoud** om xrefs aan te zetten; **Toepassen** vult dezelfde legenda meteen aan.
+Eigen regels voeg je toe via **Samenstellen**. De gekozen opmaak en opmerkingen blijven gelden.
+Als titel, opmerkingen, kader en andere zichtbare onderdelen allemaal uitstaan, verschijnt
+alleen de hulptekst **Lege legenda** op een niet-plotbare laag. Daarmee blijft de legenda te kiezen.
+
+Kies bij `NLCSLEGENDA` de optie **Blanco** om bewust zonder bronregels te starten.
+De samenstelling staat dan vast: eigen regels zijn direct toe te voegen, automatische
+regels blijven voorstellen. Keur ze goed via **Samenstelling vastzetten**, of zet daar
+het vastzetten uit om de legenda weer automatisch te vullen.
+
 ### Meerdere legenda's
 
 Je kunt meerdere legenda's naast elkaar in één tekening hebben, bijvoorbeeld één voor de
@@ -292,10 +305,22 @@ kun je de kaarten aanwijzen die bij de legenda horen. Alleen hun zichtbare kaart
 telt mee; een overzichtskaart blijft buiten de bronkeuze als je die niet selecteert.
 Dezelfde bron met dezelfde weergave wordt bij overlappende vensters één keer geteld.
 
-**Kaartvensters** (`NLCSLEGENDABRONVENSTER`) biedt **Toevoegen**: ga naar een andere
-layout en voeg daar vensters aan dezelfde legenda toe. Zo kan één legenda meerdere
-bladen volgen. Kies **HeleTekening** om de vensterselectie te wissen. Globale standaarden
-nemen deze tekeninggebonden selectie niet over.
+**Kaartvensters** (`NLCSLEGENDABRONVENSTER`) opent standaard **Lijst**. Die toont de
+vensters van alle layouts, ook vanuit modelruimte. Zoek op een deel van de bladnaam,
+vergelijk schaal en papiermaat en bekijk de schematische positie. Zoeken verbergt regels,
+maar verwijdert hun vinkjes niet. Kies alleen de gewenste kaarten: laat overzichtskaartjes
+en vensters die een legenda tonen uitgevinkt. Gekoppelde legendavensters worden weggelaten.
+
+Een inactief tabblad blijft bruikbaar; een bewust uitgezet venster is niet te selecteren.
+Ontbrekende eerder gekozen vensters blijven zichtbaar totdat je de bronkeuze herstelt.
+Bij verschillende kaartschalen verschijnt een melding; de legendaschaal verandert niet.
+Op kleinere schermen krijgt de lijst voorrang boven de schematische afbeelding.
+
+**Toevoegen** laat je nog steeds vensters op het huidige blad aanklikken. Kies
+**HeleTekening** om de vensterbeperking te wissen. Globale standaarden nemen deze
+tekeninggebonden keuze niet over. De bronvensters worden niet gewijzigd.
+
+![Kaartvensters van meerdere tekenbladen kiezen](kaartvensters.png)
 
 Bij gekozen kaartvensters staat **Laagweergave uit de gekozen kaartvensters** standaard
 aan. Kleur, lijntype, lijndikte, transparantie en de zichtbare delen van symbolen volgen

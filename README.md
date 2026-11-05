@@ -23,6 +23,9 @@ desgewenst hoeveelheden toe, en werkt de legenda bij wanneer het ontwerp verande
 3. Kies de hele tekening of een selectie, stel de schaal in en plaats de legenda.
 4. Gebruik **Lokale instellingen** voor deze legenda en **Bijwerken** na bronwijzigingen.
 
+Nog geen brongegevens? Je kunt de lege legenda alvast plaatsen en daarna xrefs kiezen.
+Met **Blanco** begin je bewust zonder automatische regels.
+
 Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitleg.
 
 ## Wat je kunt aanpassen

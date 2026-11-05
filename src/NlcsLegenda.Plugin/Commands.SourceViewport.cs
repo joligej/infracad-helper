@@ -9,30 +9,33 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
+    private static SourceViewportDialog CreateSourceViewDialog(Database db, LegendSettings settings)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var views = SourceViewportCatalog.Read(db, tr);
+        tr.Commit();
+        return new SourceViewportDialog(views, settings.SourceViewportHandles);
+    }
+
     private static void PickSourceViews(System.Windows.Forms.Form form, LegendSettings settings)
     {
-        var doc = AcApp.DocumentManager.MdiActiveDocument;
-        using var interaction = doc.Editor.StartUserInteraction(form.Handle);
-        if (doc.Database.TileMode) { doc.Editor.WriteMessage("\nGa eerst naar een layout om kaartvensters te kiezen."); return; }
-        bool append = false;
-        if (settings.SourceViewportHandles.Count > 0)
+        var db = AcApp.DocumentManager.MdiActiveDocument.Database;
+        try
         {
-            var mode = new PromptKeywordOptions("\nBronvensters [Vervangen/Toevoegen]", "Vervangen Toevoegen") { AllowNone = true };
-            mode.Keywords.Default = "Vervangen";
-            var answer = doc.Editor.GetKeywords(mode);
-            if (answer.Status != PromptStatus.OK) return;
-            append = answer.StringResult == "Toevoegen";
+            using var dialog = CreateSourceViewDialog(db, settings);
+            if (dialog.ShowDialog(form) != System.Windows.Forms.DialogResult.OK) return;
+            var working = settings.Clone();
+            working.SourceViewportHandles = dialog.SelectedHandles;
+            using var tr = db.TransactionManager.StartTransaction();
+            SourceViewport.Read(db, tr, working);
+            tr.Commit();
+            settings.SourceViewportHandles = working.SourceViewportHandles;
         }
-        var pick = doc.Editor.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelecteer de kaartvensters (geen legenda of overzichtskaart): " },
-            new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, "VIEWPORT") }));
-        if (pick.Status != PromptStatus.OK) return;
-        using var tr = doc.Database.TransactionManager.StartTransaction();
-        var registry = LegendStore.Load(doc.Database, tr);
-        var own = registry.Legends.SelectMany(l => LegendViewport.Linked(doc.Database, tr, l.Id)).Select(v => v.ObjectId).ToHashSet();
-        var ids = pick.Value.GetObjectIds().Where(id => !own.Contains(id) && tr.GetObject(id, OpenMode.ForRead) is Viewport { Number: > 1 }).ToArray();
-        if (ids.Length != pick.Value.Count) { doc.Editor.WriteMessage("\nSelecteer alleen kaartvensters; de bronkeuze is behouden."); return; }
-        settings.SourceViewportHandles = (append ? settings.SourceViewportHandles : new List<string>())
-            .Concat(LegendManagement.ToHandles(ids)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex))
+        {
+            System.Windows.Forms.MessageBox.Show(form, ex.Message, "Bronkeuze niet gewijzigd",
+                System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
+        }
     }
 
     [CommandMethod("NLCSLEGENDABRONVENSTER", CommandFlags.Modal)]
@@ -43,12 +46,25 @@ public partial class Commands
         try
         {
             if (!ResolveMutationTarget(doc.Editor, doc.Database, out var target, pickVerb: "bronvensters kiezen voor")) return;
-            var choice = new PromptKeywordOptions("\nBrongebied [Kaartvensters/Toevoegen/HeleTekening]", "Kaartvensters Toevoegen HeleTekening") { AllowNone = true };
-            choice.Keywords.Default = "Kaartvensters";
+            var choice = new PromptKeywordOptions("\nBrongebied [Lijst/Kaartvensters/Toevoegen/HeleTekening]", "Lijst Kaartvensters Toevoegen HeleTekening") { AllowNone = true };
+            choice.Keywords.Default = "Lijst";
             var answer = doc.Editor.GetKeywords(choice);
             if (answer.Status != PromptStatus.OK) return;
             ObjectId[] selected = Array.Empty<ObjectId>();
-            if (answer.StringResult != "HeleTekening")
+            if (answer.StringResult == "Lijst")
+            {
+                LegendSettings current;
+                using (var read = doc.Database.TransactionManager.StartTransaction())
+                {
+                    current = LegendStore.Load(doc.Database, read).FindById(target.LegendId)!.Settings.Clone();
+                    read.Commit();
+                }
+                using var dialog = CreateSourceViewDialog(doc.Database, current);
+                if (AcWindows.ShowModalDialog(dialog) != System.Windows.Forms.DialogResult.OK) return;
+                selected = LegendManagement.ResolveHandles(doc.Database, dialog.SelectedHandles, out int missing);
+                if (missing > 0) throw new InvalidOperationException("Een gekozen kaartvenster ontbreekt; kies de bronnen opnieuw.");
+            }
+            else if (answer.StringResult != "HeleTekening")
             {
                 if (doc.Database.TileMode) { doc.Editor.WriteMessage("\nGa naar de layout en kies daar de kaartvensters. Laat overzichtskaart en legendavenster buiten de selectie."); return; }
                 var pick = doc.Editor.GetSelection(new PromptSelectionOptions { MessageForAdding = "\nSelecteer de kaartviewports die bij deze legenda horen: " },
@@ -59,10 +75,10 @@ public partial class Commands
             using var tr = doc.Database.TransactionManager.StartTransaction();
             var registry = LegendStore.Load(doc.Database, tr);
             var definition = registry.FindById(target.LegendId) ?? throw new InvalidOperationException("Legenda ontbreekt.");
-            var legendViews = registry.Legends.SelectMany(l => LegendViewport.Linked(doc.Database, tr, l.Id)).Select(v => v.ObjectId).ToHashSet();
+            var allowed = SourceViewportCatalog.Read(doc.Database, tr).Where(v => v.Available).Select(v => v.Handle).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var id in selected)
-                if (legendViews.Contains(id) || tr.GetObject(id, OpenMode.ForRead) is not Viewport { Number: > 1 })
-                    throw new InvalidOperationException("Kies alleen kaartvensters, geen papier- of legendavenster.");
+                if (!allowed.Contains(id.Handle.ToString()))
+                    throw new InvalidOperationException("Kies alleen beschikbare kaartvensters, geen papier- of legendavenster.");
             definition.Scope = LegendScope.WholeDrawing; definition.SourceHandles.Clear();
             definition.Settings.SourceViewportHandles = (answer.StringResult == "Toevoegen" ? definition.Settings.SourceViewportHandles : new List<string>())
                 .Concat(LegendManagement.ToHandles(selected)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();

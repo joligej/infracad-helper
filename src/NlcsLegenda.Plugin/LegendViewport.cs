@@ -43,7 +43,7 @@ internal static class LegendViewport
         }
     }
 
-    private static (string Id, bool Automatic)? Read(Viewport viewport, Transaction tr)
+    internal static (string Id, bool Automatic)? Read(Viewport viewport, Transaction tr)
     {
         if (viewport.ExtensionDictionary.IsNull) return null;
         var dictionary = (DBDictionary)tr.GetObject(viewport.ExtensionDictionary, OpenMode.ForRead);

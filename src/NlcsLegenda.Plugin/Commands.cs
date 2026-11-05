@@ -97,7 +97,7 @@ public partial class Commands
             if (settings.DescriptionOverrides.Elementen.Count == 0)
                 settings.DescriptionOverrides = LoadGlobalDescriptionDefaults();
 
-            if (!PromptOptions(ed, settings, out var selection))
+            if (!PromptOptions(ed, settings, out var selection, out bool blank))
             {
                 ed.WriteMessage("\nGeannuleerd.");
                 return;
@@ -109,14 +109,11 @@ public partial class Commands
             {
                 var registry = LegendStore.Load(db, tr);
                 var excluded = LegendManagement.CollectManagedIds(db, tr, registry);
-                ed.WriteMessage("\nBronnen lezen...");
-                var analysis = DrawingAnalyzer.Analyze(db, tr, settings, selection, DescriptionCatalog.Default(), excluded);
-                if (analysis.Entries.Count == 0)
-                {
-                    ed.WriteMessage("\nGeen NLCS-lagen gevonden om een legenda van te maken.");
-                    tr.Commit();
-                    return;
-                }
+                if (!blank) ed.WriteMessage("\nBronnen lezen...");
+                var analysis = blank ? new AnalysisResult()
+                    : DrawingAnalyzer.Analyze(db, tr, settings, selection, DescriptionCatalog.Default(), excluded);
+                if (analysis.Entries.Count == 0 && !blank)
+                    ed.WriteMessage("\nNog geen regels gevonden. De lege legenda kan worden geplaatst; kies daarna bronnen via Instellingen of voeg eigen regels toe via Samenstellen.");
                 ReportAnalysis(ed, analysis);
 
                 ed.WriteMessage($"\nLegenda tekenen ({analysis.Entries.Count} regels)...");
@@ -147,7 +144,9 @@ public partial class Commands
                     var def = PlaceLegendAtPoint(
                         tr, db, registry, settings, selection, btrId, br, jig.Position);
                     def.Rows = savedRows;
+                    if (blank) LegendComposition.Lock(def);
                     LegendStore.Save(db, tr, registry);
+                    if (blank) ed.WriteMessage("\nBlanco legenda: eigen regels kun je direct toevoegen. Automatische regels blijven voorstellen tot je ze goedkeurt via Samenstelling vastzetten.");
                     ed.WriteMessage($"\n\"{def.Name}\" geplaatst ({def.Scope.ToDisplay()}).");
                 }
                 tr.Commit();
@@ -4157,9 +4156,10 @@ public partial class Commands
         return string.Join(" | ", parts);
     }
 
-    private static bool PromptOptions(Editor ed, LegendSettings s, out ObjectId[]? selection)
+    private static bool PromptOptions(Editor ed, LegendSettings s, out ObjectId[]? selection, out bool blank)
     {
         selection = null;
+        blank = false;
         while (true)
         {
             ed.WriteMessage($"\nHuidig: {OptionsSummary(s)}");
@@ -4180,6 +4180,7 @@ public partial class Commands
             pko.Keywords.Add("Uitkiezen");
             pko.Keywords.Add("Instellingen");
             pko.Keywords.Add("Beschrijvingen");
+            pko.Keywords.Add("Blanco", "BLanco", "BLanco");
             pko.Keywords.Add("Plaatsen");
             pko.Keywords.Default = "Plaatsen";
             pko.AllowNone = true;
@@ -4216,6 +4217,12 @@ public partial class Commands
                 case "Uitkiezen": selection = PromptSelection(ed) ?? selection; break;
                 case "Instellingen": EditSettingsDialog(ed, s); break;
                 case "Beschrijvingen": EditDescriptionsDialog(ed, s); break;
+                case "Blanco":
+                    blank = true;
+                    selection = null;
+                    s.ManualEntries.Clear();
+                    s.BlankEntries.Clear();
+                    return true;
                 case "Plaatsen": return true;
             }
         }
