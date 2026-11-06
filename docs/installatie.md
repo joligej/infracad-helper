@@ -41,6 +41,14 @@ krijgt ook geen toestemming om CAD automatisch te sluiten. Als Windows toch
 meldt dat een herstart nodig is, toont de updater dat; hij herstart zelf niets.
 De update is pas in gebruik na een nieuwe CAD-start.
 
+AutoCAD kan bij die eerste start **Security – Unsigned Executable File** tonen voor
+`NlcsLegenda.dll`. De MSI en updater zijn ondertekend; de DLL zelf niet. Controleer
+dat het om de zojuist geïnstalleerde plug-in onder
+`%APPDATA%\Autodesk\ApplicationPlugins\NlcsLegenda.bundle` gaat. **Load Once**
+laadt hem voor die sessie. Een blijvende vertrouwenskeuze maak je zelf volgens de
+afspraken van je organisatie. De updater verlaagt `SECURELOAD` niet en voegt geen
+vertrouwde mappen of certificaten toe.
+
 **Later** stelt de automatische melding een dag uit. **Deze versie overslaan**
 onderdrukt die versie; een handmatige controle blijft hem tonen. Het vinkje
 **Bij opstarten controleren** geldt voor jouw Windows-gebruiker,
