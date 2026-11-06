@@ -47,9 +47,10 @@ sluiten geannuleerd. In Core Console wordt hij niet gestart.
 Een handmatige controle neemt een nog lopende opstartcontrole in dezelfde CAD-sessie
 over. De oude aanvraag wordt geannuleerd en afgerond voordat de nieuwe begint.
 Mislukt een hercontrole, dan vervallen de eerdere download- en overslaankeuzes totdat
-een nieuwe controle slaagt. Annuleren stopt de aanvraag; alleen **Later** bij een
-aangeboden update bewaart een dag uitstel. Terugmeldingen lopen via de vensterthread;
-na sluiten worden ze genegeerd.
+een nieuwe controle slaagt. Annuleren stopt de aanvraag zonder uitstel te bewaren.
+**Later** bij een aangeboden update en het succesvol starten van de updater bewaren
+een dag uitstel, zodat een klaargezette installatie niet opnieuw wordt aangeboden.
+Terugmeldingen lopen via de vensterthread; na sluiten worden ze genegeerd.
 
 ## Bewaarde gegevens
 
