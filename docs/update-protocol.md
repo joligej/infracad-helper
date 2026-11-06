@@ -37,7 +37,8 @@ sluiten geannuleerd. In Core Console wordt hij niet gestart.
 8. Start Windows Installer zonder herstart en met Restart Manager uitgeschakeld.
    De MSI verwijdert de vorige installatie binnen de terugdraaibare transactie
    (`MajorUpgrade` na `InstallInitialize`). Controleer registratie, DLL-versies
-   en persoonlijke instellingen na afloop. Exitcode 3010 wordt als noodzakelijke
+   en persoonlijke instellingen na afloop. Vanaf 1.42.1 worden ook de
+   geïnstalleerde DLL-handtekeningen gecontroleerd. Exitcode 3010 wordt als noodzakelijke
    Windows-herstart getoond, zonder die uit te voeren. Bij 3010 volgt de controle
    van uitgestelde bestandsvervanging pas bij een CAD-start na de Windows-herstart.
    De bestandscontrole gebruikt de CAD-jaargangen uit de ondertekende MSI.
@@ -87,3 +88,10 @@ DLL met het origineel; daarna moet een normale upgrade slagen.
 
 Een echte update wordt daarnaast met de publieke, ondertekende bestanden getest,
 inclusief wachten op CAD, instellingenbehoud en opnieuw laden na herstart.
+
+
+Vanaf 1.42.1 ondertekent de releasebouw alle DLL’s met hetzelfde certificaat als
+de updater. Iedere bundel wordt eenmaal gebouwd en ondertekend. ZIP en MSI nemen
+die bestanden ongewijzigd over, inclusief de tijdstempels. De certificaatopslag
+blijft een expliciete gebruikers- of beheerderskeuze; automatisch updaten wijzigt
+het vertrouwen niet. Zie [Uitgever vertrouwen](installatie.md#uitgever-eenmalig-vertrouwen).

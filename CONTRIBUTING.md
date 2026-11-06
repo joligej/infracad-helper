@@ -94,8 +94,11 @@ De beoordeling van CodeQL-meldingen staat in [Codekwaliteit](docs/codekwaliteit.
 `NlcsLegenda.Updater` is een apart Windows-programma dat pas na het sluiten van
 CAD de MSI start. Bouw het met `dev/scripts/Build-Updater.ps1`.
 
-De release-workflow ondertekent eerst de updater, neemt exact dat bestand in alle
-ZIP’s en de MSI op en ondertekent daarna de MSI. `update.json` wordt afgeleid van
+De release-workflow ondertekent eerst de updater en daarna de drie DLL’s per
+CAD-jaargang. De bewaarde bundels in `artifacts/release-bundles` leveren exact
+dezelfde bytes aan ZIP’s en MSI; `Build-Installer.ps1 -BundleDirectory <map>`
+bouwt of ondertekent die DLL’s niet opnieuw. Pas daarna wordt de MSI ondertekend.
+Een verkeerde bundelversie, CAD-jaargang, helperversie of handtekening stopt de bouw. `update.json` wordt afgeleid van
 de ondertekende MSI-eigenschappen in `Package.wxs`. Alle bestanden worden eerst
 als draft gepubliceerd; pas een complete release wordt de nieuwste versie.
 
@@ -106,7 +109,10 @@ Voor een wijziging aan deze route:
   verkeerde uitgever en verkeerde versie moeten worden geweigerd;
 - controleer een ondertekende updater tijdens een actieve CAD-sessie, sluit die
   normaal en controleer de installatie, de instellingen en de volgende CAD-start;
-- vergelijk ook de derde DLL en de updater met de publieke ZIP’s.
+- vergelijk alle negen DLL’s en de updater met de publieke ZIP’s;
+- draai `Test-ReleaseSignatures.ps1 -ContentsDirectory <uitgepakte Contents>`;
+- controleer de normale CAD-start met het expliciet vertrouwde certificaat,
+  zonder wijzigingen aan `SECURELOAD` of `TRUSTEDPATHS`.
 
 Zie [Updateprotocol](docs/update-protocol.md) voor de grenzen van automatische
 updates, certificaatwisseling en het bewaren van gegevens.

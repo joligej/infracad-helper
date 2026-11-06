@@ -98,7 +98,11 @@ public static class UpdateInstallation
         {
             if (year is not (2025 or 2026 or 2027)) throw new InvalidDataException("Onbekende CAD-versie in de update-uitslag.");
             foreach (var file in new[] { "NlcsLegenda.dll", "NlcsLegenda.Core.dll", "NlcsLegenda.Update.dll" })
-                RequireFileVersion(Path.Join(Path.GetDirectoryName(PluginPath(year)), file), expected);
+            {
+                var path = Path.Join(Path.GetDirectoryName(PluginPath(year)), file);
+                RequireFileVersion(path, expected);
+                WindowsPackage.VerifySignature(path);
+            }
         }
         WindowsPackage.VerifySignature(UpdaterPath);
         RequireFileVersion(UpdaterPath, expected);
