@@ -91,9 +91,10 @@ internal static class SoftwareUpdates
         if (previousCheck is not null)
         {
             try { await previousCheck.WaitAsync(token).ConfigureAwait(false); }
-            catch (OperationCanceledException) when (!token.IsCancellationRequested) { }
             catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex) && !token.IsCancellationRequested)
-            { Store.Log("Vorige updatecontrole: " + ex.Message); }
+            {
+                if (ex is not OperationCanceledException) Store.Log("Vorige updatecontrole: " + ex.Message);
+            }
         }
         token.ThrowIfCancellationRequested();
         return await CheckAsync(true, token).ConfigureAwait(false);

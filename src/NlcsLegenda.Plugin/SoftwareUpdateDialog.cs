@@ -62,7 +62,11 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
             _status.MaximumSize = new Size(width, 0);
             _automatic.MaximumSize = new Size(width, 0);
         };
-        _laterButton.Click += (_, _) => TryAction(() => { if (!_busy && _offer is not null) _later(); Close(); });
+        _laterButton.Click += (_, _) => TryAction(() =>
+        {
+            if (!_busy && _offer is not null) _later();
+            Close();
+        });
         _skip.Click += (_, _) => TryAction(() =>
         {
             if (_offer is null) return;
@@ -120,7 +124,7 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
         if (_closing || IsDisposed) return;
         if (!InvokeRequired) { update(); return; }
         try { BeginInvoke(() => { if (!_closing && !IsDisposed) update(); }); }
-        catch (InvalidOperationException) when (_closing || IsDisposed) { }
+        catch (InvalidOperationException) when (_closing || IsDisposed) { return; }
     }
 
     private void Busy(bool busy)
