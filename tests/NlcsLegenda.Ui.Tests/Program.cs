@@ -3,7 +3,7 @@ using System.Windows.Forms;
 using NlcsLegenda.Core;
 using NlcsLegenda.Plugin;
 
-internal static class Program
+internal static partial class Program
 {
     private static int _checks;
     private static readonly List<string> Errors = new();
@@ -40,6 +40,7 @@ internal static class Program
             DiagnosticRun.Execute(() => CheckOverview(), Errors.Add, "CheckOverview");
             DiagnosticRun.Execute(() => CheckOverviewLoading(), Errors.Add, "CheckOverviewLoading");
             DiagnosticRun.Execute(CheckOverviewFatalError, Errors.Add);
+            DiagnosticRun.Execute(CheckSoftwareUpdates, Errors.Add);
             DiagnosticRun.Execute(CheckTreeImagesDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckOwnedFontsDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckManagedChoices, Errors.Add);
@@ -75,6 +76,8 @@ internal static class Program
                 () => new LegendManageDialog(new[] { new EntryCheckItem("key", "Regel", "DATA") }, new()),
                 () => new LayerEditDialog(new NlcsLayerComponents(), "N-WE-KL-DATA-G", 10, false, null),
                 () => new HelpDialog("test"),
+                () => SoftwareDialog(),
+                () => new NlcsLegenda.Updater.UpdaterForm(new NlcsLegenda.Update.UpdateStore(), new NlcsLegenda.Update.UpdateRequest(1, "1.42.0", new string('A', 64), 100, 2027), false),
                 () => new KlicOptionsDialog(new KlicOptions()),
                 () => new KlicDetailsDialog(new LegendEntry { Status = NlcsStatus.Bestaand, Discipline = "WE", Hoofdgroep = "KL", Element = "WATER", Description = "Waterleiding", KlicObjects = new[] {
                     new KlicObjectData("C:/voorbeeld/een lange bronnaam.dwg", "ABC", "KLIC", new[] {
@@ -107,7 +110,7 @@ internal static class Program
             Check(grid.Height > grid.ColumnHeadersHeight + form.Font.Height * 2, "bronvensterlijst houdt ruimte voor regels op iedere schermschaal");
         }
         Check(Descendants(form).All(c => c is not TextBox || c.Height >= c.Font.Height), form.Text + ": teksthoogte");
-        if (form is SourceViewportDialog or ExampleDialog or RowChoiceDialog or SourceMatchDialog or UpdatePreviewDialog or CompositionDialog or LinkedExampleDialog or SheetComparisonDialog && output is not null)
+        if (form is SoftwareUpdateDialog or NlcsLegenda.Updater.UpdaterForm or SourceViewportDialog or ExampleDialog or RowChoiceDialog or SourceMatchDialog or UpdatePreviewDialog or CompositionDialog or LinkedExampleDialog or SheetComparisonDialog && output is not null)
         {
             Directory.CreateDirectory(output);
             using var image = new Bitmap(form.Width, form.Height);
@@ -151,7 +154,7 @@ internal static class Program
             "NLCSLEGENDASTATUS", "NLCSLEGENDAXREFS", "NLCSLEGENDALAAGNAAM",
             "NLCSLEGENDAVIEWPORT", "NLCSLEGENDAEXPORT", "NLCSLEGENDABATCH",
             "NLCSLEGENDAOPTIES", "NLCSLEGENDASTANDAARD", "NLCSLEGENDAPRESET",
-            "NLCSLEGENDABEHEER", "NLCSLEGENDAELEMENT", "NLCSLEGENDACONFIG", "NLCSLEGENDAHELP" };
+            "NLCSLEGENDABEHEER", "NLCSLEGENDAELEMENT", "NLCSLEGENDACONFIG", "NLCSLEGENDAHELP", "NLCSLEGENDAUPDATES" };
         foreach (string command in commands)
         foreach (int size in new[] { 16, 32 })
         {

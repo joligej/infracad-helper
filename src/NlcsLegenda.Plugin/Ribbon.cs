@@ -139,6 +139,7 @@ internal static class RibbonBuilder
             ("Legenda's", "NLCSLEGENDABEHEER", "Legenda's hernoemen, opzoeken en verwijderen."),
             ("Controleren", "NLCSLEGENDAELEMENT", "Zie of een aangeklikt object in de legenda komt."),
             ("Bestanden", "NLCSLEGENDACONFIG", "De instellingenbestanden en hun paden tonen."),
+            ("Updates controleren", "NLCSLEGENDAUPDATES", "Controleer op een nieuwe versie en werk bij na het sluiten van CAD."),
             ("Help", "NLCSLEGENDAHELP", "Uitleg over de functies."));
         ribbon.Tabs.Add(tab);
     }

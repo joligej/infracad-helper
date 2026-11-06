@@ -5,7 +5,8 @@
 [CmdletBinding()]
 param(
     [ValidateSet("2025", "2026", "2027")]
-    [string]$AcadVersion = "2025"
+    [string]$AcadVersion = "2025",
+    [string]$UpdaterPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,6 +50,11 @@ Set-Content -Path (Join-Path $outBundle "PackageContents.xml") -Value $manifest 
 
 Copy-Item (Join-Path $binDir "NlcsLegenda.dll") $outContents
 Copy-Item (Join-Path $binDir "NlcsLegenda.Core.dll") $outContents
+Copy-Item (Join-Path $binDir "NlcsLegenda.Update.dll") $outContents
+if(!$UpdaterPath){ & (Join-Path $PSScriptRoot 'Build-Updater.ps1'); $UpdaterPath=Join-Path $repoRoot 'artifacts/updater/NlcsLegenda.Updater.exe' }
+$updaterDirectory=Join-Path $outContents 'Updater'
+New-Item -ItemType Directory -Path $updaterDirectory -Force | Out-Null
+Copy-Item -LiteralPath $UpdaterPath -Destination $updaterDirectory
 
 Write-Host "==> Bundle klaar: $outBundle" -ForegroundColor Green
 Write-Host "    Kopieer naar: $env:APPDATA\Autodesk\ApplicationPlugins\" -ForegroundColor Yellow

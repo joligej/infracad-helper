@@ -11,6 +11,13 @@ internal sealed class HelpDialog : LegendDialog
             "NLCS Legenda maakt een legenda van de NLCS-lagen die al in je tekening zitten.\n\n" +
             "Je vindt de knoppen in het lint onder de tab NLCS Legenda. Typen kan ook: elk\n" +
             "commando begint met NLCSLEGENDA."),
+        ("Updates controleren",
+            "Bij opstarten controleert de plug-in op een nieuwere stabiele release.\n" +
+            "Updates controleren opent dezelfde controle handmatig. Hier kun je de automatische\n" +
+            "controle uitzetten, een versie overslaan of later kiezen.\n\n" +
+            "Downloaden kan tijdens het werken. Het aparte updateprogramma wacht totdat alle\n" +
+            "CAD-sessies gesloten zijn. Sla zelf je werk op en sluit CAD. Start Civil 3D na\n" +
+            "een geslaagde installatie opnieuw; instellingen en tekeningen blijven behouden."),
         ("Legenda maken",
             "Klik op Genereren.\n\n" +
             "Kies de hele tekening of een selectie, en zet de legenda op een plek naast de\n" +

@@ -1,9 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/NlcsLegenda.Core/NlcsLegenda.Core.csproj" />
+    <Project Path="src/NlcsLegenda.Update/NlcsLegenda.Update.csproj" />
+    <Project Path="src/NlcsLegenda.Updater/NlcsLegenda.Updater.csproj" />
     <Project Path="src/NlcsLegenda.Plugin/NlcsLegenda.Plugin.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NlcsLegenda.Core.Tests/NlcsLegenda.Core.Tests.csproj" />
+    <Project Path="tests/NlcsLegenda.Update.Tests/NlcsLegenda.Update.Tests.csproj" />
   </Folder>
 </Solution>
