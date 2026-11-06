@@ -6,7 +6,10 @@
 param(
     [ValidateSet("2025", "2026", "2027")]
     [string]$AcadVersion = "2025",
-    [string]$UpdaterPath
+    [string]$UpdaterPath,
+    [string]$PfxPath,
+    [System.Security.SecureString]$PfxPassword,
+    [string]$TimestampUrl = "http://timestamp.digicert.com"
 )
 
 $ErrorActionPreference = "Stop"
@@ -51,7 +54,12 @@ Set-Content -Path (Join-Path $outBundle "PackageContents.xml") -Value $manifest 
 Copy-Item (Join-Path $binDir "NlcsLegenda.dll") $outContents
 Copy-Item (Join-Path $binDir "NlcsLegenda.Core.dll") $outContents
 Copy-Item (Join-Path $binDir "NlcsLegenda.Update.dll") $outContents
-if(!$UpdaterPath){ & (Join-Path $PSScriptRoot 'Build-Updater.ps1'); $UpdaterPath=Join-Path $repoRoot 'artifacts/updater/NlcsLegenda.Updater.exe' }
+if ($PfxPath) {
+    foreach ($name in 'NlcsLegenda.dll', 'NlcsLegenda.Core.dll', 'NlcsLegenda.Update.dll') {
+        & (Join-Path $PSScriptRoot 'Sign-ReleaseFile.ps1') -Path (Join-Path $outContents $name) -PfxPath $PfxPath -PfxPassword $PfxPassword -TimestampUrl $TimestampUrl
+    }
+}
+if(!$UpdaterPath){ & (Join-Path $PSScriptRoot 'Build-Updater.ps1') -PfxPath $PfxPath -PfxPassword $PfxPassword -TimestampUrl $TimestampUrl; $UpdaterPath=Join-Path $repoRoot 'artifacts/updater/NlcsLegenda.Updater.exe' }
 $updaterDirectory=Join-Path $outContents 'Updater'
 New-Item -ItemType Directory -Path $updaterDirectory -Force | Out-Null
 Copy-Item -LiteralPath $UpdaterPath -Destination $updaterDirectory

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.42.1 - 2026-11-06
+
+- Alle plug-in-DLL’s voor AutoCAD/Civil 3D 2025, 2026 en 2027 worden nu met hetzelfde `joligej`-certificaat ondertekend als de updater en MSI, inclusief een SHA-256-tijdstempel.
+- De ZIP’s en MSI gebruiken exact dezelfde ondertekende bestanden. De releasebouw en de controle na installatie verifiëren ook de DLL-handtekeningen.
+- De installatie-uitleg beschrijft eenmalig vertrouwen van deze uitgever. Updates met hetzelfde vertrouwde certificaat vereisen geen nieuwe laadbevestiging; de installer wijzigt geen CAD-beveiliging, vertrouwde mappen of certificaatopslag.
+
 ## 1.42.0 - 2026-11-06
 
 - Bij opstarten controleert de plug-in op een nieuwere stabiele GitHub-release. De controle loopt op de achtergrond, maximaal eenmaal per dag; zonder internet blijft CAD gewoon bruikbaar. Via Updates controleren kun je zelf controleren, een versie overslaan of de automatische controle uitzetten.

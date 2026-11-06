@@ -41,13 +41,11 @@ krijgt ook geen toestemming om CAD automatisch te sluiten. Als Windows toch
 meldt dat een herstart nodig is, toont de updater dat; hij herstart zelf niets.
 De update is pas in gebruik na een nieuwe CAD-start.
 
-AutoCAD kan bij die eerste start **Security – Unsigned Executable File** tonen voor
-`NlcsLegenda.dll`. De MSI en updater zijn ondertekend; de DLL zelf niet. Controleer
-dat het om de zojuist geïnstalleerde plug-in onder
-`%APPDATA%\Autodesk\ApplicationPlugins\NlcsLegenda.bundle` gaat. **Load Once**
-laadt hem voor die sessie. Een blijvende vertrouwenskeuze maak je zelf volgens de
-afspraken van je organisatie. De updater verlaagt `SECURELOAD` niet en voegt geen
-vertrouwde mappen of certificaten toe.
+Vanaf 1.42.1 zijn ook alle DLL’s ondertekend met het vaste `joligej`-certificaat.
+AutoCAD controleert daarnaast of jouw Windows-gebruiker deze uitgever vertrouwt.
+Na eenmalig vertrouwen blijven nieuwere releases met hetzelfde certificaat
+herkenbaar; er hoeft niet bij iedere nieuwe DLL opnieuw toestemming te worden gegeven.
+Zie [Uitgever eenmalig vertrouwen](#uitgever-eenmalig-vertrouwen).
 
 **Later** stelt de automatische melding een dag uit. **Deze versie overslaan**
 onderdrukt die versie; een handmatige controle blijft hem tonen. Het vinkje
@@ -95,3 +93,37 @@ is nodig voor aanvullende KLIC-opslagvormen. Core Console is geen vervanging voo
 een volledige Civil 3D-controle van AEC-proxyobjecten of Object Data.
 
 Ontbreekt het lint of het commando? Zie [Problemen oplossen](problemen-oplossen.md).
+
+
+## Uitgever eenmalig vertrouwen
+
+Het bestaande certificaat is self-signed: `CN=joligej`. De handtekening bewijst
+herkomst van dezelfde sleutel en ongewijzigde inhoud; een externe certificaatautoriteit
+heeft de identiteit niet gecontroleerd. Vertrouw dit certificaat alleen als je
+software van deze uitgever wilt toestaan, of laat je CAD-beheerder dit regelen.
+
+Download `joligej-codesign.cer` uit dezelfde GitHub-release en controleer de SHA-256
+van het certificaat:
+
+```text
+E2B9FBE20EB6E4423BA7DC723116CD77584DE3224ADB0DD8E48EF8089ACC826B
+```
+
+Voor Windows-handtekeningcontrole heeft dit zelfondertekende certificaat een
+vertrouwensanker nodig. Voor AutoCAD moet het daarnaast bij **Vertrouwde uitgevers**
+staan. Dit kan voor alleen de **huidige gebruiker**, zonder beheerder:
+
+1. Open `certmgr.msc` en importeer het gecontroleerde openbare certificaat in
+   **Vertrouwde basiscertificeringsinstanties → Certificaten**.
+2. Importeer hetzelfde certificaat in **Vertrouwde uitgevers → Certificaten**.
+3. Start Civil 3D opnieuw. De ondertekende plug-in moet nu zonder laadbevestiging
+   starten. Bij een afwijkend, ongeldig of verlopen certificaat blijft controle actief.
+
+Dit certificaat heeft uitsluitend het doel **Code Signing** en de sleuteltoepassing
+**Digital Signature**. Het vertrouwen geldt voor code van deze uitgever binnen jouw
+Windows-profiel, niet alleen voor deze plug-in. Installer en updater voeren deze
+vertrouwenskeuze niet stilzwijgend uit. Ze veranderen `SECURELOAD`, `TRUSTEDPATHS`
+en certificaatopslag niet. Op een andere computer is de vertrouwenskeuze opnieuw
+nodig; een toekomstige certificaatwisseling vereist eveneens een nieuwe beoordeling.
+
+[Autodesk: ondertekende plug-ins en vertrouwde uitgevers](https://blog.autodesk.io/autocad-2016-trusted-paths-and-autoloader/).

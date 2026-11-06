@@ -25,9 +25,14 @@ uitgever en de product- en CAD-gegevens. Een apart programma wacht totdat CAD
 gesloten is. Er worden geen certificaten geïmporteerd en geen CAD-sessies beëindigd.
 Zie [Updateprotocol](docs/update-protocol.md) voor de controles en beperkingen.
 
-De MSI-installer is self-signed ondertekend als `joligej`. Die handtekening laat zien
-dat het bestand na ondertekening niet is gewijzigd; hij zegt niets over een door een
-externe autoriteit geverifieerde identiteit. Windows toont pas een vertrouwde uitgever
-nadat je `joligej-codesign.cer` zelf importeert. Doe dat alleen als je dit certificaat
-vertrouwt: een certificaat in *Vertrouwde basiscertificeringsinstanties* geldt voor je
-hele gebruikersprofiel.
+De DLL’s, updater en MSI zijn ondertekend met het vaste self-signed
+codeondertekeningscertificaat `CN=joligej`. De releasebouw controleert de inhoud en
+de vaste certificaatvingerafdruk. Dezelfde ondertekende bytes gaan naar ZIP’s en MSI;
+er wordt niet na het verpakken nogmaals gebouwd of ondertekend.
+
+De handtekening bewijst dat dezelfde sleutel is gebruikt en het bestand intact is,
+geen extern geverifieerde identiteit. Windows en AutoCAD moeten deze uitgever
+één keer expliciet vertrouwen. Het certificaat heeft alleen het doel Code Signing;
+vertrouwen in de persoonlijke certificaatopslag geldt wel voor alle code van die
+uitgever binnen dat Windows-profiel. Installer en updater importeren geen
+certificaten. Zie [Uitgever eenmalig vertrouwen](docs/installatie.md#uitgever-eenmalig-vertrouwen).

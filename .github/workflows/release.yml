@@ -52,17 +52,21 @@ jobs:
           $pw = ConvertTo-SecureString $env:CODESIGN_PFX_PASSWORD -AsPlainText -Force
           ./dev/scripts/Build-Updater.ps1 -PfxPath $pfx -PfxPassword $pw
 
-      - name: Bundels bouwen (2025, 2026 en 2027)
+      - name: Bundels bouwen en DLL's ondertekenen (2025, 2026 en 2027)
         shell: pwsh
+        env:
+          CODESIGN_PFX_PASSWORD: ${{ secrets.CODESIGN_PFX_PASSWORD }}
         run: |
-          ./dev/scripts/Build-Bundle.ps1 -AcadVersion 2025 -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe
-          Compress-Archive -Path artifacts/NlcsLegenda.bundle -DestinationPath "artifacts/NlcsLegenda-2025-${{ github.ref_name }}.zip" -Force
-          Remove-Item artifacts/NlcsLegenda.bundle -Recurse -Force
-          ./dev/scripts/Build-Bundle.ps1 -AcadVersion 2026 -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe
-          Compress-Archive -Path artifacts/NlcsLegenda.bundle -DestinationPath "artifacts/NlcsLegenda-2026-${{ github.ref_name }}.zip" -Force
-          Remove-Item artifacts/NlcsLegenda.bundle -Recurse -Force
-          ./dev/scripts/Build-Bundle.ps1 -AcadVersion 2027 -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe
-          Compress-Archive -Path artifacts/NlcsLegenda.bundle -DestinationPath "artifacts/NlcsLegenda-2027-${{ github.ref_name }}.zip" -Force
+          $pfx = Join-Path $env:RUNNER_TEMP 'codesign.pfx'
+          $pw = ConvertTo-SecureString $env:CODESIGN_PFX_PASSWORD -AsPlainText -Force
+          foreach ($year in 2025, 2026, 2027) {
+            ./dev/scripts/Build-Bundle.ps1 -AcadVersion $year -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe -PfxPath $pfx -PfxPassword $pw
+            $directory = "artifacts/release-bundles/$year"
+            New-Item -ItemType Directory -Path $directory -Force | Out-Null
+            Copy-Item -LiteralPath artifacts/NlcsLegenda.bundle -Destination $directory -Recurse
+            ./dev/scripts/Test-ReleaseSignatures.ps1 -ContentsDirectory "$directory/NlcsLegenda.bundle/Contents"
+            Compress-Archive -LiteralPath "$directory/NlcsLegenda.bundle" -DestinationPath "artifacts/NlcsLegenda-$year-${{ github.ref_name }}.zip"
+          }
 
       - name: MSI-installer bouwen en ondertekenen
         shell: pwsh
@@ -79,7 +83,7 @@ jobs:
           $pfx = Join-Path $env:RUNNER_TEMP "codesign.pfx"
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CODESIGN_PFX_BASE64))
           $pw = ConvertTo-SecureString $env:CODESIGN_PFX_PASSWORD -AsPlainText -Force
-          ./dev/scripts/Build-Installer.ps1 -Version $version -PfxPath $pfx -PfxPassword $pw -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe
+          ./dev/scripts/Build-Installer.ps1 -Version $version -PfxPath $pfx -PfxPassword $pw -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe -BundleDirectory artifacts/release-bundles
           Remove-Item $pfx -Force
 
       - name: Tijdelijke sleutel verwijderen
@@ -117,7 +121,7 @@ jobs:
             Set-Content -Path SHA256SUMS.txt -Encoding ascii
           Pop-Location
 
-          $install = "## Installeren`n`nSnelst: download NlcsLegenda-$version.msi en voer die uit. De installer zet de plugin per gebruiker neer (geen beheerder nodig) en werkt voor 2025, 2026 en 2027.`n`nLiever handmatig? Kies de zip voor jouw versie en pak de map NlcsLegenda.bundle uit in %APPDATA%\Autodesk\ApplicationPlugins\.`n`nHerstart daarna Civil 3D of AutoCAD.`n`nDe installer is self-signed ondertekend als joligej. Die handtekening laat zien dat het bestand na ondertekening niet is gewijzigd; hij zegt niets over een door een externe autoriteit geverifieerde identiteit. Wil je die uitgever vertrouwen, dan importeer je joligej-codesign.cer zelf; let op dat een certificaat in Vertrouwde basiscertificeringsinstanties voor je hele gebruikersprofiel geldt. Zonder import werkt de installer gewoon, maar toont Windows onbekende uitgever.`n`nControleer een download met SHA256SUMS.txt."
+          $install = "## Installeren`n`nSnelst: download NlcsLegenda-$version.msi en voer die uit. De installer zet de plugin per gebruiker neer (geen beheerder nodig) en werkt voor 2025, 2026 en 2027.`n`nLiever handmatig? Kies de zip voor jouw versie en pak de map NlcsLegenda.bundle uit in %APPDATA%\Autodesk\ApplicationPlugins\.`n`nHerstart daarna Civil 3D of AutoCAD.`n`nDe DLL’s, updater en installer zijn ondertekend met het bestaande codeondertekeningscertificaat van joligej. Die handtekening laat zien dat het bestand na ondertekening niet is gewijzigd; hij zegt niets over een door een externe autoriteit geverifieerde identiteit. Wil je die uitgever vertrouwen, dan importeer je joligej-codesign.cer zelf; let op dat een certificaat in Vertrouwde basiscertificeringsinstanties voor je hele gebruikersprofiel geldt. AutoCAD moet deze uitgever eenmalig vertrouwen om latere updates met hetzelfde certificaat zonder laadvragen te openen. Zie de installatie-uitleg voor de persoonlijke certificaatopslag. De installer en updater wijzigen SECURELOAD, vertrouwde mappen en certificaatopslag niet.`n`nControleer een download met SHA256SUMS.txt."
           Set-Content -Path release-notes.md -Value ($body + "`n`n" + $install) -Encoding UTF8
           gh release create ${{ github.ref_name }} `
             "artifacts/NlcsLegenda-2025-${{ github.ref_name }}.zip" `
