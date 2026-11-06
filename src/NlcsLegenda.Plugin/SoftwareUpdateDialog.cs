@@ -13,6 +13,8 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
     private readonly Button _download = new() { Text = "Downloaden en bijwerken", AutoSize = true, Enabled = false };
     private readonly Button _check = new() { Text = "Opnieuw controleren", AutoSize = true };
     private readonly Button _skip = new() { Text = "Deze versie overslaan", AutoSize = true, Enabled = false };
+    private readonly Button _page = new() { Text = "Releasepagina", AutoSize = true };
+    private readonly Button _laterButton = new() { Text = "Later", AutoSize = true };
     private readonly CheckBox _automatic = new() { Text = "Bij opstarten controleren", AutoSize = true, Dock = DockStyle.Fill };
     private readonly CancellationTokenSource _cancel = new();
     private readonly Func<CancellationToken, Task<UpdateOffer?>> _checkRelease;
@@ -42,19 +44,18 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
         _automatic.CheckedChanged += (_, _) => TryAction(() => preference(_automatic.Checked));
         body.Controls.Add(_automatic, 0, 4);
         var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true };
-        var page = new Button { Text = "Releasepagina", AutoSize = true };
-        var laterButton = new Button { Text = "Later", AutoSize = true };
-        buttons.Controls.AddRange(new Control[] { _download, _check, page, _skip, laterButton });
+        buttons.Controls.AddRange(new Control[] { _download, _check, _page, _skip, _laterButton });
         body.Controls.Add(buttons, 0, 5); Controls.Add(body);
-        body.SizeChanged += (_, _) => {
+        body.SizeChanged += (_, _) =>
+        {
             var width = Math.Max(1, body.ClientSize.Width - body.Padding.Horizontal - 8);
             buttons.MaximumSize = new Size(width, 0);
             _status.MaximumSize = new Size(width, 0);
             _automatic.MaximumSize = new Size(width, 0);
         };
-        laterButton.Click += (_, _) => TryAction(() => { _later(); Close(); });
+        _laterButton.Click += (_, _) => TryAction(() => { _later(); Close(); });
         _skip.Click += (_, _) => TryAction(() => { if (_offer is not null) _skipVersion(_offer.Release.Version); Close(); });
-        page.Click += (_, _) => TryAction(() => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(ReleasePolicy.ReleasesPage) { UseShellExecute = true }));
+        _page.Click += (_, _) => TryAction(() => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(ReleasePolicy.ReleasesPage) { UseShellExecute = true }));
         _check.Click += async (_, _) => await CheckAsync();
         _download.Click += async (_, _) => await DownloadAsync();
         Shown += async (_, _) => { if (initial is null) await CheckAsync(); else Present(initial); };

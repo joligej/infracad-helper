@@ -32,7 +32,8 @@ internal sealed class UpdaterForm : Form
         body.Controls.Add(_status, 0, 0); body.Controls.Add(_details, 0, 1);
         var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft };
         buttons.Controls.Add(_close); buttons.Controls.Add(_retry); body.Controls.Add(buttons, 0, 2); Controls.Add(body);
-        body.SizeChanged += (_, _) => {
+        body.SizeChanged += (_, _) =>
+        {
             var width = Math.Max(1, body.ClientSize.Width - body.Padding.Horizontal - 8);
             buttons.MaximumSize = new Size(width, 0);
             _status.MaximumSize = new Size(width, 0);
@@ -103,12 +104,14 @@ internal sealed class UpdaterForm : Form
         }
         if (WindowsPackage.InstalledVersion() != _request.Version) throw new InvalidDataException("De installatie meldt succes, maar de geregistreerde versie wijkt af.");
         foreach (var year in new[] { 2025, 2026, 2027 })
-        foreach (var file in new[] { "NlcsLegenda.dll", "NlcsLegenda.Core.dll", "NlcsLegenda.Update.dll" })
         {
-            var path = Path.Join(Path.GetDirectoryName(UpdateInstallation.PluginPath(year)), file);
-            var version = FileVersionInfo.GetVersionInfo(path);
-            if ($"{version.FileMajorPart}.{version.FileMinorPart}.{version.FileBuildPart}" != _request.Version)
-                throw new InvalidDataException("Een geïnstalleerd bestand heeft niet de verwachte versie: " + file);
+            foreach (var file in new[] { "NlcsLegenda.dll", "NlcsLegenda.Core.dll", "NlcsLegenda.Update.dll" })
+            {
+                var path = Path.Join(Path.GetDirectoryName(UpdateInstallation.PluginPath(year)), file);
+                var version = FileVersionInfo.GetVersionInfo(path);
+                if ($"{version.FileMajorPart}.{version.FileMinorPart}.{version.FileBuildPart}" != _request.Version)
+                    throw new InvalidDataException("Een geïnstalleerd bestand heeft niet de verwachte versie: " + file);
+            }
         }
         WindowsPackage.VerifySignature(UpdateInstallation.UpdaterPath);
         var helper = FileVersionInfo.GetVersionInfo(UpdateInstallation.UpdaterPath);
@@ -143,12 +146,14 @@ internal sealed class SettingsSnapshot(Dictionary<string, string> hashes)
         var backup = Path.Join(store.DirectoryPath, "SettingsBackup", version, DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
         var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (Directory.Exists(directory))
-        foreach (var file in Directory.EnumerateFiles(directory, "*.json", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint }))
         {
-            var target = Path.Join(backup, Path.GetRelativePath(directory, file));
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            var bytes = File.ReadAllBytes(file);
-            File.WriteAllBytes(target, bytes); hashes.Add(file, Convert.ToHexString(SHA256.HashData(bytes)));
+            foreach (var file in Directory.EnumerateFiles(directory, "*.json", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint }))
+            {
+                var target = Path.Join(backup, Path.GetRelativePath(directory, file));
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                var bytes = File.ReadAllBytes(file);
+                File.WriteAllBytes(target, bytes); hashes.Add(file, Convert.ToHexString(SHA256.HashData(bytes)));
+            }
         }
         return new(hashes);
     }

@@ -8,14 +8,14 @@ public static class UpdateCache
         {
             using var lease = store.TryLease("installation");
             if (lease is null) return;
-            foreach (var directory in Children(Path.Join(store.DirectoryPath, "Packages")))
+            foreach (var directory in Children(Path.Join(store.DirectoryPath, "Packages"))
+                .Where(d => ReleaseVersion.TryParse(d.Name, out var version) && version.CompareTo(installed) <= 0))
             {
-                if (!ReleaseVersion.TryParse(directory.Name, out var version) || version.CompareTo(installed) > 0) continue;
                 RemoveKnownFiles(directory, file => file == $"NlcsLegenda-{directory.Name}.msi");
             }
-            foreach (var directory in Children(Path.Join(store.DirectoryPath, "Runner")))
+            foreach (var directory in Children(Path.Join(store.DirectoryPath, "Runner"))
+                .Where(d => Guid.TryParseExact(d.Name, "N", out _) && d.LastWriteTimeUtc <= DateTime.UtcNow.AddDays(-2)))
             {
-                if (!Guid.TryParseExact(directory.Name, "N", out _) || directory.LastWriteTimeUtc > DateTime.UtcNow.AddDays(-2)) continue;
                 RemoveKnownFiles(directory, file => file is "NlcsLegenda.Updater.exe" or "request.json");
             }
         }

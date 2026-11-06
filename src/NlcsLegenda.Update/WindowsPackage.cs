@@ -72,13 +72,15 @@ public static class WindowsPackage
     public static string? InstalledVersion()
     {
         string? installed = null;
+        var product = new StringBuilder(39);
+        var buffer = new StringBuilder(256);
         for (uint index = 0; ; index++)
         {
-            var product = new StringBuilder(39);
+            product.Clear();
             var status = MsiEnumRelatedProductsW(UpgradeCode, 0, index, product);
             if (status == 259) break;
             Check(status);
-            var buffer = new StringBuilder(256); uint size = 256;
+            buffer.Clear(); uint size = 256;
             // alleen de niet-verhoogde installatie van de huidige gebruiker
             status = MsiGetProductInfoExW(product.ToString(), null, 2, "VersionString", buffer, ref size);
             if (status is 1605 or 1608) continue;

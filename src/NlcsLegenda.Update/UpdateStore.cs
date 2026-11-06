@@ -66,7 +66,7 @@ public sealed class UpdateStore(string? directory = null)
             if (File.Exists(path) && new FileInfo(path).Length > 128 * 1024) File.WriteAllText(path, "");
             File.AppendAllText(path, $"{DateTimeOffset.Now:O} {text}\n");
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
     }
 }
 

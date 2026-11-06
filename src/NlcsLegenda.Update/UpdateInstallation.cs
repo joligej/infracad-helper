@@ -70,13 +70,15 @@ public static class UpdateInstallation
     {
         var names = new List<string>();
         foreach (var name in new[] { "acad", "accoreconsole" })
-        foreach (var process in Process.GetProcessesByName(name))
         {
-            using (process)
+            foreach (var process in Process.GetProcessesByName(name))
             {
-                try { if (!process.HasExited) names.Add($"{(name == "acad" ? "AutoCAD / Civil 3D" : "Core Console")} (proces {process.Id})"); }
-                catch (InvalidOperationException) { }
-                catch (Win32Exception) { names.Add("Een CAD-sessie waarvan de toestand niet kon worden gelezen"); }
+                using (process)
+                {
+                    try { if (!process.HasExited) names.Add($"{(name == "acad" ? "AutoCAD / Civil 3D" : "Core Console")} (proces {process.Id})"); }
+                    catch (InvalidOperationException) { continue; }
+                    catch (Win32Exception) { names.Add("Een CAD-sessie waarvan de toestand niet kon worden gelezen"); }
+                }
             }
         }
         return names.ToArray();

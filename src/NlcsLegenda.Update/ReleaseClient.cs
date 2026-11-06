@@ -104,7 +104,11 @@ public sealed class ReleaseClient : IDisposable
                 uri = location.IsAbsoluteUri ? location : new Uri(uri, location);
                 continue;
             }
-            if (!response.IsSuccessStatusCode) { try { response.EnsureSuccessStatusCode(); } finally { response.Dispose(); } }
+            if (!response.IsSuccessStatusCode)
+            {
+                using var failure = response;
+                failure.EnsureSuccessStatusCode();
+            }
             return response;
         }
         throw new InvalidDataException("Te veel doorverwijzingen bij het downloaden.");
