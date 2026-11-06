@@ -91,7 +91,7 @@ if ($BundleDirectory) {
         if ((Get-FileHash -LiteralPath $bundledHelper -Algorithm SHA256).Hash -ne $helperHash) { throw "Updateprogramma verschilt van de bundel voor $year." }
     }
 }
-if ($PfxPath) {
+if ($PfxPath -or $BundleDirectory) {
     dotnet build (Join-Path $repoRoot 'src/NlcsLegenda.Update/NlcsLegenda.Update.csproj') -c Release
     if ($LASTEXITCODE) { throw 'Handtekeningcontrole niet gebouwd.' }
     $validator = Join-Path $repoRoot 'src/NlcsLegenda.Update/bin/Release/net8.0/NlcsLegenda.Update.dll'
