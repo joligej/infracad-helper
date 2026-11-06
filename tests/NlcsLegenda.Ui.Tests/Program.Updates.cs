@@ -35,6 +35,32 @@ internal static partial class Program
             OpenOffscreen(dialog);
             Check(!Descendants(dialog).OfType<Button>().Single(b => b.Text == "Downloaden en bijwerken").Enabled, "ongeschikte release niet installeerbaar");
         }
+        using (var dialog = new SoftwareUpdateDialog("1.42.0", true, DemonstrationUpdate(),
+            _ => Task.FromResult<UpdateOffer?>(null), (_, _, _) => Task.CompletedTask,
+            _ => throw new IOException("Bestand in gebruik"), _ => { }, () => { }))
+        {
+            OpenOffscreen(dialog);
+            var checkbox = Descendants(dialog).OfType<CheckBox>().Single(); checkbox.Checked = false;
+            Check(checkbox.Checked && Descendants(dialog).OfType<Label>().Any(l => l.Text.Contains("Voorkeur niet opgeslagen")), "mislukte opslag toont de werkelijk bewaarde updatevoorkeur");
+        }
+        var started = 0;
+        using (var dialog = new SoftwareUpdateDialog("1.42.0", true, DemonstrationUpdate(),
+            _ => Task.FromResult<UpdateOffer?>(null), (_, _, _) => { started++; return Task.CompletedTask; },
+            _ => { }, _ => { }, () => throw new IOException("Uitstellen niet opgeslagen")))
+        {
+            OpenOffscreen(dialog);
+            Check(started == 0, "tonen van update start geen download");
+            Descendants(dialog).OfType<Button>().Single(b => b.Text == "Downloaden en bijwerken").PerformClick();
+            Check(started == 1 && !dialog.Visible, "gestarte updater blijft gestart bij fout in uitstelvoorkeur");
+        }
+        using (var dialog = new SoftwareUpdateDialog("1.42.0", true, DemonstrationUpdate(),
+            _ => Task.FromResult<UpdateOffer?>(null), (_, _, _) => throw new IOException("Hash klopt niet"),
+            _ => { }, _ => { }, () => { }))
+        {
+            OpenOffscreen(dialog);
+            var download = Descendants(dialog).OfType<Button>().Single(b => b.Text == "Downloaden en bijwerken"); download.PerformClick();
+            Check(dialog.Visible && download.Enabled && Descendants(dialog).OfType<Label>().Any(l => l.Text.Contains("Hash klopt niet")), "downloadfout houdt venster open voor herstel");
+        }
         var pending = new TaskCompletionSource<UpdateOffer?>(); CancellationToken cancel = default;
         using (var dialog = new SoftwareUpdateDialog("1.42.0", true, null,
             token => { cancel = token; return pending.Task; }, (_, _, _) => Task.CompletedTask, _ => { }, _ => { }, () => { }))

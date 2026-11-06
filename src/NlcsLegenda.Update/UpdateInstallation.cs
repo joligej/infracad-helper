@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace NlcsLegenda.Update;
 
 public sealed record UpdateRequest(int Schema, string Version, string Sha256, long Size, int AcadYear);
-public sealed record UpdateResult(string Version, bool Success, bool RestartRequired, string Message, DateTimeOffset Time);
+public sealed record UpdateResult(string Version, bool Success, bool RestartRequired, string Message, DateTimeOffset Time, int[]? AcadYears = null);
 
 [SupportedOSPlatform("windows")]
 public static class UpdateInstallation
@@ -92,6 +92,25 @@ public static class UpdateInstallation
         if (target.CompareTo(current) <= 0) throw new InvalidOperationException("Deze versie is al geïnstalleerd of is ouder dan de huidige installatie. Herstart Civil 3D.");
     }
 
+    public static void VerifyInstalledFiles(string expected, IEnumerable<int> years)
+    {
+        foreach (var year in years)
+        {
+            if (year is not (2025 or 2026 or 2027)) throw new InvalidDataException("Onbekende CAD-versie in de update-uitslag.");
+            foreach (var file in new[] { "NlcsLegenda.dll", "NlcsLegenda.Core.dll", "NlcsLegenda.Update.dll" })
+                RequireFileVersion(Path.Join(Path.GetDirectoryName(PluginPath(year)), file), expected);
+        }
+        WindowsPackage.VerifySignature(UpdaterPath);
+        RequireFileVersion(UpdaterPath, expected);
+    }
+
+    private static void RequireFileVersion(string path, string expected)
+    {
+        var version = FileVersionInfo.GetVersionInfo(path);
+        if ($"{version.FileMajorPart}.{version.FileMinorPart}.{version.FileBuildPart}" != expected)
+            throw new InvalidDataException("Een geïnstalleerd bestand heeft niet de verwachte versie: " + Path.GetFileName(path));
+    }
+
     public static string ConfirmLoaded(UpdateStore store, ReleaseVersion loaded)
     {
         var path = Path.Join(store.DirectoryPath, "last-result.json");
@@ -99,12 +118,25 @@ public static class UpdateInstallation
         if (new FileInfo(path).Length > 16384) throw new InvalidDataException("De update-uitslag is te groot.");
         var result = JsonSerializer.Deserialize<UpdateResult>(File.ReadAllText(path), ReleasePolicy.JsonOptions);
         if (result is null) return "";
-        var key = result.Version + "|" + result.Time.ToString("O");
+        var bootedAt = DateTimeOffset.UtcNow.AddMilliseconds(-Environment.TickCount64);
+        var pendingRestart = ReleasePolicy.RequiresRestart(result, bootedAt);
+        var key = result.Version + "|" + result.Time.ToString("O") + "|" + pendingRestart;
         if (store.Load().ReportedResult == key) return "";
+        string message;
+        if (pendingRestart)
+            message = "NLCS Legenda: Windows moet nog opnieuw worden opgestart om de update af te ronden. Sla je werk eerst op.";
+        else if (result.Success && result.Version == loaded.ToString())
+        {
+            try
+            {
+                VerifyInstalledFiles(result.Version, result.AcadYears ?? new[] { 2025, 2026, 2027 });
+                message = $"NLCS Legenda {loaded}: de update is geladen en gecontroleerd.";
+            }
+            catch (Exception ex) when (IsExpected(ex)) { message = "NLCS Legenda: controleer de installatie via Updates controleren. " + ex.Message; }
+        }
+        else message = "NLCS Legenda: controleer de laatste update via Updates controleren. " + result.Message;
         store.Change(s => s.ReportedResult = key);
-        return result.Success && result.Version == loaded.ToString()
-            ? $"NLCS Legenda {loaded}: de update is geladen."
-            : "NLCS Legenda: controleer de laatste update via Updates controleren. " + result.Message;
+        return message;
     }
     public static bool IsExpected(Exception ex) => ex is IOException or UnauthorizedAccessException or InvalidDataException or JsonException
         or HttpRequestException or OperationCanceledException or CryptographicException or Win32Exception or InvalidOperationException

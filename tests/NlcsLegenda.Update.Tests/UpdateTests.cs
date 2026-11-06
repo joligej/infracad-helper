@@ -206,6 +206,22 @@ public sealed class UpdateTests : IDisposable
         UpdateCache.Clean(store, Current); Assert.False(Directory.Exists(runner));
     }
 
+    [Fact]
+    public void FileValidationUsesOnlySupportedKnownYears()
+    {
+        Assert.Equal(new[] { 2025, 2027 }, ReleasePolicy.SupportedYears(new Dictionary<string, string> { ["NLCSACADYEARS"] = "2025,2027,2028" }));
+    }
+
+    [Fact]
+    public void PendingReplacementIsCheckedAfterWindowsRestart()
+    {
+        var time = DateTimeOffset.UtcNow;
+        var result = new UpdateResult("1.42.0", true, true, "herstart", time, new[] { 2027 });
+        Assert.True(ReleasePolicy.RequiresRestart(result, time.AddHours(-3)));
+        Assert.False(ReleasePolicy.RequiresRestart(result, time.AddMinutes(1)));
+        Assert.False(ReleasePolicy.RequiresRestart(result with { RestartRequired = false }, time.AddHours(-3)));
+    }
+
     private static ReleaseClient Client(Func<HttpRequestMessage, HttpResponseMessage> reply) => new(new HttpClient(new Handler(reply)));
     private static HttpResponseMessage Reply(string text) => new(HttpStatusCode.OK) { Content = new StringContent(text, Encoding.UTF8) };
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> reply) : HttpMessageHandler

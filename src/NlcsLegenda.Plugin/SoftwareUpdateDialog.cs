@@ -41,7 +41,14 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
         body.Controls.Add(new Label { Text = $"Geïnstalleerd: {current}", AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10) }, 0, 0);
         body.Controls.Add(_status, 0, 1); body.Controls.Add(_notes, 0, 2); body.Controls.Add(_progress, 0, 3);
         _automatic.Checked = automatic; _automatic.Margin = new Padding(0, 12, 0, 12);
-        _automatic.CheckedChanged += (_, _) => TryAction(() => preference(_automatic.Checked));
+        var savedAutomatic = automatic;
+        _automatic.CheckedChanged += (_, _) =>
+        {
+            if (_automatic.Checked == savedAutomatic) return;
+            try { preference(_automatic.Checked); savedAutomatic = _automatic.Checked; }
+            catch (Exception ex) when (!ExceptionSafety.IsFatal(ex))
+            { _automatic.Checked = savedAutomatic; _status.Text = "Voorkeur niet opgeslagen. " + ex.Message; }
+        };
         body.Controls.Add(_automatic, 0, 4);
         var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true };
         buttons.Controls.AddRange(new Control[] { _download, _check, _page, _skip, _laterButton });
@@ -92,7 +99,7 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
         try
         {
             await _downloadRelease(_offer, new Progress<int>(value => { if (!IsDisposed) _progress.Value = Math.Clamp(value, 0, 100); }), _cancel.Token);
-            if (!IsDisposed) { _later(); Close(); }
+            if (!IsDisposed) { TryAction(_later); Close(); }
         }
         catch (OperationCanceledException) { if (!IsDisposed) _status.Text = "Download afgebroken. Je huidige installatie blijft behouden."; }
         catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { if (!IsDisposed) _status.Text = "Bijwerken is niet gestart. " + ex.Message; }

@@ -71,6 +71,15 @@ public static class ReleasePolicy
             !properties.TryGetValue("NLCSACADYEARS", out var years) || !years.Split(',').Contains(acadYear.ToString(System.Globalization.CultureInfo.InvariantCulture)))
             throw new InvalidDataException("De ondertekende installer ondersteunt deze CAD-versie of updater niet. Gebruik de handmatige installatie-instructies.");
     }
+    public static int[] SupportedYears(IReadOnlyDictionary<string, string> properties)
+    {
+        if (!properties.TryGetValue("NLCSACADYEARS", out var years)) return Array.Empty<int>();
+        var declared = years.Split(',');
+        return new[] { 2025, 2026, 2027 }.Where(year => declared.Contains(year.ToString(System.Globalization.CultureInfo.InvariantCulture))).ToArray();
+    }
+
+    public static bool RequiresRestart(UpdateResult result, DateTimeOffset bootedAt) => result.RestartRequired && bootedAt <= result.Time;
+
     public static bool IsSha256(string? value) => value is { Length: 64 } && value.All(Uri.IsHexDigit);
     public static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
 }

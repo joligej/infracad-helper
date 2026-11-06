@@ -15,6 +15,7 @@ internal sealed class UpdaterForm : Form
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1500 };
     private readonly CancellationTokenSource _cancel = new();
     private bool _installing;
+    private bool _restartRequired;
     private int _clearChecks;
     private DateTimeOffset _waitUntil = DateTimeOffset.UtcNow.AddHours(2);
 
@@ -47,6 +48,7 @@ internal sealed class UpdaterForm : Form
 
     private async Task PrepareAsync()
     {
+        _restartRequired = false;
         _status.Text = $"Versie {_request.Version} controleren…";
         try
         {
@@ -89,6 +91,7 @@ internal sealed class UpdaterForm : Form
         UpdateInstallation.RequireNewerVersion(_request);
         using var packageLock = new FileStream(UpdateInstallation.PackagePath(_store, _request.Version), FileMode.Open, FileAccess.Read, FileShare.Read);
         UpdateInstallation.VerifyDownload(_store, _request);
+        var years = ReleasePolicy.SupportedYears(WindowsPackage.ReadProperties(UpdateInstallation.PackagePath(_store, _request.Version)));
         var snapshot = SettingsSnapshot.Capture(_store, _request.Version);
         if (UpdateInstallation.ActiveCadSessions().Length > 0) throw new InvalidOperationException("Er is opnieuw een CAD-sessie geopend. Sluit CAD en start de update opnieuw.");
         var log = Path.Join(_store.DirectoryPath, "install-" + _request.Version + ".log");
@@ -97,37 +100,26 @@ internal sealed class UpdaterForm : Form
         foreach (var arg in new[] { "/i", UpdateInstallation.PackagePath(_store, _request.Version), "/qn", "/norestart", "MSIRESTARTMANAGERCONTROL=Disable", "REBOOT=ReallySuppress", "/l*v", log }) start.ArgumentList.Add(arg);
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Windows Installer kon niet worden gestart.");
         await process.WaitForExitAsync();
+        _restartRequired = process.ExitCode == 3010;
         if (process.ExitCode is not (0 or 3010))
         {
             var installed = WindowsPackage.InstalledVersion();
             throw new InvalidOperationException($"Windows Installer heeft de update niet voltooid (code {process.ExitCode}). Geregistreerde versie: {installed ?? "niet gevonden"}.\r\nDetails: {log}");
         }
         if (WindowsPackage.InstalledVersion() != _request.Version) throw new InvalidDataException("De installatie meldt succes, maar de geregistreerde versie wijkt af.");
-        foreach (var year in new[] { 2025, 2026, 2027 })
-        {
-            foreach (var file in new[] { "NlcsLegenda.dll", "NlcsLegenda.Core.dll", "NlcsLegenda.Update.dll" })
-            {
-                var path = Path.Join(Path.GetDirectoryName(UpdateInstallation.PluginPath(year)), file);
-                var version = FileVersionInfo.GetVersionInfo(path);
-                if ($"{version.FileMajorPart}.{version.FileMinorPart}.{version.FileBuildPart}" != _request.Version)
-                    throw new InvalidDataException("Een geïnstalleerd bestand heeft niet de verwachte versie: " + file);
-            }
-        }
-        WindowsPackage.VerifySignature(UpdateInstallation.UpdaterPath);
-        var helper = FileVersionInfo.GetVersionInfo(UpdateInstallation.UpdaterPath);
-        if ($"{helper.FileMajorPart}.{helper.FileMinorPart}.{helper.FileBuildPart}" != _request.Version)
-            throw new InvalidDataException("Het geïnstalleerde updateprogramma heeft niet de verwachte versie.");
+        if (process.ExitCode == 0) UpdateInstallation.VerifyInstalledFiles(_request.Version, years);
         snapshot.Verify();
         return new(_request.Version, true, process.ExitCode == 3010,
             process.ExitCode == 3010 ? "De update is geïnstalleerd. Windows meldt dat opnieuw opstarten nodig is; sla je werk op en herstart de computer op een geschikt moment."
-                : $"NLCS Legenda {_request.Version} is geïnstalleerd. Je instellingen zijn behouden. Start Civil 3D opnieuw om de nieuwe versie te gebruiken.", DateTimeOffset.UtcNow);
+                : $"NLCS Legenda {_request.Version} is geïnstalleerd. Je instellingen zijn behouden. Start Civil 3D opnieuw om de nieuwe versie te gebruiken.", DateTimeOffset.UtcNow, years);
     }
 
     private void Failed(Exception exception)
     {
-        _timer.Stop(); _retry.Visible = true; _status.Text = "Bijwerken niet voltooid."; _details.Text = exception.Message; _close.Text = "Sluiten";
+        var message = (_restartRequired ? "Windows moet opnieuw worden opgestart om de installatie af te ronden.\r\n\r\n" : "") + exception.Message;
+        _timer.Stop(); _retry.Visible = !_restartRequired; _status.Text = "Bijwerken niet voltooid."; _details.Text = message; _close.Text = "Sluiten";
         _store.Log("Installatie: " + exception);
-        try { UpdateStore.WriteJson(Path.Join(_store.DirectoryPath, "last-result.json"), new UpdateResult(_request.Version, false, false, exception.Message, DateTimeOffset.UtcNow)); }
+        try { UpdateStore.WriteJson(Path.Join(_store.DirectoryPath, "last-result.json"), new UpdateResult(_request.Version, false, _restartRequired, message, DateTimeOffset.UtcNow)); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { _store.Log("Uitslag bewaren: " + ex.Message); }
     }
 

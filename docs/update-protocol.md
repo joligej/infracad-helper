@@ -38,7 +38,9 @@ sluiten geannuleerd. In Core Console wordt hij niet gestart.
    De MSI verwijdert de vorige installatie binnen de terugdraaibare transactie
    (`MajorUpgrade` na `InstallInitialize`). Controleer registratie, DLL-versies
    en persoonlijke instellingen na afloop. Exitcode 3010 wordt als noodzakelijke
-   Windows-herstart getoond, zonder die uit te voeren.
+   Windows-herstart getoond, zonder die uit te voeren. Bij 3010 volgt de controle
+   van uitgestelde bestandsvervanging pas bij een CAD-start na de Windows-herstart.
+   De bestandscontrole gebruikt de CAD-jaargangen uit de ondertekende MSI.
 9. Meld na de volgende normale CAD-start eenmaal welke update werkelijk is geladen.
 
 ## Bewaarde gegevens
