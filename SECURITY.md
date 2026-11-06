@@ -15,8 +15,15 @@ AutoCAD-/Civil 3D-versie.
 ## Wat de plugin wel en niet doet
 
 De plugin leest de tekening en schrijft geometrie, instellingen (in de tekening of in
-`%APPDATA%\NlcsLegenda\`) en desgevraagd een CSV/JSON-export. Er is geen netwerk- of
-telemetrieverkeer en er worden geen externe diensten aangeroepen.
+`%APPDATA%\NlcsLegenda\`) en desgevraagd een CSV/JSON-export. De tekeningverwerking
+blijft lokaal. De optionele opstartcontrole haalt openbare releasegegevens op bij
+GitHub; na jouw keuze downloadt hij de installer. Er worden geen tekeningen,
+projectpaden of telemetrie verstuurd.
+
+Automatische installatie controleert SHA-256, de ondertekende inhoud, de vaste
+uitgever en de product- en CAD-gegevens. Een apart programma wacht totdat CAD
+gesloten is. Er worden geen certificaten geïmporteerd en geen CAD-sessies beëindigd.
+Zie [Updateprotocol](docs/update-protocol.md) voor de controles en beperkingen.
 
 De MSI-installer is self-signed ondertekend als `joligej`. Die handtekening laat zien
 dat het bestand na ondertekening niet is gewijzigd; hij zegt niets over een door een

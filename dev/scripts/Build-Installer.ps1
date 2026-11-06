@@ -5,6 +5,7 @@
 [CmdletBinding()]
 param(
     [string]$Version,
+    [string]$UpdaterPath,
     [string]$PfxPath,
     [System.Security.SecureString]$PfxPassword,
     [string]$TimestampUrl = "http://timestamp.digicert.com"
@@ -43,6 +44,7 @@ $net82025Out = Join-Path $stage "Contents\net8-2025"
 New-Item -ItemType Directory -Force -Path $net82025Out | Out-Null
 Copy-Item (Join-Path $net8Bin2025 "NlcsLegenda.dll") $net82025Out
 Copy-Item (Join-Path $net8Bin2025 "NlcsLegenda.Core.dll") $net82025Out
+Copy-Item (Join-Path $net8Bin2025 "NlcsLegenda.Update.dll") $net82025Out
 
 Write-Host "==> Plugin bouwen (net8, AutoCAD 2026)..." -ForegroundColor Cyan
 dotnet build $pluginProj -c Release -p:AcadVersion=2026
@@ -52,6 +54,7 @@ $net82026Out = Join-Path $stage "Contents\net8-2026"
 New-Item -ItemType Directory -Force -Path $net82026Out | Out-Null
 Copy-Item (Join-Path $net8Bin2026 "NlcsLegenda.dll") $net82026Out
 Copy-Item (Join-Path $net8Bin2026 "NlcsLegenda.Core.dll") $net82026Out
+Copy-Item (Join-Path $net8Bin2026 "NlcsLegenda.Update.dll") $net82026Out
 
 Write-Host "==> Plugin bouwen (net10, AutoCAD 2027)..." -ForegroundColor Cyan
 dotnet build $pluginProj -c Release -p:AcadVersion=2027
@@ -61,6 +64,11 @@ $net10Out = Join-Path $stage "Contents\net10"
 New-Item -ItemType Directory -Force -Path $net10Out | Out-Null
 Copy-Item (Join-Path $net10Bin "NlcsLegenda.dll") $net10Out
 Copy-Item (Join-Path $net10Bin "NlcsLegenda.Core.dll") $net10Out
+Copy-Item (Join-Path $net10Bin "NlcsLegenda.Update.dll") $net10Out
+if(!$UpdaterPath){ & (Join-Path $PSScriptRoot 'Build-Updater.ps1') -PfxPath $PfxPath -PfxPassword $PfxPassword -TimestampUrl $TimestampUrl; $UpdaterPath=Join-Path $repoRoot 'artifacts/updater/NlcsLegenda.Updater.exe' }
+$updaterDirectory=Join-Path $stage 'Contents/Updater'
+New-Item -ItemType Directory -Path $updaterDirectory -Force | Out-Null
+Copy-Item -LiteralPath $UpdaterPath -Destination $updaterDirectory
 
 [xml]$src = Get-Content $manifestSrc -Raw
 $commandsXml = $src.ApplicationPackage.Components.ComponentEntry.Commands.InnerXml
@@ -101,31 +109,6 @@ wix build $wxs -arch x64 -d "Version=$Version" -d "BundleStage=$stage" -o $msi
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $msi)) { throw "MSI is niet gebouwd." }
 
 if ($PfxPath) {
-    if (-not (Test-Path $PfxPath)) { throw "PFX niet gevonden: $PfxPath" }
-    $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName | Select-Object -Last 1
-    if (-not $signtool) { throw "signtool.exe (x64) niet gevonden; installeer de Windows SDK." }
-    $plainPw = ""
-    if ($PfxPassword) {
-        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($PfxPassword)
-        try { $plainPw = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
-        finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-    }
-    Write-Host "==> MSI ondertekenen..." -ForegroundColor Cyan
-    & $signtool.FullName sign /fd SHA256 /f $PfxPath /p $plainPw /tr $TimestampUrl /td SHA256 $msi
-    if ($LASTEXITCODE -ne 0) { throw "Ondertekenen mislukt." }
-
-    # handtekening vergelijken met het meegeleverde openbare certificaat
-    $cerPath = Join-Path $repoRoot "deploy\joligej-codesign.cer"
-    if (-not (Test-Path $cerPath)) { throw "Publiek certificaat ontbreekt: $cerPath" }
-    $expected = (New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cerPath)).Thumbprint
-    $sig = Get-AuthenticodeSignature $msi
-    if ($null -eq $sig.SignerCertificate) { throw "MSI is niet ondertekend." }
-    if ($sig.Status -eq 'HashMismatch') { throw "MSI is na ondertekenen gewijzigd (HashMismatch)." }
-    if ($sig.SignerCertificate.Thumbprint -ne $expected) {
-        throw "Signer-thumbprint ($($sig.SignerCertificate.Thumbprint)) komt niet overeen met deploy/joligej-codesign.cer ($expected)."
-    }
-    Write-Host "==> Handtekening geverifieerd: $($sig.SignerCertificate.Subject), thumbprint $($sig.SignerCertificate.Thumbprint)" -ForegroundColor Green
+    & (Join-Path $PSScriptRoot 'Sign-ReleaseFile.ps1') -Path $msi -PfxPath $PfxPath -PfxPassword $PfxPassword -TimestampUrl $TimestampUrl
 }
-
 Write-Host "==> Klaar: $msi" -ForegroundColor Green

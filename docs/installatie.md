@@ -23,11 +23,49 @@ Je hoeft geen certificaat te installeren. Vergelijk de SHA-256 van je download m
 `SHA256SUMS.txt` bij dezelfde release, bijvoorbeeld met `Get-FileHash` in PowerShell.
 Meer uitleg staat in [Beveiliging](../SECURITY.md).
 
+## Vanuit de plug-in
+
+Vanaf 1.42.0 controleert de plug-in bij de eerste rustige gelegenheid na opstarten
+of GitHub een nieuwere stabiele release heeft. De automatische netwerkcontrole
+gaat maximaal eenmaal per dag; na een netwerkfout probeert hij het niet vaker
+dan eenmaal per uur. Zonder internet blijft de huidige versie werken.
+
+1. Open **Updates controleren** in het lint, of gebruik `NLCSLEGENDAUPDATES`.
+2. Lees de wijzigingen en kies **Downloaden en bijwerken**.
+3. Sla je werk op en sluit **alle** AutoCAD-, Civil 3D- en Core Console-sessies.
+   Het aparte updateprogramma wacht hierop; het sluit geen programma’s voor je.
+4. Wacht op **Bijwerken voltooid** en start Civil 3D opnieuw.
+
+De geladen DLL’s worden niet vervangen terwijl CAD draait. Windows Installer
+krijgt ook geen toestemming om CAD automatisch te sluiten. Als Windows toch
+meldt dat een herstart nodig is, toont de updater dat; hij herstart zelf niets.
+De update is pas in gebruik na een nieuwe CAD-start.
+
+**Later** stelt de automatische melding een dag uit. **Deze versie overslaan**
+onderdrukt die versie; een handmatige controle blijft hem tonen. Het vinkje
+**Bij opstarten controleren** geldt voor jouw Windows-gebruiker,
+los van de lokale legenda-instellingen en de globale legendastandaard.
+Core Console doet geen netwerkcontrole en opent geen updatevensters.
+
+![Updatevenster met demonstratiegegevens](updates.png)
+
+De automatische installatie is beschikbaar voor de gewone MSI-installatie per
+gebruiker. Een ZIP, ontwikkelbuild, afwijkende installatie of niet ondersteunde
+CAD-versie krijgt een verwijzing naar de handmatige installer. De updater vraagt
+geen beheerdersrechten en installeert geen certificaat. Een onvolledig,
+gewijzigd of anders ondertekend bestand wordt geweigerd.
+
+Persoonlijke JSON-instellingen worden vóór installatie gekopieerd naar
+`%LOCALAPPDATA%\NlcsLegenda\Updates\SettingsBackup` en daarna vergeleken.
+De installer heeft geen toegang nodig tot je tekeningen. Bij een mislukte
+installatie toont het venster de fout en de locatie van het installatielog.
+Met **Opnieuw proberen** kun je verder nadat de oorzaak is verholpen.
+
 ## Handmatig met een ZIP
 
 Kies `NlcsLegenda-2025-vX.Y.Z.zip`, `2026` of `2027` voor jouw CAD-jaargang.
 Pak `NlcsLegenda.bundle` uit in `%APPDATA%\Autodesk\ApplicationPlugins` en herstart
-CAD. De twee DLL’s horen bij elkaar. Combineer geen bestanden uit verschillende
+CAD. De drie DLL’s en het updateprogramma horen bij elkaar. Combineer geen bestanden uit verschillende
 versies en gebruik niet tegelijk een losse oude bundle en een MSI-installatie.
 
 ## Op een andere computer

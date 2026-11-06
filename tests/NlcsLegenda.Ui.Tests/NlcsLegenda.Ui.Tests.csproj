@@ -1,10 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
     <Using Include="System.IO" />
+    <ProjectReference Include="../../src/NlcsLegenda.Update/NlcsLegenda.Update.csproj" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/SoftwareUpdateDialog.cs" Link="SoftwareUpdateDialog.cs" />
+    <Compile Include="../../src/NlcsLegenda.Updater/UpdaterForm.cs" Link="UpdaterForm.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/Icons.cs" Link="Icons.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/KlicOptionsDialog.cs" Link="KlicOptionsDialog.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/KlicDetailsDialog.cs" Link="KlicDetailsDialog.cs" />

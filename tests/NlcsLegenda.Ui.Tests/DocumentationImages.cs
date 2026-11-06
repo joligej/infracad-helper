@@ -61,6 +61,8 @@ internal static class DocumentationImages
             new SourceViewOption("B24", "02 Details", 1, 100, 210, 310, 350, 400, "Vergrendeld"),
             new SourceViewOption("B31", "02 Details", 2, 100, 610, 310, 350, 400, "Vergrendeld") }, new[] { "A12" }))
             Capture(form, directory, "kaartvensters.png", new Size(1000, 640));
+        using (var form = Program.SoftwareDialog())
+            Capture(form, directory, "updates.png", new Size(720, 520));
         Console.WriteLine("Documentatiebeelden geschreven met synthetische gegevens.");
     }
 

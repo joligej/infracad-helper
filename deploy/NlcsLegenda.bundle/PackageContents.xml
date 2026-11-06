@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <ApplicationPackage SchemaVersion="1.0"
-                    AppVersion="1.41.0"
+                    AppVersion="1.42.0"
                     ProductCode="{4C4B0F1A-6C1E-4C7E-9E3A-1F2A3B4C5D6E}"
                     Name="NLCS Legenda"
                     Description="Automatische NLCS-legendagenerator"
@@ -17,6 +17,7 @@
                     AppType=".NET"
                     LoadOnAutoCADStartup="True">
       <Commands GroupName="NLCS_LEGENDA">
+        <Command Global="NLCSLEGENDAUPDATES" Local="NLCSLEGENDAUPDATES" />
         <Command Global="NLCSLEGENDA" Local="NLCSLEGENDA" />
         <Command Global="NLCSLEGENDAOVERNEMEN" Local="NLCSLEGENDAOVERNEMEN" />
         <Command Global="NLCSLEGENDAUPDATE" Local="NLCSLEGENDAUPDATE" />

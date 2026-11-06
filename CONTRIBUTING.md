@@ -11,6 +11,7 @@ de `AutoCAD.NET`-referenties van NuGet.
 ```powershell
 dotnet build NlcsLegenda.slnx -c Release
 dotnet test tests/NlcsLegenda.Core.Tests -c Release
+dotnet test tests/NlcsLegenda.Update.Tests -c Release
 dotnet run --project tests/NlcsLegenda.Ui.Tests -c Release
 pwsh -File dev/scripts/Test-CoreConsoleState.ps1
 ```
@@ -85,3 +86,27 @@ mogelijk een voorbeeldtekening of de betreffende laagnamen.
 
 
 De beoordeling van CodeQL-meldingen staat in [Codekwaliteit](docs/codekwaliteit.md).
+
+
+### Updateprogramma
+
+`NlcsLegenda.Update` bevat de hostonafhankelijke controle, cache en validatie.
+`NlcsLegenda.Updater` is een apart Windows-programma dat pas na het sluiten van
+CAD de MSI start. Bouw het met `dev/scripts/Build-Updater.ps1`.
+
+De release-workflow ondertekent eerst de updater, neemt exact dat bestand in alle
+ZIP’s en de MSI op en ondertekent daarna de MSI. `update.json` wordt afgeleid van
+de ondertekende MSI-eigenschappen in `Package.wxs`. Alle bestanden worden eerst
+als draft gepubliceerd; pas een complete release wordt de nieuwste versie.
+
+Voor een wijziging aan deze route:
+
+- draai de update- en UI-tests en `Test-InstallerRollback.ps1` (vereist WiX 5);
+- voer `Test-UpdatePackage.ps1 -SignedMsi <publieke MSI>` uit: echte inhoudswijziging,
+  verkeerde uitgever en verkeerde versie moeten worden geweigerd;
+- controleer een ondertekende updater tijdens een actieve CAD-sessie, sluit die
+  normaal en controleer de installatie, de instellingen en de volgende CAD-start;
+- vergelijk ook de derde DLL en de updater met de publieke ZIP’s.
+
+Zie [Updateprotocol](docs/update-protocol.md) voor de grenzen van automatische
+updates, certificaatwisseling en het bewaren van gegevens.

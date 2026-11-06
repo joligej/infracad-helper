@@ -28,6 +28,14 @@ Met **Blanco** begin je bewust zonder automatische regels.
 
 Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitleg.
 
+## Updates
+
+Vanaf 1.42.0 meldt de plug-in bij opstarten een nieuwe stabiele release.
+**Updates controleren** in het lint opent dezelfde controle handmatig.
+Downloaden kan tijdens het werken; installeren wacht totdat alle CAD-sessies
+zijn gesloten. Start Civil 3D daarna opnieuw. Je kunt een versie overslaan of
+de automatische controle uitschakelen. Zie [Bijwerken](docs/installatie.md#vanuit-de-plug-in).
+
 ## Wat je kunt aanpassen
 
 | Onderdeel | Mogelijkheden |
@@ -79,7 +87,9 @@ Windows, 64-bit, AutoCAD/Civil 3D **2025, 2026 en 2027**. De bundles worden apar
 gebouwd voor elke jaargang. CAD-acceptatie vindt lokaal plaats op 2025 en 2027;
 2026 wordt gebouwd maar is hier niet als host beschikbaar.
 
-De plugin werkt lokaal, zonder account of telemetrie. Dit is een onafhankelijk
+De tekenverwerking werkt lokaal, zonder account of telemetrie. Alleen de
+updatecontrole haalt openbare releasegegevens en gekozen downloads op bij GitHub;
+er worden geen tekeningen of projectgegevens verstuurd. Dit is een onafhankelijk
 project; het wordt niet uitgegeven door Autodesk of InfraCAD.
 
 [Wijzigingen per versie](CHANGELOG.md) · [Bijdragen en testen](CONTRIBUTING.md)

@@ -27,6 +27,8 @@ jobs:
         run: dotnet restore tests/NlcsLegenda.Core.Tests/NlcsLegenda.Core.Tests.csproj
       - name: Test
         run: dotnet test tests/NlcsLegenda.Core.Tests/NlcsLegenda.Core.Tests.csproj -c Release --no-restore --collect:"XPlat Code Coverage" --results-directory coverage
+      - name: Test updatecontrole
+        run: dotnet test tests/NlcsLegenda.Update.Tests -c Release
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v7
@@ -57,6 +59,16 @@ jobs:
             10.0.x
       - name: Build plugin (NuGet AutoCAD-referenties)
         run: dotnet build src/NlcsLegenda.Plugin/NlcsLegenda.Plugin.csproj -c Release -p:AcadVersion=${{ matrix.acad }} -p:UseNuGetAcad=true
+      - name: Bouw updateprogramma
+        if: matrix.acad == '2025'
+        run: ./dev/scripts/Build-Updater.ps1
+      - name: Test herstel van installer
+        if: matrix.acad == '2025'
+        shell: pwsh
+        run: |
+          dotnet tool update --global wix --version 5.0.2
+          if ($LASTEXITCODE) { throw 'WiX ontbreekt.' }
+          ./dev/scripts/Test-InstallerRollback.ps1
       - name: Test vensters en bediening
         if: matrix.acad == '2025'
         run: dotnet run --project tests/NlcsLegenda.Ui.Tests -c Release
@@ -73,3 +85,4 @@ jobs:
           path: |
             src/NlcsLegenda.Plugin/bin/Release/${{ matrix.tfm }}/NlcsLegenda.dll
             src/NlcsLegenda.Plugin/bin/Release/${{ matrix.tfm }}/NlcsLegenda.Core.dll
+            src/NlcsLegenda.Plugin/bin/Release/${{ matrix.tfm }}/NlcsLegenda.Update.dll

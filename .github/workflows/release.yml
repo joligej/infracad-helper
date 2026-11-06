@@ -37,16 +37,31 @@ jobs:
       - name: Kernlogica testen
         run: dotnet test tests/NlcsLegenda.Core.Tests/NlcsLegenda.Core.Tests.csproj -c Release
 
+      - name: Updatecontrole testen
+        run: dotnet test tests/NlcsLegenda.Update.Tests -c Release
+
+      - name: Updateprogramma bouwen en ondertekenen
+        shell: pwsh
+        env:
+          CODESIGN_PFX_BASE64: ${{ secrets.CODESIGN_PFX_BASE64 }}
+          CODESIGN_PFX_PASSWORD: ${{ secrets.CODESIGN_PFX_PASSWORD }}
+        run: |
+          if (-not $env:CODESIGN_PFX_BASE64 -or -not $env:CODESIGN_PFX_PASSWORD) { throw 'Ondertekening ontbreekt.' }
+          $pfx = Join-Path $env:RUNNER_TEMP 'codesign.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CODESIGN_PFX_BASE64))
+          $pw = ConvertTo-SecureString $env:CODESIGN_PFX_PASSWORD -AsPlainText -Force
+          ./dev/scripts/Build-Updater.ps1 -PfxPath $pfx -PfxPassword $pw
+
       - name: Bundels bouwen (2025, 2026 en 2027)
         shell: pwsh
         run: |
-          ./dev/scripts/Build-Bundle.ps1 -AcadVersion 2025
+          ./dev/scripts/Build-Bundle.ps1 -AcadVersion 2025 -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe
           Compress-Archive -Path artifacts/NlcsLegenda.bundle -DestinationPath "artifacts/NlcsLegenda-2025-${{ github.ref_name }}.zip" -Force
           Remove-Item artifacts/NlcsLegenda.bundle -Recurse -Force
-          ./dev/scripts/Build-Bundle.ps1 -AcadVersion 2026
+          ./dev/scripts/Build-Bundle.ps1 -AcadVersion 2026 -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe
           Compress-Archive -Path artifacts/NlcsLegenda.bundle -DestinationPath "artifacts/NlcsLegenda-2026-${{ github.ref_name }}.zip" -Force
           Remove-Item artifacts/NlcsLegenda.bundle -Recurse -Force
-          ./dev/scripts/Build-Bundle.ps1 -AcadVersion 2027
+          ./dev/scripts/Build-Bundle.ps1 -AcadVersion 2027 -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe
           Compress-Archive -Path artifacts/NlcsLegenda.bundle -DestinationPath "artifacts/NlcsLegenda-2027-${{ github.ref_name }}.zip" -Force
 
       - name: MSI-installer bouwen en ondertekenen
@@ -64,8 +79,15 @@ jobs:
           $pfx = Join-Path $env:RUNNER_TEMP "codesign.pfx"
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CODESIGN_PFX_BASE64))
           $pw = ConvertTo-SecureString $env:CODESIGN_PFX_PASSWORD -AsPlainText -Force
-          ./dev/scripts/Build-Installer.ps1 -Version $version -PfxPath $pfx -PfxPassword $pw
+          ./dev/scripts/Build-Installer.ps1 -Version $version -PfxPath $pfx -PfxPassword $pw -UpdaterPath artifacts/updater/NlcsLegenda.Updater.exe
           Remove-Item $pfx -Force
+
+      - name: Tijdelijke sleutel verwijderen
+        if: always()
+        shell: pwsh
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP 'codesign.pfx'
+          if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
 
       - name: Release aanmaken
         shell: pwsh
@@ -83,8 +105,13 @@ jobs:
             $body = ($section -join "`n").Trim()
           }
 
+          [xml]$definition = Get-Content deploy/installer/Package.wxs -Raw
+          $years = ($definition.Wix.Package.Property | Where-Object Id -eq 'NLCSACADYEARS').Value.Split(',') | ForEach-Object { [int]$_ }
+          $protocol = [int]($definition.Wix.Package.Property | Where-Object Id -eq 'NLCSUPDATEPROTOCOL').Value
+          @{ schema=1; version=$version; autoCadYears=@($years); minimumUpdater=$protocol; installer="NlcsLegenda-$version.msi"; sha256=(Get-FileHash -LiteralPath "artifacts/NlcsLegenda-$version.msi" -Algorithm SHA256).Hash.ToLowerInvariant() } |
+            ConvertTo-Json | Set-Content -LiteralPath artifacts/update.json -Encoding utf8
           Push-Location artifacts
-          Get-ChildItem -File -Include *.zip, *.msi -Recurse |
+          Get-ChildItem -LiteralPath "NlcsLegenda-2025-${{ github.ref_name }}.zip", "NlcsLegenda-2026-${{ github.ref_name }}.zip", "NlcsLegenda-2027-${{ github.ref_name }}.zip", "NlcsLegenda-$version.msi", "update.json" |
             Sort-Object Name |
             ForEach-Object { "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower(), $_.Name } |
             Set-Content -Path SHA256SUMS.txt -Encoding ascii
@@ -98,6 +125,10 @@ jobs:
             "artifacts/NlcsLegenda-2027-${{ github.ref_name }}.zip" `
             "artifacts/NlcsLegenda-$version.msi" `
             "artifacts/SHA256SUMS.txt" `
+            "artifacts/update.json" `
             "deploy/joligej-codesign.cer" `
             --title "NLCS Legenda ${{ github.ref_name }}" `
-            --notes-file release-notes.md
+            --notes-file release-notes.md --draft
+          if ($LASTEXITCODE) { throw "Releasebestanden niet volledig geplaatst." }
+          gh release edit ${{ github.ref_name }} --draft=false --latest
+          if ($LASTEXITCODE) { throw "Release niet gepubliceerd." }

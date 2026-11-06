@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.42.0 - 2026-11-06
+
+- Bij opstarten controleert de plug-in op een nieuwere stabiele GitHub-release. De controle loopt op de achtergrond, maximaal eenmaal per dag; zonder internet blijft CAD gewoon bruikbaar. Via Updates controleren kun je zelf controleren, een versie overslaan of de automatische controle uitzetten.
+- Downloaden en bijwerken controleert bestandsgrootte, SHA-256, ondertekenaar, product en CAD-ondersteuning. Een apart updateprogramma wacht totdat AutoCAD, Civil 3D en Core Console gesloten zijn. Het sluit geen sessies of tekeningen en herstart de computer niet.
+- Na installatie laad je de nieuwe versie door CAD opnieuw te starten. Persoonlijke instellingen worden vooraf gekopieerd en achteraf gecontroleerd. Bestaande legenda’s en DWG’s worden niet aangepast.
+- De MSI kan bij een mislukte upgrade de vorige bestanden terugzetten. Dit is getest met een opzettelijke fout na het installeren van nieuwe bestanden. ZIP- en afwijkende installaties krijgen een handmatige updateroute.
+
 ## 1.41.0 - 2026-11-05
 
 - Genereren plaatst ook zonder gevonden bronregels een beheerde legenda. Daarna kunnen xrefs en eigen regels via de lokale instellingen worden toegevoegd. Als alle zichtbare onderdelen uitstaan, blijft een niet-plotbare hulptekst beschikbaar om de legenda te kiezen.

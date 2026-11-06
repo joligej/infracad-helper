@@ -190,3 +190,13 @@ bij het eerste verschil. Een afzonderlijk filter zou extra iteratie of opnieuw
 opzoeken introduceren. Daarom blijft deze meetbaar snellere lus staan. Tests dekken
 tabelnamen, veldvolgorde, lege en numerieke waarden, verschillende woordenboek-
 vergelijkingen en opnieuw gewijzigde records. Er wordt geen broncontrole overgeslagen.
+
+
+## Updateprogramma
+
+De updater gebruikt Windows Installer en crypt32 voor bestandsvalidatie en
+registratiecontrole. De native bibliotheken worden uitsluitend uit System32
+geladen; database- en certificaathandles worden vrijgegeven. De controle verifieert
+zowel de ondertekende inhoud als de vaste uitgever en de productgegevens.
+HTTPS en SHA-256 zijn aanvullende controles, geen vervanging voor de handtekening.
+De keuzes en regressieproeven staan in [Updateprotocol](update-protocol.md).

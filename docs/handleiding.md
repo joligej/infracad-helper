@@ -642,3 +642,16 @@ De opmerkingenkop volgt de koppenlaag **X-XX-AL-LEGENDA-T50**, standaard ACI 130
 de KLIC-waarschuwing, beide samen of eigen tekst. Klik **Tekst overnemen** en pas
 de tekst aan. De algemene teksten komen uit de TAUW-template; projectspecifieke
 beplantingslijsten worden niet als algemene standaard overgenomen.
+
+
+## Plug-in bijwerken
+
+**Updates controleren** (`NLCSLEGENDAUPDATES`) toont de geïnstalleerde versie,
+de nieuwste stabiele release en de wijzigingen. Kies zelf of je downloadt,
+uitstelt of deze versie overslaat. De automatische opstartcontrole kan hier uit.
+Deze voorkeur staat los van tekeningen en legendaprofielen.
+
+Na downloaden vraagt een apart venster om je werk op te slaan en alle CAD-sessies
+te sluiten. De installatie wacht; daarna start je Civil 3D opnieuw. Zie
+[Installeren en bijwerken](installatie.md#vanuit-de-plug-in) voor de controles,
+handmatige route en foutmeldingen.
