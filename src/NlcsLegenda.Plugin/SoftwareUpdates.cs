@@ -65,24 +65,39 @@ internal static class SoftwareUpdates
     {
         if (HostEnvironment.IsCoreConsole) return;
         if (_dialog is not null && !_dialog.IsDisposed) { _dialog.Activate(); return; }
-        if (_lease is not null || (_lease = Store.TryLease("notification")) is null)
+        if (_lease is null && (_lease = Store.TryLease("notification")) is null)
         { AcApp.ShowAlertDialog("Er loopt al een updatecontrole of er staat een updatevenster open in een andere CAD-sessie."); return; }
         Unhook();
-        try { ShowDialog(null); }
+        _cancel?.Cancel();
+        try { ShowDialog(null, _check); }
         catch { ReleaseLease(); throw; }
     }
 
-    private static void ShowDialog(UpdateOffer? offer)
+    private static void ShowDialog(UpdateOffer? offer, Task<UpdateOffer?>? previousCheck = null)
     {
         var problem = UpdateInstallation.Eligibility(typeof(Plugin).Assembly.Location, Version, AcadYear);
         var dialog = new SoftwareUpdateDialog(Version.ToString(), Store.Load().Automatic, offer,
-            token => CheckAsync(true, token), DownloadAsync,
+            token => CheckForDialogAsync(previousCheck, token), DownloadAsync,
             automatic => Store.Change(s => s.Automatic = automatic),
             version => Store.Change(s => s.SkippedVersion = version),
             () => Store.Change(s => s.SnoozeUntil = DateTimeOffset.UtcNow.AddDays(1)), problem);
         _dialog = dialog;
         dialog.FormClosed += (_, _) => { _dialog = null; ReleaseLease(); dialog.Dispose(); };
         AcApp.ShowModelessDialog(dialog);
+    }
+
+    private static async Task<UpdateOffer?> CheckForDialogAsync(Task<UpdateOffer?>? previousCheck, CancellationToken token)
+    {
+        if (previousCheck is not null)
+        {
+            try { await previousCheck.WaitAsync(token).ConfigureAwait(false); }
+            catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex) && !token.IsCancellationRequested)
+            {
+                if (ex is not OperationCanceledException) Store.Log("Vorige updatecontrole: " + ex.Message);
+            }
+        }
+        token.ThrowIfCancellationRequested();
+        return await CheckAsync(true, token).ConfigureAwait(false);
     }
 
     private static async Task<UpdateOffer?> CheckAsync(bool manual, CancellationToken token)

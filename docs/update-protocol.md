@@ -44,6 +44,13 @@ sluiten geannuleerd. In Core Console wordt hij niet gestart.
    De bestandscontrole gebruikt de CAD-jaargangen uit de ondertekende MSI.
 9. Meld na de volgende normale CAD-start eenmaal welke update werkelijk is geladen.
 
+Een handmatige controle neemt een nog lopende opstartcontrole in dezelfde CAD-sessie
+over. De oude aanvraag wordt geannuleerd en afgerond voordat de nieuwe begint.
+Mislukt een hercontrole, dan vervallen de eerdere download- en overslaankeuzes totdat
+een nieuwe controle slaagt. Annuleren stopt de aanvraag; alleen **Later** bij een
+aangeboden update bewaart een dag uitstel. Terugmeldingen lopen via de vensterthread;
+na sluiten worden ze genegeerd.
+
 ## Bewaarde gegevens
 
 `%LOCALAPPDATA%\NlcsLegenda\Updates` bevat de updatevoorkeuren, releasecache,

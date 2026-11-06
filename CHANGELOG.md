@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.42.2 - 2026-11-06
+
+- Handmatig controleren neemt een lopende opstartcontrole over. Een controle in dezelfde CAD-sessie geeft geen onterechte melding meer dat een andere sessie bezig is.
+- Een mislukte hercontrole laat geen download- of overslaankeuze voor een eerder gevonden release actief. Opnieuw proberen gebruikt de nieuw opgehaalde gegevens.
+- Annuleren en sluiten zonder beschikbare update slaan geen dag uitstel op. Bij opnieuw downloaden begint de voortgang opnieuw en worden late meldingen van een eerdere poging genegeerd.
+- Terugmeldingen werken via de vensterthread en worden na sluiten genegeerd, ook tijdens het annuleren van een download.
+
 ## 1.42.1 - 2026-11-06
 
 - Alle plug-in-DLL’s voor AutoCAD/Civil 3D 2025, 2026 en 2027 worden nu met hetzelfde `joligej`-certificaat ondertekend als de updater en MSI, inclusief een SHA-256-tijdstempel.

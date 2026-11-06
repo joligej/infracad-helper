@@ -24,6 +24,8 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
     private readonly string? _installationProblem;
     private UpdateOffer? _offer;
     private bool _busy;
+    private volatile bool _closing;
+    private int _downloadAttempt;
 
     public SoftwareUpdateDialog(string current, bool automatic, UpdateOffer? initial,
         Func<CancellationToken, Task<UpdateOffer?>> check,
@@ -60,7 +62,11 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
             _status.MaximumSize = new Size(width, 0);
             _automatic.MaximumSize = new Size(width, 0);
         };
-        _laterButton.Click += (_, _) => TryAction(() => { _later(); Close(); });
+        _laterButton.Click += (_, _) => TryAction(() =>
+        {
+            if (!_busy && _offer is not null) _later();
+            Close();
+        });
         _skip.Click += (_, _) => TryAction(() =>
         {
             if (_offer is null) return;
@@ -71,18 +77,18 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
         _check.Click += async (_, _) => await CheckAsync();
         _download.Click += async (_, _) => await DownloadAsync();
         Shown += async (_, _) => { if (initial is null) await CheckAsync(); else Present(initial); };
-        FormClosing += (_, _) => _cancel.Cancel();
+        FormClosing += (_, _) => { _closing = true; _cancel.Cancel(); };
 
     }
 
     private async Task CheckAsync()
     {
         if (_busy) return;
-        Busy(true); _status.Text = "Controleren op updates…";
-        try { Present(await _checkRelease(_cancel.Token)); }
-        catch (OperationCanceledException) { if (!IsDisposed) _status.Text = "De controle is afgebroken of de server reageert niet op tijd."; }
-        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { if (!IsDisposed) _status.Text = "Controleren is niet gelukt. " + ex.Message; }
-        finally { if (!IsDisposed) Busy(false); }
+        _offer = null; _notes.Clear(); Busy(true); _status.Text = "Controleren op updates…";
+        try { var offer = await _checkRelease(_cancel.Token); UpdateUi(() => Present(offer)); }
+        catch (OperationCanceledException) { UpdateUi(() => _status.Text = "De controle is afgebroken of de server reageert niet op tijd."); }
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { UpdateUi(() => _status.Text = "Controleren is niet gelukt. " + ex.Message); }
+        finally { UpdateUi(() => Busy(false)); }
     }
 
     private void Present(UpdateOffer? offer)
@@ -95,25 +101,36 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
         _notes.Text = offer?.Release.Notes.Replace("\r\n", "\n").Replace("\n", "\r\n") ?? "";
         _download.Enabled = offer?.Compatible == true && _installationProblem is null && !_busy;
         _skip.Enabled = offer is not null && !_busy;
+        _laterButton.Text = _busy ? "Annuleren" : offer is null ? "Sluiten" : "Later";
     }
 
     private async Task DownloadAsync()
     {
         if (_busy || _offer is null) return;
-        Busy(true); _progress.Visible = true; _status.Text = "Downloaden en controleren…";
+        var attempt = ++_downloadAttempt;
+        Busy(true); _progress.Value = 0; _progress.Visible = true; _status.Text = "Downloaden en controleren…";
         try
         {
-            await _downloadRelease(_offer, new Progress<int>(value => { if (!IsDisposed) _progress.Value = Math.Clamp(value, 0, 100); }), _cancel.Token);
-            if (!IsDisposed) { TryAction(_later); Close(); }
+            await _downloadRelease(_offer, new Progress<int>(value => UpdateUi(() => { if (attempt == _downloadAttempt) _progress.Value = Math.Clamp(value, 0, 100); })), _cancel.Token);
+            UpdateUi(() => { TryAction(_later); Close(); });
         }
-        catch (OperationCanceledException) { if (!IsDisposed) _status.Text = "Download afgebroken. Je huidige installatie blijft behouden."; }
-        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { if (!IsDisposed) _status.Text = "Bijwerken is niet gestart. " + ex.Message; }
-        finally { if (!IsDisposed) { _progress.Visible = false; Busy(false); } }
+        catch (OperationCanceledException) { UpdateUi(() => _status.Text = "Download afgebroken. Je huidige installatie blijft behouden."); }
+        catch (Exception ex) when (!ExceptionSafety.IsFatal(ex)) { UpdateUi(() => _status.Text = "Bijwerken is niet gestart. " + ex.Message); }
+        finally { UpdateUi(() => { _progress.Visible = false; Busy(false); }); }
+    }
+
+    private void UpdateUi(Action update)
+    {
+        if (_closing || IsDisposed) return;
+        if (!InvokeRequired) { update(); return; }
+        try { BeginInvoke(() => { if (!_closing && !IsDisposed) update(); }); }
+        catch (InvalidOperationException) when (_closing || IsDisposed) { return; }
     }
 
     private void Busy(bool busy)
     {
         _busy = busy; _check.Enabled = !busy; _automatic.Enabled = !busy;
+        _laterButton.Text = busy ? "Annuleren" : _offer is null ? "Sluiten" : "Later";
         _download.Enabled = !busy && _offer?.Compatible == true && _installationProblem is null;
         _skip.Enabled = !busy && _offer is not null;
     }
@@ -125,7 +142,7 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing && !IsDisposed) { _cancel.Cancel(); _cancel.Dispose(); }
+        if (disposing && !IsDisposed) { _closing = true; _cancel.Cancel(); _cancel.Dispose(); }
         base.Dispose(disposing);
     }
 }
