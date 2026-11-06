@@ -61,7 +61,12 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
             _automatic.MaximumSize = new Size(width, 0);
         };
         _laterButton.Click += (_, _) => TryAction(() => { _later(); Close(); });
-        _skip.Click += (_, _) => TryAction(() => { if (_offer is not null) _skipVersion(_offer.Release.Version); Close(); });
+        _skip.Click += (_, _) => TryAction(() =>
+        {
+            if (_offer is null) return;
+            _skipVersion(_offer.Release.Version);
+            Close();
+        });
         _page.Click += (_, _) => TryAction(() => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(ReleasePolicy.ReleasesPage) { UseShellExecute = true }));
         _check.Click += async (_, _) => await CheckAsync();
         _download.Click += async (_, _) => await DownloadAsync();
