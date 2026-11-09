@@ -8,6 +8,7 @@ internal static class CommandHelp
 {
     private static bool _pending;
 
+    [DefaultDllImportSearchPaths(DllImportSearchPath.ApplicationDirectory)]
     [DllImport("accore.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl,
         EntryPoint = "acedSetFunHelp")]
     private static extern int SetHelp(string command, string file, string topic, int flags);
