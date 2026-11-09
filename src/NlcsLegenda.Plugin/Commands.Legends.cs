@@ -99,7 +99,7 @@ public partial class Commands
         return UpdateResult.Updated;
     }
 
-    [CommandMethod("NLCSLEGENDARESET", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDARESET", null, CommandFlags.Modal, null, "help-NLCSLEGENDARESET.html", "")]
     public void NlcsLegendaReset()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -135,7 +135,7 @@ public partial class Commands
         LegendRowSamples.Prune(db);
     }
 
-    [CommandMethod("NLCSLEGENDABEHEER", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDABEHEER", null, CommandFlags.Modal, null, "help-NLCSLEGENDABEHEER.html", "")]
     public void NlcsLegendaBeheer()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -534,8 +534,8 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDAELEMENT", CommandFlags.Modal)]
-    [CommandMethod("NLCSLEGENDAWAAROM", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAELEMENT", null, CommandFlags.Modal, null, "help-NLCSLEGENDAELEMENT.html", "")]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAWAAROM", null, CommandFlags.Modal, null, "help-NLCSLEGENDAWAAROM.html", "")]
     public void NlcsLegendaElement()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;

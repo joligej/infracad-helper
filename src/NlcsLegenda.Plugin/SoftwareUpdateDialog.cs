@@ -54,6 +54,9 @@ internal sealed class SoftwareUpdateDialog : LegendDialog
         body.Controls.Add(_automatic, 0, 4);
         var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true };
         buttons.Controls.AddRange(new Control[] { _download, _check, _page, _skip, _laterButton });
+        var help = new Button { Text = "Hulp (F1)", Name = "HelpButton", AutoSize = true };
+        help.Click += (_, _) => OpenHelp(CurrentHelpTopic);
+        buttons.Controls.Add(help);
         body.Controls.Add(buttons, 0, 5); Controls.Add(body);
         body.SizeChanged += (_, _) =>
         {

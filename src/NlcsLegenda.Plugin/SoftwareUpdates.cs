@@ -140,7 +140,7 @@ internal static class SoftwareUpdates
 
 public partial class Commands
 {
-    [CommandMethod("NLCSLEGENDAUPDATES", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAUPDATES", null, CommandFlags.Modal, null, "help-NLCSLEGENDAUPDATES.html", "")]
     public void NlcsLegendaUpdates()
     {
         if (HostEnvironment.IsCoreConsole) return;

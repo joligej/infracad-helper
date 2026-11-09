@@ -35,6 +35,24 @@ Bij een expliciete `-Cases`-selectie draait alleen die selectie. Zonder `-Isolat
 bronbehoud en opslaan/heropenen. Dit bewijst geen normale GUI-start of automatische
 bundellading. Gebruik voor installed acceptance `-PluginPath <geïnstalleerde DLL>`.
 
+### Offline handleiding
+
+De tekst staat in `docs/handleiding.md` en de bijbehorende Markdown-pagina's.
+`docs/help-topics.json` koppelt commando's en vensters aan de juiste koppen.
+Voeg uitleg daar toe, zodat GitHub en de geïnstalleerde hulp dezelfde bron houden.
+
+Met PowerShell 7.4 of nieuwer maak en controleer je de hulpbestanden:
+
+```powershell
+pwsh -File dev/scripts/Test-Help.ps1
+pwsh -File dev/scripts/Build-Help.ps1 -OutputDirectory <DLL-map>/Help
+```
+
+Bij een release voeren de bundelbouwer en de installer dit automatisch uit.
+De kleine doorverwijspagina's bewaren het gekozen onderwerp wanneer Windows een
+lokaal bestand in de browser opent. Controleer na een wijziging ook F1 in Civil 3D,
+een hulpknop in de instellingen en de zoekfunctie zonder netwerk.
+
 ### Documentatiebeelden
 
 De vensterbeelden gebruiken de echte forms met synthetische gegevens. Genereer ze

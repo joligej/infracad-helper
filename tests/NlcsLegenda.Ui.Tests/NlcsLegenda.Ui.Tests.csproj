@@ -27,6 +27,7 @@
     <Compile Include="../../src/NlcsLegenda.Plugin/ManageDialog.cs" Link="ManageDialog.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/TriStateTree.cs" Link="TriStateTree.cs" />
     <Compile Include="../../src/NlcsLegenda.Plugin/LayerEditDialog.cs" Link="LayerEditDialog.cs" />
-    <Compile Include="../../src/NlcsLegenda.Plugin/HelpDialog.cs" Link="HelpDialog.cs" />
+    <Compile Include="../../src/NlcsLegenda.Plugin/OfflineHelp.cs" Link="OfflineHelp.cs" />
+    <EmbeddedResource Include="../../docs/help-topics.json" LogicalName="NlcsLegenda.HelpTopics" />
   </ItemGroup>
 </Project>

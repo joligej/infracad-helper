@@ -1,45 +1,41 @@
-<?xml version="1.0" encoding="utf-8"?>
-
-<ApplicationPackage SchemaVersion="1.0"
-                    AppVersion="1.42.2"
-                    ProductCode="{4C4B0F1A-6C1E-4C7E-9E3A-1F2A3B4C5D6E}"
-                    Name="NLCS Legenda"
-                    Description="Automatische NLCS-legendagenerator"
-                    Author="infracad-helper">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0" AppVersion="1.43.0" ProductCode="{4C4B0F1A-6C1E-4C7E-9E3A-1F2A3B4C5D6E}" Name="NLCS Legenda" Description="Automatische NLCS-legendagenerator" Author="infracad-helper" HelpFile="./Contents/Help/NlcsLegenda.html">
   <CompanyDetails Name="infracad-helper" />
   <Components Description="NLCS Legenda (.NET 8)">
-    <RuntimeRequirements OS="Win64"
-                         Platform="AutoCAD*"
-                         SeriesMin="R25.0"
-                         SeriesMax="R25.0" />
-    <ComponentEntry AppName="NlcsLegenda"
-                    ModuleName="./Contents/NlcsLegenda.dll"
-                    AppType=".NET"
-                    LoadOnAutoCADStartup="True">
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R25.0" SeriesMax="R25.0" SupportPath="./Contents/Help" />
+    <ComponentEntry AppName="NlcsLegenda" ModuleName="./Contents/NlcsLegenda.dll" AppType=".NET" LoadOnAutoCADStartup="True">
       <Commands GroupName="NLCS_LEGENDA">
-        <Command Global="NLCSLEGENDAUPDATES" Local="NLCSLEGENDAUPDATES" />
-        <Command Global="NLCSLEGENDA" Local="NLCSLEGENDA" />
-        <Command Global="NLCSLEGENDAOVERNEMEN" Local="NLCSLEGENDAOVERNEMEN" />
-        <Command Global="NLCSLEGENDAUPDATE" Local="NLCSLEGENDAUPDATE" />
-        <Command Global="NLCSLEGENDARESET" Local="NLCSLEGENDARESET" />
-        <Command Global="NLCSLEGENDAINFO" Local="NLCSLEGENDAINFO" />
-        <Command Global="NLCSLEGENDAEXPORT" Local="NLCSLEGENDAEXPORT" />
-        <Command Global="NLCSLEGENDABATCH" Local="NLCSLEGENDABATCH" />
-        <Command Global="NLCSLEGENDAVIEWPORT" Local="NLCSLEGENDAVIEWPORT" />
-        <Command Global="NLCSLEGENDAOPTIES" Local="NLCSLEGENDAOPTIES" />
-        <Command Global="NLCSLEGENDASTANDAARD" Local="NLCSLEGENDASTANDAARD" />
-        <Command Global="NLCSLEGENDAOMSCHRIJVINGEN" Local="NLCSLEGENDAOMSCHRIJVINGEN" />
-        <Command Global="NLCSLEGENDATEKST" Local="NLCSLEGENDATEKST" />
-        <Command Global="NLCSLEGENDABEHEER" Local="NLCSLEGENDABEHEER" />
-        <Command Global="NLCSLEGENDAELEMENT" Local="NLCSLEGENDAELEMENT" />
-        <Command Global="NLCSLEGENDAWAAROM" Local="NLCSLEGENDAWAAROM" />
-        <Command Global="NLCSLEGENDASAMENSTELLEN" Local="NLCSLEGENDASAMENSTELLEN" />
-        <Command Global="NLCSLEGENDAUITVINKEN" Local="NLCSLEGENDAUITVINKEN" />
-        <Command Global="NLCSLEGENDATOEVOEGEN" Local="NLCSLEGENDATOEVOEGEN" />
-        <Command Global="NLCSLEGENDASTATUS" Local="NLCSLEGENDASTATUS" />
-        <Command Global="NLCSLEGENDAXREFS" Local="NLCSLEGENDAXREFS" />
-        <Command Global="NLCSLEGENDAPRESET" Local="NLCSLEGENDAPRESET" />
-        <Command Global="NLCSLEGENDACONFIG" Local="NLCSLEGENDACONFIG" />
+        <Command Global="NLCSLEGENDA" Local="NLCSLEGENDA" HelpTopic="#NLCSLEGENDA" />
+        <Command Global="NLCSLEGENDABATCH" Local="NLCSLEGENDABATCH" HelpTopic="#NLCSLEGENDABATCH" />
+        <Command Global="NLCSLEGENDABEHEER" Local="NLCSLEGENDABEHEER" HelpTopic="#NLCSLEGENDABEHEER" />
+        <Command Global="NLCSLEGENDABRONCONTROLE" Local="NLCSLEGENDABRONCONTROLE" HelpTopic="#NLCSLEGENDABRONCONTROLE" />
+        <Command Global="NLCSLEGENDABRONVENSTER" Local="NLCSLEGENDABRONVENSTER" HelpTopic="#NLCSLEGENDABRONVENSTER" />
+        <Command Global="NLCSLEGENDACONFIG" Local="NLCSLEGENDACONFIG" HelpTopic="#NLCSLEGENDACONFIG" />
+        <Command Global="NLCSLEGENDAELEMENT" Local="NLCSLEGENDAELEMENT" HelpTopic="#NLCSLEGENDAELEMENT" />
+        <Command Global="NLCSLEGENDAEXPORT" Local="NLCSLEGENDAEXPORT" HelpTopic="#NLCSLEGENDAEXPORT" />
+        <Command Global="NLCSLEGENDAHELP" Local="NLCSLEGENDAHELP" HelpTopic="#NLCSLEGENDAHELP" />
+        <Command Global="NLCSLEGENDAINFO" Local="NLCSLEGENDAINFO" HelpTopic="#NLCSLEGENDAINFO" />
+        <Command Global="NLCSLEGENDALAAGNAAM" Local="NLCSLEGENDALAAGNAAM" HelpTopic="#NLCSLEGENDALAAGNAAM" />
+        <Command Global="NLCSLEGENDAOMSCHRIJVINGEN" Local="NLCSLEGENDAOMSCHRIJVINGEN" HelpTopic="#NLCSLEGENDAOMSCHRIJVINGEN" />
+        <Command Global="NLCSLEGENDAOPTIES" Local="NLCSLEGENDAOPTIES" HelpTopic="#NLCSLEGENDAOPTIES" />
+        <Command Global="NLCSLEGENDAOVERNEMEN" Local="NLCSLEGENDAOVERNEMEN" HelpTopic="#NLCSLEGENDAOVERNEMEN" />
+        <Command Global="NLCSLEGENDAPRESET" Local="NLCSLEGENDAPRESET" HelpTopic="#NLCSLEGENDAPRESET" />
+        <Command Global="NLCSLEGENDARESET" Local="NLCSLEGENDARESET" HelpTopic="#NLCSLEGENDARESET" />
+        <Command Global="NLCSLEGENDASAMENSTELLEN" Local="NLCSLEGENDASAMENSTELLEN" HelpTopic="#NLCSLEGENDASAMENSTELLEN" />
+        <Command Global="NLCSLEGENDASTANDAARD" Local="NLCSLEGENDASTANDAARD" HelpTopic="#NLCSLEGENDASTANDAARD" />
+        <Command Global="NLCSLEGENDASTATUS" Local="NLCSLEGENDASTATUS" HelpTopic="#NLCSLEGENDASTATUS" />
+        <Command Global="NLCSLEGENDATEKST" Local="NLCSLEGENDATEKST" HelpTopic="#NLCSLEGENDATEKST" />
+        <Command Global="NLCSLEGENDATOEVOEGEN" Local="NLCSLEGENDATOEVOEGEN" HelpTopic="#NLCSLEGENDATOEVOEGEN" />
+        <Command Global="NLCSLEGENDAUITVINKEN" Local="NLCSLEGENDAUITVINKEN" HelpTopic="#NLCSLEGENDAUITVINKEN" />
+        <Command Global="NLCSLEGENDAUPDATE" Local="NLCSLEGENDAUPDATE" HelpTopic="#NLCSLEGENDAUPDATE" />
+        <Command Global="NLCSLEGENDAUPDATES" Local="NLCSLEGENDAUPDATES" HelpTopic="#NLCSLEGENDAUPDATES" />
+        <Command Global="NLCSLEGENDAVASTZETTEN" Local="NLCSLEGENDAVASTZETTEN" HelpTopic="#NLCSLEGENDAVASTZETTEN" />
+        <Command Global="NLCSLEGENDAVERGELIJKEN" Local="NLCSLEGENDAVERGELIJKEN" HelpTopic="#NLCSLEGENDAVERGELIJKEN" />
+        <Command Global="NLCSLEGENDAVERPLAATSEN" Local="NLCSLEGENDAVERPLAATSEN" HelpTopic="#NLCSLEGENDAVERPLAATSEN" />
+        <Command Global="NLCSLEGENDAVIEWPORT" Local="NLCSLEGENDAVIEWPORT" HelpTopic="#NLCSLEGENDAVIEWPORT" />
+        <Command Global="NLCSLEGENDAVOORBEELDKOPPELEN" Local="NLCSLEGENDAVOORBEELDKOPPELEN" HelpTopic="#NLCSLEGENDAVOORBEELDKOPPELEN" />
+        <Command Global="NLCSLEGENDAWAAROM" Local="NLCSLEGENDAWAAROM" HelpTopic="#NLCSLEGENDAWAAROM" />
+        <Command Global="NLCSLEGENDAXREFS" Local="NLCSLEGENDAXREFS" HelpTopic="#NLCSLEGENDAXREFS" />
       </Commands>
     </ComponentEntry>
   </Components>

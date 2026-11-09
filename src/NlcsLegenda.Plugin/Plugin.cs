@@ -29,11 +29,13 @@ public sealed class Plugin : IExtensionApplication
         {
             ed?.WriteMessage($"\nNLCS Legenda: de werkbalk kon niet worden opgebouwd ({ex.Message}). De commando's werken wel.\n");
         }
+        CommandHelp.Initialize();
         SoftwareUpdates.Initialize();
     }
 
     public void Terminate()
     {
+        CommandHelp.Shutdown();
         SoftwareUpdates.Shutdown();
         _gdiLog?.Dispose();
         _gdiLog = null;

@@ -41,6 +41,7 @@ internal static partial class Program
             DiagnosticRun.Execute(() => CheckOverviewLoading(), Errors.Add, "CheckOverviewLoading");
             DiagnosticRun.Execute(CheckOverviewFatalError, Errors.Add);
             DiagnosticRun.Execute(CheckSoftwareUpdates, Errors.Add);
+            DiagnosticRun.Execute(CheckOfflineHelp, Errors.Add);
             DiagnosticRun.Execute(CheckTreeImagesDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckOwnedFontsDisposed, Errors.Add);
             DiagnosticRun.Execute(CheckManagedChoices, Errors.Add);
@@ -75,7 +76,6 @@ internal static partial class Program
                 () => new CustomLayerDialog(new[] { new CustomLayerRule { Layer = "Eigen laag" } }),
                 () => new LegendManageDialog(new[] { new EntryCheckItem("key", "Regel", "DATA") }, new()),
                 () => new LayerEditDialog(new NlcsLayerComponents(), "N-WE-KL-DATA-G", 10, false, null),
-                () => new HelpDialog("test"),
                 () => SoftwareDialog(),
                 () => new NlcsLegenda.Updater.UpdaterForm(new NlcsLegenda.Update.UpdateStore(), new NlcsLegenda.Update.UpdateRequest(1, "1.42.0", new string('A', 64), 100, 2027), false),
                 () => new KlicOptionsDialog(new KlicOptions()),

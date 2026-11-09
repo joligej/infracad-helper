@@ -68,4 +68,7 @@
     <ProjectReference Include="..\NlcsLegenda.Update\NlcsLegenda.Update.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="../../docs/help-topics.json" LogicalName="NlcsLegenda.HelpTopics" />
+  </ItemGroup>
 </Project>

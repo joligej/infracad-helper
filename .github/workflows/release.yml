@@ -34,6 +34,10 @@ jobs:
           if ($tag -ne $manifest) { throw "Tag $tag komt niet overeen met het bundle-manifest ($manifest)." }
           if (-not (Select-String -Path CHANGELOG.md -SimpleMatch "## $tag ")) { throw "Geen CHANGELOG-sectie voor $tag." }
 
+      - name: Offline handleiding controleren
+        shell: pwsh
+        run: ./dev/scripts/Test-Help.ps1
+
       - name: Kernlogica testen
         run: dotnet test tests/NlcsLegenda.Core.Tests/NlcsLegenda.Core.Tests.csproj -c Release
 

@@ -30,7 +30,7 @@ public partial class Commands
         return LegendUpdatePlan.Compare(working.Rows, composition.Entries).Concat(composition.Notices).Concat(analysis.Coverage).ToArray();
     }
 
-    [CommandMethod("NLCSLEGENDAOVERNEMEN", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAOVERNEMEN", null, CommandFlags.Modal, null, "help-NLCSLEGENDAOVERNEMEN.html", "")]
     public void AdoptLegendRow()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;

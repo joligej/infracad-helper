@@ -38,7 +38,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDABRONVENSTER", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDABRONVENSTER", null, CommandFlags.Modal, null, "help-NLCSLEGENDABRONVENSTER.html", "")]
     public void SelectSourceViewports()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -92,7 +92,7 @@ public partial class Commands
         catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex)) { doc.Editor.WriteMessage("\nBrongebied niet gewijzigd: " + ex.Message); }
     }
 
-    [CommandMethod("NLCSLEGENDABRONCONTROLE", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDABRONCONTROLE", null, CommandFlags.Modal, null, "help-NLCSLEGENDABRONCONTROLE.html", "")]
     public void ExplainLegendSources()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;

@@ -1,13 +1,12 @@
 using Autodesk.AutoCAD.Runtime;
 using NlcsLegenda.Core;
 using AcApp = Autodesk.AutoCAD.ApplicationServices.Core.Application;
-using AcWindows = Autodesk.AutoCAD.ApplicationServices.Application;
 
 namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    [CommandMethod("NLCSLEGENDAHELP", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAHELP", null, CommandFlags.Modal, null, "help-NLCSLEGENDAHELP.html", "")]
     public void NlcsLegendaHelp()
     {
         var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
@@ -31,7 +30,6 @@ public partial class Commands
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static void ShowHelp()
     {
-        using var dialog = new HelpDialog(PluginVersion);
-        AcWindows.ShowModalDialog(dialog);
+        OfflineHelp.Open();
     }
 }

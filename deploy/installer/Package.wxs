@@ -27,6 +27,7 @@
               <Directory Id="Net82026Dir" Name="net8-2026" />
               <Directory Id="Net10Dir" Name="net10" />
               <Directory Id="UpdaterDir" Name="Updater" />
+              <Directory Id="HelpDir" Name="Help" />
             </Directory>
           </Directory>
         </Directory>
@@ -67,6 +68,7 @@
         <RegistryValue Root="HKCU" Key="Software\joligej\NlcsLegenda" Name="Updater" Type="integer" Value="1" KeyPath="yes" />
         <File Source="$(var.BundleStage)\Contents\Updater\NlcsLegenda.Updater.exe" />
       </Component>
+      <ComponentGroupRef Id="OfflineHelpFiles" />
     </Feature>
   </Package>
 </Wix>

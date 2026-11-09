@@ -101,6 +101,18 @@ if ($PfxPath -or $BundleDirectory) {
     }
 }
 
+$helpDirectory = Join-Path $stage 'Contents/Help'
+& (Join-Path $PSScriptRoot 'Build-Help.ps1') -OutputDirectory $helpDirectory
+if ($BundleDirectory) {
+    $helpFiles = @(Get-ChildItem -LiteralPath $helpDirectory -File | Sort-Object Name)
+    foreach ($year in 2025, 2026, 2027) {
+        $bundledHelp = Join-Path $BundleDirectory "$year/NlcsLegenda.bundle/Contents/Help"
+        if (@(Get-ChildItem -LiteralPath $bundledHelp -File).Count -ne $helpFiles.Count) { throw "Hulpbestanden ontbreken in bundel $year." }
+        foreach ($file in $helpFiles) {
+            if ((Get-FileHash -LiteralPath (Join-Path $bundledHelp $file.Name)).Hash -ne (Get-FileHash -LiteralPath $file.FullName).Hash) { throw "Handleiding verschilt van de bundel voor $year." }
+        }
+    }
+}
 [xml]$src = Get-Content $manifestSrc -Raw
 $commandsXml = $src.ApplicationPackage.Components.ComponentEntry.Commands.InnerXml
 $productCode = $src.ApplicationPackage.ProductCode
@@ -108,7 +120,7 @@ $productCode = $src.ApplicationPackage.ProductCode
 function New-Component([string]$series, [string]$path, [string]$dotnet) {
     @"
   <Components Description="NLCS Legenda ($dotnet)">
-    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="$($series.Split('-')[0])" SeriesMax="$($series.Split('-')[1])" />
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="$($series.Split('-')[0])" SeriesMax="$($series.Split('-')[1])" SupportPath="./Contents/Help" />
     <ComponentEntry AppName="NlcsLegenda" ModuleName="./Contents/$path/NlcsLegenda.dll" AppType=".NET"
                     LoadOnAutoCADStartup="True">
       <Commands GroupName="NLCS_LEGENDA">$commandsXml</Commands>
@@ -124,7 +136,7 @@ $manifest = @"
                     ProductCode="$productCode"
                     Name="NLCS Legenda"
                     Description="Automatische NLCS-legendagenerator"
-                    Author="infracad-helper">
+                    Author="infracad-helper" HelpFile="./Contents/Help/NlcsLegenda.html">
   <CompanyDetails Name="infracad-helper" />
 $(New-Component "R25.0-R25.0" "net8-2025" ".NET 8")
 $(New-Component "R25.1-R25.1" "net8-2026" ".NET 8")
@@ -136,7 +148,16 @@ Set-Content -Path (Join-Path $stage "PackageContents.xml") -Value $manifest -Enc
 $outDir = Join-Path $repoRoot "artifacts"
 $msi = Join-Path $outDir "NlcsLegenda-$Version.msi"
 Write-Host "==> MSI samenstellen met WiX..." -ForegroundColor Cyan
-wix build $wxs -arch x64 -d "Version=$Version" -d "BundleStage=$stage" -o $msi
+$helpComponents = foreach ($file in Get-ChildItem -LiteralPath $helpDirectory -File | Sort-Object Name) {
+    $digest = [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes("NlcsLegenda/Help/" + $file.Name.ToLowerInvariant()))
+    $id = 'Help_' + [Convert]::ToHexString($digest).Substring(0, 24)
+    $guid = [Guid]::new([byte[]]$digest[0..15]).ToString('B')
+    $sourcePath = [Security.SecurityElement]::Escape($file.FullName)
+    '<Component Id="' + $id + '" Directory="HelpDir" Guid="' + $guid + '"><RegistryValue Root="HKCU" Key="Software\joligej\NlcsLegenda\HelpFiles" Name="' + $file.Name + '" Type="integer" Value="1" KeyPath="yes" /><File Source="' + $sourcePath + '" /></Component>'
+}
+$helpWxs = Join-Path $stage 'Help.wxs'
+Set-Content -LiteralPath $helpWxs -Value ('<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"><Fragment><ComponentGroup Id="OfflineHelpFiles">' + ($helpComponents -join "`n") + '</ComponentGroup></Fragment></Wix>') -Encoding utf8
+wix build $wxs $helpWxs -arch x64 -d "Version=$Version" -d "BundleStage=$stage" -o $msi
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $msi)) { throw "MSI is niet gebouwd." }
 
 if ($PfxPath) {

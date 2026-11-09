@@ -80,7 +80,7 @@ public partial class Commands
         return "voor alle tekeningen";
     }
 
-    [CommandMethod("NLCSLEGENDA", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDA", null, CommandFlags.Modal, null, "help-NLCSLEGENDA.html", "")]
     public void NlcsLegenda()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -160,7 +160,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDAINFO", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAINFO", null, CommandFlags.Modal, null, "help-NLCSLEGENDAINFO.html", "")]
     public void NlcsLegendaInfo()
     {
         if (!HostEnvironment.IsCoreConsole)
@@ -217,7 +217,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDAEXPORT", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAEXPORT", null, CommandFlags.Modal, null, "help-NLCSLEGENDAEXPORT.html", "")]
     public void NlcsLegendaExport()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -301,7 +301,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDABATCH", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDABATCH", null, CommandFlags.Modal, null, "help-NLCSLEGENDABATCH.html", "")]
     public void NlcsLegendaBatch()
     {
         var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
@@ -399,7 +399,7 @@ public partial class Commands
         ed.WriteMessage($"\nGeschreven:\n  {csvPath}\n  {jsonPath}");
     }
 
-    [CommandMethod("NLCSLEGENDAVIEWPORT", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAVIEWPORT", null, CommandFlags.Modal, null, "help-NLCSLEGENDAVIEWPORT.html", "")]
     public void NlcsLegendaViewport()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -611,7 +611,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDAUPDATE", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAUPDATE", null, CommandFlags.Modal, null, "help-NLCSLEGENDAUPDATE.html", "")]
     public void NlcsLegendaUpdate()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -678,7 +678,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDACONFIG", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDACONFIG", null, CommandFlags.Modal, null, "help-NLCSLEGENDACONFIG.html", "")]
     public void NlcsLegendaConfig()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -707,7 +707,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDAOPTIES", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAOPTIES", null, CommandFlags.Modal, null, "help-NLCSLEGENDAOPTIES.html", "")]
     public void NlcsLegendaOpties()
     {
         var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
@@ -715,7 +715,7 @@ public partial class Commands
         NlcsLegendaOptiesInteractive();
     }
 
-    [CommandMethod("NLCSLEGENDASTANDAARD", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDASTANDAARD", null, CommandFlags.Modal, null, "help-NLCSLEGENDASTANDAARD.html", "")]
     public void NlcsLegendaStandaard()
     {
         var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
@@ -753,7 +753,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDAOMSCHRIJVINGEN", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAOMSCHRIJVINGEN", null, CommandFlags.Modal, null, "help-NLCSLEGENDAOMSCHRIJVINGEN.html", "")]
     public void NlcsLegendaOmschrijvingen()
     {
         var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
@@ -814,7 +814,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDAUITVINKEN", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAUITVINKEN", null, CommandFlags.Modal, null, "help-NLCSLEGENDAUITVINKEN.html", "")]
     public void NlcsLegendaUitvinken()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -893,7 +893,7 @@ public partial class Commands
 
     }
 
-    [CommandMethod("NLCSLEGENDATOEVOEGEN", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDATOEVOEGEN", null, CommandFlags.Modal, null, "help-NLCSLEGENDATOEVOEGEN.html", "")]
     public void NlcsLegendaToevoegen()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -1053,7 +1053,7 @@ public partial class Commands
         };
     }
 
-    [CommandMethod("NLCSLEGENDASAMENSTELLEN", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDASAMENSTELLEN", null, CommandFlags.Modal, null, "help-NLCSLEGENDASAMENSTELLEN.html", "")]
     public void NlcsLegendaSamenstellen()
     {
         var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
@@ -1123,7 +1123,7 @@ public partial class Commands
         return xrefs;
     }
 
-    [CommandMethod("NLCSLEGENDAXREFS", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAXREFS", null, CommandFlags.Modal, null, "help-NLCSLEGENDAXREFS.html", "")]
     public void NlcsLegendaXrefs()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -1196,7 +1196,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDASTATUS", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDASTATUS", null, CommandFlags.Modal, null, "help-NLCSLEGENDASTATUS.html", "")]
     public void NlcsLegendaStatus()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -1273,7 +1273,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDAPRESET", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAPRESET", null, CommandFlags.Modal, null, "help-NLCSLEGENDAPRESET.html", "")]
     public void NlcsLegendaPreset()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -1650,7 +1650,7 @@ public partial class Commands
         return int.TryParse(res.StringResult, out var n) && n >= 1 && n <= statuses.Count ? n - 1 : -1;
     }
 
-    [CommandMethod("NLCSLEGENDATEKST", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDATEKST", null, CommandFlags.Modal, null, "help-NLCSLEGENDATEKST.html", "")]
     public void NlcsLegendaTekst()
     {
         var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;
@@ -1781,7 +1781,7 @@ public partial class Commands
         return "voor alle tekeningen";
     }
 
-    [CommandMethod("NLCSLEGENDALAAGNAAM", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDALAAGNAAM", null, CommandFlags.Modal, null, "help-NLCSLEGENDALAAGNAAM.html", "")]
     public void NlcsLegendaLaagnaam()
     {
         var ed = AcApp.DocumentManager.MdiActiveDocument?.Editor;

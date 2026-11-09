@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.43.0 (2026-11-09)
+
+- De volledige handleiding is offline beschikbaar, met afbeeldingen en een zoekfunctie. De hulp wordt opgebouwd uit dezelfde Markdown-documentatie als op GitHub.
+- F1 opent tijdens een legenda-commando de bijbehorende uitleg. Instellingenvensters hebben een hulpknop en openen de uitleg bij het gekozen onderdeel.
+- De installer en de ZIP-bundels bevatten dezelfde handleiding. Losse, verouderde hulpteksten in de plug-in zijn vervangen.
+
 ## 1.42.2 - 2026-11-06
 
 - Handmatig controleren neemt een lopende opstartcontrole over. Een controle in dezelfde CAD-sessie geeft geen onterechte melding meer dat een andere sessie bezig is.
