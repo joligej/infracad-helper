@@ -46,7 +46,7 @@ internal static class LegendRowSamples
         }
     }
 
-    public static string Capture(Database db, Transaction tr, IReadOnlyList<ObjectId> ids, LayerDisplayStyle? singleStyle = null, LayerDisplayStyle? singleLayer = null, ObjectId viewport = default, SymbolTransform? symbolTransform = null)
+    public static string Capture(Database db, Transaction tr, IReadOnlyList<ObjectId> ids, LayerDisplayStyle? singleStyle = null, LayerDisplayStyle? singleLayer = null, ObjectId viewport = default, SymbolTransform? symbolTransform = null, IReadOnlyList<SymbolTransform>? symbolTransforms = null)
     {
         var table = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
         using var block = new BlockTableRecord { Name = "NLCS_ROW_" + Guid.NewGuid().ToString("N") };
@@ -63,7 +63,7 @@ internal static class LegendRowSamples
             var layerStyle = singleLayer ?? DrawingAnalyzer.EntityLayerStyle(reference, tr);
             var style = singleStyle ?? DrawingAnalyzer.EntityStyle(reference, tr, null, layerStyle);
             var sample = new SymbolSample(source.Name, "", SymbolTransform.From(reference.BlockTransform)) {
-                ReferenceId = id, InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceViewportId = viewport, ViewIdentity = viewport, FrozenLayers = imports.FrozenLayers };
+                ReferenceId = id, PlacementTransforms = symbolTransforms, InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceViewportId = viewport, ViewIdentity = viewport, FrozenLayers = imports.FrozenLayers };
             var transform = symbolTransform ?? sample.Transform;
             if (!LegendBuilder.TryInsertSymbol(block, tr, db, imports, source.Name, reference.Layer, transform,
                 sample, reference.Position.X, reference.Position.Y, 1, true, out _, out var error)) throw new InvalidOperationException(error);

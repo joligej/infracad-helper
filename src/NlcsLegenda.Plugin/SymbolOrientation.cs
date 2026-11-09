@@ -4,9 +4,26 @@ using NlcsLegenda.Core;
 
 namespace NlcsLegenda.Plugin;
 
-internal readonly record struct SymbolOrientation(SymbolTransform Transform, bool KeepSource)
+internal readonly record struct SymbolOrientation(SymbolTransform Source, bool FlipX, bool KeepSource, IReadOnlyList<SymbolTransform> Steps)
 {
-    public static SymbolOrientation Root => new(SymbolTransform.Identity, false);
+    public static SymbolOrientation Root => new(SymbolTransform.Identity, false, false, Array.Empty<SymbolTransform>());
+
+    private Matrix3d Rotation => Matrix3d.Rotation(
+        -(Math.Atan2(Source.XAxis.Y, Source.XAxis.X) - (FlipX ? Math.PI : 0)), Vector3d.ZAxis, Point3d.Origin);
+
+    public IReadOnlyList<SymbolTransform> PlacementTransforms => KeepSource
+        ? Steps : new[] { SymbolTransform.From(Rotation) }.Concat(Steps).ToArray();
+
+    public SymbolTransform Transform
+    {
+        get
+        {
+            if (KeepSource) return Source;
+            // pas na alle brontransformaties draaien, met behoud van vervorming
+            var rotation = Rotation;
+            return new(Source.XAxis.TransformBy(rotation), Source.YAxis.TransformBy(rotation), Source.ZAxis.TransformBy(rotation));
+        }
+    }
 
     public SymbolOrientation Nested(BlockReference reference, Transaction tr)
     {
@@ -19,7 +36,7 @@ internal readonly record struct SymbolOrientation(SymbolTransform Transform, boo
         var rotation = planar
             ? Matrix3d.Rotation(-reference.Rotation, reference.Normal, Point3d.Origin)
             : Matrix3d.Identity;
-        var basis = new SymbolTransform(original.XAxis.TransformBy(rotation), original.YAxis.TransformBy(rotation), original.ZAxis);
-        return new(SymbolTransform.From(Transform.ToMatrix() * basis.ToMatrix()), KeepSource || section || !planar);
+        bool flipX = original.XAxis.TransformBy(rotation).X < 0;
+        return new(SymbolTransform.From(Source.ToMatrix() * original.ToMatrix()), FlipX ^ flipX, KeepSource || section || !planar, Steps.Append(original).ToArray());
     }
 }

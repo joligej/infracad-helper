@@ -691,13 +691,30 @@ public static class LegendBuilder
                 local.AssumeOwnershipOf(ids);
                 ((DrawOrderTable)tr.GetObject(local.DrawOrderTableId, OpenMode.ForWrite)).SetRelativeDrawOrder(ids);
                 foreach (var id in primitives) ((Entity)tr.GetObject(id, OpenMode.ForWrite)).Layer = layer;
-                using var reference = new BlockReference(Point3d.Origin, localId);
-                SetLegendDefaults(reference, db);
-                reference.Layer = layer;
-                reference.BlockTransform = transform;
-                var referenceId = AppendEntity(btr, reference); tr.AddNewlyCreatedDBObject(reference, true);
-                created.Add(referenceId);
-                primitives = new List<ObjectId> { referenceId };
+                // afzonderlijke bronstappen behouden bij scheefgetrokken symbolen
+                var axes = new[] { sourceTransform.XAxis.GetNormal(), sourceTransform.YAxis.GetNormal(), sourceTransform.ZAxis.GetNormal() };
+                bool orthogonal = Math.Abs(axes[0].DotProduct(axes[1])) < 1e-9
+                    && Math.Abs(axes[0].DotProduct(axes[2])) < 1e-9 && Math.Abs(axes[1].DotProduct(axes[2])) < 1e-9;
+                var steps = !orthogonal && sample?.PlacementTransforms is { Count: > 0 } chain ? chain : new[] { sourceTransform };
+                for (int index = steps.Count - 1; index >= 0; index--)
+                {
+                    using var reference = new BlockReference(Point3d.Origin, localId);
+                    SetLegendDefaults(reference, db);
+                    reference.Layer = layer;
+                    reference.BlockTransform = steps[index].ToMatrix();
+                    if (index == 0)
+                    {
+                        var referenceId = AppendEntity(btr, reference); tr.AddNewlyCreatedDBObject(reference, true);
+                        created.Add(referenceId);
+                        primitives = new List<ObjectId> { referenceId };
+                    }
+                    else
+                    {
+                        using var wrapper = new BlockTableRecord { Name = "NLCS_LEGENDA_SYMBOL_" + Guid.NewGuid().ToString("N") };
+                        localId = bt.Add(wrapper); tr.AddNewlyCreatedDBObject(wrapper, true);
+                        wrapper.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true);
+                    }
+                }
             }
             else
                 foreach (var id in primitives) TransformPlanarSymbol((Entity)tr.GetObject(id, OpenMode.ForWrite), transform);

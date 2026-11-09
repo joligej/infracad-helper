@@ -5,7 +5,7 @@ using NlcsLegenda.Core;
 namespace NlcsLegenda.Plugin;
 
 internal sealed record LinkedSource(Entity Entity, LayerDisplayStyle Style, LayerDisplayStyle Layer,
-    IReadOnlyList<ExampleDisplay> Display, ObjectId ViewportId, SymbolTransform? SymbolTransform = null);
+    IReadOnlyList<ExampleDisplay> Display, ObjectId ViewportId, SymbolOrientation? Orientation = null);
 
 internal static class LinkedLegendExamples
 {
@@ -78,7 +78,6 @@ internal static class LinkedLegendExamples
                 throw new InvalidOperationException("Het gekoppelde bronobject of zijn bronblok is verborgen, bevroren of niet plottend.");
         }
         BlockTableRecord? owner = null; LayerDisplayStyle? parent = null, parentLayer = null;
-        var transform = Matrix3d.Identity;
         var orientation = SymbolOrientation.Root;
         string drawing = db.FingerprintGuid.ToString();
         ObjectId Find(string handle)
@@ -92,7 +91,6 @@ internal static class LinkedLegendExamples
             if (id.IsNull || id.IsErased || tr.GetObject(id, OpenMode.ForRead) is not BlockReference reference)
                 throw new InvalidOperationException("Een gekoppeld bronblok of een xref ontbreekt.");
             RequireVisible(reference);
-            transform *= reference.BlockTransform;
             orientation = orientation.Nested(reference, tr);
             var layer = DrawingAnalyzer.EntityLayerStyle(reference, tr, parentLayer, viewport);
             parent = DrawingAnalyzer.EntityStyle(reference, tr, parent, layer); parentLayer = layer;
@@ -113,14 +111,8 @@ internal static class LinkedLegendExamples
             : DrawingAnalyzer.EntityStyle(entity, tr, parent, sourceLayer);
         var display = link.Component.Length == 0 && entity is BlockReference
             ? ManagedLegendExamples.Read(db, tr, new[] { entity.ObjectId }, sourceStyle, sourceLayer, viewport, includeText: true) : new[] { ManagedLegendExamples.Display(sourceStyle) };
-        SymbolTransform? symbolTransform = null;
-        if (entity is BlockReference symbol)
-        {
-            var symbolOrientation = orientation.Nested(symbol, tr);
-            symbolTransform = symbolOrientation.KeepSource
-                ? SymbolTransform.From(transform * symbol.BlockTransform) : symbolOrientation.Transform;
-        }
-        return new(entity, sourceStyle, sourceLayer, display, viewport, symbolTransform);
+        SymbolOrientation? symbolOrientation = entity is BlockReference symbol ? orientation.Nested(symbol, tr) : null;
+        return new(entity, sourceStyle, sourceLayer, display, viewport, symbolOrientation);
     }
 
     internal static void Refresh(Database db, Transaction tr, LegendDefinition definition)
@@ -146,7 +138,7 @@ internal static class LinkedLegendExamples
     {
         string result;
         if (link.Component.Length == 0)
-            result = LegendRowSamples.Capture(db, tr, new[] { source.Entity.ObjectId }, source.Style, source.Layer, source.ViewportId, source.SymbolTransform);
+            result = LegendRowSamples.Capture(db, tr, new[] { source.Entity.ObjectId }, source.Style, source.Layer, source.ViewportId, source.Orientation?.Transform, source.Orientation?.PlacementTransforms);
         else
         {
             var blocks = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
