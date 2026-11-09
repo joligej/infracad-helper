@@ -11,7 +11,7 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    [CommandMethod("NLCSLEGENDAVASTZETTEN", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAVASTZETTEN", null, CommandFlags.Modal, null, "help-NLCSLEGENDAVASTZETTEN.html", "")]
     public void SetLegendComposition()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -46,7 +46,7 @@ public partial class Commands
         catch (System.Exception ex) when (!ExceptionSafety.IsFatal(ex)) { doc.Editor.WriteMessage("\nSamenstelling niet gewijzigd: " + ex.Message); }
     }
 
-    [CommandMethod("NLCSLEGENDAVERPLAATSEN", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAVERPLAATSEN", null, CommandFlags.Modal, null, "help-NLCSLEGENDAVERPLAATSEN.html", "")]
     public void MoveManagedLegend()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -126,7 +126,7 @@ public partial class Commands
         }
     }
 
-    [CommandMethod("NLCSLEGENDAVERGELIJKEN", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAVERGELIJKEN", null, CommandFlags.Modal, null, "help-NLCSLEGENDAVERGELIJKEN.html", "")]
     public void CompareSheetLegends()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;

@@ -69,6 +69,10 @@ jobs:
           dotnet tool update --global wix --version 5.0.2
           if ($LASTEXITCODE) { throw 'WiX ontbreekt.' }
           ./dev/scripts/Test-InstallerRollback.ps1
+      - name: Test offline handleiding en F1-koppelingen
+        if: matrix.acad == '2025'
+        shell: pwsh
+        run: ./dev/scripts/Test-Help.ps1
       - name: Test vensters en bediening
         if: matrix.acad == '2025'
         run: dotnet run --project tests/NlcsLegenda.Ui.Tests -c Release

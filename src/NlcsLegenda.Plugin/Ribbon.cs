@@ -155,13 +155,14 @@ internal static class RibbonBuilder
             {
                 if (i > start) column.Items.Add(new RibbonRowBreak());
                 var (text, command, tip) = buttons[i];
+                var help = OfflineHelp.Find(command);
                 column.Items.Add(new RibbonButton
                 {
                     Text = text, ShowText = true, ShowImage = true, Size = RibbonItemSize.Standard,
                     Orientation = System.Windows.Controls.Orientation.Horizontal,
                     IsToolTipEnabled = true, Image = RibbonIcons.Get(command, 16), LargeImage = RibbonIcons.Get(command, 32),
                     CommandParameter = command, CommandHandler = CommandRunner.Instance,
-                    ToolTip = new RibbonToolTip { Title = text, Content = tip, Command = command }
+                    ToolTip = new RibbonToolTip { Title = text, Content = tip, Command = command, IsHelpEnabled = help is not null, HelpSource = help, HelpTopic = "" }
                 });
             }
             source.Items.Add(column);

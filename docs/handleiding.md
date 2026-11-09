@@ -11,6 +11,19 @@ getekend. De knoppen staan op het lint **NLCS Legenda**. De bijbehorende command
 staan [onderaan](#commandos). Waar **Lokale instellingen → Opmaak** staat, open je
 eerst Lokale instellingen en kies je daarna Opmaak in de lijst links.
 
+## Hulp tijdens het werken
+
+Met **Help** op het lint of `NLCSLEGENDAHELP` open je deze handleiding in je browser.
+De tekst en afbeeldingen worden met de plug-in geïnstalleerd. Je hebt daarvoor
+geen internet nodig. De handleiding hoort bij jouw geïnstalleerde versie en komt
+uit dezelfde documentatie als op GitHub.
+
+Druk tijdens een legenda-commando op **F1** voor uitleg over dat commando. In een
+instellingenvenster open je met **Hulp** of de F1-toets de uitleg bij het
+gekozen onderdeel. Het venster blijft open en je instellingen veranderen niet.
+In de handleiding kun je op woorden zoeken, bijvoorbeeld `xrefs` of `schaalbalk`.
+Links naar GitHub en andere websites hebben wel internet nodig.
+
 ## Waar wil je mee aan de slag?
 
 - [Een eerste legenda plaatsen](#eerste-legenda)

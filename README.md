@@ -26,7 +26,7 @@ desgewenst hoeveelheden toe, en werkt de legenda bij wanneer het ontwerp verande
 Nog geen brongegevens? Je kunt de lege legenda alvast plaatsen en daarna xrefs kiezen.
 Met **Blanco** begin je bewust zonder automatische regels.
 
-Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint bevat de basisuitleg.
+Typen kan ook: begin met `NLCSLEGENDA`. **Help** in het lint opent de volledige offline handleiding. Met **F1** krijg je uitleg bij het actieve commando of instellingenonderdeel.
 
 Nieuw met de plug-in? Begin bij [Je eerste legenda](docs/handleiding.md#eerste-legenda).
 Werk je in een kaderbestand met xrefs, volg dan de

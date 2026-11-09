@@ -200,3 +200,15 @@ geladen; database- en certificaathandles worden vrijgegeven. De controle verifie
 zowel de ondertekende inhoud als de vaste uitgever en de productgegevens.
 HTTPS en SHA-256 zijn aanvullende controles, geen vervanging voor de handtekening.
 De keuzes en regressieproeven staan in [Updateprotocol](update-protocol.md).
+
+## F1-hulp
+
+De commandohulp gebruikt de Autodesk-functie `acedSetFunHelp`. Het managed
+commandoattribuut kan het installatiepad niet tijdens het laden invullen. Een
+relatief HTML-pad werd in Civil 3D 2027 als webadres geopend.
+
+Deze aanroep registreert uitsluitend bekende commando's en lokale hulpbestanden.
+De DLL wordt gezocht in de map van het CAD-programma. De koppeling gebeurt één
+keer, na de commandoregistratie. De idle-handler wordt daarna losgekoppeld, ook
+bij een fout. CodeQL-meldingen over het gebruik van native code zijn hier
+beoordeeld als noodzakelijke aansluiting op de Autodesk-API.

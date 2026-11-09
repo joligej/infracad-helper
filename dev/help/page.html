@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>NLCS Legenda {{VERSION}} – handleiding</title>
+<style>
+* { box-sizing: border-box; }
+html { scroll-padding-top: 1.5rem; }
+body { margin: 0; color: #25343b; background: #fff; font: 17px/1.65 system-ui, sans-serif; }
+header { padding: 1.5rem 2rem; background: #153e51; color: white; }
+header strong { display: block; font-size: 1.6rem; }
+.layout { display: grid; grid-template-columns: 18rem minmax(0, 1fr); }
+nav { padding: 1.5rem; background: #f3f6f7; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+nav a { display: block; padding: .25rem 0; }
+input { width: 100%; padding: .6rem; font: inherit; border: 1px solid #8799a2; border-radius: 3px; }
+main { padding: 1.5rem 3rem 5rem; max-width: 76rem; min-width: 0; }
+a { color: #005f8b; text-underline-offset: .15em; overflow-wrap: anywhere; }
+a:focus-visible, input:focus-visible { outline: 3px solid #d56b00; outline-offset: 3px; }
+h1, h2, h3 { line-height: 1.25; color: #153e51; }
+h1 { margin-top: 3rem; font-size: 2rem; }
+h2 { margin-top: 2.5rem; padding-top: .75rem; border-top: 1px solid #dbe3e6; }
+h3 { margin-top: 2rem; }
+img { max-width: 100%; height: auto; border: 1px solid #dbe3e6; }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+td, th { border: 1px solid #c9d4d9; padding: .55rem .7rem; text-align: left; overflow-wrap: anywhere; }
+th { background: #eef3f5; }
+code { font-size: .9em; overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; background: #f3f6f7; padding: 1rem; }
+blockquote { margin-left: 0; border-left: 4px solid #8799a2; padding-left: 1rem; }
+.hint { font-size: .85rem; color: #526570; }
+#results { padding-left: 1.2rem; }
+#results:empty { display: none; }
+@media (max-width: 800px) {
+ .layout { display: block; }
+ nav { position: static; height: auto; }
+ main { padding: 1rem; }
+ header { padding: 1rem; }
+ table { display: block; overflow-x: auto; }
+}
+@media print { nav, header { display: none; } .layout { display: block; } main { padding: 0; } img { max-height: 75vh; } }
+</style>
+</head>
+<body>
+<header><strong>NLCS Legenda</strong>Handleiding bij versie {{VERSION}} · offline beschikbaar</header>
+<div class="layout">
+<nav aria-label="Handleiding">
+<label for="search"><strong>Zoeken in de handleiding</strong></label>
+<input id="search" type="search" placeholder="Bijvoorbeeld xrefs of schaalbalk" autocomplete="off">
+<p id="search-status" class="hint" aria-live="polite"></p>
+<ol id="results"></ol>
+{{NAV}}
+<p class="hint">Deze handleiding komt uit dezelfde documentatie als op GitHub. Links naar websites hebben internet nodig.</p>
+</nav>
+<main id="content">{{CONTENT}}</main>
+</div>
+<script>
+const headings = [...document.querySelectorAll('main h1, main h2, main h3')];
+const sections = headings.map(heading => {
+  let text = heading.textContent;
+  for (let node = heading.nextElementSibling; node && !/^H[123]$/.test(node.tagName); node = node.nextElementSibling)
+    text += ' ' + node.textContent;
+  return { heading, text: text.toLocaleLowerCase('nl') };
+});
+const search = document.getElementById('search');
+const results = document.getElementById('results');
+const status = document.getElementById('search-status');
+search.addEventListener('input', () => {
+  results.replaceChildren();
+  const words = search.value.trim().toLocaleLowerCase('nl').split(/\s+/).filter(Boolean);
+  if (!words.length) { status.textContent = ''; return; }
+  const matches = sections.filter(section => words.every(word => section.text.includes(word)));
+  status.textContent = matches.length ? `${matches.length} onderwerpen gevonden` : 'Geen onderwerp gevonden. Probeer een ander woord.';
+  for (const {heading} of matches) {
+    const item = document.createElement('li');
+    const link = document.createElement('a');
+    link.href = '#' + heading.id;
+    link.textContent = heading.textContent;
+    item.append(link);
+    results.append(item);
+  }
+});
+</script>
+</body>
+</html>

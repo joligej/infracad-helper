@@ -7,6 +7,26 @@ namespace NlcsLegenda.Plugin;
 internal class LegendDialog : Form
 {
     private readonly ResourceScope _resources = new();
+    protected Func<string>? HelpTopic { get; set; }
+    internal string CurrentHelpTopic => HelpTopic?.Invoke() ?? OfflineHelp.Topic("dialogs", GetType().Name);
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal Action<string> OpenHelp { get; set; }
+
+    protected override void OnHelpRequested(HelpEventArgs hevent)
+    {
+        OpenHelp(CurrentHelpTopic);
+        hevent.Handled = true;
+        base.OnHelpRequested(hevent);
+    }
+
+    private static IEnumerable<Control> Descendants(Control parent)
+    {
+        foreach (Control child in parent.Controls)
+        {
+            yield return child;
+            foreach (var descendant in Descendants(child)) yield return descendant;
+        }
+    }
 
     protected T Own<T>(T resource) where T : IDisposable => _resources.Own(resource);
 
@@ -38,12 +58,15 @@ internal class LegendDialog : Form
 
     public LegendDialog()
     {
+        OpenHelp = topic => OfflineHelp.Show(this, topic);
         AutoScaleDimensions = new SizeF(96, 96);
         AutoScaleMode = AutoScaleMode.Dpi;
     }
 
     protected override void OnLoad(EventArgs e)
     {
+        if (Descendants(this).OfType<ButtonBar>().FirstOrDefault() is { } buttons)
+            buttons.AddHelp(() => OpenHelp(CurrentHelpTopic));
         var area = Screen.FromControl(Owner ?? this).WorkingArea;
         var available = new Size(Math.Max(1, area.Width - 24), Math.Max(1, area.Height - 24));
         MinimumSize = new Size(Math.Min(MinimumSize.Width, available.Width), Math.Min(MinimumSize.Height, available.Height));

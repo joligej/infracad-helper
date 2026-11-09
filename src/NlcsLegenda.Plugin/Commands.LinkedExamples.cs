@@ -9,7 +9,7 @@ namespace NlcsLegenda.Plugin;
 
 public partial class Commands
 {
-    [CommandMethod("NLCSLEGENDAVOORBEELDKOPPELEN", CommandFlags.Modal)]
+    [CommandMethod("NLCS_LEGENDA", "NLCSLEGENDAVOORBEELDKOPPELEN", null, CommandFlags.Modal, null, "help-NLCSLEGENDAVOORBEELDKOPPELEN.html", "")]
     public void LinkLegendExample()
     {
         var doc = AcApp.DocumentManager.MdiActiveDocument;

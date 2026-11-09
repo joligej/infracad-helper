@@ -64,6 +64,7 @@ $updaterDirectory=Join-Path $outContents 'Updater'
 New-Item -ItemType Directory -Path $updaterDirectory -Force | Out-Null
 Copy-Item -LiteralPath $UpdaterPath -Destination $updaterDirectory
 
+& (Join-Path $PSScriptRoot 'Build-Help.ps1') -OutputDirectory (Join-Path $outContents 'Help')
 Write-Host "==> Bundle klaar: $outBundle" -ForegroundColor Green
 Write-Host "    Kopieer naar: $env:APPDATA\Autodesk\ApplicationPlugins\" -ForegroundColor Yellow
 

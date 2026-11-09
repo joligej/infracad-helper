@@ -8,6 +8,7 @@ namespace NlcsLegenda.Plugin;
 internal sealed class ButtonBar : TableLayoutPanel
 {
     private readonly FlowLayoutPanel _extras = new() { Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+    private readonly FlowLayoutPanel _actions;
     public Button Ok { get; }
     public Button Cancel { get; }
     public Button? Apply { get; }
@@ -20,6 +21,7 @@ internal sealed class ButtonBar : TableLayoutPanel
         RowStyles.Add(new RowStyle(SizeType.AutoSize));
         RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+        _actions = actions;
         Controls.Add(_extras, 0, 0);
         Controls.Add(actions, 0, 1);
         AutoSize = true;
@@ -35,6 +37,18 @@ internal sealed class ButtonBar : TableLayoutPanel
             Apply = MakeButton("Toepassen", DialogResult.None);
             actions.Controls.Add(Apply);
         }
+    }
+
+    public void AddHelp(Action open)
+    {
+        if (_actions.Controls.Cast<Control>().Concat(_extras.Controls.Cast<Control>()).Any(c => c.Name == "HelpButton")) return;
+        var button = MakeButton("Hulp", DialogResult.None);
+        button.MinimumSize = Size.Empty;
+        button.Padding = new Padding(4, 2, 4, 2);
+        button.AccessibleDescription = "Uitleg bij dit venster, ook met F1";
+        (_extras.Controls.Count > 0 ? _extras : _actions).Controls.Add(button);
+        button.Name = "HelpButton";
+        button.Click += (_, _) => open();
     }
 
     public Button AddExtra(string text)
@@ -107,6 +121,7 @@ internal sealed class SettingsDialog : LegendDialog
 
         var tabs = new TabControl { Dock = DockStyle.Fill, Appearance = TabAppearance.FlatButtons,
             SizeMode = TabSizeMode.Fixed, ItemSize = new Size(0, 1), TabStop = false };
+        HelpTopic = () => OfflineHelp.Topic("settings", tabs.SelectedTab?.Text ?? "Legenda");
         tabs.TabPages.Add(BuildAlgemeenTab());
         tabs.TabPages.Add(BuildInhoudTab());
         tabs.TabPages.Add(BuildSamenvoegenTab());
