@@ -118,3 +118,11 @@ Testuitvoer staat in `artifacts/` en kan na beoordeling worden verwijderd.
 - `NLCSLEGENDAEXAMPLEAPPEARANCETEST`: behoud van bronvorm, maat en arceringsachtergrond; expliciete voorbeeldkeuze.
 - `NLCSLEGENDAEXAMPLEREVISIONTEST`: gewijzigde bibliotheek, gelijknamige hostblokken, behoud van andere legenda's en hergebruik zonder bron.
 - `NLCSLEGENDAEXAMPLEREVISIONVERIFY`: vervolg na opslaan en heropenen van de vorige proef.
+
+## Symboolstand
+
+`NLCSLEGENDASYMBOLORIENTATIONTEST` maakt eigen proefsymbolen en een bron-xref.
+De proef meet de getekende richtingen bij rotatie, spiegeling, doorsneden en
+gekantelde symbolen. Ook herhaald opbouwen, vaste en gekoppelde voorbeelden,
+uitsluitingen en ongewijzigde bronbestanden worden gecontroleerd. Gebruik een
+lege proeftekening in een eigen werkmap.

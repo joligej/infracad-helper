@@ -1,5 +1,5 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<ApplicationPackage SchemaVersion="1.0" AppVersion="1.43.0" ProductCode="{4C4B0F1A-6C1E-4C7E-9E3A-1F2A3B4C5D6E}" Name="NLCS Legenda" Description="Automatische NLCS-legendagenerator" Author="infracad-helper" HelpFile="./Contents/Help/NlcsLegenda.html">
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage SchemaVersion="1.0" AppVersion="1.44.0" ProductCode="{4C4B0F1A-6C1E-4C7E-9E3A-1F2A3B4C5D6E}" Name="NLCS Legenda" Description="Automatische NLCS-legendagenerator" Author="infracad-helper" HelpFile="./Contents/Help/NlcsLegenda.html">
   <CompanyDetails Name="infracad-helper" />
   <Components Description="NLCS Legenda (.NET 8)">
     <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R25.0" SeriesMax="R25.0" SupportPath="./Contents/Help" />

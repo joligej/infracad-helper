@@ -13,6 +13,13 @@ public static class SymbolDescription
         ["PUT_DRAINAGEPUT"] = "Drainageput"
     };
 
+    public static bool IsSection(string block, string layer)
+    {
+        if (NlcsLayerParser.TryParse(layer, out var parsed) && parsed.TypeSuffix == "SD") return true;
+        var options = LayerNaming.LocalName(block).Split('-');
+        return options.Skip(1).Any(part => part.ToUpperInvariant() is "D" or "SOD" or "DMM" or "SODMM");
+    }
+
     public static bool IsManhole(string block, string element) =>
         System.Text.RegularExpressions.Regex.IsMatch(block + "_" + element,
             @"(?:^|[-_ ])(?:PUT|RIOOLPUT|INSPECTIEPUT)(?:$|[-_ ])", System.Text.RegularExpressions.RegexOptions.IgnoreCase);

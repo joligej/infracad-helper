@@ -126,7 +126,7 @@ public static class LegendBuilder
                     renderLayer = EnsureStyledLayer(tr, db, imports, layer, display);
                 else renderLayer = ResolveManualLayer(tr, db, imports, layer);
                 var sample = entry.IsManual ? null : analysis.SymbolSamples.GetValueOrDefault(layer);
-                if (!TryInsertSymbol(btr, tr, db, imports, name, renderLayer, sample?.Transform ?? SymbolTransform.Identity,
+                if (!TryInsertSymbol(btr, tr, db, imports, name, renderLayer, sample?.LegendTransform ?? SymbolTransform.Identity,
                     sample, 0, 0, s.ModelUnitsPerPaperMm, s.IncludeInvisibleLayers, out var ids, out var reason))
                     throw new InvalidOperationException($"Symbool '{entry.Description}': {reason}");
                 var bounds = new Extents3d();

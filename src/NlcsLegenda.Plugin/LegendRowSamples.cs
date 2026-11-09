@@ -46,7 +46,7 @@ internal static class LegendRowSamples
         }
     }
 
-    public static string Capture(Database db, Transaction tr, IReadOnlyList<ObjectId> ids, LayerDisplayStyle? singleStyle = null, LayerDisplayStyle? singleLayer = null, ObjectId viewport = default)
+    public static string Capture(Database db, Transaction tr, IReadOnlyList<ObjectId> ids, LayerDisplayStyle? singleStyle = null, LayerDisplayStyle? singleLayer = null, ObjectId viewport = default, SymbolTransform? symbolTransform = null)
     {
         var table = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForWrite);
         using var block = new BlockTableRecord { Name = "NLCS_ROW_" + Guid.NewGuid().ToString("N") };
@@ -64,7 +64,8 @@ internal static class LegendRowSamples
             var style = singleStyle ?? DrawingAnalyzer.EntityStyle(reference, tr, null, layerStyle);
             var sample = new SymbolSample(source.Name, "", SymbolTransform.From(reference.BlockTransform)) {
                 ReferenceId = id, InsertionStyle = style, InsertionLayerStyle = layerStyle, SourceViewportId = viewport, ViewIdentity = viewport, FrozenLayers = imports.FrozenLayers };
-            if (!LegendBuilder.TryInsertSymbol(block, tr, db, imports, source.Name, reference.Layer, sample.Transform,
+            var transform = symbolTransform ?? sample.Transform;
+            if (!LegendBuilder.TryInsertSymbol(block, tr, db, imports, source.Name, reference.Layer, transform,
                 sample, reference.Position.X, reference.Position.Y, 1, true, out _, out var error)) throw new InvalidOperationException(error);
         }
         if (ordinary.Count > 0)

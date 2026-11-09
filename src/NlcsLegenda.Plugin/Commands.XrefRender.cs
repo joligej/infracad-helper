@@ -1163,8 +1163,8 @@ public partial class Commands
                     .Select(circle => circle.Radius)
                     .Distinct()
                     .Count() > 1;
-                transformsOk = symbolTexts.Any(angle => Math.Abs(angle - Math.PI / 2.0) < 0.05)
-                    && hasNormal && hasRotated && hasMirrored && scaledSmaller;
+                transformsOk = symbolTexts.All(angle => Math.Abs(angle - Math.PI / 2.0) > 0.05)
+                    && hasNormal && !hasRotated && hasMirrored && scaledSmaller;
                 tr.Commit();
             }
 

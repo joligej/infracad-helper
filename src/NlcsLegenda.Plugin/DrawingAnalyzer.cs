@@ -329,7 +329,7 @@ public static class DrawingAnalyzer
 
     private static void CollectFromBlock(
         ObjectId btrId, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> path, int depth, Matrix3d transform, string sourceXref, LayerDisplayStyle? inheritedStyle = null, LayerDisplayStyle? inheritedLayerStyle = null)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, string sourceXref, LayerDisplayStyle? inheritedStyle = null, LayerDisplayStyle? inheritedLayerStyle = null, SymbolOrientation? orientation = null)
     {
         if (depth > MaxDepth) throw new InvalidOperationException("Te diep geneste blokken; analyse afgebroken om onvolledige hoeveelheden te voorkomen.");
         if (!path.Add(btrId)) return;
@@ -337,14 +337,14 @@ public static class DrawingAnalyzer
         var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
         foreach (ObjectId id in btr)
             if (tr.GetObject(id, OpenMode.ForRead) is Entity ent)
-                Process(ent, tr, c, settings, path, depth, transform, sourceXref, inheritedStyle, inheritedLayerStyle);
+                Process(ent, tr, c, settings, path, depth, transform, sourceXref, inheritedStyle, inheritedLayerStyle, orientation);
 
         path.Remove(btrId);
     }
 
     private static void Process(
         Entity ent, Transaction tr, Collector c, LegendSettings settings,
-        HashSet<ObjectId> path, int depth, Matrix3d transform, string sourceXref, LayerDisplayStyle? inheritedStyle = null, LayerDisplayStyle? inheritedLayerStyle = null)
+        HashSet<ObjectId> path, int depth, Matrix3d transform, string sourceXref, LayerDisplayStyle? inheritedStyle = null, LayerDisplayStyle? inheritedLayerStyle = null, SymbolOrientation? orientation = null)
     {
         if (c.Excluded.Contains(ent.ObjectId))
             return;
@@ -370,7 +370,7 @@ public static class DrawingAnalyzer
         // xref-insert als broncontainer, ook op een symboollaag
         if (definition is not { IsFromExternalReference: true })
         {
-            Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle, inheritedStyle);
+            Record(ent, tr, c, settings, transform, sourceXref, effectiveStyle, layerStyle, inheritedStyle, orientation ?? SymbolOrientation.Root);
             // symbolen zonder dubbeltelling van interne lijnen
             if (block is not null && c.ParseLayer(ent.Layer) is { } blockLayer
                 && blockLayer.DrawType is NlcsDrawType.Symbool or NlcsDrawType.Geometrie)
@@ -383,6 +383,7 @@ public static class DrawingAnalyzer
             if (def is { IsLayout: false })
             {
                 var nested = transform * br.BlockTransform;
+                var nestedOrientation = (orientation ?? SymbolOrientation.Root).Nested(br, tr);
                 if (def.IsFromExternalReference)
                 {
                     string childSource = string.IsNullOrEmpty(sourceXref) ? def.Name : sourceXref + "|" + LayerNaming.LocalName(def.Name);
@@ -391,19 +392,19 @@ public static class DrawingAnalyzer
                         + sourceDb.FingerprintGuid + ":" + br.ObjectId.NonForwardedHandle;
                     if (settings.IsXrefIncluded(childSource))
                         CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested,
-                            sourceXref: childSource, inheritedStyle: effectiveStyle, inheritedLayerStyle: layerStyle);
+                            sourceXref: childSource, inheritedStyle: effectiveStyle, inheritedLayerStyle: layerStyle, orientation: nestedOrientation);
                     else c.Skip(ent, tr, sourceXref, "xref is uitgesloten in Bronnen en inhoud");
                 }
                 else
                 {
-                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, sourceXref, effectiveStyle, layerStyle);
+                    CollectFromBlock(br.BlockTableRecord, tr, c, settings, path, depth + 1, nested, sourceXref, effectiveStyle, layerStyle, nestedOrientation);
                 }
             }
         }
     }
 
     private static void Record(Entity ent, Transaction tr, Collector c, LegendSettings settings,
-        Matrix3d transform, string sourceXref, LayerDisplayStyle style, LayerDisplayStyle layerStyle, LayerDisplayStyle? parentStyle)
+        Matrix3d transform, string sourceXref, LayerDisplayStyle style, LayerDisplayStyle layerStyle, LayerDisplayStyle? parentStyle, SymbolOrientation orientation)
     {
         var layerName = ent.Layer;
         KlicObjectData? metadata = null;
@@ -481,8 +482,9 @@ public static class DrawingAnalyzer
                     c.SymbolDefinitionIdentities[normalizedKey] = normalized;
                 }
             }
+            var symbolOrientation = orientation.Nested(br, tr);
             symbol = new SymbolSample(blockName, identity, SymbolTransform.From(transform * br.BlockTransform))
-            { ReferenceId = br.ObjectId, ViewIdentity = c.Viewport?.Id ?? ObjectId.Null, SourceViewportId = c.Viewport?.Appearance == true ? c.Viewport.Id : ObjectId.Null, FrozenLayers = c.Viewport?.FrozenLayers ?? EmptyObjectIds, SourceXref = sourceXref, NormalizedDefinitionIdentity = normalized, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers, settings.GenericManholes && SymbolDescription.IsManhole(blockName, parsed.Element), c.Viewport),
+            { OriginalOrientation = symbolOrientation.KeepSource ? null : symbolOrientation.Transform, ReferenceId = br.ObjectId, ViewIdentity = c.Viewport?.Id ?? ObjectId.Null, SourceViewportId = c.Viewport?.Appearance == true ? c.Viewport.Id : ObjectId.Null, FrozenLayers = c.Viewport?.FrozenLayers ?? EmptyObjectIds, SourceXref = sourceXref, NormalizedDefinitionIdentity = normalized, AttributeIdentity = AttributeIdentity(br, tr, style, layerStyle, settings.IncludeInvisibleLayers, settings.GenericManholes && SymbolDescription.IsManhole(blockName, parsed.Element), c.Viewport),
                 OmitManholeNumber = settings.GenericManholes && SymbolDescription.IsManhole(blockName, parsed.Element),
                 Variant = SymbolDescription.Variant(blockName) is { Length: > 0 } treeClass ? treeClass
                     : settings.GenericManholes ? SymbolDescription.ManholeKind(blockName, parsed.Element) : "",
