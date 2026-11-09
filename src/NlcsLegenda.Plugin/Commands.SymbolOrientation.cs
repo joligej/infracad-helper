@@ -32,16 +32,17 @@ public partial class Commands
                     ("NAAM", 1.18, new Scale3d(1), true) })
                 {
                     string element = prefix + "_" + label;
-                    var layer = new LayerTableRecord { Name = "N-WE-AL-" + element + (label == "LAAG" ? "-SD" : "-S") };
+                    using var layer = new LayerTableRecord { Name = "N-WE-AL-" + element + (label == "LAAG" ? "-SD" : "-S") };
                     layers.Add(layer); tr.AddNewlyCreatedDBObject(layer, true);
-                    var block = new BlockTableRecord { Name = "SAL-" + element + (label == "NAAM" ? "-SODMM" : "") };
+                    using var block = new BlockTableRecord { Name = "SAL-" + element + (label == "NAAM" ? "-SODMM" : "") };
                     blocks.Add(block); tr.AddNewlyCreatedDBObject(block, true);
-                    foreach (var end in new[] { new Point3d(4, 0, 0), new Point3d(0, 1, 0) })
+                    foreach (var line in new[] { new Point3d(4, 0, 0), new Point3d(0, 1, 0) }.Select(end => new Line(Point3d.Origin, end)))
                     {
-                        var line = new Line(Point3d.Origin, end);
-                        block.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
+                        using (line) {
+                            block.AppendEntity(line); tr.AddNewlyCreatedDBObject(line, true);
+                        }
                     }
-                    var reference = new BlockReference(new Point3d(expected.Count * 30, 0, 0), block.ObjectId) { LayerId = layer.ObjectId, Rotation = angle, ScaleFactors = scale };
+                    using var reference = new BlockReference(new Point3d(expected.Count * 30.0, 0, 0), block.ObjectId) { LayerId = layer.ObjectId, Rotation = angle, ScaleFactors = scale };
                     if (label == "GEKANTELD") reference.Normal = new Vector3d(0, 1, 1).GetNormal();
                     model.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true);
                     expected[element] = section || label == "GEKANTELD" ? Vector3d.XAxis.TransformBy(reference.BlockTransform).GetNormal()
@@ -57,7 +58,7 @@ public partial class Commands
             using (var tr = db.TransactionManager.StartTransaction())
             {
                 var model = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-                var reference = new BlockReference(new Point3d(0, 50, 0), xrefId) { Rotation = .42, ScaleFactors = new Scale3d(1.5) };
+                using var reference = new BlockReference(new Point3d(0, 50, 0), xrefId) { Rotation = .42, ScaleFactors = new Scale3d(1.5) };
                 model.AppendEntity(reference); tr.AddNewlyCreatedDBObject(reference, true); tr.Commit();
             }
             foreach (var key in new[] { "XREF_LAAG", "XREF_NAAM", "XREF_GEKANTELD" })
