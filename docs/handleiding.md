@@ -1,657 +1,941 @@
-# Handleiding
+# Handleiding NLCS Legenda
 
 [Installeren](installatie.md) · [Problemen oplossen](problemen-oplossen.md) · [Terug naar het project](../README.md)
 
+Met NLCS Legenda maak je een legenda van de lijnen, arceringen en symbolen in je
+tekening. Je kiest welke onderdelen erin komen en hoe ze worden omschreven. Als
+het ontwerp verandert, werk je de legenda bij met behoud van je keuzes.
+
+Deze handleiding gaat uit van AutoCAD of Civil 3D en een model dat in meters is
+getekend. De knoppen staan op het lint **NLCS Legenda**. De bijbehorende commando's
+staan [onderaan](#commandos). Waar **Lokale instellingen → Opmaak** staat, open je
+eerst Lokale instellingen en kies je daarna Opmaak in de lijst links.
+
+## Waar wil je mee aan de slag?
+
+- [Een eerste legenda plaatsen](#eerste-legenda)
+- [Instellingen voor één legenda of voor nieuwe legenda's aanpassen](#instellingen)
+- [Xrefs en kaartvensters kiezen](#bronnen-kiezen)
+- [Regels toevoegen, uitsluiten en ordenen](#de-inhoud-samenstellen)
+- [Teksten en statussen aanpassen](#teksten-en-statussen)
+- [Regels samenvoegen](#regels-samenvoegen)
+- [Schaal, opmaak en opmerkingen instellen](#schaal-en-opmaak)
+- [Een eigen voorbeeld of bronobject gebruiken](#voorbeelden-kiezen-en-koppelen)
+- [Bijwerken met behoud van je keuzes](#bijwerken-en-keuzes-bewaren)
+- [De legenda op een tekenblad plaatsen](#de-legenda-op-een-tekenblad)
+- [Instellingen delen en tekenbladen vergelijken](#meerdere-legendas-en-tekenbladen)
+- [Hoeveelheden bekijken en exporteren](#hoeveelheden-en-export)
+
 ## Eerste legenda
 
-Start `NLCSLEGENDA`. Je kunt eerst nog de schaal of een paar opties zetten; daarna
-hangt de legenda aan je cursor en zet je hem naast de tekening neer. Standaard maakt hij
-een legenda van de hele tekening; kies je in het optiemenu `Uitkiezen`, dan komt er een
-legenda van alleen die selectie. Alles komt in de model space op de eigen NLCS-lagen, dus
-kleur en lijntype kloppen meteen. Wie liever klikt dan typt vindt
-in het lint een tab **NLCS Legenda** met dezelfde functies. Via **Help** in het lint staat
-de basisuitleg ook in AutoCAD zelf.
+1. Open de tekening waarin de legenda moet komen en ga naar modelruimte.
+   Werk je in een kaderbestand met xrefs, open dan dat kaderbestand.
+2. Kies **Genereren** op het lint of typ `NLCSLEGENDA`.
+3. Kies **Schaal** en vul de schaalnoemer in. Voor een kaart op 1:500 vul je `500` in.
+4. Standaard wordt de hele tekening als bron gebruikt. Kies **Uitkiezen** als je
+   zelf een selectie wilt aanwijzen.
+5. Kies **Plaatsen** en zet de legenda met de muis naast je tekening.
+6. Open **Lokale instellingen** om bronnen, inhoud en opmaak te controleren.
+   Met **Toepassen** zie je het resultaat meteen in dezelfde legenda.
+
+Een nieuwe legenda komt standaard als één blok in modelruimte te staan. Met
+**Exploderen bij plaatsen** kun je losse objecten kiezen. Gebruik in beide
+gevallen de functies van de plug-in om teksten en voorbeelden aan te passen.
+Rechtstreekse wijzigingen aan de getekende legenda kunnen bij het bijwerken
+verdwijnen.
 
 ### Leeg beginnen
 
-Ook zonder gevonden regels kun je een legenda plaatsen. Open daarna **Lokale instellingen →
-Bronnen en inhoud** om xrefs aan te zetten; **Toepassen** vult dezelfde legenda meteen aan.
-Eigen regels voeg je toe via **Samenstellen**. De gekozen opmaak en opmerkingen blijven gelden.
-Als titel, opmerkingen, kader en andere zichtbare onderdelen allemaal uitstaan, verschijnt
-alleen de hulptekst **Lege legenda** op een niet-plotbare laag. Daarmee blijft de legenda te kiezen.
+Je kunt ook een legenda plaatsen als er nog geen regels zijn gevonden. Dat is
+handig als je eerst de xrefs wilt kiezen. Open na het plaatsen **Lokale instellingen →
+Bronnen en inhoud**, kies de bronnen en klik op **Toepassen**. Eigen regels voeg je
+toe via **Samenstellen**.
 
-Kies bij `NLCSLEGENDA` de optie **Blanco** om bewust zonder bronregels te starten.
-De samenstelling staat dan vast: eigen regels zijn direct toe te voegen, automatische
-regels blijven voorstellen. Keur ze goed via **Samenstelling vastzetten**, of zet daar
-het vastzetten uit om de legenda weer automatisch te vullen.
+Met de optie **Blanco** bij Genereren begin je bewust zonder automatische regels.
+De samenstelling staat dan vast. Je kunt zelf regels toevoegen. Gevonden
+bronregels verschijnen als voorstel en komen pas in de legenda nadat je ze
+goedkeurt via **Samenstelling vastzetten**. Daar kun je het vastzetten ook uitzetten.
 
-### Meerdere legenda's
+Staan titel, opmerkingen, kader en alle andere zichtbare onderdelen uit, dan
+verschijnt de hulptekst **Lege legenda**. Die wordt niet geplot en zorgt ervoor
+dat je de legenda nog kunt aanwijzen.
 
-Je kunt meerdere legenda's naast elkaar in één tekening hebben, bijvoorbeeld één voor de
-hele tekening en aparte legenda's voor deelgebieden. Elke legenda onthoudt zijn eigen
-bron (hele tekening of selectie) en zijn eigen instellingen. `NLCSLEGENDABEHEER` toont de
-legenda's en laat je ze bijwerken, hernoemen, opzoeken (zoomen) en verwijderen. In
-hetzelfde commando pas je per gekozen legenda de instellingen aan (de legenda wordt daarna
-in dezelfde bewerking opnieuw opgebouwd), neem je de instellingen over van een andere
-legenda, dupliceer je een legenda, wijzig je de bronselectie of zet je de opmaak van die
-legenda als globale standaard voor nieuwe legenda's.
+### Werken in een kaderbestand met xrefs
 
-### Goedgekeurde samenstelling en gekoppelde voorbeelden
+Voor een tekenblad met een aparte ondergrond of KLIC-xref werkt deze volgorde prettig:
 
-Gebruik versie 1.40 of hoger op alle werkplekken die deze nieuwe keuzes bewerken.
-Oudere legenda's worden bij opslaan omgezet; oudere plug-ins kunnen de nieuwe
-legenda-opslag niet bewerken, zodat vastgezette regels en bronkoppelingen beschermd blijven.
+1. Plaats de legenda in het kaderbestand, eventueel eerst leeg.
+2. Kies onder **Lokale instellingen → Bronnen en inhoud → Xrefs…** de benodigde xrefs.
+3. Kies **Kaartvensters** als alleen de inhoud van bepaalde kaarten op het blad
+   mag meetellen. Laat een overzichtskaartje en het venster van de legenda uitgevinkt.
+4. Controleer via **Samenstellen** welke regels je wilt opnemen.
+5. Pas omschrijvingen en volgorde aan in **Overzicht**.
+6. Gebruik **Samenstelling vastzetten** zodra de inhoud is goedgekeurd.
+7. Plaats de legenda op de layout met **Viewport** of **Naar model of layout**.
 
-**Samenstelling vastzetten** (`NLCSLEGENDAVASTZETTEN`) bewaart de bestaande regels als
-vaste lijst. Bijwerken houdt hun bronweergave actueel, maar voegt nieuwe onderdelen
-alleen toe na goedkeuring in dit venster. Eigen regels die je zelf toevoegt zijn al
-een bewuste keuze. Uitsluitingen en niet-plottende of verborgen bronlagen houden
-voorrang. Uitzetten hervat het automatisch bepalen van de samenstelling; **Resetten**
-wist de vaste samenstelling en begint met de globale standaard.
+Een *kaartvenster* toont het ontwerp op je layout. Het kan bepalen welke
+bronobjecten in de legenda horen. Een *legendavenster* toont de legenda zelf.
+Dat venster is dus geen bron voor de legenda.
 
-Bij een niet eenduidige splitsing blijft het vorige voorbeeld staan. Kies eerst in
-**Overzicht → Bron koppelen** welk bronvoorbeeld die regel moet volgen. Keur daarna
-gewenste extra regels goed. Zo worden oude en nieuwe varianten niet ongemerkt dubbel
-opgenomen.
+## Instellingen
 
-![Een vaste samenstelling met nieuwe voorstellen](vaste-samenstelling.png)
+Elke legenda bewaart haar eigen instellingen in de DWG. De globale standaard is
+alleen het startpunt voor nieuwe legenda's.
 
-**Gekoppeld voorbeeld** (`NLCSLEGENDAVOORBEELDKOPPELEN`) laat je een bronobject
-rechtstreeks aanwijzen, ook binnen een xref. Kies een nieuwe eigen regel of koppel
-een bestaande eigen regel. De bestaande plaats, identiteit en uitsluitingen blijven
-bewaard. Het bronobject blijft staan en wordt niet gewijzigd.
+| Wat wil je aanpassen? | Gebruik | Gevolg |
+| --- | --- | --- |
+| De legenda waaraan je nu werkt | **Lokale instellingen** | Alleen de gekozen legenda verandert. |
+| De opzet voor volgende legenda's | **Globale standaard** | Bestaande legenda's houden hun instellingen. |
+| Een opzet bewaren of delen | **Profielen** | Je slaat instellingen op en kiest later waar je ze wilt laden. |
 
-- **Bron volgen:** het voorbeeld wordt bij bijwerken opnieuw uit de gekoppelde bron
-  opgebouwd. De actuele kleur, het lijntype, de lijndikte en transparantie tellen mee.
-- **Voorbeeld vastzetten:** de huidige afbeelding blijft bewaard. Overzicht meldt
-  verschillen met de gekoppelde bron per regel; een melding verandert het voorbeeld niet.
-- **Laagweergave:** standaard de globale laagweergave van het kader, inclusief
-  aangepaste xref- en KLIC-kleuren. Kies expliciet een kaartvenster om diens
-  laagafwijkingen te gebruiken. Dit kiest de weergave van het voorbeeld; het verandert
-  niet de bronselectie van de hele legenda.
+Bij één legenda openen de lokale instellingen direct. Bij meerdere legenda's
+wijs je de gewenste legenda aan of kies je die uit een lijst. De globale
+standaard kun je ook aanpassen als er nog geen legenda is geplaatst.
 
-Ook via **Overzicht → Regel aanpassen** kun je de bronmodus wijzigen. Een oude eigen
-regel zonder bronkoppeling blijft een eigen voorbeeld. De plug-in leidt geen bron af
-uit alleen de omschrijving: koppel die eenmaal zelf. Een legenda met uitsluitend
-zulke regels krijgt geen onterechte melding dat er geen bronobjecten meer zijn.
+**Toepassen** werkt de gekozen legenda bij en houdt het venster open. **Opslaan**
+doet hetzelfde en sluit het venster. Na Toepassen zijn beide knoppen uitgeschakeld
+totdat je weer iets wijzigt. **Annuleren** sluit het venster zonder de nog niet
+toegepaste wijzigingen op te slaan. Eerder toegepaste wijzigingen blijven staan.
+Lukt het toepassen niet, dan blijft het venster open en blijft de vorige legenda behouden.
 
-Voor Civil 3D kies je bij het aanklikken van een profielonderdeel het profielvenster
-en de zichtbare stijlcomponent: maaiveldlijn, rioolhartlijn, wanden, put of putarcering.
-Stijloverschrijvingen in het profielvenster gaan vóór de basisstijl. Lijnen en wanden
-worden schematisch weergegeven met hun echte stijl; putvormen komen uit het
-profielonderdeel. Neem overige getekende markeringen, zoals een rode overlap bij een
-kruising, als afzonderlijk gekoppeld bronobject op. De koppeling bewaart de gekozen
-Civil 3D-component; er wordt geen riooltype afgeleid uit alleen zijn kleur.
+![Lokale instellingen met de onderdelen links in het venster](instellingen.png)
 
-![Een bronvoorbeeld met een eigen omschrijving koppelen](gekoppeld-voorbeeld.png)
+## Bronnen kiezen
 
-### Verplaatsen en bladen vergelijken
+Een *bron* is de tekening of xref waaruit een legendaregel wordt afgeleid. Het
+*voorbeeld* is het stukje lijn, arcering of symbool dat naast de omschrijving staat.
+Meerdere bronobjecten kunnen samen één legendaregel vormen.
 
-**Naar model of layout** (`NLCSLEGENDAVERPLAATSEN`) plaatst de gekozen legenda in de
-huidige modelruimte of papierlayout. Schakel eerst naar het gewenste tabblad; verlaat
-een actief kaartvenster met `PSPACE`. Kies de legenda en haar nieuwe linkerbovenpunt.
-Papiermaten, inhoud, volgorde en instellingen blijven behouden. Een eigen gekoppeld
-legendavenster wordt verwijderd wanneer de legenda rechtstreeks naar papier gaat.
-De bronkaartvensters blijven staan. In papierruimte vermeldt de voettekst
-**Voorbeelden schematisch**; de kaart- en schaalbalkschaal blijft apart bewaard.
+### Xrefs
 
-**Bladen vergelijken** (`NLCSLEGENDAVERGELIJKEN`) leest de legenda's in andere gekozen
-DWG's zonder die bestanden te wijzigen. De controle vergelijkt dezelfde bronlaag,
-objectsoort, symboolsoort en status. Voor eigen regels of verschillend benoemde bronnen
-kun je een gedeelde **Onderdeelnaam voor vergelijking tussen bladen** invullen via
-Regel aanpassen of Gekoppeld voorbeeld. Verschillende statussen blijven afzonderlijk.
+Open **Lokale instellingen → Bronnen en inhoud → Xrefs…** om per xref te kiezen
+of die meetelt. Het commando `NLCSLEGENDAXREFS` opent dezelfde keuze.
 
-De lijst toont afwijkende omschrijvingen en weergaven. Vink een bewuste uitzondering
-aan en sla de keuze op. Die keuze blijft in de huidige tekening bewaard en wordt
-opnieuw gevraagd zodra de betrokken tekst of weergave verandert. Regels zonder
-bronkoppeling of gedeelde onderdeelnaam worden als niet vergeleken gemeld.
+**Xrefs meenemen** schakelt alle xrefs tegelijk in of uit en vervangt eerdere
+uitzonderingen. Gebruik daarom **Xrefs…** als je afzonderlijke bronnen wilt kiezen.
+Een uitgeschakelde bovenliggende xref sluit ook de daarin geneste xrefs uit.
 
-### Bijwerken en viewport
+De plug-in kan voorbeelden uit alleen-lezen of vergrendelde bronnen gebruiken.
+Ze worden op lokale legendalagen getekend. De bron-xrefs blijven ongewijzigd.
 
-Is het ontwerp veranderd, dan tekent `NLCSLEGENDAUPDATE` de legenda opnieuw op precies
-dezelfde plek. Instellingen, uitsluitingen en handmatige samenstellingen blijven bewaard
-voor bestaande bronobjecten, ook na een kleur-, stijl- of schaalwijziging en na heropenen.
-Vooraf verschijnt een overzicht van toegevoegde, verdwenen, gesplitste en samengevoegde
-regels, gewijzigde voorbeelden en bronmeldingen. Annuleren laat de legenda staan.
-Dit overzicht verschijnt ook bij Alles bijwerken. Nieuwe bronregels worden
-volgens de opgeslagen filters toegevoegd. Ook een volledig uitgevinkte legenda blijft
-beschikbaar om later weer aan te vullen.
+Is een bronbestand op schijf gewijzigd sinds het laden, herlaad die xref dan
+voordat je de legenda bijwerkt. Bij een verschil tussen de geladen en opgeslagen
+bronversie geeft de plug-in een melding en blijft de vorige legenda behouden.
 
-**Resetten** (`NLCSLEGENDARESET`) vervangt na bevestiging de eigen instellingen en
-samenstelling door de huidige globale standaard. Naam, bronselectie en plaats blijven
-behouden; andere legenda's veranderen niet.
+### Kaartvensters kiezen
 
-Omdat een beheerde legenda bij bijwerken volledig opnieuw wordt opgebouwd,
-verdwijnen rechtstreekse wijzigingen die je met de hand in de legenda hebt gemaakt; pas de
-tekst daarom aan via de instellingen of `NLCSLEGENDATEKST`. Is er één legenda, dan gaat dat
-direct; bij meerdere klik je de gewenste legenda aan (of kies je uit een lijst). Een
-selectielegenda wordt daarbij opnieuw van diezelfde selectie opgebouwd, niet van de hele
-tekening. `NLCSLEGENDAVIEWPORT` maakt in
-de paper space een viewport rond de gekozen legenda op de ingestelde schaal. Dit venster
-blijft gekoppeld: bij een schaalwijziging van de legenda volgt de viewport automatisch en
-blijft hij vergrendeld. Automatisch gemaakte kaders groeien mee; een handmatig getekend
-kader houdt zijn papierafmetingen. De marge wordt zo nodig verkleind; een te klein
-kader geeft een melding zonder de schaal te veranderen. Kies **Bestaand** om een oud legenda-venster eenmalig te
-koppelen. Andere viewports worden niet aangepast.
+Met **Kaartvensters** of **Bronnen en inhoud → Kaartvensters kiezen…** beperk je
+de bron tot de kaarten die bij deze legenda horen.
 
-Bij plaatsen wijs je standaard de **linkerbovenhoek** aan. Onder **Legenda → Viewport**
-kun je kiezen voor het **middelpunt**. Bij automatisch vergroten blijft dat punt op zijn
-plaats. Zowel getekende als automatisch geplaatste kaders komen standaard op
-**VIEWPORT-NOPLOT**, met plotten uit. De laagnaam en plotinstelling zijn aanpasbaar;
-de plotinstelling geldt voor alle objecten op die laag.
+1. Open **Lijst**. Je ziet de kaartvensters van alle layouts, ook als je zelf in
+   modelruimte werkt.
+2. Zoek op de bladnaam en vergelijk de schaal, papiermaat en schematische positie.
+3. Vink de gewenste kaarten aan. Laat overzichtskaarten en vensters die een
+   legenda tonen uitgevinkt. Gekoppelde legendavensters worden al uit de lijst gelaten.
+4. Bevestig de bronkeuze.
 
-### Instellingen
+Het zoekfilter verbergt alleen regels in de lijst. Eerder gezette vinkjes blijven
+bewaard. Een venster op een andere layout is gewoon te kiezen. Een uitgezet
+venster niet. Ontbreekt een eerder gekozen venster, dan blijft dat in de lijst
+zichtbaar totdat je de bronkeuze herstelt.
 
-De globale instellingen zijn het startpunt voor een **nieuwe** legenda. Wijzig je later de
-globale standaard, dan verandert een bestaande legenda niet mee: die houdt de
-instellingen waarmee hij is gemaakt. Bij één aanwezige legenda openen de instelcommando's direct die legenda. Bij meerdere
-klik je de gewenste legenda aan of kies je uit een lijst. Gewiste legenda's tellen niet
-mee; Undo maakt ze weer bereikbaar. **Lokale instellingen** (`NLCSLEGENDAOPTIES`) werkt
-uitsluitend op een bestaande legenda. **Toepassen** tekent die legenda meteen opnieuw;
-**Opslaan** doet hetzelfde en sluit het venster. Na **Toepassen** zijn beide opslagknoppen
-uitgeschakeld totdat je iets wijzigt. **Annuleren** sluit het venster en laat reeds toegepaste
-wijzigingen staan. Een fout houdt het venster open en
-behoudt de vorige legenda en instellingen.
-**Globale standaard** (`NLCSLEGENDASTANDAARD`) opent afzonderlijk de instellingen voor
-nieuwe legenda's, ook wanneer er nog geen legenda in de tekening staat. De instellingen
-van één bestaande legenda bewerk je ook via `NLCSLEGENDABEHEER`.
-Het instellingenvenster heeft links een lijst met onderdelen: naast schaal, inhoud, opmaak, teksten,
-hoeveelheden en schaalbalk zitten daar ook de per-xref keuze, de eigen statussen inclusief
-ledentoewijzing en de omschrijvingen. De losse commando's blijven als snelkoppeling bestaan.
-De omschrijvingen bewerk je met `NLCSLEGENDAOMSCHRIJVINGEN`, en `NLCSLEGENDATEKST` past de
-tekst van één aangeklikte bron- of legendaregel aan. Werk een oudere legenda eerst bij om de tekstkoppeling toe te voegen. Eigen regels bewerk je via Samenstellen. Een nieuwe legenda wordt standaard als één blok
-geplaatst; met *Exploderen bij plaatsen* kies je losse entiteiten.
+![Kaartvensters op verschillende tekenbladen kiezen](kaartvensters.png)
 
-Weet je niet zeker waarom een element niet in de legenda staat? `NLCSLEGENDAELEMENT` laat
-je een object aanwijzen en meldt of en waarom het wel of niet in de gekozen legenda komt
-(status, discipline, hoofdgroep, elementsoort, xref, zichtbaarheid of uitgevinkt).
+Met **Toevoegen** kun je vensters op het huidige blad aanwijzen. **HeleTekening**
+verwijdert de beperking tot kaartvensters. Deze keuze hoort bij de DWG en wordt
+niet overgenomen in de globale standaard.
 
-De teksten volgen de NLCS-template: tekststijl `NLCS-ISO` met standaardhoogtes (2,5 mm voor
-regels en statuskoppen, 5 mm voor de titel) op de tekstlagen `-T25` en `-T50`. Alle tekst
-in de legenda bestaat uit gewone MText-objecten, zodat je die in AutoCAD net als andere tekst
-kunt selecteren en bewerken. De teksthoogtes zijn per legenda instelbaar.
-De standaard statuskoppen zijn "Nieuwe situatie:", "Bestaande situatie:", "Vervallen situatie:",
-"Tijdelijke situatie:" en "Revisie"; je kunt ze in de instellingen aanpassen.
+Alleen het zichtbare kaartgebied telt mee. Een bronobject met dezelfde weergave
+wordt bij overlappende kaartvensters één keer geteld. Bij verschillende kaartschalen
+krijg je een melding. De ingestelde legendaschaal verandert daardoor niet.
+Gebruik een orthogonale kaartweergave. Perspectiefvensters worden niet ondersteund.
 
-Onder de legenda staan standaard de tekeningnotities, een schaalbalk en de schaaltekst.
-De schaalbalk heeft vier segmenten van elk 10 mm op papier, met afwisselende halve
-vullingen. De maximale hoogte onder Kolommen geldt voor de hele legenda, inclusief meerregelige omschrijvingen, deze onderdelen en een eventueel kader. Ook het maximumaantal regels per kolom blijft gelden. Past één regel niet, vergroot dan de hoogte of zet deze op 0. Teksten en onderdelen kun je aanpassen of uitzetten. In het opmerkingenvenster
-kies je tussen tekeningnotities en de KLIC-waarschuwing.
+### Kleuren en stijlen van de kaart volgen
 
-Bij de standaardregelafstand krijgen lange omschrijvingen extra leesruimte. De compacte
-afstand uit de template blijft voor korte labels gelden. De berekening van de
-kolomhoogte gebruikt de werkelijk getekende teksthoogte, symbolen en koppen. **Kolommen
-balanceren** verdeelt ook automatisch gekozen kolommen op die hoogte. Met **Statusgroep
-bijeenhouden als die in één kolom past** begint een passende groep zo nodig in de volgende
-kolom. Een grotere groep loopt door met een herhaalde kop; koppen staan altijd bij een regel.
-**Lichte voorbeelden omranden bij plotten** geeft bijna witte stalen een dunne plotbare rand
-op een eigen legendalaag. De algemene hulplaag blijft niet plotbaar.
+Zonder gekozen kaartvensters gebruikt de legenda de algemene laaginstellingen
+van het kaderbestand, inclusief aangepaste xref- en KLIC-kleuren.
 
-De legenda is bedoeld voor modelruimte in meters. Papiermaten worden eenmaal met de
-gekozen schaal omgerekend. Symbolen behouden hun modelmaat; een expliciete NLCS-schaalvariant
-wordt naar de gekozen schaal omgerekend. Grote symbolen krijgen meer rij- en kolomruimte.
-Met **Opmaak → Symbolen → Passend maken in het voorbeeldvak** worden ze evenredig
-verkleind of vergroot tot het ingestelde vak. Gekozen templatevoorbeelden houden hun
-eigen opmaak. **Verschillende groottes samenvoegen** maakt van gelijke symbolen met
-verschillende uniforme schaal één regel, ook bij afzonderlijke blokdefinities met
-dezelfde vorm. **Verschillende draairichtingen samenvoegen** negeert daarnaast de
-rotatie in het tekeningvlak. Spiegeling, vervorming en kleur blijven onderscheiden.
-Varianten waarbij bijvoorbeeld alleen de buitencontour groter is maar het middenpunt
-niet meeschaalt, zijn geen gelijke vormen. Voeg die via **Overzicht → Samenvoegen**
-met een gekozen hoofdvoorbeeld samen. **Verschillende attribuutteksten samenvoegen** helpt bijvoorbeeld bij
-kadastrale symbolen met wisselende nummers. Eén bronsymbool wordt het voorbeeld;
-alle bronobjecten en aantallen blijven bij de samengevoegde regel horen.
-De hulpkaders zijn in modelruimte zichtbaar en worden niet geplot; een buitenkader staat
-standaard uit. Een lege tekststijl kiest `NLCS-ISO` met lettertype `NLCS-ISO.ttf`. Ontbreekt dat lettertype, installeer
-het of kies in Instellingen een bestaande tekststijl.
+Na het kiezen van kaartvensters staat **Laagweergave uit de gekozen kaartvensters**
+standaard aan. Voorbeelden volgen dan de kleur, het lijntype, de lijndikte en de
+transparantie van die vensters. Ook zichtbare delen van symbolen tellen mee.
 
-Nieuwe legenda's beginnen met de TAUW-maatvoering. Een globaal profiel met de herkenbare
-oude standaardmaten (20 × 8 mm, regelafstand 11 mm, kolom 75 mm) wordt bij het lezen
-bijgewerkt. Eigen maten blijven behouden.
+Zet deze optie uit om de algemene laagweergave te gebruiken. De kaartbegrenzing
+en bevroren lagen blijven dan wel bepalen wat meetelt. **Broncontrole** maakt
+verschillen met de viewportweergave zichtbaar. De plug-in verandert de bronlagen
+en kaartvensters hiervoor niet.
 
-Bestaande legenda's houden hun opgeslagen instellingen. Kies **Instellingen → Legenda → Templateopmaak herstellen** om
-de maatvoering bij te werken. Eigen teksten, bronnen, filters en de gekozen schaal blijven
-behouden. De standaardmaatvoering staat in [Maatvoering](template-maatvoering.md).
+### Nagaan waarom iets ontbreekt
 
-`NLCSLEGENDAEXPORT` schrijft de regels van de huidige tekening weg als CSV en JSON.
-Wil je een hele projectmap in één keer, dan leest `NLCSLEGENDABATCH` elke DWG in een
-gekozen map (zonder ze te openen of te wijzigen) en zet alles in één uittrekstaat met
-een kolom *Tekening*; een tekening die niet leesbaar is, wordt overgeslagen en gemeld.
+Met **Controleren** wijs je één bronobject aan. Je ziet waarom het wel of niet
+in de gekozen legenda wordt opgenomen. Denk aan een uitgeschakelde xref, status,
+hoofdgroep, objectsoort of een eerder uitgesloten regel.
 
-Kan AutoCAD het oppervlak van een bronarcering niet bepalen, dan verschijnt `? m²` in de legenda en bij het oppervlaktetotaal. **Overzicht → Broncontrole** vermeldt de laag en het object. CSV en JSON laten het numerieke oppervlak leeg en nemen die melding mee. Herstel de broncontour en werk de legenda bij om weer een volledig oppervlak te krijgen.
+**Broncontrole** geeft een doorzoekbare lijst. Daarin staan ook verborgen of
+niet-plottende objecten, objecten buiten de kaart en onbekende lagen. Gebruik
+deze lijst als er meer ontbreekt dan één regel.
 
-Niet elk element hoeft in de legenda. Kies **Samenstellen → In tekening uitsluiten**
-of start `NLCSLEGENDAUITVINKEN`. Klik achter elkaar de ongewenste objecten aan, ook
-binnen xrefs. Enter past de keuzes toe en bouwt de legenda één keer opnieuw op.
-Escape annuleert de aanklikronde. De bronobjecten blijven staan. Een uitgesloten
-regel kun je via Samenstellen weer opnemen.
+## De inhoud samenstellen
 
-**Samenstellen** heeft twee tabbladen: **Tekening** voor gevonden bronregels en
-**Eigen regels** voor zelf toegevoegde regels. De wijzigingen horen bij de gekozen
-legenda. **Laag toevoegen** biedt lokale en xref-lagen met een voorgestelde omschrijving,
-type en waar mogelijk blok of patroon; deze gegevens zijn vrij aanpasbaar.
-De keuzelijst toont bron, laagnaam en blok of patroon apart. Je kunt op alle kolommen
-zoeken, ook binnen de volledige xref-naam. Meerdere voorbeelden op één laag zijn
-afzonderlijk te kiezen.
-Bij **Eigen lagen → Laag kiezen** worden de bron, het type en het blok overgenomen.
-Je kunt ook een volledige naam als `ONDERGROND|laag` plakken; de bronkoppeling wordt
-dan automatisch ingevuld. Een voorbeeld uit een vergrendelde of alleen-lezen bron
-wordt op een lokale legendalaag getekend; de bron wordt niet aangepast.
+### Regels kiezen en zoeken
 
-Lijngeometrie, arceringen, vlakvullingen en symbolen krijgen ieder een eigen regel.
-Daardoor kan een arcering uit de ene bron niet het samenvoegen van gelijke lijnen
-uit een andere bron verhinderen. Bestaande gecombineerde uitsluitingen en de
-handmatige volgorde worden waar de oorspronkelijke inhoud gelijk is overgenomen.
+Open **Samenstellen**. Het tabblad **Tekening** bevat de gevonden bronregels.
+Onder **Eigen regels** staan de regels die je zelf hebt toegevoegd. De keuzes
+gelden alleen voor de legenda die je bewerkt.
 
-Zoeken werkt op elk deel van omschrijving of laagnaam, inclusief xref-namen.
-`fiets asfalt` zoekt beide woorden, ongeacht de volgorde. `*asfalt*fiets*` zoekt
-die delen achter elkaar. **Resultaten opnemen** en **Resultaten uitsluiten**
-werken alleen op de zichtbare zoekresultaten. Kleurvarianten staan afzonderlijk
-in de lijst en behouden hun eigen keuze.
+Je kunt zoeken op elk deel van een omschrijving of laagnaam, ook binnen een
+xref-naam. Je hoeft voor een gewone zoekopdracht geen sterretjes te typen.
 
-![Samenstellen met een zoekfilter op kabel- en leidinglagen](samenstellen.png)
+| Zoekopdracht | Resultaat |
+| --- | --- |
+| `asfalt` | Regels waarin asfalt voorkomt, ook midden in de naam. |
+| `fiets asfalt` | Regels waarin beide woorden voorkomen, ongeacht hun volgorde. |
+| `*asfalt*fiets*` | Regels waarin asfalt vóór fiets voorkomt. |
 
-### Blijvende regels en bronkeuzes
+**Resultaten opnemen** en **Resultaten uitsluiten** werken op de zichtbare
+zoekresultaten. Kleurvarianten staan apart in de lijst en houden hun eigen keuze.
 
-![Wijzigingen vooraf bekijken, met demonstratiegegevens](bijwerken.png)
+![Samenstellen met een zoekfilter](samenstellen.png)
 
-Met **Regel overnemen** (`NLCSLEGENDAOVERNEMEN`) voeg je een handmatig getekende regel
-aan een bestaande beheerde legenda toe. Kies **NieuweLegenda** als er nog geen beheerde
-legenda is. De overgenomen regel blijft in dezelfde modelruimte of papierlayout.
-Kies de omschrijving, selecteer alleen het
-bijbehorende voorbeeld en kies de status. De plug-in bewaart een lokale kopie van het
-voorbeeld, met tekst en vorm. De geselecteerde oude tekst en het voorbeeld worden pas
-vervangen als de nieuwe legenda is opgebouwd. Een eigen hoogte of controlesymbool kan
-zo via Samenstellen worden onderhouden. De brontekening of xref wordt niet aangepast.
+Lijnen, vlakcontouren, arceringen, vlakvullingen en symbolen worden als afzonderlijke
+soorten voorbeelden behandeld. Onder **Bronnen en inhoud → Elementsoorten** kun
+je ze aan- of uitzetten. Standaard staan ze allemaal aan.
 
-**Overzicht → Regel aanpassen** koppelt een eigen omschrijving of uitsluiting aan:
+### Objecten aanklikken om regels uit te sluiten
 
-- deze variant: dezelfde bronobjecten, ook als hun kleur of stijl verandert;
-- deze bronlaag en objectsoort: ook toekomstige objecten op die laag;
-- dit bronsymbool op deze laag: ook nieuwe exemplaren van hetzelfde bronblok.
+1. Kies **Samenstellen → In tekening uitsluiten** of typ `NLCSLEGENDAUITVINKEN`.
+2. Klik de ongewenste objecten achter elkaar aan. Dit werkt ook binnen xrefs.
+3. Druk op Enter om de keuzes toe te passen. De legenda wordt daarna één keer bijgewerkt.
 
-![Een eigen omschrijving en toepassingsbereik kiezen](regel-aanpassen.png)
-
-De keuzes blijven per status gelden. Een uitgesloten bestaande kabel sluit dus niet
-vanzelf ook een nieuwe kabel uit. Een specifieke keuze voor één variant gaat vóór een
-bredere laagkeuze. De bronlaag en het bronblok hoeven niet te worden hernoemd.
-
-In de kolom **Variant** staan bronblok, grootte, draairichting en weergave. Expliciete
-boomklassen zoals `SGR-BOOM_2E GROOTTE` heten **Boom 2e grootte**. Alleen een volgnummer
-zoals `_01` wordt niet als grootteklasse uitgelegd. Grootte, rotatie en attribuuttekst
-zijn apart samen te voegen in Instellingen. Betekenisvolle klassen of puttypen kun je
-bewust combineren via **Overzicht → Samenvoegen**, met een gekozen hoofdvoorbeeld.
-
-**Putten zonder afzonderlijke putnummers** staat standaard aan onder Bijwerken in de
-instellingen. Bekende nummerattributen zoals `PUTNUMMER`, `PUTNR` en `PUT_ID` veroorzaken
-dan geen extra regels en worden niet in het voorbeeld getekend. Puttypen en statussen
-blijven behouden. Tekst die als gewone geometrie in een blok is getekend, wordt niet
-blind verwijderd; neem daarvoor een schoon eigen voorbeeld over en koppel dat.
-
-Als een bron ontbreekt of ontladen is, blijft de oude regel standaard staan
-met **(bron ontbreekt of uitgeschakeld)**. Er wordt geen actuele hoeveelheid verzonnen.
-Bewuste uitsluitingen en verborgen of niet-plottende bronlagen krijgen voorrang. Zet **Vorige regels bewaren** uit om deze
-terugval niet te gebruiken. Als oude regels niet eenduidig gekoppeld kunnen worden,
-kiest de plug-in geen willekeurige bron.
-
-Via **Overzicht → Bron koppelen** kies je de juiste huidige regel. De lijst toont bron,
-objectsoort, symbool, status en weergave. Je kunt beide voorbeelden in CAD bekijken en
-kiezen of het oude voorbeeld behouden moet blijven. Na koppelen verdwijnt de losse
-bewaarde regel. De keuze wordt in de DWG opgeslagen.
-
-Zonder gekozen kaartvensters volgt de legenda de globale laaginstellingen van het
-kader, inclusief xref-laagafwijkingen. Onder **Bronnen en inhoud → Kaartvensters kiezen**
-kun je de kaarten aanwijzen die bij de legenda horen. Alleen hun zichtbare kaartgebied
-telt mee; een overzichtskaart blijft buiten de bronkeuze als je die niet selecteert.
-Dezelfde bron met dezelfde weergave wordt bij overlappende vensters één keer geteld.
-
-**Kaartvensters** (`NLCSLEGENDABRONVENSTER`) opent standaard **Lijst**. Die toont de
-vensters van alle layouts, ook vanuit modelruimte. Zoek op een deel van de bladnaam,
-vergelijk schaal en papiermaat en bekijk de schematische positie. Zoeken verbergt regels,
-maar verwijdert hun vinkjes niet. Kies alleen de gewenste kaarten: laat overzichtskaartjes
-en vensters die een legenda tonen uitgevinkt. Gekoppelde legendavensters worden weggelaten.
-
-Een inactief tabblad blijft bruikbaar; een bewust uitgezet venster is niet te selecteren.
-Ontbrekende eerder gekozen vensters blijven zichtbaar totdat je de bronkeuze herstelt.
-Bij verschillende kaartschalen verschijnt een melding; de legendaschaal verandert niet.
-Op kleinere schermen krijgt de lijst voorrang boven de schematische afbeelding.
-
-**Toevoegen** laat je nog steeds vensters op het huidige blad aanklikken. Kies
-**HeleTekening** om de vensterbeperking te wissen. Globale standaarden nemen deze
-tekeninggebonden keuze niet over. De bronvensters worden niet gewijzigd.
-
-![Kaartvensters van meerdere tekenbladen kiezen](kaartvensters.png)
-
-Bij gekozen kaartvensters staat **Laagweergave uit de gekozen kaartvensters** standaard
-aan. Kleur, lijntype, lijndikte, transparantie en de zichtbare delen van symbolen volgen
-dan die vensters. Uitzetten gebruikt de globale kleuren en stijlen, terwijl de
-kaartbegrenzing en bevroren lagen blijven gelden. Broncontrole meldt viewportafwijkingen.
-De algemene lagen, kaartvensters en bronobjecten worden hiervoor niet gewijzigd.
-Perspectiefvensters worden geweigerd; kies een orthogonale kaartweergave.
-
-**Broncontrole** (`NLCSLEGENDABRONCONTROLE`) toont ook niet opgenomen objecten: verborgen,
-niet plotbaar, buiten de kaart, onbekende laag of bewust uitgesloten. Je kunt door deze
-lijst zoeken. Een individuele regel weer aanvinken in Samenstellen maakt een uitzondering
-op de opgeslagen brede uitsluiting; overige uitgesloten regels blijven uit. Filters voor
-xref, status en objectsoort blijven gelden.
-
-**Beheer → Opschonen** verwijdert alleen lege registraties zonder regels, eigen inhoud,
-groepsgeometrie of gekoppeld venster. Bij bijwerken gebeurt dezelfde controle.
-Een ontbrekende bron met bewaarde legendaregels wordt niet als lege legenda verwijderd.
-
-**Binnen het bestaande legendavenster blijven** staat standaard aan. De kolombreedte
-en hoogte houden rekening met tekstomloop, opmerkingen, eigen regels en schaalbalk.
-Venstergrootte, plaats, plotschaal en teksthoogte blijven behouden. Past de inhoud niet
-leesbaar, dan wordt de update teruggedraaid met een melding; het venster groeit niet
-over andere bladonderdelen heen. Zonder gekoppeld venster geldt de ingestelde opmaak.
-
-Bronkoppelingen en overgenomen voorbeelden horen bij de DWG. Bewaar die DWG als basis
-voor later gebruik; een los JSON-profiel bevat geen CAD-geometrie. Globale standaarden
-nemen geen koppelingen naar afzonderlijke bronobjecten over.
+Escape annuleert de aanklikronde. De bronobjecten blijven staan. Je sluit hun
+legendaregel uit, niet alleen dat ene aangeklikte exemplaar. Via Samenstellen
+kun je de regel weer opnemen.
 
 ### Overzicht en eigen volgorde
 
-**Overzicht** (`NLCSLEGENDAINFO`) opent een lijst met regels, hoeveelheden, bronlagen
-en netbeheerders. Alleen de gekozen legenda wordt gelezen. Bij wisselen wordt elke
-legenda eenmaal gelezen. Lege kolommen voor netbeheerders, samenvoegingen en
-bronmeldingen blijven verborgen; zelf gekozen KLIC-velden blijven zichtbaar.
-**Vernieuwen** leest de gekozen bron opnieuw met je huidige
-keuzes. Vernieuwen verandert de getekende legenda nog niet. Een bronfout staat in het
-venster; je kunt de andere legenda’s blijven bekijken. Kies de legenda en zet **Volgorde** op **Handmatig** om regels met
-de knoppen of Alt+↑ / Alt+↓ te verplaatsen. **Toepassen** werkt de gekozen legenda bij;
-**Opslaan** sluit daarna het venster. Andere legenda's houden hun eigen instellingen.
+**Overzicht** toont de regels, hoeveelheden, bronlagen en beschikbare KLIC-gegevens
+van de gekozen legenda. Lege kolommen worden waar mogelijk verborgen. Zelf
+gekozen KLIC-kolommen blijven zichtbaar.
+
+Met **Vernieuwen** lees je de bron opnieuw in de lijst. De getekende legenda
+verandert dan nog niet. Met **Toepassen** werk je de legenda wel bij. **Opslaan** past
+de wijzigingen toe en sluit het venster.
+
+Voor een eigen volgorde:
+
+1. Maak het zoekfilter leeg.
+2. Zet **Volgorde** op **Handmatig**.
+3. Selecteer een regel en verplaats die met de knoppen of met Alt+↑ en Alt+↓.
+4. Klik op **Toepassen** of **Opslaan**.
+
 Tijdelijk uitgezette regels onthouden hun plaats. Nieuwe regels komen achteraan.
+Andere legenda's houden hun eigen volgorde.
 
-### Voorbeelden uit een bibliotheek
+![Overzicht met regels, hoeveelheden en bronlagen](overzicht.png)
 
-Via **Overzicht → Voorbeeld…** kies je een voorbeeld voor de geselecteerde regel.
-Open eerst de bijbehorende voorbeeldenbibliotheek (DWG). De keuze geldt alleen voor
-deze legenda. **Uit tekening** gebruikt weer de brongeometrie; **Automatisch** kiest
-alleen een eenduidig passend voorbeeld dat de bronkleuren behoudt. Bij bemonsterde
-symbolen blijft de werkelijke bronvorm leidend. Bij meerdere varianten kies je zelf.
-**Als nieuwe regel** voegt een handmatige regel toe, zonder bronhoeveelheid.
+### Eigen regels en eigen lagen
 
-Een voorbeeld bewaart de gezamenlijke lijnen, arceringen, symbolen en codes, met
-hun onderlinge afstanden en schaal. Gebruikte voorbeelden worden in de tekening
-bewaard en blijven beschikbaar na heropenen, ook zonder de bibliotheek. Voor een
-nog niet gebruikt voorbeeld is het bibliotheekbestand wel nodig. Neem dat bestand
-daarom mee naar een andere computer en kies het daar opnieuw via **Bibliotheek…**.
-Is de bibliotheek gewijzigd, dan gebruikt **Toepassen** of **Bijwerken** de nieuwe
-versie van het gekozen voorbeeld. Andere geplaatste legenda's veranderen pas
-wanneer je die zelf bijwerkt. De blokken en stijlen van het voorbeeld blijven
-gescheiden van gelijknamige onderdelen in de tekening.
+Gebruik een **eigen regel** voor een voorbeeld dat je zelf in de legenda wilt
+zetten, ook als er geen bijbehorend bronobject is. Een eigen regel heeft geen
+gemeten bronhoeveelheid.
 
-Bedrijfseigen bibliotheken worden afzonderlijk geleverd en zitten niet in de
-openbare installer. Een gewone DWG zonder voorbeeldencatalogus is geen bibliotheek.
+Met **Laag toevoegen** in Samenstellen kies je een lokale laag of xref-laag.
+De lijst toont de bron, laagnaam en het blok of arceringspatroon apart. Je kunt
+op die gegevens zoeken en meerdere voorbeelden op dezelfde laag apart kiezen.
+De voorgestelde omschrijving en het type kun je aanpassen.
 
-### Eigen lagen
+Wil je echte objecten op een niet-NLCS-laag laten meetellen, gebruik dan **Eigen
+lagen** in de instellingen. Kies de laag, het type en de meetwijze: lengte,
+aantal of oppervlak. Kies ook de bron. Dat kan alleen de hoofdtekening zijn,
+één specifieke xref of elke bron die voor deze legenda is ingeschakeld.
 
-Heb je eigen (niet-NLCS) lagen die als echte bron moeten meetellen, dan koppel je die in
-het instellingenvenster onder *Eigen lagen*. Je kiest de laag, het type en de hoeveelheid
-(lengte, aantal of oppervlak), en de legenda leest de echte geometrie van die laag. Je kiest
-ook de bron: alleen de hoofdtekening, elke meegenomen bron, of één specifieke xref. Zit
-dezelfde laagnaam in de host én in een xref, dan houdt de bron ze uit elkaar. Eigen lagen
-werken daarna hetzelfde als NLCS-lagen, ook voor hoeveelheden en xrefs. Anders dan een
-handmatige regel verschijnt een eigen laag alleen als er echt objecten op staan. Je koppelt
-alleen de lagen die je zelf aanwijst; hulp- en annotatielagen blijven buiten beeld.
+Met **Laag kiezen** worden bron, type en blok overgenomen. Je kunt ook een
+volledige naam zoals `ONDERGROND|laag` plakken. De bronkoppeling wordt dan ingevuld.
+Een eigen laag verschijnt pas in de legenda als er passende bronobjecten zijn.
+Gelijknamige lagen in de hoofdtekening en een xref blijven via hun bron herkenbaar.
+
+### Een getekende regel overnemen
+
+Met **Regel overnemen** maak je een bestaande, handmatig getekende regel onderdeel
+van een beheerde legenda. Dit kan ook met een eigen hoogtevoorbeeld of controlesymbool.
+
+1. Kies de legenda waaraan de regel moet worden toegevoegd. Kies **NieuweLegenda**
+   als er nog geen beheerde legenda is.
+2. Kies de omschrijving.
+3. Selecteer alleen de objecten die bij het voorbeeld horen.
+4. Kies de status.
+
+De plug-in bewaart een lokale kopie van het voorbeeld. De oude tekst en het
+geselecteerde voorbeeld worden pas vervangen als de nieuwe legenda is opgebouwd.
+De regel blijft in dezelfde modelruimte of layout en kan daarna via Samenstellen
+worden onderhouden. Een bronbestand of xref wordt niet aangepast.
 
 ### Blanco regels
 
-Wil je bewust lege ruimte in de legenda reserveren, bijvoorbeeld om er later met de hand
-iets bij te tekenen, gebruik dan *Blanco regels* in het instellingenvenster. Een blanco
-regel is een statische, lege regel (leeg vakje, standaardtekst "[blanco]") zonder bron en
-zonder hoeveelheid. Je kunt er meerdere toevoegen; elke regel blijft los bestaan en
-behouden bij bijwerken, opslaan en heropenen. De tekst en status zijn per regel aan te passen.
+Met **Blanco regels** reserveer je lege regels, bijvoorbeeld voor een latere
+aanvulling. Elke regel begint met een leeg voorbeeldvak en de tekst `[blanco]`.
+Je kunt tekst en status aanpassen. Blanco regels hebben geen bronhoeveelheid en
+blijven bij bijwerken en heropenen bewaard.
 
-Je kunt ook per elementsoort kiezen wat in de legenda komt: geometrie/lijnen, vlakken,
-arceringen, vlakvullingen en symbolen zijn afzonderlijk aan of uit te zetten. Standaard
-staat alles aan. Je vindt dit in `NLCSLEGENDAOPTIES` onder *Elementsoorten* en in het
-keuzemenu vóór het plaatsen. `NLCSLEGENDAINFO` meldt welke soorten uitstaan.
+Losse geometrie die je later met de hand bijtekent, hoort daarmee nog niet bij
+de opgeslagen regel. Gebruik **Regel overnemen** als ook dat voorbeeld moet blijven.
 
-### KLIC-tekeningen
+## Teksten en statussen
 
-Netbeheerders en andere KLIC-gegevens komen uit de bron-DWG, ook bij geneste xrefs.
-De plugin leest ingebedde InfraCAD Map-tabellen en, waar de AutoCAD-host dit ondersteunt,
-Property Sets en Object Data. In Civil 3D/Map werkt Object Data ook met directe en
-geneste xrefs; de bron-DWG hoeft niet handmatig geopend te worden. De eerste analyse
-leest de veldindeling via een tijdelijke bronkopie. Netbeheerders worden niet afgeleid
-uit volgnummers zoals DATA2.
+### Een omschrijving aanpassen
 
-Kies in **Overzicht → KLIC-instellingen** welke velden als kolommen en in de export verschijnen.
-Je kunt zoeken in de zichtbare velden of één gekozen eigenschap. Dit filter verandert alleen
-de lijst en haar export. Dubbelklik op een regel of kies **KLIC-details** voor alle gelezen
-waarden per bron en tabel, objecthandles, voorzorgsmaatregelen en bijlagen.
+Kies **Elementtekst** en wijs de bron of legendaregel aan. Je kunt ook
+**Overzicht → Regel aanpassen** gebruiken. De bronlaag en het bronblok hoeven
+niet te worden hernoemd. Werk een oudere legenda eerst bij als de tekstkoppeling
+nog ontbreekt. Eigen regels kun je ook via Samenstellen bewerken.
 
-Onder **Legenda-omschrijving** voeg je eigenschappen toe aan de tekst; onder **Afzonderlijke
-regels** kies je aanvullende eigenschappen om varianten apart weer te geven.
-Diameters en materialen regel je op **Instellingen → Samenvoegen**, voor zowel laagnamen als objectgegevens.
-Zonder die keuzes blijft de bestaande legenda behouden. Opgeslagen keuzes gelden per legenda.
-Met **Volgorde → Handmatig** verplaats je regels; maak eerst het zoekfilter leeg.
+Bij Regel aanpassen kies je waar de omschrijving of uitsluiting voor geldt:
 
-Verschillende bronwaarden blijven zichtbaar. **Gegevensbron** bepaalt welke opslagvorm
-voorrang krijgt. Ontbreekt een veld in die bron, dan wordt een andere beschikbare bron gelezen.
-Een aanwezige lege waarde wordt niet stilzwijgend vervangen. Nulwaarden geven geen gemeten
-diepte aan; een standaarddiepte is apart benoemd. Zie [KLIC-gegevens](klic-bronnen.md).
+| Keuze | Gebruik |
+| --- | --- |
+| Deze variant | Alleen deze bronobjecten, ook na een kleur- of stijlwijziging. |
+| Deze bronlaag en objectsoort | Ook toekomstige objecten van die soort op dezelfde bronlaag. |
+| Dit bronsymbool op deze laag | Ook nieuwe exemplaren van hetzelfde bronblok op die laag. |
 
-Op **Instellingen → Samenvoegen** staan KLIC en overige lagen naast elkaar.
-Een aangevinkt kenmerk betekent: **niet vergelijken**.
-**Soorten samenvoegen** negeert bijvoorbeeld het verschil tussen gas en water.
-Dit staat standaard **uit**, zowel voor KLIC als voor overige lagen. Verschillende
-kleuren en lijnpatronen blijven bij automatisch samenvoegen apart. Lijnen, vlakcontouren,
-arceringen, vlakvullingen en symbolen behouden ieder hun eigen regel.
+Een keuze voor één variant gaat vóór een bredere laagkeuze. De keuzes blijven
+per status gelden. Een uitgesloten bestaande kabel sluit daardoor niet vanzelf
+een nieuwe kabel uit. Een individuele regel weer aanvinken in Samenstellen
+maakt een uitzondering op een brede uitsluiting. Andere filters, zoals xref en
+status, blijven wel gelden.
 
-Met **Voorbeeldtype** kies je eerst **Alle typen (standaard)** of een afzonderlijk type.
-Een wijziging bij bijvoorbeeld **Lijnen** maakt eigen keuzes voor dat type; symbolen
-en arceringen volgen hun eigen keuzes of de standaard. De knoppen **KLIC: standaardkeuzes**
-en **Overige lagen: standaardkeuzes** heffen alleen de afwijking voor het gekozen type op.
-De KLIC-keuzes en die voor overige lagen blijven onafhankelijk.
+![Regel aanpassen met een eigen omschrijving en toepassingsbereik](regel-aanpassen.png)
 
-Voor nieuwe KLIC-legenda's staan **Spanning/druk**, **Uitvoering**, **Volgnummer**,
-**Diameters**, **Materialen** en **Netbeheerders samenvoegen** standaard aan. Een beheerder achter in de laagnaam
-wordt herkend via de KLIC-gegevens, ook als punten of spaties anders zijn geschreven.
-Zonder die gegevens wordt geen beheerder uit een laagnaam geraden.
-Een oud globaal profiel zonder
-samenvoegkeuzes krijgt deze beginwaarden eenmaal mee; daarna worden ook bewust
-uitgeschakelde keuzes behouden. Bestaande legenda's houden hun lokale keuzes.
-**Overige lagen** heeft een eigen groep vinkjes, standaard allemaal uit. Binnen
-beide groepen blijven discipline en hoofdgroep aparte grenzen.
+De plug-in gebruikt eerst je eigen omschrijving. Daarna zoekt ze naar een gevuld
+KLIC-attribuut `OMSCHRIJVING`, een bruikbare laagbeschrijving, een herkende
+BGT-bloknaam en een omschrijving in de ingebouwde catalogus. Als die ontbreken,
+wordt de laagnaam zo leesbaar mogelijk gemaakt. Technische labels zoals
+`NLCS-basis` worden niet als objectomschrijving gebruikt. Zelf ingevulde teksten
+blijven behouden.
+
+Via **Omschrijvingen** kun je meerdere teksten in een tabel aanpassen. Deze
+teksten horen bij de gekozen legenda. Voor volgende legenda's pas je de
+omschrijvingen in **Globale standaard** aan.
+
+### Statussen
+
+De vaste statussen zijn Nieuw, Bestaand, Vervallen, Tijdelijk en Revisie. De
+standaardkoppen zijn **Nieuwe situatie:**, **Bestaande situatie:**,
+**Vervallen situatie:**, **Tijdelijke situatie:** en **Revisie**.
+Je kunt de kopteksten aanpassen in de instellingen.
+
+Via **Statussen** maak je eigen statussen en wijs je daar regels aan toe.
+Automatische regels kies je door bronobjecten aan te wijzen. Handmatige regels
+kies je uit een lijst. Een toegewezen regel verschijnt onder de eigen status,
+ook als de oorspronkelijke status is uitgeschakeld.
+
+Laat **Gelijke statussen samenvoegen** uit als nieuwe en bestaande onderdelen
+afzonderlijk moeten blijven. De werking staat bij [Regels samenvoegen](#regels-samenvoegen).
+
+## Regels samenvoegen
+
+### Wat betekent een vinkje?
+
+Onder **Lokale instellingen → Samenvoegen** betekent een aangevinkt kenmerk:
+**negeer dit verschil bij het vergelijken van regels**.
+
+Met **Diameters samenvoegen** kunnen bijvoorbeeld een leiding van 200 en een
+leiding van 300 één legendaregel worden. Daarvoor moeten de overige eigenschappen
+nog wel overeenkomen. Een verschil in kleur wordt niet door dat vinkje genegeerd.
+
+**Soorten samenvoegen** zou ook het verschil tussen bijvoorbeeld gas en water
+negeren. Die optie staat daarom standaard uit. Je hoeft deze niet aan te zetten
+om leidingen van dezelfde soort bij elkaar te houden.
+
+| Samenvoegkeuze | KLIC, standaard | Overige lagen, standaard |
+| --- | --- | --- |
+| Soorten | Uit | Uit |
+| Spanning/druk, uitvoering en volgnummer | Aan | Uit |
+| Diameters en materialen | Aan | Uit |
+| Netbeheerders | Aan | Uit |
+
+Deze beginwaarden gelden voor nieuwe instellingen. Bestaande legenda's bewaren
+hun lokale keuzes. Oude globale profielen zonder deze keuzes krijgen de
+beginwaarden eenmalig mee. Daarna blijven ook bewust uitgezette opties behouden.
+
+KLIC en overige lagen hebben ieder hun eigen instellingen. KLIC-rioollagen onder
+hoofdgroep RI worden als KLIC behandeld wanneer ze KLIC-objectgegevens hebben of
+uit een bron met KLIC in de naam komen. Discipline en hoofdgroep blijven grenzen
+voor het automatisch samenvoegen.
 
 ![Samenvoegkeuzes voor KLIC en overige lagen](samenvoegen.png)
 
-**Diameters samenvoegen** negeert de diameter in de laagnaam, bijvoorbeeld bij
-`VRIJVERVAL_200` en `VRIJVERVAL_300`. Ook `DN200`, `DN_200`, `Ø200` en maten met
-mm, cm of m worden herkend. Een los getal geldt alleen bij bekende leidingsoorten
-als diameter; een volgnummer zoals `DATA2` blijft een aparte keuze. KLIC-rioollagen
-onder hoofdgroep RI gebruiken de KLIC-keuzes als zij KLIC-objectgegevens hebben of uit
-een bron met KLIC in de naam komen. De optie geldt ook voor diameters uit objectgegevens;
-daarvoor is geen tweede instelling nodig. Een bestaand globaal profiel krijgt de
-diameterstandaard eenmaal mee. Bestaande legenda's houden hun lokale keuze.
+### Keuzes per voorbeeldtype
 
-**Materialen samenvoegen** negeert herkenbare materiaalnamen zoals PVC, PE, beton en
-staal in de laagnaam, plus het materiaal uit KLIC-objectgegevens. Soorten blijven
-onderscheiden: een waterleiding wordt daardoor geen gasleiding. Eerdere keuzes voor
-afzonderlijke materiaalregels uit het KLIC-venster worden overgenomen in dit centrale
-vinkje. Onbekende materiaalnamen worden niet geraden.
+Kies bij **Voorbeeldtype** eerst **Alle typen (standaard)** of een afzonderlijk
+type, zoals Lijnen. Zo kun je diameters bij lijnen samenvoegen en bij symbolen
+apart houden. Een type zonder eigen keuzes volgt de standaard.
 
-Onder de eigenschappen staan de uiterlijkkeuzes voor het gekozen voorbeeldtype:
+**KLIC: standaardkeuzes** en **Overige lagen: standaardkeuzes** heffen de afwijking
+voor het gekozen type op. De twee groepen blijven onafhankelijk van elkaar.
 
-- **Lijnschalen**: dezelfde lijn met een andere herhalingsafstand. Kleur, lijndikte en lijnbreedte blijven apart.
-- **Arceerschalen en arceerhoeken**: hetzelfde patroon met een andere schaal of hoek. Bij een gebruikersarcering gaat de schaalkeuze over de lijnafstand. Patroon, kleur, achtergrondkleur en transparantie blijven apart.
-- **Symbolen**: grootte, draairichting en attribuutteksten zijn afzonderlijk te negeren. Vorm, spiegeling en vervorming blijven apart. Passend maken in het vak stel je onder **Opmaak** in.
+Onder de eigenschappen staan keuzes voor het uiterlijk. Die gelden voor KLIC
+én overige lagen en staan standaard uit:
 
-Deze uiterlijkkeuzes gelden voor KLIC én overige lagen en staan standaard uit.
-Bij samenvoegen wordt één oorspronkelijk voorbeeld getekend. Wil je zelf bepalen
-welk voorbeeld dat is, gebruik dan de handmatige samenvoeging in Overzicht.
+| Keuze | Welk verschil wordt genegeerd? | Wat blijft onderscheiden? |
+| --- | --- | --- |
+| Lijnschalen | De herhalingsafstand van hetzelfde lijnpatroon. | Kleur, lijndikte en lijnbreedte. |
+| Arceerschalen en arceerhoeken | Schaal en hoek van hetzelfde patroon. Bij een gebruikersarcering gaat het om de lijnafstand. | Patroon, kleur, achtergrondkleur en transparantie. |
+| Verschillende groottes samenvoegen | Een gelijkmatig vergrote of verkleinde versie van dezelfde symboolvorm. | Andere vormen, spiegeling en vervorming. |
+| Verschillende draairichtingen samenvoegen | De rotatie van het symbool in het tekeningvlak. | Andere vormen en spiegeling. |
+| Verschillende attribuutteksten samenvoegen | Wisselende teksten in blokattributen, zoals nummers. | De symboolvorm en overige weergaveverschillen. |
 
-**Samengevoegde waarden tonen** staat standaard aan. Zo wordt `Leiding 200` met
-`Leiding 300` één regel **Leiding (200, 300)**; `Leiding Dorp` en `Leiding Stad` worden
-**Leiding (Dorp, Stad)**. Uitgeschakeld blijft alleen **Leiding** staan. Bronobjecten,
-hoeveelheden en detailgegevens blijven in beide gevallen behouden. Ook materiaalvarianten
-en genegeerde schaal- of hoekverschillen kunnen zo zichtbaar worden, bijvoorbeeld
-**Leiding (lijnschaal 1 / 2)**.
+Kleurverschillen blijven bij automatisch samenvoegen apart. Ook lijnen,
+vlakcontouren, arceringen, vlakvullingen en symbolen houden elk hun eigen regels.
+Voor het verkleinen van een symbool in het voorbeeldvak gebruik je een andere
+optie: **Opmaak → Symbolen → Passend maken in het voorbeeldvak**.
 
-Selecteer in **Overzicht** meerdere regels met Ctrl of Shift en kies **Samenvoegen…**
-om zelf een groep te maken. Kies vervolgens het **hoofdobject**: daarvan komen
-de kleur, lijn en het symbool. De titel gebruikt het gemeenschappelijke deel van de
-omschrijvingen; ontbreekt dat, dan blijft de titel van het hoofdobject staan. Deze handmatige keuze mag verschillende
-kleuren verbinden. Hoeveelheden met dezelfde eenheid worden opgeteld.
-**Samenvoeging opheffen** brengt de afzonderlijke regels terug. Een bestaande
-handmatige groep moet eerst worden opgeheven voordat je er een andere groep van maakt.
-Als het hoofdobject uit de bron verdwijnt, worden de overgebleven regels afzonderlijk
-weergegeven. Generieke KLIC-placeholdertekst wordt standaard weggelaten.
+### Diameters, materialen en netbeheerders
 
-Bij de statussen staat ook *Gelijke statussen samenvoegen*. Die voegt dezelfde regel uit
-verschillende statussen samen, maar alleen als lijn, vlak, arcering en symbool er precies
-hetzelfde uitzien. Bij eerder samengevoegde regels moet de volledige verzameling
-oorspronkelijke weergaven overeenkomen. Dit verandert de samenvoegkeuzes binnen een
-status niet. Standaard staat dit uit, omdat de status in NLCS meestal juist de kleur bepaalt.
+**Diameters samenvoegen** werkt met diameters in laagnamen en in KLIC-objectgegevens.
+Voorbeelden zijn `VRIJVERVAL_200`, `DN200`, `DN_200` en `Ø200`. Maten met mm, cm of m
+worden ook herkend. Een los getal telt alleen bij bekende leidingsoorten als
+diameter. Een aanduiding zoals `DATA2` is geen diameter.
 
-De keuzelijst bij Samenstellen volgt de bron van de gekozen legenda. Uitgevinkte
-regels blijven uitgevinkt als hun bron tijdelijk ontbreekt. Instellingen en
-beschrijvingen die je vóór het plaatsen aanpast, gelden alleen voor die nieuwe legenda.
-Gebruik Standaard om de instellingen voor nieuwe legenda's te wijzigen.
+**Materialen samenvoegen** herkent onder meer PVC, PE, beton en staal in de
+laagnaam en leest materiaal uit KLIC-objectgegevens. Onbekende materiaalnamen
+worden niet geraden. Er is voor diameter of materiaal geen tweede instelling
+nodig in het KLIC-venster. Een oudere keuze voor afzonderlijke materialen wordt
+overgenomen bij Samenvoegen.
 
-### Statussen, xrefs en profielen
+Een netbeheerder wordt uit KLIC-gegevens gelezen. Daarmee kan ook een beheerder
+achter in een laagnaam worden herkend, ondanks andere punten of spaties.
+Zonder die gegevens wordt geen beheerder uit een volgnummer of laagnaam afgeleid.
 
-Naast de vaste statussen (Nieuw, Bestaand, Vervallen, Tijdelijk, Revisie) maak je met
-`NLCSLEGENDASTATUS` eigen statussen aan. Daar wijs je regels aan toe: automatische
-NLCS-lagen door ze in de tekening aan te wijzen, handmatige regels via een lijstje. Zo'n
-regel verschijnt dan onder de eigen kopregel, ook als de gewone status ervan uitstaat.
+### De samengevoegde waarden in de tekst
 
-Werk je met externe referenties, dan bepaalt `NLCSLEGENDAXREFS` per gekoppelde xref of
-die meetelt. De keuze geldt voor de aanwezige of gekozen legenda. Voor nieuwe
-legenda's pas je de xref-keuze aan onder Standaard. Onder Instellingen → Bronnen en inhoud
-zet **Xrefs meenemen** alle bronnen aan of uit en vervangt daarbij eerdere uitzonderingen.
-Met **Xrefs…** kies je afzonderlijke koppelingen; een gemengde keuze wordt aangegeven.
-Een uitgeschakelde bovenliggende koppeling sluit ook de inhoud van geneste xrefs uit. Is het xref-bestand op schijf gewijzigd sinds het laden, herlaad dan eerst de
-xref voordat je de legenda bijwerkt. Zo blijven hoeveelheden en voorbeelden op dezelfde
-bronversie gebaseerd; bij een versieverschil blijft de bestaande legenda behouden.
+**Samengevoegde waarden tonen** staat standaard aan. Daardoor kan de lezer nog
+zien welke varianten achter één regel zitten:
 
-Een arceringspatroon dat in het bronvlak ongelijk is geschaald, past niet in één
-patroonhoek en schaal. De plugin meldt dit en breekt het maken of bijwerken af.
-Een afwijkende schaal loodrecht op het vlak is wel toegestaan.
+| Afzonderlijke regels | Waarden tonen aan | Waarden tonen uit |
+| --- | --- | --- |
+| Leiding 200 en Leiding 300 | Leiding (200, 300) | Leiding |
+| Leiding Dorp en Leiding Stad | Leiding (Dorp, Stad) | Leiding |
 
-Heb je een legenda-opzet die je vaker gebruikt, dan bewaar je die met `NLCSLEGENDAPRESET`
-als profiel. Bij Opslaan en Laden kies je expliciet **Legenda** of **Standaard**.
-Standaard werkt ook zonder geplaatste legenda en verandert bestaande legenda’s niet. Zo
-hoef je schaal, teksten en opmaak niet telkens opnieuw in te stellen. Een profiel kun je
-ook exporteren naar een `.json`-bestand en op een andere computer weer importeren, zodat je
-een opzet met collega's kunt delen.
+Ook materiaal-, lijnschaal- en arceerverschillen kunnen in de tekst worden vermeld,
+bijvoorbeeld **Leiding (lijnschaal 1 / 2)**. De bronobjecten, hoeveelheden en
+detailgegevens blijven bewaard, ook als je de waarden niet in de omschrijving toont.
 
-| Commando | Doet |
-|----------|------|
-| `NLCSLEGENDA` | Legenda genereren en met de muis plaatsen (hele tekening of selectie). |
-| `NLCSLEGENDABRONCONTROLE` | Verklaring van opgenomen, ontbrekende en uitgesloten bronnen bekijken. |
-| `NLCSLEGENDABRONVENSTER` | Kaartvensters kiezen of toevoegen, ook op andere layouts. |
-| `NLCSLEGENDAOVERNEMEN` | Getekende tekst, voorbeeld en status als blijvende regel overnemen. |
-| `NLCSLEGENDAUPDATE` | Een legenda opnieuw tekenen op dezelfde plek; bij meerdere kies je welke. |
-| `NLCSLEGENDABEHEER` | Legenda's bekijken, bijwerken, hernoemen, opzoeken, verwijderen, en per legenda instellingen aanpassen, overnemen, dupliceren of de bron wijzigen. |
-| `NLCSLEGENDAELEMENT` | Klik een object aan en zie of en waarom het in de gekozen legenda komt. |
-| `NLCSLEGENDAINFO` | Tonen wat erin zou komen (aantallen, lengtes, oppervlakten, totalen per hoofdgroep) en welke regels nog een eigen omschrijving missen, zonder te tekenen. |
-| `NLCSLEGENDAEXPORT` | CSV en JSON met hoeveelheden, oorspronkelijke en getoonde omschrijving, bronlagen en gekozen KLIC-velden. |
-| `NLCSLEGENDABATCH` | Alle DWG's in een map samen in één uittrekstaat (CSV/JSON) met een kolom Tekening. |
-| `NLCSLEGENDAVIEWPORT` | Een viewport in de huidige layout rond de legenda, op schaal. |
-| `NLCSLEGENDAOPTIES` | Lokale instellingen van een bestaande legenda bewerken en direct toepassen. |
-| `NLCSLEGENDASTANDAARD` | De instellingen voor nieuwe legenda's bewerken. |
-| `NLCSLEGENDAOMSCHRIJVINGEN` | De omschrijvingen per element bewerken in een tabel. |
-| `NLCSLEGENDATEKST` | Klik een element aan en pas de tekst ervan aan (meerdere regels mogelijk). |
-| `NLCSLEGENDASAMENSTELLEN` | Regels uitvinken en eigen regels toevoegen in één venster. |
-| `NLCSLEGENDAUITVINKEN` | Klik een element aan om die regel uit de legenda te laten. |
-| `NLCSLEGENDATOEVOEGEN` | Een eigen regel toevoegen (type, laag en omschrijving zelf kiezen). |
-| `NLCSLEGENDASTATUS` | Eigen statussen maken en er regels aan toewijzen (naast Nieuw/Bestaand/...). |
-| `NLCSLEGENDALAAGNAAM` | Een NLCS-laagnaam component voor component bewerken en de laag hernoemen. |
-| `NLCSLEGENDAXREFS` | Per gekoppelde xref kiezen of die in de legenda wordt meegenomen. |
-| `NLCSLEGENDAPRESET` | Instellingen van de globale standaard of een gekozen legenda als profiel opslaan, laden, en im-/exporteren. |
-| `NLCSLEGENDACONFIG` | De globale configuratiebestanden aanmaken en de paden tonen. |
+### Zelf regels samenvoegen
 
+Gebruik handmatig samenvoegen als jij bepaalt dat verschillende voorbeelden
+één regel mogen worden. Dat kan bijvoorbeeld bij twee boomsymbolen die niet
+precies dezelfde vorm hebben.
 
-## Omschrijvingen en configuratie
+1. Selecteer in **Overzicht** meerdere regels met Ctrl of Shift.
+2. Kies **Samenvoegen…**.
+3. Kies het **hoofdobject**. De groep gebruikt daarvan de kleur, lijn en het symbool.
+4. Controleer de omschrijving en pas de wijziging toe.
 
-Een eigen omschrijving krijgt voorrang. Daarna volgt een ingevuld KLIC-attribuut
-`OMSCHRIJVING`, een bruikbare laagbeschrijving, een herkende BGT-bloknaam, de ingebouwde
-catalogus en ten slotte een leesbare laagnaam. Technische labels zoals `NLCS-basis`
-zijn geen objectomschrijving. Zelf ingevulde teksten worden niet weggefilterd.
+De voorgestelde titel gebruikt het gemeenschappelijke deel van de omschrijvingen.
+Ontbreekt dat, dan blijft de titel van het hoofdobject staan. Handmatig samenvoegen
+kan ook verschillende kleuren combineren. Hoeveelheden met dezelfde eenheid
+worden opgeteld. Blanco regels en regels met verschillende eenheden kun je niet
+op deze manier samenvoegen.
 
-**Lokale instellingen** en **Omschrijvingen** werken op een bestaande legenda.
-Voor nieuwe legenda’s bewerk je **Globale standaard**, met daarin ook de omschrijvingen.
-De globale bestanden staan in `%APPDATA%\NlcsLegenda\settings.json` en
-`omschrijvingen.json`. **Bestanden** (`NLCSLEGENDACONFIG`) toont de paden.
-Voorbeelden: [instellingen](../deploy/settings.sample.json) en
-[omschrijvingen](../deploy/omschrijvingen.sample.json).
+**Samenvoeging opheffen** brengt de losse regels terug. Hef een bestaande groep
+eerst op voordat je een andere groep maakt. Als het hoofdobject uit de bron
+verdwijnt, worden de overgebleven regels weer afzonderlijk weergegeven.
+Eigen en blanco regels vallen buiten automatisch samenvoegen.
+
+### Bomen, putten en statussen
+
+De kolom **Variant** helpt verklaren waarom symbolen zijn gesplitst. Je ziet er
+onder meer bronblok, grootte, draairichting en weergave. Een expliciete boomklasse
+zoals `SGR-BOOM_2E GROOTTE` krijgt de tekst **Boom 2e grootte**. Een volgnummer
+zoals `_01` wordt niet als grootteklasse uitgelegd.
+
+**Putten zonder afzonderlijke putnummers** staat standaard aan onder **Bijwerken**
+in de instellingen. Bekende nummerattributen zoals `PUTNUMMER`, `PUTNR` en `PUT_ID`
+maken dan geen aparte regels en worden niet in het voorbeeld getekend. Puttypen
+en statussen blijven behouden. Een putnummer dat als gewone geometrie in een
+blok staat, wordt niet verwijderd. Gebruik daarvoor een eigen voorbeeld zonder nummer.
+
+**Gelijke statussen samenvoegen** staat standaard uit. Zet je dit aan, dan kunnen
+gelijke regels uit verschillende statussen worden gecombineerd. Hun voorbeelden
+moeten er volledig hetzelfde uitzien. Bij al samengevoegde regels geldt dat voor
+alle oorspronkelijke weergaven. Laat de optie uit als bijvoorbeeld nieuwe en
+bestaande kabels altijd hun eigen regel moeten houden.
+
+## Schaal en opmaak
+
+### Papiermaten en modelruimte
+
+Nieuwe legenda's beginnen met de maatvoering van de TAUW-template. De legenda
+rekent papiermaten om naar modelruimte in meters. Bij 1:500 wordt een tekst van
+2,5 mm op papier bijvoorbeeld 1,25 m hoog in modelruimte. Dat is dus niet de
+hoogte die je op het geplotte blad ziet.
+
+Stel de schaal in onder **Lokale instellingen → Legenda**. Gebruik voor een
+legenda in modelruimte dezelfde schaal als het legendavenster op de layout.
+Een met de plug-in gekoppeld legendavenster volgt een schaalwijziging automatisch.
+
+Standaard zijn omschrijvingen en statuskoppen 2,5 mm hoog op papier. De titel is
+5 mm hoog. De tekststijl is `NLCS-ISO`, met lettertype `NLCS-ISO.ttf`. Ontbreekt
+dat lettertype, installeer het via je organisatie of kies een beschikbare
+tekststijl. Alle legendatekst wordt als MText getekend. Pas de tekst via de
+plug-in aan als de wijziging na Bijwerken behouden moet blijven.
+
+Met **Lokale instellingen → Legenda → Templateopmaak herstellen** zet je de
+templateopmaak terug. Daarbij worden ook extra hoeveelheden en de totaalregel
+uitgezet. Eigen teksten, schaal, handmatige volgorde en bronkeuzes blijven
+behouden. Dit is iets anders dan **Resetten**, dat ook je samenstelling en
+overige lokale instellingen vervangt.
+
+Eigen maten blijven normaal bewaard. Alleen herkenbare oude globale
+standaardmaten worden bij het lezen omgezet naar de TAUW-maatvoering.
+De exacte maten en uitzonderingen staan in [Maatvoering](template-maatvoering.md).
+
+### Symbolen en voorbeeldvakken
+
+Symbolen behouden standaard hun maat uit het model. Een expliciete NLCS-schaalvariant
+wordt omgerekend naar de gekozen legendaschaal. Grote symbolen krijgen meer
+ruimte in hun rij en kolom.
+
+Zet **Opmaak → Symbolen → Passend maken in het voorbeeldvak** aan als je symbolen
+evenredig wilt verkleinen of vergroten tot het ingestelde vak. Een bewust gekozen
+templatevoorbeeld houdt zijn eigen opmaak.
+
+Gelijke vormen met verschillende groottes kunnen worden samengevoegd. Dat werkt
+ook bij afzonderlijke blokdefinities met dezelfde vorm. Een symbool waarvan alleen
+de buitencontour groter is, terwijl de rest niet meeschaalt, is een andere vorm.
+Gebruik daarvoor zo nodig handmatig samenvoegen met een gekozen hoofdobject.
+
+De hulpkaders rond voorbeelden zijn in modelruimte zichtbaar en worden niet
+geplot. Een buitenkader staat standaard uit. Met **Lichte voorbeelden omranden
+bij plotten** geef je bijna witte voorbeelden een dunne plotbare rand op een
+eigen legendalaag.
+
+### Kolommen en beschikbare ruimte
+
+De maximale hoogte onder **Kolommen** geldt voor de hele legenda. Lange teksten,
+symbolen, koppen, opmerkingen, schaalbalk en een eventueel kader tellen allemaal
+mee. Ook het maximumaantal regels per kolom blijft gelden. Past één regel niet,
+vergroot dan de hoogte of zet die op `0` om deze hoogtebeperking uit te schakelen.
+
+**Kolommen balanceren** verdeelt de inhoud op basis van de werkelijke hoogte.
+Met **Statusgroep bijeenhouden als die in één kolom past** begint zo'n groep
+zo nodig in de volgende kolom. Een grotere groep loopt door met een herhaalde
+kop. Een kop blijft altijd bij een regel staan.
+
+**Binnen het bestaande legendavenster blijven** staat standaard aan. Bij een
+gekoppeld venster zoekt de plug-in een indeling binnen de bestaande ruimte.
+Plaats, venstergrootte, plotschaal en teksthoogte blijven behouden. Past de inhoud
+niet leesbaar, dan wordt de update niet doorgevoerd en krijg je een melding.
+Pas dan de beschikbare ruimte of inhoud aan. Zonder gekoppeld legendavenster
+geldt de ingestelde opmaak.
+
+### Opmerkingen en schaalbalk
+
+Onder de legenda staan standaard tekeningnotities, een schaalbalk en de schaaltekst.
+Je kunt deze onderdelen aanpassen of uitzetten.
+
+In **Opmerkingen** kies je tekeningnotities, de KLIC-waarschuwing, beide samen of
+eigen tekst. Klik op **Tekst overnemen** en pas de tekst daarna aan je tekening
+aan. De algemene teksten komen uit de TAUW-template. Projectspecifieke
+beplantingslijsten zijn geen algemene standaardtekst.
+
+De kop Opmerkingen volgt de laag **X-XX-AL-LEGENDA-T50**, standaard kleur ACI 130
+zoals in de template. Een eigen laagkleur via de Layer Manager blijft bij
+bijwerken behouden.
+
+De standaard schaalbalk is 40 mm breed op papier. Hij bestaat uit vier segmenten
+van 10 mm met afwisselende halve vullingen. De maten en teksten stel je in onder
+**Schaalbalk**.
+
+## Voorbeelden kiezen en koppelen
+
+### Een bronobject als voorbeeld gebruiken
+
+Met **Gekoppeld voorbeeld** wijs je een bronobject aan, ook binnen een xref.
+Je maakt daarmee een nieuwe eigen regel of koppelt een bestaande eigen regel.
+Geef de gewenste omschrijving en kies hoe het voorbeeld moet worden bijgewerkt.
+
+| Keuze | Wat gebeurt er bij Bijwerken? |
+| --- | --- |
+| **Bron volgen** | Het voorbeeld wordt opnieuw uit de bron opgebouwd, met de actuele kleur, het lijntype, de lijndikte en transparantie. |
+| **Voorbeeld vastzetten** | De huidige weergave blijft staan. Overzicht meldt verschillen met de gekoppelde bron, maar past het voorbeeld niet aan. |
+
+Met **Laagweergave** kies je welke laaginstellingen het voorbeeld gebruikt.
+Standaard is dat de algemene laagweergave van het kaderbestand. Je kunt een
+kaartvenster kiezen om zijn laagafwijkingen te gebruiken. Die keuze geldt voor
+het voorbeeld en verandert niet het brongebied van de hele legenda.
+
+![Een bronvoorbeeld koppelen en een eigen omschrijving invullen](gekoppeld-voorbeeld.png)
+
+Je kunt deze keuzes later wijzigen via **Overzicht → Regel aanpassen**.
+Een eigen regel zonder bronkoppeling blijft een eigen voorbeeld. De plug-in
+kiest niet zelf een bron op basis van alleen de omschrijving. Koppel die regel
+eenmalig als je wilt dat het voorbeeld de bron volgt. Een legenda met alleen
+eigen regels zonder bronkoppeling hoort geen melding over ontbrekende bronobjecten te geven.
+
+### Voorbeelden uit Civil 3D-profielen
+
+Bij een profielonderdeel kies je het profielvenster en de zichtbare stijlcomponent,
+zoals een maaiveldlijn, rioolhartlijn, wand, put of putarcering. Een afwijkende
+stijl in het profielvenster gaat vóór de basisstijl.
+
+Lijnen en wanden worden schematisch getekend met hun werkelijke stijl. Putvormen
+komen uit het profielonderdeel. Neem een eigen markering, zoals een rode overlap
+bij een rioolkruising, als afzonderlijk bronobject op. De koppeling bewaart de
+gekozen component. Een riooltype wordt niet uit alleen de kleur afgeleid.
+
+### Voorbeelden uit een bibliotheek
+
+Kies in **Overzicht** een regel en open **Voorbeeld…**. Via **Bibliotheek…** kies
+je de bijbehorende voorbeeldenbibliotheek in DWG-formaat.
+
+- **Uit tekening** gebruikt de brongeometrie.
+- **Automatisch** kiest een passend voorbeeld als er één duidelijke keuze is
+  en de bronkleuren behouden blijven. Bij bemonsterde symbolen blijft de
+  werkelijke bronvorm leidend.
+- Een zelf gekozen bibliotheekvoorbeeld gebruikt zijn eigen weergave.
+- **Als nieuwe regel** voegt het voorbeeld toe als eigen regel zonder bronhoeveelheid.
+
+Samengestelde voorbeelden bewaren hun lijnen, arceringen, symbolen en codes
+met de onderlinge afstanden en schaal. Gebruikte voorbeelden worden in de DWG
+bewaard en zijn na heropenen ook zonder de bibliotheek beschikbaar. Voor een
+nieuw voorbeeld heb je het bibliotheekbestand wel nodig.
+
+Als de bibliotheek is gewijzigd, gebruikt Toepassen of Bijwerken de nieuwe
+versie van het gekozen voorbeeld. Andere legenda's veranderen pas wanneer je
+die zelf bijwerkt. Blokken en stijlen van het voorbeeld blijven gescheiden
+van gelijknamige onderdelen in de tekening.
+
+Bedrijfseigen bibliotheken zitten niet in de openbare installer. Neem je
+bibliotheek mee naar een andere computer en kies daar het nieuwe pad. Een
+gewone DWG zonder voorbeeldencatalogus kan niet als bibliotheek worden gebruikt.
+
+## Bijwerken en keuzes bewaren
+
+### Een gewijzigde tekening verwerken
+
+Kies **Bijwerken** om de legenda opnieuw op dezelfde plaats te tekenen. Je
+instellingen, uitsluitingen, eigen teksten en handmatige volgorde blijven
+voor bestaande bronobjecten bewaard, ook na een kleur- of stijlwijziging.
+Een selectielegenda blijft dezelfde bronselectie gebruiken.
+
+Vooraf zie je welke regels worden toegevoegd, verdwijnen, splitsen of
+samengaan. Ook gewijzigde voorbeelden en bronmeldingen staan in dit overzicht.
+Controleer de wijzigingen voordat je doorgaat. Annuleren laat de vorige legenda
+staan. Bij Alles bijwerken verschijnt deze controle ook.
+
+![Wijzigingen bekijken voordat de legenda wordt bijgewerkt](bijwerken.png)
+
+Zonder vaste samenstelling worden nieuwe bronregels volgens je opgeslagen
+filters toegevoegd. Met een vaste samenstelling blijven ze eerst voorstellen.
+Een volledig uitgevinkte legenda blijft beschikbaar om later weer aan te vullen.
+
+### Goedgekeurde samenstelling vastzetten
+
+Gebruik **Samenstelling vastzetten** als de lijst op het blad is goedgekeurd
+en nieuwe bronobjecten niet ongemerkt extra regels mogen opleveren.
+
+Bijwerken houdt de bestaande regels en hun bronvolgende voorbeelden actueel.
+Nieuwe automatische regels verschijnen als voorstel. Keur alleen de gewenste
+regels goed in het venster Samenstelling vastzetten. Eigen regels die je zelf
+toevoegt zijn al een bewuste keuze.
+
+![Een vaste samenstelling met nieuwe voorstellen](vaste-samenstelling.png)
+
+Een vaste samenstelling is niet hetzelfde als een vastgezet voorbeeld. De
+samenstelling bepaalt **welke regels** erin staan. De voorbeeldkeuze bepaalt
+**of hun uiterlijk de bron volgt**.
+
+Bewuste uitsluitingen en verborgen of niet-plottende bronlagen houden voorrang.
+Zet het vastzetten uit om de samenstelling weer automatisch te laten bepalen.
+Gebruik op alle werkplekken versie 1.40 of hoger om deze keuzes te bewerken.
+Bij opslaan wordt oudere legenda-opslag omgezet. Oudere plug-ins kunnen die
+nieuwe opslag niet bewerken.
+
+### Ontbrekende bronnen of onduidelijke koppelingen
+
+Als een bron ontbreekt of is ontladen, kan de vorige regel bewaard blijven met
+de toevoeging **(bron ontbreekt of uitgeschakeld)**. Er wordt dan geen actuele
+hoeveelheid ingevuld. **Vorige regels bewaren** staat standaard aan. Zet dit
+uit als je deze regels niet wilt behouden. Bewuste uitsluitingen en verborgen
+of niet-plottende bronlagen blijven voorgaan.
+
+Kan de plug-in een oude regel niet aan één huidige bron koppelen, dan blijft
+het vorige voorbeeld staan. Open **Overzicht → Bron koppelen**. De lijst toont
+mogelijke bronnen met objectsoort, symbool, status en weergave. Bekijk de
+voorbeelden in CAD en kies welke bron bij de regel hoort. Je kunt daarbij
+kiezen of het oude voorbeeld moet blijven staan.
+
+Na koppelen verdwijnt de losse bewaarde regel. De bronkeuze wordt in de DWG
+opgeslagen. Keur bij een splitsing pas daarna eventuele extra regels goed.
+
+### Opnieuw beginnen met Resetten
+
+**Resetten** vervangt na bevestiging de lokale instellingen en samenstelling
+door de huidige globale standaard. Ook een vastgezette samenstelling wordt
+gewist. Naam, bronselectie en plaats blijven behouden. Andere legenda's
+veranderen niet.
+
+Gebruik Resetten dus alleen als je die eigen keuzes wilt laten vervallen.
+Voor een gewijzigd ontwerp gebruik je **Bijwerken**. Voor alleen de
+templateopmaak gebruik je **Templateopmaak herstellen**.
+
+## De legenda op een tekenblad
+
+### Een viewport rond de legenda
+
+Laat de legenda in modelruimte staan en ga naar de gewenste layout. Kies
+**Viewport** om een gekoppeld legendavenster te maken op de ingestelde schaal.
+Je kunt het venster plaatsen, zelf een kader tekenen of met **Bestaand** een
+bestaand legendavenster koppelen.
+
+Standaard wijs je de **linkerbovenhoek** aan. Onder **Lokale instellingen →
+Legenda → Viewport** kun je het **middelpunt** kiezen. Dat gekozen punt blijft
+op zijn plaats als een automatisch kader groter wordt.
+
+Het gekoppelde legendavenster blijft vergrendeld en volgt een schaalwijziging
+van de legenda. Een handmatig getekend kader houdt zijn papierafmetingen.
+De marge kan worden verkleind om de inhoud te laten passen. Een te klein
+kader geeft een melding zonder de schaal te veranderen. Bij bijwerken geldt
+ook de keuze **Binnen het bestaande legendavenster blijven**.
+
+Zowel getekende als automatisch geplaatste kaders komen standaard op
+**VIEWPORT-NOPLOT**, met plotten uit. Laagnaam en plotinstelling zijn aanpasbaar.
+Bedenk dat de plotinstelling geldt voor alle objecten op die laag.
+Andere viewports worden niet aangepast.
+
+### Verplaatsen tussen modelruimte en papierruimte
+
+Met **Naar model of layout** verplaats je de beheerde legenda zelf:
+
+1. Ga naar de modelruimte of layout waar de legenda moet komen.
+2. Werk je nog binnen een kaartvenster, ga dan met `PSPACE` naar papierruimte.
+3. Kies **Naar model of layout**, kies de legenda en wijs het nieuwe linkerbovenpunt aan.
+
+Papiermaten, inhoud, volgorde en instellingen blijven behouden. Gaat de legenda
+rechtstreeks naar papierruimte, dan wordt het gekoppelde legendavenster
+verwijderd. De kaartvensters blijven staan. De legenda kan daarna normaal
+worden bijgewerkt.
+
+In papierruimte staat bij de legenda **Voorbeelden schematisch**. De schaal
+voor kaart en schaalbalk blijft afzonderlijk bewaard.
+
+## Meerdere legenda's en tekenbladen
+
+### Legenda's beheren
+
+Via **Legenda's** op het lint open je het beheer. Je kunt legenda's bijwerken,
+hernoemen, opzoeken, verwijderen en dupliceren. Elke legenda heeft haar eigen
+bronselectie en instellingen.
+
+In het beheer kun je ook de bronselectie wijzigen, instellingen van een andere
+legenda overnemen of de opzet als globale standaard bewaren. Een lokale
+instellingswijziging bouwt die legenda opnieuw op. Gewiste legenda's tellen
+niet mee bij het kiezen. Na Undo zijn ze weer beschikbaar.
+
+**Opschonen** verwijdert alleen lege registraties zonder regels, eigen inhoud,
+groepsgeometrie of gekoppeld venster. Een legenda met bewaarde regels wegens
+een ontbrekende bron wordt niet als leeg verwijderd.
+
+### Bladen vergelijken
+
+**Bladen vergelijken** leest legenda's in andere gekozen DWG's zonder die
+bestanden te wijzigen. De vergelijking gebruikt bronlaag, objectsoort,
+symboolsoort en status. Verschillende statussen blijven afzonderlijk.
+
+Voor eigen regels of verschillend benoemde bronnen vul je een gedeelde
+**Onderdeelnaam voor vergelijking tussen bladen** in. Dat kan via Regel
+aanpassen of Gekoppeld voorbeeld. Gebruik op de betrokken bladen dezelfde naam.
+
+De lijst toont afwijkende omschrijvingen en weergaven. Vink een bewuste
+uitzondering aan en sla die op. De keuze blijft in de huidige DWG bewaard.
+Verandert de betrokken tekst of weergave later, dan wordt de afwijking opnieuw
+gemeld. Regels zonder bruikbare bronkoppeling of gedeelde onderdeelnaam worden
+als niet vergeleken aangegeven.
+
+### Profielen bewaren en delen
+
+Met **Profielen** bewaar je een opzet voor later. Bij Opslaan en Laden kies je
+**Legenda** voor de gekozen legenda of **Standaard** voor nieuwe legenda's.
+Standaard werkt ook zonder geplaatste legenda.
+
+Exporteer een profiel naar een JSON-bestand om instellingen met een collega
+te delen. Een profiel bevat geen CAD-geometrie of koppelingen naar afzonderlijke
+bronobjecten. Bewaar de DWG als je eigen voorbeelden en bronkoppelingen wilt
+hergebruiken. Gebruikte bibliotheekvoorbeelden blijven in die DWG aanwezig.
 
 ### Projectomschrijvingen delen
 
-Onder **Teksten** kies je een projectbestand met **Projectbestand kiezen…** of maak je er een met
-**Projectbestand opslaan…**. Selecteer hetzelfde bestand bij andere legenda’s om korte
-projectnamen te delen, bijvoorbeeld Rijbaan of een projectspecifieke naam voor een drain.
-De bronlagen en bloknamen blijven gelijk. Een eigen omschrijving per variant of in de
-lokale omschrijvingen gaat vóór het projectbestand. Kies het projectbestand alleen als
-globale standaard wanneer het ook voor nieuwe legenda’s moet gelden.
+Onder **Teksten** kies je een bestand met **Projectbestand kiezen…** of maak
+je er een met **Projectbestand opslaan…**. Selecteer hetzelfde bestand bij
+andere legenda's om projectomschrijvingen te delen. Bronlagen en bloknamen
+blijven gelijk.
 
-Het bestand moet bereikbaar blijven; bij een ontbrekend of ongeldig bestand blijft de
-vorige legenda behouden en wordt de oorzaak gemeld. Neem het bestand mee naar een andere
-computer en kies daar het nieuwe pad. Het [voorbeeldbestand](../deploy/projectomschrijvingen.sample.json)
-bevat omschrijvingen en optionele aliassen voor beheerders. **Leesbare beheerdernamen**
-verkort bekende namen in de zichtbare tekst. De volledige bronnaam blijft in de brongegevens. Met **Beheerdernamen in de legenda tonen**
-kun je deze toevoeging afzonderlijk aan- of uitzetten, ook bij gekozen KLIC-tekstvelden.
+Een eigen omschrijving per variant of in de lokale omschrijvingen gaat vóór
+het projectbestand. Kies het bestand alleen in de globale standaard als het
+ook voor nieuwe legenda's moet gelden.
 
-Onder **Legenda → Detailniveau** zetten **Compacte lijnregels** en **Gedetailleerde lijnregels** de
-keuzes voor diameter, materiaal, nummer en het tonen van samengevoegde waarden tegelijk.
-Leidingsoorten en statussen blijven apart; symboolkeuzes worden niet veranderd.
-Voor Info en Overig toont Broncontrole alleen functies die uit de bronlaag zijn af te
-leiden. Geef een eigen tekst via Regel aanpassen als de bron onvoldoende betekenis geeft.
+Het projectbestand moet bereikbaar blijven. Bij een ontbrekend of ongeldig
+bestand wordt de oorzaak gemeld en blijft de vorige legenda staan. Neem het
+bestand mee naar een andere computer en kies daar het nieuwe pad.
+Het [voorbeeldbestand](../deploy/projectomschrijvingen.sample.json) bevat
+omschrijvingen en optionele alternatieve namen voor beheerders.
 
-## Export gebruiken
+**Leesbare beheerdernamen** verkort bekende namen in de zichtbare tekst.
+De volledige bronnaam blijft in de gegevens beschikbaar. Met **Beheerdernamen
+in de legenda tonen** zet je de toevoeging aan of uit, ook bij gekozen KLIC-tekstvelden.
 
-**Exporteren** schrijft de gekozen legenda naar CSV en JSON naast de DWG.
-Zonder legenda gebruikt het de globale standaard voor de hele tekening.
-**Exporteer lijst** in Overzicht laat je een bestand kiezen en neemt alleen de
-zichtbare regels mee. **Batch** gebruikt de globale standaard voor alle DWG’s
-direct in de gekozen map; bronbestanden worden niet gewijzigd.
+## KLIC-gegevens bekijken
 
-CSV gebruikt puntkomma’s, UTF-8 en numerieke meetkolommen met een decimale punt.
-De kolom Hoeveelheid gebruikt Nederlandse getalnotatie. Kies bij import in een
-spreadsheet de passende notatie. De oorspronkelijke Omschrijving blijft bestaan;
-Legenda-omschrijving bevat ook netbeheerders en de gekozen KLIC-eigenschappen.
-Bronlagen noemt de oorspronkelijke lagen, inclusief xref-voorvoegsels. Die twee
-kolommen staan achteraan, na eventuele KLIC-kolommen.
+De plug-in leest beschikbare KLIC-gegevens uit de hoofdtekening en uit xrefs,
+ook als die genest zijn. InfraCAD Map kan deze gegevens opslaan in ingebedde
+tabellen, Property Sets of Object Data. Voor Object Data is Civil 3D/Map nodig.
+In gewone AutoCAD kunnen aanvullende gegevens ontbreken.
 
-JSON bevat dezelfde oorspronkelijke en getoonde omschrijving en een lijst `bronlagen`.
-Een onbekend oppervlak blijft leeg in de numerieke CSV-kolom en is `null` in JSON;
-de bronmelding verklaart waarom. Handmatige regels hebben geen gemeten hoeveelheid.
+Open **Overzicht → KLIC-details** of dubbelklik op een regel om de gelezen
+waarden te bekijken. Je ziet per bron en tabel de gegevens, objectnummers
+(handles), voorzorgsmaatregelen en eventuele bijlagen.
 
-## Werken zonder venster
+Bij **KLIC-instellingen** maak je drie verschillende keuzes:
 
-In AutoCAD Core Console werken INFO, EXPORT en UPDATE. Venstercommando’s weigeren
-daar zonder wijziging. Bij meerdere legenda’s kies je voor UPDATE en EXPORT vooraf
-`NLCSLEGENDA_TARGET` als omgevingsvariabele: een legenda-id of unieke naam.
-Zonder die keuze wordt niet willekeurig een legenda gekozen.
+| Onderdeel | Wat stel je in? |
+| --- | --- |
+| Overzicht en export | Welke velden als kolommen en in de lijstexport verschijnen. |
+| Legenda-omschrijving | Welke eigenschappen achter de omschrijving in de legenda komen. |
+| Afzonderlijke regels | Welke extra eigenschappen een eigen legendaregel opleveren. |
 
-Core Console heeft niet alle objectondersteuning van Civil 3D/Map. Controleer
-KLIC-proxyobjecten en Object Data daarom in de volledige host; zie
-[KLIC-gegevens](klic-bronnen.md).
+Het zoekfilter in Overzicht verandert alleen de lijst en de lijstexport.
+Diameter en materiaal stel je centraal in onder **Samenvoegen**. Daarvoor hoef
+je geen extra veld onder Afzonderlijke regels te kiezen.
 
-### Bronkleuren en opmerkingen
+Met **Gegevensbron** bepaal je welke opslagvorm voorrang krijgt. Ontbreekt een
+veld daar, dan wordt een andere beschikbare bron gelezen. Een bestaande maar
+lege waarde wordt niet vervangen door een waarde uit een andere bron.
+Verschillende gevonden waarden blijven zichtbaar.
 
-De legenda leest kleuren van de objecten en lagen, inclusief xref-laagkleuren.
-Een automatisch templatevoorbeeld wordt alleen gebruikt als zijn kleuren bij de
-bron passen. Anders blijft de bronweergave behouden. Een via **Overzicht → Voorbeeld**
-expliciet gekozen voorbeeld gebruikt wel zijn eigen weergave.
+Een nulwaarde is geen gemeten diepte. Een standaarddiepte wordt apart benoemd.
+De plug-in stelt niet vast waar kabels en leidingen werkelijk in het terrein
+liggen. De eerste analyse van Object Data in xrefs kan langer duren doordat
+de veldindeling uit een tijdelijke bronkopie wordt gelezen. De bron-DWG hoeft
+je daarvoor niet zelf te openen.
 
-De opmerkingenkop volgt de koppenlaag **X-XX-AL-LEGENDA-T50**, standaard ACI 130 zoals in de template. Een eigen kleur via de Layer Manager blijft bij bijwerken behouden. In **Opmerkingen** kies je tekeningnotities,
-de KLIC-waarschuwing, beide samen of eigen tekst. Klik **Tekst overnemen** en pas
-de tekst aan. De algemene teksten komen uit de TAUW-template; projectspecifieke
-beplantingslijsten worden niet als algemene standaard overgenomen.
+De tekst `TYPE \ LABEL \ OMSCHRIJVING` bij lege KLIC-attributen wordt standaard
+weggelaten. Werkelijke objectgegevens blijven beschikbaar. Meer uitleg over
+bronkeuze en gegevens staat bij [KLIC-gegevens](klic-bronnen.md).
 
+## Hoeveelheden en export
+
+**Overzicht** toont aantallen, lengtes en oppervlakken van de gekozen regels.
+Bij **Hoeveelheden** stel je in wat op de legenda komt.
+
+Staat er `? m²`, dan kan AutoCAD van een bronarcering geen betrouwbaar oppervlak
+bepalen. Ook een totaal met een onbekend deel wordt als onbekend getoond.
+Onder **Overzicht → Broncontrole** vind je de laag en het object. Herstel de
+broncontour en werk de legenda bij.
+
+| Functie | Uitvoer |
+| --- | --- |
+| **Exporteren** | De gekozen legenda als CSV en JSON naast de DWG. Zonder legenda wordt de hele tekening met de globale standaard gebruikt. |
+| **Exporteer lijst** in Overzicht | Alleen de zichtbare regels naar een bestand dat je zelf kiest. |
+| **Batch** | Eén uittrekstaat van de DWG's direct in een gekozen map, met de globale standaard en een kolom Tekening. |
+
+Batch leest de tekeningen zonder ze in een tekenvenster te openen of te wijzigen.
+Een onleesbare tekening wordt overgeslagen en gemeld.
+
+CSV gebruikt puntkomma's als kolomscheiding en UTF-8 als tekstcodering.
+De numerieke meetkolommen gebruiken een
+decimale punt. De kolom Hoeveelheid gebruikt Nederlandse getalnotatie. Kies bij
+het importeren in een spreadsheet de passende notatie.
+
+De oorspronkelijke kolom Omschrijving blijft behouden. Legenda-omschrijving
+bevat de tekst zoals die wordt getoond, inclusief gekozen KLIC-eigenschappen
+en netbeheerders. Bronlagen noemt de oorspronkelijke lagen met xref-voorvoegsels.
+Deze twee kolommen staan achter de eventuele KLIC-kolommen.
+
+JSON bevat dezelfde gegevens en een lijst `bronlagen`. Een onbekend oppervlak
+blijft leeg in de numerieke CSV-kolom en is `null` in JSON. De bronmelding legt
+uit waarom. Eigen regels hebben geen gemeten bronhoeveelheid.
 
 ## Plug-in bijwerken
 
-**Updates controleren** (`NLCSLEGENDAUPDATES`) toont de geïnstalleerde versie,
-de nieuwste stabiele release en de wijzigingen. Kies zelf of je downloadt,
-uitstelt of deze versie overslaat. De automatische opstartcontrole kan hier uit.
-Deze voorkeur staat los van tekeningen en legendaprofielen.
+**Bijwerken** vernieuwt een legenda. **Updates controleren** controleert de
+versie van de plug-in zelf.
+
+Open **Updates controleren** om de geïnstalleerde versie, de nieuwste stabiele
+release en de wijzigingen te zien. Je kiest zelf of je downloadt, uitstelt of
+een versie overslaat. Hier kun je ook **Bij opstarten controleren** uitzetten.
+Die voorkeur geldt voor jouw Windows-gebruiker en staat los van de legenda-instellingen.
 
 Na downloaden vraagt een apart venster om je werk op te slaan en alle CAD-sessies
-te sluiten. De installatie wacht; daarna start je Civil 3D opnieuw. Zie
-[Installeren en bijwerken](installatie.md#vanuit-de-plug-in) voor de controles,
-handmatige route en foutmeldingen.
+te sluiten. Pas daarna kan de installatie doorgaan. Start Civil 3D vervolgens
+opnieuw. Zie [Installeren en bijwerken](installatie.md#vanuit-de-plug-in) voor de stappen.
+
+## Commando's
+
+De meeste functies zijn ook bereikbaar via het lint **NLCS Legenda**.
+
+| Commando | Functie |
+| --- | --- |
+| `NLCSLEGENDA` | Een legenda maken van de tekening, een selectie of een blanco opzet. |
+| `NLCSLEGENDAUPDATE` | De gekozen legenda bijwerken met behoud van keuzes. |
+| `NLCSLEGENDARESET` | Na bevestiging opnieuw beginnen met de globale standaard. |
+| `NLCSLEGENDABEHEER` | Legenda's beheren, dupliceren en hun bron of instellingen wijzigen. |
+| `NLCSLEGENDAINFO` | Overzicht openen, hoeveelheden bekijken en regels ordenen. |
+| `NLCSLEGENDASAMENSTELLEN` | Regels kiezen en eigen regels toevoegen. |
+| `NLCSLEGENDAUITVINKEN` | Bronobjecten aanklikken om hun legendaregel uit te sluiten. |
+| `NLCSLEGENDATOEVOEGEN` | Een eigen regel toevoegen met een gekozen type, laag en omschrijving. |
+| `NLCSLEGENDAOVERNEMEN` | Een getekende tekst en voorbeeld als blijvende regel overnemen. |
+| `NLCSLEGENDAVASTZETTEN` | De samenstelling vastzetten en nieuwe voorstellen beoordelen. |
+| `NLCSLEGENDAVOORBEELDKOPPELEN` | Een bronobject of Civil 3D-profielonderdeel koppelen. |
+| `NLCSLEGENDAELEMENT` | Voor één object bekijken waarom het wel of niet meetelt. |
+| `NLCSLEGENDABRONCONTROLE` | Bronmeldingen en redenen voor ontbrekende regels bekijken. |
+| `NLCSLEGENDABRONVENSTER` | Kaartvensters als brongebied kiezen. |
+| `NLCSLEGENDAXREFS` | Per xref kiezen of die meetelt. |
+| `NLCSLEGENDAOPTIES` | Lokale instellingen van een bestaande legenda aanpassen. |
+| `NLCSLEGENDASTANDAARD` | De standaard voor nieuwe legenda's aanpassen. |
+| `NLCSLEGENDAOMSCHRIJVINGEN` | Omschrijvingen in een tabel bewerken. |
+| `NLCSLEGENDATEKST` | De tekst van een aangeklikt element aanpassen. |
+| `NLCSLEGENDASTATUS` | Eigen statussen maken en regels toewijzen. |
+| `NLCSLEGENDALAAGNAAM` | Een NLCS-laagnaam per onderdeel bewerken en de laag hernoemen. |
+| `NLCSLEGENDAVIEWPORT` | Een legendavenster op de layout maken of koppelen. |
+| `NLCSLEGENDAVERPLAATSEN` | Een legenda tussen modelruimte en papierruimte verplaatsen. |
+| `NLCSLEGENDAVERGELIJKEN` | Teksten en voorbeelden tussen tekenbladen vergelijken. |
+| `NLCSLEGENDAPRESET` | Instellingen als profiel bewaren, laden, exporteren of importeren. |
+| `NLCSLEGENDAEXPORT` | Een legenda naar CSV en JSON exporteren. |
+| `NLCSLEGENDABATCH` | Een uittrekstaat maken van DWG's in een map. |
+| `NLCSLEGENDACONFIG` | De globale instellingenbestanden aanmaken en hun paden tonen. |
+| `NLCSLEGENDAUPDATES` | Op een nieuwe plug-inversie controleren. |
+| `NLCSLEGENDAHELP` | De ingebouwde uitleg en geladen versie bekijken. |
+
+## Aanvullende informatie
+
+### Instellingenbestanden
+
+De globale bestanden staan in `%APPDATA%\NlcsLegenda\settings.json` en
+`omschrijvingen.json`. **Bestanden** toont de paden. Voor normaal gebruik pas je
+de instellingen via de vensters aan. Voorbeelden staan bij
+[instellingen](../deploy/settings.sample.json) en
+[omschrijvingen](../deploy/omschrijvingen.sample.json).
+
+Onder **Legenda → Detailniveau** zetten **Compacte lijnregels** en
+**Gedetailleerde lijnregels** de keuzes voor diameter, materiaal, nummer en het
+tonen van samengevoegde waarden tegelijk. Leidingsoorten en statussen blijven
+apart. Symboolkeuzes veranderen niet. Bij Info en Overig kan de plug-in alleen
+benoemen wat uit de bronlaag is af te leiden. Geef zelf een omschrijving als
+die informatie onvoldoende is.
+
+Een arcering die in het eigen vlak ongelijk is geschaald, kan niet met één patroonhoek
+en schaal worden weergegeven. In dat geval stopt het maken of bijwerken met
+een melding. Een afwijkende schaal loodrecht op het vlak is wel toegestaan.
+
+### Werken zonder venster
+
+In AutoCAD Core Console werken INFO, EXPORT en UPDATE. Functies die een venster
+nodig hebben, worden daar niet uitgevoerd. Kies bij meerdere legenda's voor
+UPDATE en EXPORT vooraf de omgevingsvariabele `NLCSLEGENDA_TARGET`. De waarde
+is een legenda-id of unieke naam. Zonder die keuze wordt niet willekeurig
+een legenda gebruikt.
+
+Core Console heeft niet alle objectondersteuning van Civil 3D/Map. Controleer
+KLIC-proxyobjecten en Object Data daarom in Civil 3D/Map zelf.
+De [diagnostische commando's](diagnostische-commandos.md) zijn bedoeld voor
+testtekeningen, niet voor dagelijks ontwerpwerk.
