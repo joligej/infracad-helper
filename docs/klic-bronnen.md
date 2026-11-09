@@ -1,27 +1,35 @@
 # KLIC-gegevens en groepering
 
+[Handleiding](handleiding.md#klic-gegevens-bekijken) · [Samenvoegen](handleiding.md#regels-samenvoegen) · [Problemen oplossen](problemen-oplossen.md#klic-gegevens-ontbreken)
+
+KLIC-objecten kunnen extra gegevens bevatten, zoals diameter, materiaal en
+netbeheerder. Op deze pagina lees je waar de plug-in die gegevens vindt en hoe
+je kiest wat in de legenda verschijnt.
+
 ## Gegevens lezen
 
 InfraCAD Map kan dezelfde objectgegevens op meerdere manieren in een DWG bewaren:
 ingebedde XML-tabellen, Property Sets en Object Data. De legenda leest deze opslagvormen
-afzonderlijk en koppelt ze aan de handle in de juiste brontekening, ook bij geneste xrefs.
+afzonderlijk en koppelt ze aan het objectnummer, de handle, in de juiste
+brontekening. Dat werkt ook bij geneste xrefs.
 De bronbestanden worden niet gewijzigd.
 
 In **Overzicht → KLIC-details** staan de waarden met bron, tabel en het aantal bronobjecten.
 **Gebruikt** laat zien welke bron de legenda gebruikt. Onder **Bronobjecten** staan tekening,
 xref en handle. Bij **Bijlagen** kun je een gekoppelde PDF of afbeelding openen. Ontbreekt
-het bestand, dan volgt een melding; de plugin downloadt geen ontbrekende bijlagen.
+het bestand, dan krijg je een melding. De plug-in downloadt geen ontbrekende bijlagen.
 Voorzorgsmaatregelen, toelichtingen en contactverwijzingen staan bij de veldwaarden.
 
-Property Sets vereisen AEC-ondersteuning; Object Data vereist een beschikbare Map-API.
+Voor Property Sets is AEC-ondersteuning nodig. Object Data wordt via de Map-API gelezen.
+Deze ondersteuning is in Civil 3D/Map beschikbaar en kan in gewone AutoCAD ontbreken.
 Object Data wordt ook uit directe en geneste xrefs gelezen. De waarden komen van de
-geladen bronobjecten. Voor de veldnamen opent de plugin bij de eerste analyse een
-tijdelijke, alleen-lezen kopie van de bron-DWG. Deze wordt meteen gesloten en verwijderd;
-de veldindeling blijft beschikbaar zolang de geladen xref ongewijzigd is.
-De hoofdtekening blijft actief en de plugin herlaadt geen xrefs. Een gewijzigde bronversie
+geladen bronobjecten. Voor de veldnamen opent de plug-in bij de eerste analyse een
+tijdelijke, alleen-lezen kopie van de bron-DWG. Die wordt meteen gesloten en verwijderd.
+De gelezen veldindeling blijft beschikbaar zolang de geladen xref ongewijzigd is.
+De hoofdtekening blijft actief en de plug-in herlaadt geen xrefs. Een gewijzigde bronversie
 wordt gemeld, zodat waarden niet aan een verkeerde veldindeling worden gekoppeld.
 De eerste analyse kan daardoor langer duren dan opnieuw bijwerken.
-In Core Console wordt Object Data niet gelezen. In gewone AutoCAD kunnen beide ontbreken.
+In Core Console wordt Object Data niet gelezen.
 Overzicht vermeldt wanneer een aanwezige opslagvorm niet kon worden gecontroleerd.
 Die melding betekent niet dat de overige bronnen ook onleesbaar zijn.
 
@@ -32,7 +40,7 @@ diameter, druk, spanning, KLIC-melding, aanvraagdatum en aanvraagsoort. De gekoz
 verschijnen ook in CSV/JSON. De export vermeldt gebruikte bronnen en bronmeldingen.
 **Exporteer lijst** in Overzicht exporteert alleen de regels die het huidige filter toont.
 Het zoekfilter wijzigt de inhoud van de getekende legenda niet. CSV bevat naast de
-oorspronkelijke omschrijving ook Legenda-omschrijving en Bronlagen; JSON bevat
+oorspronkelijke omschrijving ook Legenda-omschrijving en Bronlagen. JSON bevat
 `omschrijving`, `legendaOmschrijving` en `bronlagen`. Xref-voorvoegsels blijven zichtbaar.
 
 Standaard krijgt de ingebedde InfraCAD-bron voorrang. Met **Gegevensbron** kies je desgewenst
@@ -42,38 +50,44 @@ Ontbreekt het veld, dan geldt de eerste beschikbare bron in de volgorde InfraCAD
 Sets, Object Data. Conflicten binnen dezelfde tabel blijven zichtbaar. Gelijknamige velden
 in verschillende tabellen zijn op zichzelf geen bronconflict.
 
-Een groep met verschillende waarden toont alle varianten. Een ontbrekende waarde wordt
-niet aan andere objecten toegeschreven. Bevat een samengevoegde kabel-/leidingregel ook
-objecten zonder metadata, dan staat bijvoorbeeld **Niet opgegeven; PE** in het overzicht,
-de export en de gekozen legenda-omschrijving. Zonder metadata op alle objecten blijven
+Een groep met verschillende waarden toont alle varianten. Bevat een samengevoegde
+leidingregel bijvoorbeeld objecten met materiaal PE én objecten zonder
+materiaalgegevens, dan zie je zowel **PE** als **Niet opgegeven**. Dat geldt voor
+Overzicht, de export en de gekozen legenda-omschrijving. De waarde PE wordt dus
+niet aan de hele groep toegeschreven. Ontbreken de gegevens bij alle objecten, dan blijven
 de extra velden leeg. DiameterM wordt van meter naar millimeter omgezet.
 Nul of een negatieve waarde bij diameter, diepte, druk en spanning wordt als niet opgegeven
 getoond. **Standaarddiepte (niet gemeten)** blijft onderscheiden van **Opgegeven diepte**.
-De plugin controleert daarmee niet de werkelijke ligging in het terrein.
+De plug-in controleert daarmee niet de werkelijke ligging in het terrein.
 
 ## Regels samenvoegen of uitsplitsen
 
-In **Instellingen → Samenvoegen** betekent een aangevinkt samenvoegkenmerk dat dit kenmerk niet
-wordt vergeleken. **Soorten samenvoegen** staat standaard uit: gas en water blijven
-verschillende soorten. Voor nieuwe KLIC-legenda's staan specificatie (spanning/druk),
-uitvoering, volgnummer, diameter, materiaal en netbeheerder standaard aan. Overige lagen hebben aparte keuzes,
-standaard allemaal uit. Soort, specificatie, uitvoering en volgnummer komen
-uit de NLCS-laagnaam; diameter en materiaal uit de laagnaam of objectgegevens.
-De netbeheerder komt uit de objectgegevens. Per voorbeeldtype zijn afwijkende
-keuzes mogelijk: bijvoorbeeld diameters bij lijnen samenvoegen en bij symbolen apart houden. DATA2 bewijst dus niet wie
-de netbeheerder is. Ook objectgegevens of een bronnaam met KLIC herkennen KLIC-riool onder hoofdgroep RI.
-Bij **Diameters samenvoegen** verliezen de samengevoegde regels geen bronobjecten;
-de afzonderlijke diameters blijven terug te vinden in KLIC-details en de bronlagen.
-Hoeveelheden worden opgeteld; zichtbaar verschillende symbolen of
-arceringen blijven gescheiden.
+Onder **Lokale instellingen → Samenvoegen** betekent een vinkje dat het verschil
+in die eigenschap wordt genegeerd. **Soorten samenvoegen** staat standaard uit.
+Gas en water blijven daardoor verschillende soorten. Voor nieuwe KLIC-instellingen
+staan spanning/druk, uitvoering, volgnummer, diameter, materiaal en netbeheerder
+standaard aan. Overige lagen hebben hun eigen keuzes, standaard allemaal uit.
+
+Soort, spanning/druk, uitvoering en volgnummer komen uit de NLCS-laagnaam.
+Diameter en materiaal worden uit de laagnaam of objectgegevens gelezen.
+De netbeheerder komt uit de objectgegevens. Een naam zoals DATA2 vertelt dus
+niet wie de netbeheerder is. Een rioollaag onder hoofdgroep RI wordt als KLIC
+behandeld als zij KLIC-objectgegevens heeft of uit een bron met KLIC in de naam komt.
+
+Per voorbeeldtype kun je afwijken van de standaard. Je kunt bijvoorbeeld
+diameters bij lijnen samenvoegen en bij symbolen apart houden. De afzonderlijke
+diameters blijven terug te vinden in KLIC-details en de bronlagen. Er gaan geen
+bronobjecten verloren. Hoeveelheden worden opgeteld. Verschillen in kleur en
+voorbeeldvorm blijven bij automatisch samenvoegen onderscheiden.
 
 De diameter- en materiaalkeuzes gelden voor zowel de laagnaam als objectgegevens.
 Een bestaande keuze voor afzonderlijke materialen uit het KLIC-venster wordt
 overgenomen bij **Samenvoegen**. Onder **KLIC-instellingen → Afzonderlijke regels**
-kun je andere extra velden, zoals het thema of de druk, aanvinken. Verschillende combinaties krijgen dan aparte legendaregels, ook als andere
-eigenschappen worden samengevoegd. **Legenda-omschrijving** bepaalt welke veldwaarden achter
-de bestaande omschrijving verschijnen. Standaard zijn beide keuzes leeg; zo blijven bestaande
-legenda's gelijk. De maatvoering en vormgeving volgen de bestaande legenda-instellingen.
+kun je extra velden, zoals thema of druk, aanvinken. Verschillende combinaties
+krijgen dan aparte legendaregels, ook als andere eigenschappen worden samengevoegd.
+**Legenda-omschrijving** bepaalt welke veldwaarden achter de bestaande tekst
+verschijnen. Deze twee lijsten zijn standaard leeg. Bestaande legenda's veranderen
+daardoor niet zonder je keuze. De bestaande opmaak blijft gelden.
 
 **Samengevoegde waarden tonen** voegt de verschillende waarden tussen haakjes toe,
 bijvoorbeeld **Vrijvervalriool (200, 300)**. Zet dit uit voor alleen **Vrijvervalriool**.
@@ -81,23 +95,27 @@ De gegevens blijven dan beschikbaar in Overzicht en KLIC-details.
 
 Elke legenda bewaart haar eigen keuzes. In Overzicht kun je de volgorde op **Handmatig**
 zetten en regels verplaatsen. Bij een actief filter is verplaatsen uitgeschakeld. Bestaande
-regels behouden hun plaats bij bijwerken; nieuwe combinaties worden achteraan toegevoegd.
+regels behouden hun plaats bij bijwerken. Nieuwe combinaties worden achteraan toegevoegd.
 Eigen regels met dezelfde omschrijving maar verschillende voorbeelden houden elk hun positie.
 Eigen en blanco regels vallen buiten automatisch samenvoegen. **Overzicht → Samenvoegen**
-kan zelf gekozen regels combineren met één hoofdobject voor de weergave en een gedeelde titel; blanco
-regels en verschillende eenheden worden geweigerd. **Samenvoeging opheffen** maakt
-de handmatige groep weer los. Eigen regels volgen het statusfilter;
-een toewijzing aan een eigen status heeft voorrang op dat filter.
+combineert zelf gekozen regels. Je kiest één hoofdobject voor het voorbeeld.
+De titel wordt afgeleid van de omschrijvingen. Blanco regels en regels met
+verschillende eenheden worden geweigerd. **Samenvoeging opheffen** maakt de
+groep weer los. Eigen regels volgen het statusfilter. Een toewijzing aan een
+eigen status heeft voorrang op dat filter.
 
 ## Symbolen en attributen
 
 Een gevuld attribuut `OMSCHRIJVING` blijft de bron voor de beschrijving van een KLIC-symbool.
 Per symboollaag wordt de meest voorkomende niet-lege omschrijving gebruikt. `TYPE` herhaalt
-meestal het laag-element; `LABEL` is doorgaans een objectidentificatie. Zijn deze attributen
+meestal het onderdeel uit de laagnaam. `LABEL` is doorgaans een objectnummer. Zijn deze attributen
 leeg, dan kan de generieke tekst `TYPE \ LABEL \ OMSCHRIJVING` worden weggelaten via
 **KLIC-placeholdertekst weglaten**. Werkelijke objectgegevens blijven beschikbaar in KLIC-details.
 
 ## Controle in Civil 3D/Map
+
+Deze controle is bedoeld voor onderzoek naar een probleem. Gebruik voor het
+dagelijks bekijken van gegevens **Overzicht → KLIC-details**.
 
 Open een kopie van een KLIC-brontekening of een hoofdtekening met KLIC-xrefs en voer
 `NLCSLEGENDAMAPDATATEST` uit. De proef analyseert drie keer, waarvan eenmaal met
