@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.44.0 (2026-11-09)
+
+- Symbolen volgen in de legenda hun oorspronkelijke blokstand. De draaiing van een symbool of zijn bron-xref wordt niet meer overgenomen. Schaal en spiegeling blijven behouden.
+- Doorsnedesymbolen houden hun bronstand. De herkenning gebruikt de NLCS-laagcode SD en de blokopties D, SOD, DMM en SODMM. Gekantelde 3D-symbolen worden niet vlak gedraaid.
+- Gekoppelde bronvoorbeelden gebruiken dezelfde symboolstand. Bewust vastgezette voorbeelden, overgenomen regels en Civil 3D-profielvoorbeelden behouden hun gekozen stand. Uitsluitingen en samenvoegkeuzes blijven bewaard.
+
 ## 1.43.0 (2026-11-09)
 
 - De volledige handleiding is offline beschikbaar, met afbeeldingen en een zoekfunctie. De hulp wordt opgebouwd uit dezelfde Markdown-documentatie als op GitHub.

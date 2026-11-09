@@ -504,6 +504,19 @@ De exacte maten en uitzonderingen staan in [Maatvoering](template-maatvoering.md
 
 ### Symbolen en voorbeeldvakken
 
+Symbolen staan in de legenda zoals ze in hun blokdefinitie zijn getekend. Een
+gedraaide plaatsing op de situatie, ook binnen een gedraaide xref, draait het
+legendavoorbeeld dus niet mee. Grootte en spiegeling blijven behouden, ook als de xref in X- en Y-richting verschillend is geschaald.
+
+Doorsnedesymbolen houden hun stand uit de bron. De plug-in herkent de laagcode
+`SD` en de blokopties `D`, `SOD`, `DMM` en `SODMM`. Ook gekantelde 3D-symbolen,
+Civil 3D-profielvoorbeelden en bewust vastgezette of overgenomen voorbeelden
+houden hun gekozen stand.
+
+**Verschillende draairichtingen samenvoegen** bepaalt nog steeds of gedraaide
+bronobjecten één regel vormen. De stand van het legendavoorbeeld staat los van
+die keuze. Zo veranderen bestaande uitsluitingen en bronkoppelingen niet.
+
 Symbolen behouden standaard hun maat uit het model. Een expliciete NLCS-schaalvariant
 wordt omgerekend naar de gekozen legendaschaal. Grote symbolen krijgen meer
 ruimte in hun rij en kolom.
